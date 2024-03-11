@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -30,7 +30,6 @@ pub struct IndexingLocalConfig {
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,
     pub warc_source: WarcSource,
-    pub batch_size: Option<usize>,
     pub page_webgraph_path: Option<String>,
     pub host_centrality_threshold: Option<f64>,
     pub topics_path: Option<String>,
@@ -38,6 +37,20 @@ pub struct IndexingLocalConfig {
     pub page_centrality_store_path: Option<String>,
     pub safety_classifier_path: Option<String>,
     pub minimum_clean_words: Option<usize>,
+
+    #[serde(default = "defaults::Indexing::batch_size")]
+    pub batch_size: usize,
+
+    pub dual_encoder: Option<IndexingDualEncoderConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct IndexingDualEncoderConfig {
+    pub model_path: String,
+
+    /// Only compute embeddings for pages that has a
+    /// centrality rank less than this threshold
+    pub page_centrality_rank_threshold: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -201,6 +214,7 @@ pub struct ApiConfig {
     pub prometheus_host: SocketAddr,
     pub crossencoder_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
+    pub dual_encoder_model_path: Option<String>,
     pub spell_checker_path: Option<String>,
     pub bangs_path: String,
     pub query_store_db_host: Option<String>,
@@ -272,6 +286,7 @@ pub struct SearchServerConfig {
     pub host_centrality_store_path: Option<String>,
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
+    pub dual_encoder_model_path: Option<String>,
     pub host: SocketAddr,
 
     #[serde(default)]

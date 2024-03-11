@@ -45,7 +45,7 @@ pub async fn click(
         q.lock().await.push(ImprovementEvent::Click {
             qid: params.qid,
             idx: params.click,
-        })
+        });
     }
 }
 

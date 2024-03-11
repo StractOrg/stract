@@ -400,7 +400,7 @@ mod tests {
         let mut index = Index::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -424,7 +424,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"

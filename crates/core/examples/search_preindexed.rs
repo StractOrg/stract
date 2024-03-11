@@ -9,7 +9,7 @@ use stract::{
     image_store::Image,
     index::Index,
     inverted_index::RetrievedWebpage,
-    ranking::{inbound_similarity::InboundSimilarity, pipeline::RetrievedWebpageRanking},
+    ranking::{inbound_similarity::InboundSimilarity, pipeline::PrecisionRankingWebpage},
     searcher::{api::ApiSearcher, live::LiveSearcher, LocalSearcher, SearchQuery, ShardId},
     Result,
 };
@@ -30,9 +30,9 @@ impl stract::searcher::distributed::SearchClient for Searcher {
 
     async fn retrieve_webpages(
         &self,
-        top_websites: &[(usize, stract::searcher::ScoredWebsitePointer)],
+        top_websites: &[(usize, stract::searcher::ScoredWebpagePointer)],
         query: &str,
-    ) -> Vec<(usize, stract::ranking::pipeline::RetrievedWebpageRanking)> {
+    ) -> Vec<(usize, stract::ranking::pipeline::PrecisionRankingWebpage)> {
         let pointers = top_websites
             .iter()
             .map(|(_, p)| p.website.pointer.clone())
@@ -44,7 +44,7 @@ impl stract::searcher::distributed::SearchClient for Searcher {
             .unwrap()
             .into_iter()
             .zip(top_websites.iter().map(|(i, p)| (*i, p.website.clone())))
-            .map(|(ret, (i, ran))| (i, RetrievedWebpageRanking::new(ret, ran)))
+            .map(|(ret, (i, ran))| (i, PrecisionRankingWebpage::new(ret, ran)))
             .collect::<Vec<_>>();
 
         res
@@ -99,6 +99,7 @@ pub async fn main() {
         prometheus_host: "0.0.0.0:8001".parse().unwrap(),
         crossencoder_model_path: None,
         lambda_model_path: None,
+        dual_encoder_model_path: None,
         spell_checker_path: Some("data/web_spell".to_string()),
         bangs_path: "data/bangs.json".to_string(),
         summarizer_path: "data/summarizer".to_string(),
@@ -142,14 +143,14 @@ pub async fn main() {
     let searcher = Searcher(searcher);
 
     let searcher: ApiSearcher<Searcher, LiveSearcher> =
-        ApiSearcher::new(searcher, None, None, None, bangs, config);
+        ApiSearcher::new(searcher, None, None, None, None, bangs, config);
 
     for query in &queries {
         let mut desc = "search '".to_string();
         desc.push_str(query);
         desc.push('\'');
 
-        println!("{}", desc);
+        println!("{desc}");
 
         searcher
             .search(&SearchQuery {

@@ -76,8 +76,8 @@ impl Index {
         Ok(s)
     }
 
-    pub fn insert(&self, webpage: Webpage) -> Result<()> {
-        if let Ok(region) = Region::guess_from(&webpage) {
+    pub fn insert(&self, webpage: &Webpage) -> Result<()> {
+        if let Ok(region) = Region::guess_from(webpage) {
             let mut reg = self.region_count.lock().unwrap_or_else(|e| e.into_inner());
             reg.increment(&region);
         }
@@ -121,14 +121,14 @@ impl Index {
 
     pub fn retrieve_websites(
         &self,
-        websites: &[inverted_index::WebsitePointer],
+        websites: &[inverted_index::WebpagePointer],
         query: &Query,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
         self.inverted_index.retrieve_websites(websites, query)
     }
 
     pub fn merge(self, other: Self) -> Self {
-        self.inverted_index.merge(other.inverted_index);
+        let _ = self.inverted_index.merge(other.inverted_index);
 
         let mut self_region_count = self
             .region_count
@@ -165,7 +165,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>
@@ -186,7 +186,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>
@@ -207,7 +207,7 @@ mod tests {
             .expect("failed to insert webpage");
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>

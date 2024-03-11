@@ -27,7 +27,7 @@ use crate::{
     combine_u64s,
     config::CollectorConfig,
     fastfield_reader,
-    inverted_index::{DocAddress, WebsitePointer},
+    inverted_index::{DocAddress, WebpagePointer},
     prehashed::Prehashed,
     ranking::initial::{InitialScoreTweaker, Score},
     schema::FastField,
@@ -139,10 +139,13 @@ pub struct TopSegmentCollector {
 }
 
 impl TopSegmentCollector {
-    fn get_hash(&self, doc: &DocId, field1: &FastField, field2: &FastField) -> Prehashed {
+    fn get_hash(&self, doc: DocId, field1: FastField, field2: FastField) -> Prehashed {
         let field_reader = self.fastfield_segment_reader.get_field_reader(doc);
 
-        let hash = [field_reader.get(field1), field_reader.get(field2)];
+        let hash = [
+            field_reader.get(field1).unwrap().as_u64().unwrap(),
+            field_reader.get(field2).unwrap().as_u64().unwrap(),
+        ];
         combine_u64s(hash).into()
     }
 }
@@ -165,19 +168,20 @@ impl TopSegmentCollector {
 
         let simhash: Option<u64> = self
             .fastfield_segment_reader
-            .get_field_reader(&doc)
-            .get(&FastField::SimHash)
+            .get_field_reader(doc)
+            .get(FastField::SimHash)
+            .unwrap()
             .into();
 
         self.bucket_collector.insert(SegmentDoc {
             hashes: Hashes {
-                site: self.get_hash(&doc, &FastField::SiteHash1, &FastField::SiteHash2),
-                title: self.get_hash(&doc, &FastField::TitleHash1, &FastField::TitleHash2),
-                url: self.get_hash(&doc, &FastField::UrlHash1, &FastField::UrlHash2),
+                site: self.get_hash(doc, FastField::SiteHash1, FastField::SiteHash2),
+                title: self.get_hash(doc, FastField::TitleHash1, FastField::TitleHash2),
+                url: self.get_hash(doc, FastField::UrlHash1, FastField::UrlHash2),
                 url_without_tld: self.get_hash(
-                    &doc,
-                    &FastField::UrlWithoutTldHash1,
-                    &FastField::UrlWithoutTldHash2,
+                    doc,
+                    FastField::UrlWithoutTldHash1,
+                    FastField::UrlWithoutTldHash2,
                 ),
                 simhash: simhash.unwrap(),
             },
@@ -382,7 +386,7 @@ impl<TScoreTweaker> Collector for TweakedScoreTopCollector<TScoreTweaker>
 where
     TScoreTweaker: ScoreTweaker<Score> + Send + Sync,
 {
-    type Fruit = Vec<WebsitePointer>;
+    type Fruit = Vec<WebpagePointer>;
 
     type Child = TopTweakedScoreSegmentCollector<TScoreTweaker::Child>;
 
@@ -426,7 +430,7 @@ where
             .into_sorted_vec(self.top_docs.de_rank_similar)
             .into_iter()
             .skip(self.top_docs.offset)
-            .map(|doc| WebsitePointer {
+            .map(|doc| WebpagePointer {
                 score: doc.score,
                 hashes: doc.hashes,
                 address: DocAddress {

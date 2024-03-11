@@ -61,7 +61,7 @@ impl<T> NodeDataRef<T> {
     where
         F: FnOnce(&Node) -> Option<&T>,
     {
-        f(&rc).map(|r| r as *const T).map(move |r| NodeDataRef {
+        f(&rc).map(|r| std::ptr::from_ref::<T>(r)).map(move |r| NodeDataRef {
             _reference: r,
             _keep_alive: rc,
         })
@@ -69,7 +69,7 @@ impl<T> NodeDataRef<T> {
 
     /// Access the corresponding node.
     #[inline]
-    pub fn as_node(&self) -> &NodeRef {
+    #[must_use] pub fn as_node(&self) -> &NodeRef {
         &self._keep_alive
     }
 }
@@ -110,7 +110,7 @@ impl<T: fmt::Debug> fmt::Debug for NodeDataRef<T> {
 
 impl NodeDataRef<ElementData> {
     /// Return the concatenation of all text nodes in this subtree.
-    pub fn text_contents(&self) -> String {
+    #[must_use] pub fn text_contents(&self) -> String {
         self.as_node().text_contents()
     }
 }

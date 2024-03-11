@@ -134,9 +134,9 @@ impl EmptyFieldScorer {
     fn num_tokes(&self, doc: DocId) -> u64 {
         let s: Option<u64> = self
             .segment_reader
-            .get_field_reader(&doc)
-            .get(&self.num_tokens_fastfield)
-            .into();
+            .get_field_reader(doc)
+            .get(self.num_tokens_fastfield)
+            .and_then(|v| v.as_u64());
         s.unwrap_or_default()
     }
 }
@@ -277,9 +277,9 @@ impl NormalPatternScorer {
         let mut slop = 1;
         let num_tokens_doc: Option<u64> = self
             .segment_reader
-            .get_field_reader(&self.doc())
-            .get(&self.num_tokens_field)
-            .into();
+            .get_field_reader(self.doc())
+            .get(self.num_tokens_field)
+            .and_then(|v| v.as_u64());
         let num_tokens_doc = num_tokens_doc.unwrap();
 
         for (i, pattern_part) in self.pattern.iter().enumerate() {

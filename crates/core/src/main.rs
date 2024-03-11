@@ -243,7 +243,7 @@ fn main() -> Result<()> {
         Commands::Indexer { options } => match options {
             IndexingOptions::Search { config_path } => {
                 let config = load_toml_config(config_path);
-                entrypoint::Indexer::run(&config)?;
+                entrypoint::indexer::run(&config)?;
             }
             IndexingOptions::Entity {
                 wikipedia_dump_path,
@@ -258,7 +258,7 @@ fn main() -> Result<()> {
                     .into_iter()
                     .map(entrypoint::indexer::IndexPointer::from)
                     .collect::<Vec<_>>();
-                entrypoint::indexer::Indexer::merge(pointers)?;
+                entrypoint::indexer::merge(pointers)?;
             }
         },
         Commands::Centrality { mode } => {
@@ -299,7 +299,7 @@ fn main() -> Result<()> {
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?
-                    .block_on(webgraph_server::run(config))?
+                    .block_on(webgraph_server::run(config))?;
             }
         },
         Commands::Api { config_path } => {
@@ -308,7 +308,7 @@ fn main() -> Result<()> {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()?
-                .block_on(api::run(config))?
+                .block_on(api::run(config))?;
         }
         Commands::SearchServer { config_path } => {
             let config: config::SearchServerConfig = load_toml_config(config_path);
@@ -316,7 +316,7 @@ fn main() -> Result<()> {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()?
-                .block_on(search_server::run(config))?
+                .block_on(search_server::run(config))?;
         }
         Commands::EntitySearchServer { config_path } => {
             let config: config::EntitySearchServerConfig = load_toml_config(config_path);
@@ -324,7 +324,7 @@ fn main() -> Result<()> {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()?
-                .block_on(entity_search_server::run(config))?
+                .block_on(entity_search_server::run(config))?;
         }
         Commands::AutosuggestScrape {
             num_queries: queries_to_scrape,
@@ -349,7 +349,7 @@ fn main() -> Result<()> {
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?
-                    .block_on(entrypoint::crawler::worker(config))?
+                    .block_on(entrypoint::crawler::worker(config))?;
             }
             Crawler::Coordinator { config_path } => {
                 let config: config::CrawlCoordinatorConfig = load_toml_config(config_path);
@@ -357,7 +357,7 @@ fn main() -> Result<()> {
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?
-                    .block_on(entrypoint::crawler::coordinator(config))?
+                    .block_on(entrypoint::crawler::coordinator(config))?;
             }
             Crawler::Router { config_path } => {
                 let config: config::CrawlRouterConfig = load_toml_config(config_path);
@@ -365,7 +365,7 @@ fn main() -> Result<()> {
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?
-                    .block_on(entrypoint::crawler::router(config))?
+                    .block_on(entrypoint::crawler::router(config))?;
             }
             Crawler::Plan { config_path } => {
                 let config: config::CrawlPlannerConfig = load_toml_config(config_path);
@@ -379,7 +379,7 @@ fn main() -> Result<()> {
                 output_path,
             } => safety_classifier::train(dataset_path, output_path)?,
             SafetyClassifierOptions::Predict { model_path, text } => {
-                safety_classifier::predict(model_path, &text)?
+                safety_classifier::predict(model_path, &text)?;
             }
         },
         Commands::LiveIndex { options } => match options {
@@ -393,7 +393,7 @@ fn main() -> Result<()> {
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?
-                    .block_on(entrypoint::live_index::serve(config))?
+                    .block_on(entrypoint::live_index::serve(config))?;
             }
         },
         Commands::WebSpell { config_path } => {

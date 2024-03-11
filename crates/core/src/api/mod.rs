@@ -31,6 +31,7 @@ use crate::{
     },
     improvement::{store_improvements_loop, ImprovementEvent},
     leaky_queue::LeakyQueue,
+    models::dual_encoder::DualEncoder,
     ranking::models::lambdamart::LambdaMART,
     searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher},
 };
@@ -90,72 +91,8 @@ pub async fn favicon() -> impl IntoResponse {
         .unwrap()
 }
 
-pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
-    let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
-
-    let lambda_model = match &config.lambda_model_path {
-        Some(path) => Some(LambdaMART::open(path)?),
-        None => None,
-    };
-
-    let query_store_queue = config.query_store_db_host.clone().map(|db_host| {
-        let query_store_queue = Arc::new(Mutex::new(LeakyQueue::new(10_000)));
-        tokio::spawn(store_improvements_loop(query_store_queue.clone(), db_host));
-        query_store_queue
-    });
-
-    let bangs = Bangs::from_path(&config.bangs_path);
-
-    let cluster = Arc::new(
-        Cluster::join(
-            Member {
-                id: config.cluster_id.clone(),
-                service: Service::Api { host: config.host },
-            },
-            config.gossip_addr,
-            config.gossip_seed_nodes.clone().unwrap_or_default(),
-        )
-        .await?,
-    );
-    let remote_webgraph = RemoteWebgraph::new(cluster.clone());
-
-    let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster));
-    let live_searcher = LiveSearcher::new(Arc::clone(&cluster));
-
-    let state = {
-        let mut cross_encoder = None;
-
-        if let Some(path) = config.crossencoder_model_path.as_ref() {
-            cross_encoder = Some(CrossEncoderModel::open(path)?);
-        }
-
-        let searcher = ApiSearcher::new(
-            dist_searcher,
-            Some(live_searcher),
-            cross_encoder,
-            lambda_model,
-            bangs,
-            config.clone(),
-        );
-
-        Arc::new(State {
-            config: config.clone(),
-            searcher,
-            autosuggest,
-            counters,
-            remote_webgraph,
-            summarizer: Arc::new(Summarizer::new(
-                &config.summarizer_path,
-                config.llm.api_base.clone(),
-                config.llm.model.clone(),
-                config.llm.api_key.clone(),
-            )?),
-            improvement_queue: query_store_queue,
-            cluster,
-        })
-    };
-
-    Ok(Router::new()
+fn build_router(state: Arc<State>) -> Router {
+    Router::new()
         .merge(
             Router::new()
                 .route("/beta/api/search", post(search::search))
@@ -203,7 +140,81 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
                 .route("/api/entity_image", get(search::entity_image))
                 .layer(cors_layer()),
         )
-        .with_state(state))
+        .with_state(state)
+}
+
+pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
+    let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
+
+    let lambda_model = match &config.lambda_model_path {
+        Some(path) => Some(LambdaMART::open(path)?),
+        None => None,
+    };
+
+    let dual_encoder_model = match &config.dual_encoder_model_path {
+        Some(path) => Some(DualEncoder::open(path)?),
+        None => None,
+    };
+
+    let query_store_queue = config.query_store_db_host.clone().map(|db_host| {
+        let query_store_queue = Arc::new(Mutex::new(LeakyQueue::new(10_000)));
+        tokio::spawn(store_improvements_loop(query_store_queue.clone(), db_host));
+        query_store_queue
+    });
+
+    let bangs = Bangs::from_path(&config.bangs_path);
+
+    let cluster = Arc::new(
+        Cluster::join(
+            Member {
+                id: config.cluster_id.clone(),
+                service: Service::Api { host: config.host },
+            },
+            config.gossip_addr,
+            config.gossip_seed_nodes.clone().unwrap_or_default(),
+        )
+        .await?,
+    );
+    let remote_webgraph = RemoteWebgraph::new(cluster.clone());
+
+    let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster));
+    let live_searcher = LiveSearcher::new(Arc::clone(&cluster));
+
+    let state = {
+        let mut cross_encoder = None;
+
+        if let Some(path) = config.crossencoder_model_path.as_ref() {
+            cross_encoder = Some(CrossEncoderModel::open(path)?);
+        }
+
+        let searcher = ApiSearcher::new(
+            dist_searcher,
+            Some(live_searcher),
+            cross_encoder,
+            lambda_model,
+            dual_encoder_model,
+            bangs,
+            config.clone(),
+        );
+
+        Arc::new(State {
+            config: config.clone(),
+            searcher,
+            autosuggest,
+            counters,
+            remote_webgraph,
+            summarizer: Arc::new(Summarizer::new(
+                &config.summarizer_path,
+                config.llm.api_base.clone(),
+                config.llm.model.clone(),
+                config.llm.api_key.clone(),
+            )?),
+            improvement_queue: query_store_queue,
+            cluster,
+        })
+    };
+
+    Ok(build_router(state))
 }
 
 /// Enables CORS for development where the API and frontend are on

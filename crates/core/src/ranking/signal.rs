@@ -134,6 +134,10 @@ pub enum Signal {
     UrlSlashes,
     #[serde(rename = "link_density")]
     LinkDensity,
+    #[serde(rename = "title_embedding_similarity")]
+    TitleEmbeddingSimilarity,
+    #[serde(rename = "keyword_embedding_similarity")]
+    KeywordEmbeddingSimilarity,
 }
 
 impl From<Signal> for usize {
@@ -142,7 +146,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 38] = [
+pub const ALL_SIGNALS: [Signal; 40] = [
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
     Signal::Bm25TitleTrigrams,
@@ -181,6 +185,8 @@ pub const ALL_SIGNALS: [Signal; 38] = [
     Signal::UrlDigits,
     Signal::UrlSlashes,
     Signal::LinkDensity,
+    Signal::TitleEmbeddingSimilarity,
+    Signal::KeywordEmbeddingSimilarity,
 ];
 
 fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f64 {
@@ -288,6 +294,10 @@ fn idf_sum(field: &mut TextFieldData, doc: DocId) -> f64 {
 impl Signal {
     fn is_computable_before_search(&self) -> bool {
         self.as_fastfield().is_some()
+            && !matches!(
+                self,
+                Signal::TitleEmbeddingSimilarity | Signal::KeywordEmbeddingSimilarity
+            )
     }
 
     pub fn default_coefficient(&self) -> f64 {
@@ -329,7 +339,9 @@ impl Signal {
             Signal::LambdaMART => 10.0,
             Signal::UrlSlashes => 0.01,
             Signal::UrlDigits => 0.01,
-            Signal::LinkDensity => 0.00,
+            Signal::LinkDensity => 0.0,
+            Signal::TitleEmbeddingSimilarity => 0.01,
+            Signal::KeywordEmbeddingSimilarity => 0.01,
         }
     }
 
@@ -344,9 +356,13 @@ impl Signal {
             .as_ref()
             .unwrap()
             .borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(&doc);
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
 
-        let node_id = fastfield_reader.get(&FastField::HostNodeID);
+        let node_id = fastfield_reader
+            .get(FastField::HostNodeID)
+            .and_then(|n| n.as_u64())
+            .unwrap();
+
         let host_id: Option<NodeID> = if node_id == u64::MAX {
             None
         } else {
@@ -355,23 +371,38 @@ impl Signal {
 
         let value: Option<f64> = match self {
             Signal::HostCentrality | Signal::PageCentrality => {
-                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .and_then(|v| v.as_u64())
+                    .unwrap();
                 Some(val as f64 / FLOAT_SCALING as f64)
             }
             Signal::HostCentralityRank | Signal::PageCentralityRank => {
-                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .and_then(|v| v.as_u64())
+                    .unwrap();
                 Some(score_rank(val as f64))
             }
             Signal::IsHomepage => {
-                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .and_then(|v| v.as_u64())
+                    .unwrap();
                 Some(val as f64)
             }
             Signal::LinkDensity => {
-                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .and_then(|v| v.as_u64())
+                    .unwrap();
                 Some(score_link_density(val as f64 / FLOAT_SCALING as f64))
             }
             Signal::FetchTimeMs => {
-                let fetch_time_ms = fastfield_reader.get(&self.as_fastfield().unwrap()) as usize;
+                let fetch_time_ms = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .and_then(|v| v.as_u64())
+                    .unwrap() as usize;
 
                 if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
                     Some(0.0)
@@ -380,24 +411,39 @@ impl Signal {
                 }
             }
             Signal::UpdateTimestamp => {
-                let val = fastfield_reader.get(&self.as_fastfield().unwrap()) as usize;
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .and_then(|v| v.as_u64())
+                    .unwrap() as usize;
 
                 Some(score_timestamp(val, signal_aggregator))
             }
             Signal::TrackerScore => {
-                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .and_then(|v| v.as_u64())
+                    .unwrap();
                 Some(score_trackers(val as f64))
             }
             Signal::UrlDigits => {
-                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .and_then(|v| v.as_u64())
+                    .unwrap();
                 Some(score_digits(val as f64))
             }
             Signal::UrlSlashes => {
-                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .and_then(|v| v.as_u64())
+                    .unwrap();
                 Some(score_slashes(val as f64))
             }
             Signal::Region => {
-                let val = fastfield_reader.get(&self.as_fastfield().unwrap());
+                let val = fastfield_reader
+                    .get(self.as_fastfield().unwrap())
+                    .and_then(|v| v.as_u64())
+                    .unwrap();
                 let region = Region::from_id(val);
                 Some(score_region(region, signal_aggregator))
             }
@@ -436,8 +482,11 @@ impl Signal {
                 .get_mut(self.as_textfield().unwrap())
                 .map(|field| idf_sum(field, doc)),
 
-            Signal::CrossEncoderSnippet => None, // this is calculated in a later step
-            Signal::CrossEncoderTitle => None,   // this is calculated in a later step
+            Signal::CrossEncoderSnippet
+            | Signal::CrossEncoderTitle
+            | Signal::TitleEmbeddingSimilarity
+            | Signal::KeywordEmbeddingSimilarity => None, // these are calculated in a later step
+
             Signal::LambdaMART => None,
         };
 
@@ -458,9 +507,9 @@ impl Signal {
 
         let value = match self {
             Signal::HostCentrality => Some(webpage.host_centrality),
-            Signal::HostCentralityRank => Some(webpage.host_centrality_rank),
             Signal::PageCentrality => Some(webpage.page_centrality),
-            Signal::PageCentralityRank => Some(webpage.page_centrality_rank),
+            Signal::HostCentralityRank => Some(score_rank(webpage.host_centrality_rank as f64)),
+            Signal::PageCentralityRank => Some(score_rank(webpage.page_centrality_rank as f64)),
             Signal::IsHomepage => Some(webpage.html.is_homepage().into()),
             Signal::FetchTimeMs => {
                 let fetch_time_ms = webpage.fetch_time_ms as usize;
@@ -544,6 +593,8 @@ impl Signal {
             | Signal::CrossEncoderTitle
             | Signal::InboundSimilarity
             | Signal::LambdaMART
+            | Signal::TitleEmbeddingSimilarity
+            | Signal::KeywordEmbeddingSimilarity
             | Signal::QueryCentrality => {
                 tracing::error!("signal {self:?} cannot be precomputed");
                 None
@@ -573,6 +624,8 @@ impl Signal {
             Signal::UrlSlashes => Some(FastField::NumPathAndQuerySlashes),
             Signal::UrlDigits => Some(FastField::NumPathAndQueryDigits),
             Signal::LinkDensity => Some(FastField::LinkDensity),
+            Signal::TitleEmbeddingSimilarity => Some(FastField::TitleEmbeddings),
+            Signal::KeywordEmbeddingSimilarity => Some(FastField::KeywordEmbeddings),
             _ => None,
         }
     }
@@ -625,8 +678,11 @@ pub struct SignalCoefficient {
 }
 
 impl SignalCoefficient {
-    pub fn get(&self, signal: &Signal) -> Option<f64> {
-        self.map.get(*signal).copied()
+    pub fn get(&self, signal: &Signal) -> f64 {
+        self.map
+            .get(*signal)
+            .copied()
+            .unwrap_or(signal.default_coefficient())
     }
 
     pub fn new(coefficients: impl Iterator<Item = (Signal, f64)>) -> Self {
@@ -651,7 +707,7 @@ impl SignalCoefficient {
 
     pub fn merge_into(&mut self, coeffs: SignalCoefficient) {
         for signal in ALL_SIGNALS {
-            if let Some(coeff) = coeffs.get(&signal) {
+            if let Some(coeff) = coeffs.map.get(signal).copied() {
                 match self.map.get_mut(signal) {
                     Some(existing_coeff) => *existing_coeff += coeff,
                     None => {
@@ -997,7 +1053,7 @@ impl SignalAggregator {
     pub fn coefficient(&self, signal: &Signal) -> f64 {
         self.query_signal_coefficients
             .as_ref()
-            .and_then(|coefficients| coefficients.get(signal))
+            .map(|coefficients| coefficients.get(signal))
             .or_else(|| {
                 self.linear_regression
                     .as_ref()

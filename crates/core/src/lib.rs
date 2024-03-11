@@ -17,11 +17,16 @@
 //! Main library for Stract.
 
 #![doc(html_logo_url = "https://stract.com/images/biglogo.svg")]
+// #![warn(clippy::too_many_lines)]
+// pedantic stuff
 // #![warn(clippy::pedantic)]
-// #![warn(missing_docs)]
-// #![warn(clippy::missing_docs_in_private_items)]
-#![allow(clippy::cast_precision_loss)]
-#![allow(clippy::missing_errors_doc)]
+// #![allow(clippy::unreadable_literal)]
+// #![allow(clippy::missing_fields_in_debug)]
+// #![allow(clippy::cast_possible_truncation)]
+// #![allow(clippy::cast_precision_loss)]
+// #![allow(clippy::cast_sign_loss)]
+// #![allow(clippy::module_name_repetitions)] // maybe we should remove this later
+// #![allow(clippy::missing_errors_doc)]
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

@@ -85,7 +85,7 @@ mod tests {
         let graph = wrt.finalize();
 
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -110,7 +110,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -135,7 +135,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"

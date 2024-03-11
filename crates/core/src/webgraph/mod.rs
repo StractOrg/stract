@@ -485,21 +485,23 @@ impl Id2NodeDb {
         opts.set_target_file_size_base(512 * 1024 * 1024); // 512 MB
         opts.set_target_file_size_multiplier(10);
 
-        opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+        opts.set_compression_type(rocksdb::DBCompressionType::None);
 
         let mut block_opts = rocksdb::BlockBasedOptions::default();
-        let cache = rocksdb::Cache::new_lru_cache(8 * 1024 * 1024 * 1024); // 8 gb
-        opts.set_block_based_table_factory(&block_opts);
+        let cache = rocksdb::Cache::new_lru_cache(1024 * 1024 * 1024); // 1 gb
+        block_opts.set_ribbon_filter(10.0);
 
         // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
         opts.set_level_compaction_dynamic_level_bytes(true);
         opts.set_bytes_per_sync(1048576);
 
-        block_opts.set_block_size(16 * 1024);
+        block_opts.set_block_size(32 * 1024); // 32 kb
         block_opts.set_format_version(5);
         block_opts.set_cache_index_and_filter_blocks(true);
         block_opts.set_pin_l0_filter_and_index_blocks_in_cache(true);
         block_opts.set_block_cache(&cache);
+
+        opts.set_block_based_table_factory(&block_opts);
 
         let db = rocksdb::DB::open(&opts, path).unwrap();
 

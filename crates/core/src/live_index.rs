@@ -17,7 +17,7 @@
 use anyhow::Result;
 use std::{
     path::Path,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    sync::{Arc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     time::{Duration, SystemTime},
 };
 
@@ -29,7 +29,7 @@ use crate::{
     crawler::{
         reqwest_client, CrawlDatum, DatumStream, JobExecutor, RetrieableUrl, WeightedUrl, WorkerJob,
     },
-    entrypoint::indexer::IndexingWorker,
+    entrypoint::indexer::{self, IndexingWorker},
     feed::{
         self,
         scheduler::{Domain, DomainFeeds, Split},
@@ -41,6 +41,7 @@ const PRUNE_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
 const FEED_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 10); // 10 minutes
 const AUTO_COMMIT_INTERVAL: Duration = Duration::from_secs(60 * 5); // 5 minutes
 const EVENT_LOOP_INTERVAL: Duration = Duration::from_secs(5);
+const BATCH_SIZE: usize = 512;
 
 #[derive(Debug, Clone)]
 struct Feeds {
@@ -108,6 +109,7 @@ impl DownloadedDb {
 struct Indexer {
     search_index: Arc<RwLock<crate::index::Index>>,
     worker: IndexingWorker,
+    write_batch: Arc<Mutex<Vec<indexer::IndexableWebpage>>>,
 }
 
 enum CrawlResults {
@@ -221,6 +223,38 @@ impl Crawler {
     }
 }
 
+impl Indexer {
+    fn maybe_write_batch_to_index(&self) {
+        let batch = self.write_batch.lock().unwrap_or_else(|e| e.into_inner());
+
+        if batch.len() < BATCH_SIZE {
+            return;
+        }
+
+        let prepared = self.worker.prepare_webpages(&batch);
+
+        let search_index = self.search_index.write().unwrap_or_else(|e| e.into_inner());
+        for webpage in &prepared {
+            search_index.insert(webpage).ok();
+        }
+    }
+
+    fn write_batch_to_index(&self) {
+        let batch = self.write_batch.lock().unwrap_or_else(|e| e.into_inner());
+
+        if batch.is_empty() {
+            return;
+        }
+
+        let prepared = self.worker.prepare_webpages(&batch);
+
+        let search_index = self.search_index.write().unwrap_or_else(|e| e.into_inner());
+        for webpage in &prepared {
+            search_index.insert(webpage).ok();
+        }
+    }
+}
+
 pub struct Index {
     search_index: Arc<RwLock<crate::index::Index>>,
 }
@@ -267,21 +301,19 @@ impl Index {
 
 impl DatumStream for Indexer {
     async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
-        let webpage = self.worker.prepare_webpage(
-            &crawl_datum.body,
-            crawl_datum.url.as_str(),
-            crawl_datum.fetch_time_ms,
-        )?;
-
-        self.search_index
-            .read()
+        self.write_batch
+            .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .insert(webpage)?;
+            .push(crawl_datum.into());
+
+        self.maybe_write_batch_to_index();
 
         Ok(())
     }
 
     async fn finish(&self) -> Result<()> {
+        self.write_batch_to_index();
+
         self.search_index
             .write()
             .unwrap_or_else(|e| e.into_inner())
@@ -328,13 +360,8 @@ impl IndexManager {
         let index = Index::new(&config.index_path)?;
         let indexer = Arc::new(Indexer {
             search_index: index.clone_inner_index(),
-            worker: IndexingWorker::new(
-                config.host_centrality_store_path.clone(),
-                config.page_centrality_store_path.clone(),
-                config.page_webgraph_path.clone(),
-                None,
-                config.safety_classifier_path.clone(),
-            ),
+            worker: IndexingWorker::new(config.clone()),
+            write_batch: Arc::new(Mutex::new(Vec::new())),
         });
 
         let crawler_config = CrawlerConfig::from(&config);

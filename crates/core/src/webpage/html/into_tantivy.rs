@@ -129,11 +129,7 @@ impl Html {
             .unwrap_or_default()
     }
 
-    pub fn into_tantivy(
-        self,
-        schema: &tantivy::schema::Schema,
-        rake: &RakeModel,
-    ) -> Result<TantivyDocument> {
+    pub fn as_tantivy(&self, schema: &tantivy::schema::Schema) -> Result<TantivyDocument> {
         let mut doc = TantivyDocument::new();
 
         let title = self.pretokenize_title()?;
@@ -415,10 +411,6 @@ impl Html {
                         doc.add_text(tantivy_field, "");
                     }
                 }
-                Field::Text(TextField::Keywords) => {
-                    let rake_keywords = self.keywords(rake);
-                    doc.add_text(tantivy_field, rake_keywords.join("\n"));
-                }
                 Field::Text(TextField::AllBody) => {
                     doc.add_pre_tokenized_text(tantivy_field, all_text.clone())
                 }
@@ -562,6 +554,9 @@ impl Html {
                 | Field::Fast(FastField::PreComputedScore)
                 | Field::Fast(FastField::Region)
                 | Field::Fast(FastField::HostNodeID)
+                | Field::Fast(FastField::TitleEmbeddings)
+                | Field::Fast(FastField::KeywordEmbeddings)
+                | Field::Text(TextField::Keywords)
                 | Field::Text(TextField::DmozDescription) => {}
             }
         }

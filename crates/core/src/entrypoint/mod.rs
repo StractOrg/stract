@@ -34,7 +34,6 @@ pub mod webgraph_server;
 
 pub use centrality::Centrality;
 pub use entity::EntityIndexer;
-pub use indexer::Indexer;
 use tracing::{debug, log::error};
 pub use webgraph::Webgraph;
 pub mod live_index;

@@ -70,7 +70,7 @@ where
             tracing::debug!(?website.score, ?self.thresholds.stackoverflow, "stackoverflow score");
             if website.score > self.thresholds.stackoverflow {
                 let scored_websites =
-                    vec![(0, distributed::ScoredWebsitePointer { website, shard })];
+                    vec![(0, distributed::ScoredWebpagePointer { website, shard })];
                 let mut retrieved = self
                     .distributed_searcher
                     .retrieve_webpages(&scored_websites, &query.query)

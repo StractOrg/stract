@@ -29,6 +29,7 @@ use crate::{
     },
     index::Index,
     inverted_index::{self, RetrievedWebpage},
+    models::dual_encoder::DualEncoder,
     ranking::{
         inbound_similarity::InboundSimilarity,
         models::{lambdamart::LambdaMART, linear::LinearRegression},
@@ -75,6 +76,10 @@ impl SearchService {
             local_searcher.set_lambda_model(LambdaMART::open(model_path)?);
         }
 
+        if let Some(model_path) = config.dual_encoder_model_path {
+            local_searcher.set_dual_encoder(DualEncoder::open(model_path)?);
+        }
+
         local_searcher.set_collector_config(config.collector);
         local_searcher.set_snippet_config(config.snippet);
 
@@ -100,7 +105,7 @@ impl SearchService {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrieveWebsites {
-    pub websites: Vec<inverted_index::WebsitePointer>,
+    pub websites: Vec<inverted_index::WebpagePointer>,
     pub query: String,
 }
 impl sonic::service::Message<SearchService> for RetrieveWebsites {

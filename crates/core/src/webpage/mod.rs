@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -15,11 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    rake::RakeModel,
     schema::{FastField, TextField},
     webgraph::NodeID,
     Result,
 };
+use candle_core::Tensor;
 use chrono::{DateTime, Utc};
 
 use std::collections::HashMap;
@@ -44,15 +44,18 @@ pub struct Webpage {
     pub html: Html,
     pub backlink_labels: Vec<String>,
     pub host_centrality: f64,
-    pub host_centrality_rank: f64,
+    pub host_centrality_rank: u64,
     pub page_centrality: f64,
-    pub page_centrality_rank: f64,
+    pub page_centrality_rank: u64,
     pub fetch_time_ms: u64,
     pub pre_computed_score: f64,
     pub node_id: Option<NodeID>,
     pub dmoz_description: Option<String>,
     pub safety_classification: Option<safety_classifier::Label>,
     pub inserted_at: DateTime<Utc>,
+    pub keywords: Vec<String>,
+    pub title_embedding: Option<Tensor>,
+    pub keyword_embedding: Option<Tensor>,
 }
 
 #[cfg(test)]
@@ -62,22 +65,47 @@ impl Default for Webpage {
             html: Html::parse_without_text("<html></html>", "https://example.com/").unwrap(),
             backlink_labels: Default::default(),
             host_centrality: Default::default(),
-            host_centrality_rank: u64::MAX as f64,
+            host_centrality_rank: u64::MAX,
             page_centrality: Default::default(),
-            page_centrality_rank: u64::MAX as f64,
+            page_centrality_rank: u64::MAX,
             fetch_time_ms: Default::default(),
             pre_computed_score: Default::default(),
             node_id: Default::default(),
             dmoz_description: Default::default(),
             safety_classification: Default::default(),
             inserted_at: Utc::now(),
+            keywords: Default::default(),
+            title_embedding: Default::default(),
+            keyword_embedding: Default::default(),
+        }
+    }
+}
+
+impl From<Html> for Webpage {
+    fn from(html: Html) -> Self {
+        Self {
+            html,
+            backlink_labels: Default::default(),
+            host_centrality: Default::default(),
+            host_centrality_rank: u64::MAX,
+            page_centrality: Default::default(),
+            page_centrality_rank: u64::MAX,
+            fetch_time_ms: Default::default(),
+            pre_computed_score: Default::default(),
+            node_id: Default::default(),
+            dmoz_description: Default::default(),
+            safety_classification: Default::default(),
+            inserted_at: Utc::now(),
+            keywords: Default::default(),
+            title_embedding: Default::default(),
+            keyword_embedding: Default::default(),
         }
     }
 }
 
 impl Webpage {
     #[cfg(test)]
-    pub fn new(html: &str, url: &str) -> Result<Self> {
+    pub fn test_parse(html: &str, url: &str) -> Result<Self> {
         let html = Html::parse(html, url)?;
 
         Ok(Self {
@@ -102,16 +130,12 @@ impl Webpage {
         })
     }
 
-    pub fn into_tantivy(
-        self,
-        schema: &tantivy::schema::Schema,
-        rake: &RakeModel,
-    ) -> Result<TantivyDocument> {
-        let region = Region::guess_from(&self);
+    pub fn as_tantivy(&self, schema: &tantivy::schema::Schema) -> Result<TantivyDocument> {
+        let region = Region::guess_from(self);
 
         let dmoz_description = self.dmoz_description();
 
-        let mut doc = self.html.into_tantivy(schema, rake)?;
+        let mut doc = self.html.as_tantivy(schema)?;
 
         if let Ok(region) = region {
             doc.add_u64(
@@ -130,13 +154,20 @@ impl Webpage {
         }
 
         let backlink_text: String =
-            itertools::intersperse(self.backlink_labels, "\n".to_string()).collect();
+            itertools::intersperse(self.backlink_labels.clone(), "\n".to_string()).collect();
 
         doc.add_text(
             schema
                 .get_field(Field::Text(TextField::BacklinkText).name())
                 .expect("Failed to get backlink-text field"),
             backlink_text,
+        );
+
+        doc.add_text(
+            schema
+                .get_field(Field::Text(TextField::Keywords).name())
+                .expect("Failed to get keywords field"),
+            self.keywords.join("\n"),
         );
 
         doc.add_date(
@@ -171,7 +202,7 @@ impl Webpage {
             schema
                 .get_field(Field::Fast(FastField::HostCentralityRank).name())
                 .expect("Failed to get host_centrality_rank field"),
-            self.host_centrality_rank as u64,
+            self.host_centrality_rank,
         );
 
         doc.add_u64(
@@ -185,7 +216,7 @@ impl Webpage {
             schema
                 .get_field(Field::Fast(FastField::PageCentralityRank).name())
                 .expect("Failed to get page_centrality_rank field"),
-            self.page_centrality_rank as u64,
+            self.page_centrality_rank,
         );
 
         doc.add_u64(
@@ -201,6 +232,44 @@ impl Webpage {
                 .expect("failed to get pre_computed_score field"),
             (self.pre_computed_score * FLOAT_SCALING as f64) as u64,
         );
+
+        if let Some(emb) = &self.title_embedding {
+            let mut serialized = Vec::new();
+            emb.write_bytes(&mut serialized)?;
+
+            doc.add_bytes(
+                schema
+                    .get_field(Field::Fast(FastField::TitleEmbeddings).name())
+                    .expect("Failed to get title_embeddings field"),
+                serialized,
+            );
+        } else {
+            doc.add_bytes(
+                schema
+                    .get_field(Field::Fast(FastField::TitleEmbeddings).name())
+                    .expect("Failed to get title_embeddings field"),
+                Vec::new(),
+            );
+        }
+
+        if let Some(emb) = &self.keyword_embedding {
+            let mut serialized = Vec::new();
+            emb.write_bytes(&mut serialized)?;
+
+            doc.add_bytes(
+                schema
+                    .get_field(Field::Fast(FastField::KeywordEmbeddings).name())
+                    .expect("Failed to get keyword_embeddings field"),
+                serialized,
+            );
+        } else {
+            doc.add_bytes(
+                schema
+                    .get_field(Field::Fast(FastField::KeywordEmbeddings).name())
+                    .expect("Failed to get keyword_embeddings field"),
+                Vec::new(),
+            );
+        }
 
         match &self.node_id {
             Some(node_id) => {

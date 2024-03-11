@@ -11,7 +11,7 @@ fn random_bitvec(max_len: usize, max_id: usize) -> BitVec {
         ranks.push(rng.gen_range(0..max_id) as u64);
     }
 
-    ranks.sort();
+    ranks.sort_unstable();
     ranks.dedup();
 
     BitVec::new(ranks)
@@ -26,7 +26,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 for _ in 0..10_000 {
                     a.sim(&b);
                 }
-            })
+            });
         }
     });
 
@@ -38,7 +38,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 for _ in 0..10_000 {
                     a.sim(&b);
                 }
-            })
+            });
         }
     });
 
@@ -50,7 +50,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 for _ in 0..10_000 {
                     a.sim(&b);
                 }
-            })
+            });
         }
     });
 }

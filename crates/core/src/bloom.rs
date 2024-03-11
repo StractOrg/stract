@@ -35,16 +35,16 @@ impl BloomFilter {
         ((estimated_items as f64) * fp.ln() / (-8.0 * 2.0_f64.ln().powi(2))).ceil() as u64
     }
 
-    fn hash(item: &u64) -> usize {
+    fn hash(item: u64) -> usize {
         item.wrapping_mul(11400714819323198549) as usize
     }
 
     pub fn insert(&mut self, item: u64) {
-        let h = Self::hash(&item);
+        let h = Self::hash(item);
         self.bit_vec.set(h % self.num_bits as usize, true);
     }
 
-    pub fn contains(&self, item: &u64) -> bool {
+    pub fn contains(&self, item: u64) -> bool {
         let h = Self::hash(item);
         self.bit_vec[h % self.num_bits as usize]
     }

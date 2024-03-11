@@ -9,7 +9,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Inbound similarity creation", |b| {
         b.iter(|| {
             InboundSimilarity::build(&graph);
-        })
+        });
     });
 }
 

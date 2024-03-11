@@ -41,9 +41,8 @@ use crate::config::SnippetConfig;
 use crate::fastfield_reader::FastFieldReader;
 use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
-use crate::rake::RakeModel;
 use crate::ranking::initial::Score;
-use crate::ranking::pipeline::RankingWebsite;
+use crate::ranking::pipeline::RecallRankingWebpage;
 use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField};
 use crate::search_ctx::Ctx;
@@ -66,11 +65,11 @@ use std::sync::Arc;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialSearchResult {
     pub num_websites: Option<usize>,
-    pub top_websites: Vec<WebsitePointer>,
+    pub top_websites: Vec<WebpagePointer>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct WebsitePointer {
+pub struct WebpagePointer {
     pub score: Score,
     pub hashes: Hashes,
     pub address: DocAddress,
@@ -165,7 +164,6 @@ pub struct InvertedIndex {
     schema: Arc<Schema>,
     snippet_config: SnippetConfig,
     fastfield_reader: FastFieldReader,
-    rake: RakeModel,
 }
 
 impl InvertedIndex {
@@ -236,7 +234,6 @@ impl InvertedIndex {
             tantivy_index,
             snippet_config: SnippetConfig::default(),
             fastfield_reader,
-            rake: RakeModel::default(),
         })
     }
 
@@ -287,11 +284,11 @@ impl InvertedIndex {
         Ok(s)
     }
 
-    pub fn insert(&self, webpage: Webpage) -> Result<()> {
+    pub fn insert(&self, webpage: &Webpage) -> Result<()> {
         self.writer
             .as_ref()
             .expect("writer has not been prepared")
-            .add_document(webpage.into_tantivy(&self.schema, &self.rake)?)?;
+            .add_document(webpage.as_tantivy(&self.schema)?)?;
         Ok(())
     }
 
@@ -374,10 +371,10 @@ impl InvertedIndex {
     pub fn retrieve_ranking_websites(
         &self,
         ctx: &Ctx,
-        pointers: Vec<WebsitePointer>,
+        pointers: Vec<WebpagePointer>,
         mut aggregator: SignalAggregator,
         fastfield_reader: &FastFieldReader,
-    ) -> Result<Vec<RankingWebsite>> {
+    ) -> Result<Vec<RecallRankingWebpage>> {
         let mut top_websites = Vec::new();
 
         let mut pointers: Vec<_> = pointers.into_iter().enumerate().collect();
@@ -396,14 +393,21 @@ impl InvertedIndex {
                 _ => false,
             };
 
+            let segment_reader = ctx.tv_searcher.segment_reader(pointer.address.segment);
             if update_segment {
-                let segment_reader = ctx.tv_searcher.segment_reader(pointer.address.segment);
                 aggregator.register_segment(&ctx.tv_searcher, segment_reader, fastfield_reader)?;
             }
 
             prev_segment = Some(pointer.address.segment);
 
-            top_websites.push((orig_index, RankingWebsite::new(pointer, &mut aggregator)));
+            top_websites.push((
+                orig_index,
+                RecallRankingWebpage::new(
+                    pointer,
+                    fastfield_reader.borrow_segment(&segment_reader.segment_id()),
+                    &mut aggregator,
+                ),
+            ));
         }
 
         top_websites.sort_by(|a, b| a.0.cmp(&b.0));
@@ -414,7 +418,7 @@ impl InvertedIndex {
             .collect())
     }
 
-    pub fn website_host_node(&self, website: &WebsitePointer) -> Result<Option<NodeID>> {
+    pub fn website_host_node(&self, website: &WebpagePointer) -> Result<Option<NodeID>> {
         let searcher = self.reader.searcher();
         let doc: TantivyDocument = searcher.doc(website.address.into())?;
 
@@ -434,7 +438,7 @@ impl InvertedIndex {
 
     pub fn retrieve_websites(
         &self,
-        websites: &[WebsitePointer],
+        websites: &[WebpagePointer],
         query: &Query,
     ) -> Result<Vec<RetrievedWebpage>> {
         let tv_searcher = self.reader.searcher();
@@ -509,6 +513,7 @@ impl InvertedIndex {
         Ok(webpages)
     }
 
+    #[allow(clippy::missing_panics_doc)] // cannot panic as writer is prepared
     pub fn merge_into_max_segments(&mut self, max_num_segments: u64) -> Result<()> {
         self.prepare_writer()?;
         let base_path = Path::new(&self.path);
@@ -538,6 +543,7 @@ impl InvertedIndex {
         Ok(RetrievedWebpage::from(doc))
     }
 
+    #[must_use]
     pub fn merge(mut self, mut other: InvertedIndex) -> Self {
         self.prepare_writer().expect("failed to prepare writer");
         other.prepare_writer().expect("failed to prepare writer");
@@ -700,6 +706,15 @@ impl RetrievedWebpage {
     }
 }
 
+fn str_value(field: TextField, value: &tantivy::schema::FieldValue) -> String {
+    value
+        .value()
+        .as_value()
+        .as_str()
+        .unwrap_or_else(|| panic!("{} field should be text", field.name()))
+        .to_string()
+}
+
 impl From<TantivyDocument> for RetrievedWebpage {
     fn from(doc: TantivyDocument) -> Self {
         let mut webpage = RetrievedWebpage::default();
@@ -707,38 +722,17 @@ impl From<TantivyDocument> for RetrievedWebpage {
         for value in doc.field_values() {
             match Field::get(value.field.field_id() as usize).copied() {
                 Some(Field::Text(TextField::Title)) => {
-                    webpage.title = value
-                        .value()
-                        .as_value()
-                        .as_str()
-                        .expect("Title field should be text")
-                        .to_string();
+                    webpage.title = str_value(TextField::Title, value);
                 }
                 Some(Field::Text(TextField::StemmedCleanBody)) => {
-                    webpage.body = value
-                        .value()
-                        .as_value()
-                        .as_str()
-                        .expect("Body field should be text")
-                        .to_string();
+                    webpage.body = str_value(TextField::StemmedCleanBody, value);
                 }
                 Some(Field::Text(TextField::Description)) => {
-                    let desc = value
-                        .value()
-                        .as_value()
-                        .as_str()
-                        .expect("Description field should be text")
-                        .to_string();
-
+                    let desc = str_value(TextField::Description, value);
                     webpage.description = if desc.is_empty() { None } else { Some(desc) }
                 }
                 Some(Field::Text(TextField::Url)) => {
-                    webpage.url = value
-                        .value()
-                        .as_value()
-                        .as_str()
-                        .expect("Url field should be text")
-                        .to_string();
+                    webpage.url = str_value(TextField::Url, value);
                 }
                 Some(Field::Fast(FastField::LastUpdated)) => {
                     webpage.updated_time = {
@@ -751,12 +745,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
                     }
                 }
                 Some(Field::Text(TextField::AllBody)) => {
-                    webpage.dirty_body = value
-                        .value()
-                        .as_value()
-                        .as_str()
-                        .expect("All body field should be text")
-                        .to_string();
+                    webpage.dirty_body = str_value(TextField::AllBody, value);
                 }
                 Some(Field::Fast(FastField::Region)) => {
                     webpage.region = {
@@ -765,23 +754,11 @@ impl From<TantivyDocument> for RetrievedWebpage {
                     }
                 }
                 Some(Field::Text(TextField::DmozDescription)) => {
-                    let desc = value
-                        .value()
-                        .as_value()
-                        .as_str()
-                        .expect("Dmoz description field should be text")
-                        .to_string();
-
+                    let desc = str_value(TextField::DmozDescription, value);
                     webpage.dmoz_description = if desc.is_empty() { None } else { Some(desc) }
                 }
                 Some(Field::Text(TextField::SchemaOrgJson)) => {
-                    let json = value
-                        .value()
-                        .as_value()
-                        .as_str()
-                        .expect("Schema.org json field should be stored as text")
-                        .to_string();
-
+                    let json = str_value(TextField::SchemaOrgJson, value);
                     webpage.schema_org = serde_json::from_str(&json).unwrap_or_default();
                 }
                 Some(Field::Fast(FastField::LikelyHasAds)) => {
@@ -793,25 +770,13 @@ impl From<TantivyDocument> for RetrievedWebpage {
                         value.value().as_value().as_u64().unwrap_or_default() != 0;
                 }
                 Some(Field::Text(TextField::RecipeFirstIngredientTagId)) => {
-                    let tag_id = value
-                        .value()
-                        .as_value()
-                        .as_str()
-                        .expect("Recipe first ingredient tag id field should be stored as text")
-                        .to_string();
-
+                    let tag_id = str_value(TextField::RecipeFirstIngredientTagId, value);
                     if !tag_id.is_empty() {
                         webpage.recipe_first_ingredient_tag_id = Some(tag_id);
                     }
                 }
                 Some(Field::Text(TextField::Keywords)) => {
-                    let keywords = value
-                        .value()
-                        .as_value()
-                        .as_str()
-                        .expect("Keywords field should be stored as text")
-                        .to_string();
-
+                    let keywords = str_value(TextField::Keywords, value);
                     webpage.keywords = keywords.split('\n').map(|s| s.to_string()).collect();
                 }
                 _ => {}
@@ -824,9 +789,11 @@ impl From<TantivyDocument> for RetrievedWebpage {
 
 #[cfg(test)]
 mod tests {
+    use candle_core::Tensor;
     use maplit::hashmap;
 
     use crate::{
+        config::CollectorConfig,
         ranking::{Ranker, SignalAggregator},
         searcher::SearchQuery,
         webpage::Html,
@@ -872,7 +839,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
@@ -880,7 +847,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -904,7 +871,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let result =
@@ -919,7 +886,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -953,7 +920,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let result =
@@ -967,7 +934,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>
@@ -1000,7 +967,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let result =
@@ -1015,7 +982,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>
@@ -1048,7 +1015,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let result =
@@ -1063,7 +1030,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>
@@ -1081,7 +1048,7 @@ mod tests {
             )
             .expect("failed to insert webpage");
         index
-            .insert(Webpage {
+            .insert(&Webpage {
                 html: Html::parse(
                     &format!(
                         r#"
@@ -1120,7 +1087,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let mut result =
@@ -1143,7 +1110,7 @@ mod tests {
 
             index
                 .insert(
-                    Webpage::new(
+                    &Webpage::test_parse(
                         &format!(
                             r#"
                     <html>
@@ -1178,7 +1145,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let result =
@@ -1192,7 +1159,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                     <html>
@@ -1225,7 +1192,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let result =
@@ -1240,7 +1207,7 @@ mod tests {
 
         index1
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>
@@ -1264,7 +1231,7 @@ mod tests {
 
         index2
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
             <html>
@@ -1301,7 +1268,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let result =
@@ -1328,7 +1295,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let result =
@@ -1337,7 +1304,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -1361,7 +1328,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
         let result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
@@ -1375,7 +1342,7 @@ mod tests {
 
         index
             .insert(
-                Webpage::new(
+                &Webpage::test_parse(
                     &format!(
                         r#"
                         <html>
@@ -1408,7 +1375,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let result =
@@ -1422,7 +1389,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
+            .insert(&Webpage::test_parse(
                 &format!(
                     r#"
                     <html>
@@ -1459,7 +1426,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let result =
@@ -1501,7 +1468,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
+            .insert(&Webpage::test_parse(
                 &format!(
                     r#"
                     <html>
@@ -1535,7 +1502,7 @@ mod tests {
         let mut index = InvertedIndex::temporary().expect("Unable to open index");
 
         index
-            .insert(Webpage::new(
+            .insert(&Webpage::test_parse(
                 &format!(
                     r#"
                     <html>
@@ -1617,8 +1584,8 @@ mod tests {
             ..Default::default()
         };
 
-        index.insert(a).unwrap();
-        index.insert(b).unwrap();
+        index.insert(&a).unwrap();
+        index.insert(&b).unwrap();
 
         index.commit().expect("failed to commit index");
 
@@ -1636,7 +1603,7 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         let mut result =
@@ -1656,12 +1623,100 @@ mod tests {
         let ranker = Ranker::new(
             SignalAggregator::new(Some(&query)),
             ctx.fastfield_reader.clone(),
-            Default::default(),
+            CollectorConfig::default(),
         );
 
         result =
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
 
         assert_eq!(result.documents.len(), 1);
+    }
+
+    #[test]
+    fn test_title_embeddings_stored() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        let mut webpage = Webpage::test_parse(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>Test website A</title>
+                    </head>
+                    <body>
+                        {CONTENT} test
+                    </body>
+                </html>
+            "#,
+                CONTENT = crate::rand_words(100)
+            ),
+            "https://www.a.com",
+        )
+        .unwrap();
+
+        webpage.title_embedding =
+            Some(Tensor::rand(0.0, 1.0, &[2, 2], &candle_core::Device::Cpu).unwrap());
+
+        index.insert(&webpage).unwrap();
+
+        let mut webpage = Webpage::test_parse(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>Test website B</title>
+                    </head>
+                    <body>
+                        {CONTENT} test
+                    </body>
+                </html>
+            "#,
+                CONTENT = crate::rand_words(100)
+            ),
+            "https://www.b.com",
+        )
+        .unwrap();
+
+        webpage.title_embedding = None;
+
+        index.insert(&webpage).unwrap();
+        index.commit().expect("failed to commit index");
+
+        let ctx = index.local_search_ctx();
+
+        let query = Query::parse(
+            &ctx,
+            &SearchQuery {
+                query: "test".to_string(),
+                ..Default::default()
+            },
+            &index,
+        )
+        .expect("Failed to parse query");
+
+        let ranker = Ranker::new(
+            SignalAggregator::new(Some(&query)),
+            ctx.fastfield_reader.clone(),
+            CollectorConfig::default(),
+        );
+
+        let res = index
+            .search_initial(&query, &ctx, ranker.collector(ctx.clone()))
+            .unwrap();
+
+        let fastfield_reader = index.fastfield_reader();
+
+        let ranking_websites = index
+            .retrieve_ranking_websites(
+                &ctx,
+                res.top_websites,
+                ranker.aggregator(),
+                &fastfield_reader,
+            )
+            .unwrap();
+
+        assert_eq!(ranking_websites.len(), 2);
+        assert!(ranking_websites[0].title_embedding.is_some());
+        assert!(ranking_websites[1].title_embedding.is_none());
     }
 }

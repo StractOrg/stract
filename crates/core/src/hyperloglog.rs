@@ -456,12 +456,12 @@ pub(crate) const RAW_ESTIMATE_DATA_VEC: &[&[f64]] = &[
         97665.679,
         98442.68,
         99229.3002,
-        100011.0994,
-        100790.6386,
-        101580.1564,
-        102377.7484,
-        103152.1392,
-        103944.2712,
+        100_011.099_4,
+        100_790.638_6,
+        101_580.156_4,
+        102_377.748_4,
+        103_152.139_2,
+        103_944.271_2,
         104730.216,
         105528.6336,
         106324.9398,
@@ -4362,12 +4362,12 @@ impl<H: HyperLogLogHasher, const N: usize> HyperLogLog<N, H> {
     }
 
     #[inline]
-    fn b(&self) -> usize {
+    fn b() -> usize {
         (N as f64).log2() as usize
     }
 
     pub fn add(&mut self, item: u64) {
-        let b = self.b();
+        let b = Self::b();
         let hash = H::hash(item) as usize;
 
         let j = hash >> (64 - b);
@@ -4383,14 +4383,16 @@ impl<H: HyperLogLogHasher, const N: usize> HyperLogLog<N, H> {
         self.registers.iter_mut().for_each(|r| *r = 0);
     }
 
+    #[must_use]
     pub fn estimate_bias(&self, e: f64, b: usize) -> f64 {
+        const K: usize = 6;
+
         // binary search first nearest neighbor
         let lookup_array = RAW_ESTIMATE_DATA_VEC[b - 1 - RAW_ESTIMATE_DATA_OFFSET];
 
-        let mut idx_left = match lookup_array.binary_search_by(|v| v.partial_cmp(&e).unwrap()) {
-            Ok(i) => Some(i),                                 // exact match
+        let mut idx_left = match lookup_array.binary_search_by(|v| v.total_cmp(&e)) {
             Err(i) if i == lookup_array.len() => Some(i - 1), // no match, i points to end of array
-            Err(i) => Some(i),                                // no match, i points to left neighbor
+            Ok(i) | Err(i) => Some(i),                        // exact match
         };
 
         let mut idx_right = match idx_left {
@@ -4405,10 +4407,9 @@ impl<H: HyperLogLogHasher, const N: usize> HyperLogLog<N, H> {
         };
 
         // collect k nearest neighbors
-        const K: usize = 6;
         debug_assert!(lookup_array.len() >= K);
         let mut neighbors = [0; K];
-        for neighbor in neighbors.iter_mut() {
+        for neighbor in &mut neighbors {
             let (right_instead_left, idx) = match (idx_left, idx_right) {
                 (Some(i_left), Some(i_right)) => {
                     // 2 candidates, find better one
@@ -4428,7 +4429,7 @@ impl<H: HyperLogLogHasher, const N: usize> HyperLogLog<N, H> {
                     // just right one is there, use it
                     (true, i_right)
                 }
-                _ => panic!("neighborhood search failed, this is bug!"),
+                _ => unreachable!("neighborhood search failed, this is bug!"),
             };
             *neighbor = idx;
             if right_instead_left {
@@ -4454,13 +4455,15 @@ impl<H: HyperLogLogHasher, const N: usize> HyperLogLog<N, H> {
         m * (m / (v as f64)).ln()
     }
 
-    fn threshold(&self, b: usize) -> usize {
+    fn threshold(b: usize) -> usize {
         THRESHOLD_DATA_VEC[b - THRESHOLD_DATA_OFFSET]
     }
 
+    #[must_use]
+    #[allow(clippy::many_single_char_names)] // variables refer directly to the paper
     pub fn size(&self) -> usize {
         let m = self.registers.len() as f64;
-        let b = self.b();
+        let b = Self::b();
 
         let sum: f64 = self
             .registers
@@ -4478,24 +4481,26 @@ impl<H: HyperLogLogHasher, const N: usize> HyperLogLog<N, H> {
             e
         };
 
-        let v = self.registers.iter().filter(|r| **r == 0).count();
+        let v = bytecount::count(&self.registers, 0);
         let h = if v != 0 {
             self.linear_counting(v)
         } else {
             e_star
         };
 
-        if h <= (self.threshold(b) as f64) {
+        if h <= (Self::threshold(b) as f64) {
             h as usize
         } else {
             e_star as usize
         }
     }
 
+    #[must_use]
     pub fn relative_error(&self) -> f64 {
         1.04 / (self.registers.len() as f64).sqrt()
     }
 
+    #[must_use]
     pub fn size_bounds(&self) -> (usize, usize) {
         let size = self.size();
         let delta = (self.relative_error() * 2.0 * (size as f64)) as usize;
@@ -4515,6 +4520,7 @@ impl<H: HyperLogLogHasher, const N: usize> HyperLogLog<N, H> {
         }
     }
 
+    #[must_use]
     pub fn registers(&self) -> &[u8] {
         self.registers.as_ref()
     }
@@ -4580,7 +4586,7 @@ mod tests {
             set.add(item);
             counter += 1;
 
-            assert!((set.size() as f64 - counter as f64).abs() <= 10.0);
+            assert!((set.size() as f64 - f64::from(counter)).abs() <= 10.0);
         }
     }
 }

@@ -17,16 +17,18 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLockReadGuard};
 
+use itertools::Itertools;
 use url::Url;
 
 use crate::config::{CollectorConfig, SnippetConfig};
 use crate::index::Index;
 use crate::inverted_index::{InvertedIndex, RetrievedWebpage};
+use crate::models::dual_encoder::DualEncoder;
 use crate::query::Query;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
-use crate::ranking::pipeline::{RankingPipeline, RankingWebsite};
+use crate::ranking::pipeline::{PrecisionRankingWebpage, RankingPipeline, RecallRankingWebpage};
 use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS};
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::DisplayedWebpage;
@@ -103,6 +105,7 @@ pub struct LocalSearcher<I: SearchableIndex> {
     inbound_similarity: Option<InboundSimilarity>,
     linear_regression: Option<Arc<LinearRegression>>,
     lambda_model: Option<Arc<LambdaMART>>,
+    dual_encoder: Option<Arc<DualEncoder>>,
     collector_config: CollectorConfig,
 }
 
@@ -116,7 +119,7 @@ where
 }
 
 struct InvertedIndexResult {
-    webpages: Vec<RankingWebsite>,
+    webpages: Vec<RecallRankingWebpage>,
     num_hits: Option<usize>,
     has_more: bool,
 }
@@ -131,6 +134,7 @@ where
             inbound_similarity: None,
             linear_regression: None,
             lambda_model: None,
+            dual_encoder: None,
             collector_config: CollectorConfig::default(),
         }
     }
@@ -145,6 +149,10 @@ where
 
     pub fn set_lambda_model(&mut self, model: LambdaMART) {
         self.lambda_model = Some(Arc::new(model));
+    }
+
+    pub fn set_dual_encoder(&mut self, dual_encoder: DualEncoder) {
+        self.dual_encoder = Some(Arc::new(dual_encoder));
     }
 
     pub fn set_collector_config(&mut self, config: CollectorConfig) {
@@ -226,12 +234,14 @@ where
         de_rank_similar: bool,
     ) -> Result<InvertedIndexResult> {
         let mut query = query.clone();
-        let pipeline: RankingPipeline<RankingWebsite> = RankingPipeline::recall_stage(
-            &mut query,
-            self.lambda_model.clone(),
-            self.collector_config.clone(),
-            100,
-        );
+        let pipeline: RankingPipeline<RecallRankingWebpage> =
+            RankingPipeline::<RecallRankingWebpage>::recall_stage(
+                &mut query,
+                self.lambda_model.clone(),
+                self.dual_encoder.clone(),
+                self.collector_config.clone(),
+                100,
+            );
         let parsed_query = self.parse_query(ctx, guard, &query)?;
 
         let mut aggregator = SignalAggregator::new(Some(&parsed_query));
@@ -318,7 +328,7 @@ where
 
     pub fn retrieve_websites(
         &self,
-        websites: &[inverted_index::WebsitePointer],
+        websites: &[inverted_index::WebpagePointer],
         query: &str,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
         let guard = self.index.guard();
@@ -365,15 +375,28 @@ where
 
         let search_result = self.search_initial(&search_query, true)?;
 
-        let search_len = search_result.websites.len();
+        let pointers: Vec<_> = search_result
+            .websites
+            .iter()
+            .map(|website| website.pointer.clone())
+            .collect();
 
-        let top_websites = pipeline.apply(search_result.websites);
+        let websites: Vec<_> = self
+            .retrieve_websites(&pointers, &query.query)?
+            .into_iter()
+            .zip_eq(search_result.websites)
+            .map(|(webpage, ranking)| PrecisionRankingWebpage::new(webpage, ranking))
+            .collect();
+
+        let search_len = websites.len();
+
+        let top_websites = pipeline.apply(websites);
 
         let has_more_results = search_len != top_websites.len();
 
         let pointers: Vec<_> = top_websites
             .iter()
-            .map(|website| website.pointer.clone())
+            .map(|website| website.ranking.pointer.clone())
             .collect();
 
         let retrieved_sites = self.retrieve_websites(&pointers, &search_query.query)?;
@@ -387,7 +410,7 @@ where
             let mut ranking_signals = HashMap::new();
 
             for signal in ALL_SIGNALS {
-                if let Some(score) = ranking.signals.get(signal) {
+                if let Some(score) = ranking.ranking.signals.get(signal) {
                     ranking_signals.insert(signal, *score);
                 }
             }
@@ -430,7 +453,7 @@ mod tests {
 
         for i in 0..NUM_WEBSITES {
             index
-                .insert(Webpage {
+                .insert(&Webpage {
                     html: Html::parse(
                         r#"
             <html>

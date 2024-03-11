@@ -169,3 +169,11 @@ impl Widgets {
         true
     }
 }
+
+pub struct Indexing;
+
+impl Indexing {
+    pub fn batch_size() -> usize {
+        512
+    }
+}

@@ -10,7 +10,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             for _ in 0..10 {
                 HarmonicCentrality::calculate(&webgraph);
             }
-        })
+        });
     });
 }
 

@@ -119,7 +119,7 @@ impl Header {
             ]),
         };
 
-        if header.magic != 72173914 {
+        if header.magic != 72_173_914 {
             return Err(Error::InvalidMagicNumber);
         }
 
@@ -412,12 +412,12 @@ impl Cluster {
         match size {
             OffsetSize::U32 => {
                 blob_offsets.push(ClusterOffset {
-                    offset: u32::from_le_bytes([
+                    offset: u64::from(u32::from_le_bytes([
                         reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
                         reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
                         reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
                         reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                    ]) as u64,
+                    ])),
                 });
             }
             OffsetSize::U64 => {
@@ -445,12 +445,12 @@ impl Cluster {
             match size {
                 OffsetSize::U32 => {
                     blob_offsets.push(ClusterOffset {
-                        offset: u32::from_le_bytes([
+                        offset: u64::from(u32::from_le_bytes([
                             reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
                             reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
                             reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
                             reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        ]) as u64,
+                        ])),
                     });
                 }
                 OffsetSize::U64 => {
@@ -490,7 +490,7 @@ impl Cluster {
         })
     }
 
-    pub fn get_blob(&self, blob_number: usize) -> Option<&[u8]> {
+    #[must_use] pub fn get_blob(&self, blob_number: usize) -> Option<&[u8]> {
         if self.blob_offsets.is_empty() {
             return None;
         }
@@ -524,7 +524,7 @@ impl ZimFile {
 
         let header = Header::from_bytes(&mmap)?;
 
-        if header.magic != 72173914 {
+        if header.magic != 72_173_914 {
             return Err(Error::InvalidMagicNumber);
         }
 
@@ -574,19 +574,19 @@ impl ZimFile {
         Ok(Some(Cluster::from_bytes(&self.mmap[pointer..])?))
     }
 
-    pub fn mime_types(&self) -> &MimeTypes {
+    #[must_use] pub fn mime_types(&self) -> &MimeTypes {
         &self.mime_types
     }
 
-    pub fn url_pointers(&self) -> &UrlPointerList {
+    #[must_use] pub fn url_pointers(&self) -> &UrlPointerList {
         &self.url_pointers
     }
 
-    pub fn title_pointers(&self) -> &TitlePointerList {
+    #[must_use] pub fn title_pointers(&self) -> &TitlePointerList {
         &self.title_pointers
     }
 
-    pub fn dir_entries(&self) -> DirEntryIterator<'_> {
+    #[must_use] pub fn dir_entries(&self) -> DirEntryIterator<'_> {
         DirEntryIterator::new(&self.mmap, &self.url_pointers)
     }
 
@@ -644,7 +644,7 @@ mod tests {
 
         let zim = ZimFile::open(data_path).unwrap();
 
-        assert_eq!(zim.header.magic, 72173914);
+        assert_eq!(zim.header.magic, 72_173_914);
         assert_eq!(zim.header.major_version, 5);
         assert_eq!(zim.header.minor_version, 0);
 

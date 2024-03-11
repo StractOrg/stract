@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    bangs::BangHit, config::defaults, ranking::pipeline::RankingWebsite,
+    bangs::BangHit, config::defaults, ranking::pipeline::RecallRankingWebpage,
     search_prettifier::DisplayedWebpage, webpage::region::Region,
 };
 
@@ -63,7 +63,7 @@ pub struct SearchQuery {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialWebsiteResult {
     pub num_websites: Option<usize>,
-    pub websites: Vec<RankingWebsite>,
+    pub websites: Vec<RecallRankingWebpage>,
     pub has_more: bool,
 }
 

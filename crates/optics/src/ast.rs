@@ -45,7 +45,7 @@ impl Display for RankingCoeff {
 
         match &self.target {
             RankingTarget::Signal(signal) => {
-                write!(f, "Signal(\"{}\")", signal)?;
+                write!(f, "Signal(\"{signal}\")")?;
             }
         }
 
@@ -77,12 +77,7 @@ impl From<Vec<RawOpticBlock>> for RawOptic {
             }
         }
 
-        RawOptic {
-            rankings,
-            rules,
-            host_preferences,
-            discard_non_matching,
-        }
+        RawOptic { rules, rankings, host_preferences, discard_non_matching }
     }
 }
 
