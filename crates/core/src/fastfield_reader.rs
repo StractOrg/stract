@@ -37,6 +37,10 @@ impl FastFieldReader {
     pub fn get_segment(&self, segment: &SegmentId) -> Arc<SegmentReader> {
         Arc::clone(self.inner.segments.get(segment).unwrap())
     }
+
+    pub fn borrow_segment(&self, segment: &SegmentId) -> &SegmentReader {
+        self.inner.segments.get(segment).unwrap()
+    }
 }
 
 impl FastFieldReader {

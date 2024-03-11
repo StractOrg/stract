@@ -393,8 +393,8 @@ impl InvertedIndex {
                 _ => false,
             };
 
+            let segment_reader = ctx.tv_searcher.segment_reader(pointer.address.segment);
             if update_segment {
-                let segment_reader = ctx.tv_searcher.segment_reader(pointer.address.segment);
                 aggregator.register_segment(&ctx.tv_searcher, segment_reader, fastfield_reader)?;
             }
 
@@ -402,7 +402,11 @@ impl InvertedIndex {
 
             top_websites.push((
                 orig_index,
-                RecallRankingWebpage::new(pointer, &mut aggregator),
+                RecallRankingWebpage::new(
+                    pointer,
+                    fastfield_reader.borrow_segment(&segment_reader.segment_id()),
+                    &mut aggregator,
+                ),
             ));
         }
 

@@ -852,12 +852,6 @@ impl SignalAggregator {
         s
     }
 
-    pub fn fastfield_readers(&self) -> Option<Arc<fastfield_reader::SegmentReader>> {
-        self.segment_reader
-            .as_ref()
-            .map(|segment_reader| segment_reader.borrow().fastfield_reader.clone())
-    }
-
     fn prepare_textfields(
         &self,
         tv_searcher: &tantivy::Searcher,
