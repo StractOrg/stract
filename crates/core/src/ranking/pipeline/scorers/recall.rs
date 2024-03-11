@@ -28,12 +28,12 @@ use crate::{
 
 use super::{
     calculate_score,
-    embedding::{EmbeddingScorer, TitleEmbeddings},
+    embedding::{EmbeddingScorer, KeywordEmbeddings, TitleEmbeddings},
     MultiScorer, Scorer,
 };
 
 pub struct Recall<T: RankableWebpage> {
-    scorers: MultiScorer<T>,
+    sub_scorers: MultiScorer<T>,
     lambdamart: Option<Arc<LambdaMART>>,
     signal_coefficients: Option<SignalCoefficient>,
 }
@@ -46,10 +46,16 @@ impl Recall<RecallRankingWebpage> {
         Self {
             lambdamart,
             signal_coefficients: None,
-            scorers: MultiScorer::new(vec![Box::new(EmbeddingScorer::<
-                RecallRankingWebpage,
-                TitleEmbeddings,
-            >::new(dual_encoder))]),
+            sub_scorers: MultiScorer::new(vec![
+                Box::new(
+                    EmbeddingScorer::<RecallRankingWebpage, TitleEmbeddings>::new(
+                        dual_encoder.clone(),
+                    ),
+                ),
+                Box::new(
+                    EmbeddingScorer::<RecallRankingWebpage, KeywordEmbeddings>::new(dual_encoder),
+                ),
+            ]),
         }
     }
 }
@@ -62,17 +68,23 @@ impl Recall<ScoredWebpagePointer> {
         Self {
             lambdamart,
             signal_coefficients: None,
-            scorers: MultiScorer::new(vec![Box::new(EmbeddingScorer::<
-                ScoredWebpagePointer,
-                TitleEmbeddings,
-            >::new(dual_encoder))]),
+            sub_scorers: MultiScorer::new(vec![
+                Box::new(
+                    EmbeddingScorer::<ScoredWebpagePointer, TitleEmbeddings>::new(
+                        dual_encoder.clone(),
+                    ),
+                ),
+                Box::new(
+                    EmbeddingScorer::<ScoredWebpagePointer, KeywordEmbeddings>::new(dual_encoder),
+                ),
+            ]),
         }
     }
 }
 
 impl Scorer<RecallRankingWebpage> for Recall<RecallRankingWebpage> {
     fn score(&self, webpages: &mut [RecallRankingWebpage]) {
-        self.scorers.score(webpages);
+        self.sub_scorers.score(webpages);
 
         for webpage in webpages {
             webpage.set_score(calculate_score(
@@ -84,14 +96,14 @@ impl Scorer<RecallRankingWebpage> for Recall<RecallRankingWebpage> {
     }
 
     fn set_query_info(&mut self, query: &SearchQuery) {
-        self.scorers.set_query_info(query);
+        self.sub_scorers.set_query_info(query);
         self.signal_coefficients = query.optic.as_ref().map(SignalCoefficient::from_optic);
     }
 }
 
 impl Scorer<ScoredWebpagePointer> for Recall<ScoredWebpagePointer> {
     fn score(&self, webpages: &mut [crate::searcher::api::ScoredWebpagePointer]) {
-        self.scorers.score(webpages);
+        self.sub_scorers.score(webpages);
 
         for webpage in webpages {
             webpage.set_score(calculate_score(

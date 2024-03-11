@@ -320,6 +320,7 @@ pub enum FastField {
     LikelyHasPaywall,
     LinkDensity,
     TitleEmbeddings,
+    KeywordEmbeddings,
 }
 
 impl FastField {
@@ -363,6 +364,7 @@ impl FastField {
             FastField::LikelyHasPaywall => "likely_has_paywall",
             FastField::LinkDensity => "link_density",
             FastField::TitleEmbeddings => "title_embeddings",
+            FastField::KeywordEmbeddings => "keyword_embeddings",
         }
     }
 }
@@ -379,7 +381,7 @@ pub enum Field {
     Text(TextField),
 }
 
-static ALL_FIELDS: [Field; 69] = [
+static ALL_FIELDS: [Field; 70] = [
     Field::Text(TextField::Title),
     Field::Text(TextField::CleanBody),
     Field::Text(TextField::StemmedTitle),
@@ -450,6 +452,7 @@ static ALL_FIELDS: [Field; 69] = [
     Field::Fast(FastField::LikelyHasPaywall),
     Field::Fast(FastField::LinkDensity),
     Field::Fast(FastField::TitleEmbeddings),
+    Field::Fast(FastField::KeywordEmbeddings),
 ];
 
 impl Field {
@@ -713,6 +716,9 @@ impl Field {
             Field::Fast(FastField::TitleEmbeddings) => {
                 IndexingOption::Bytes(BytesOptions::default().set_fast())
             }
+            Field::Fast(FastField::KeywordEmbeddings) => {
+                IndexingOption::Bytes(BytesOptions::default().set_fast())
+            }
         }
     }
 
@@ -838,6 +844,7 @@ impl FastField {
             FastField::LikelyHasPaywall => DataType::U64,
             FastField::LinkDensity => DataType::U64,
             FastField::TitleEmbeddings => DataType::Bytes,
+            FastField::KeywordEmbeddings => DataType::Bytes,
         }
     }
 }

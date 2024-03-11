@@ -116,12 +116,25 @@ impl RecallRankingWebpage {
             .as_ref()
             .and_then(|s| Embedding::new(s, hidden_size).ok())
     }
+
+    fn keyword_emb(&self, hidden_size: usize) -> Option<Embedding> {
+        self.keyword_embedding
+            .as_ref()
+            .and_then(|s| Embedding::new(s, hidden_size).ok())
+    }
 }
 
 impl ScoredWebpagePointer {
     fn title_emb(&self, hidden_size: usize) -> Option<Embedding> {
         self.as_ranking()
             .title_embedding
+            .as_ref()
+            .and_then(|s| Embedding::new(s, hidden_size).ok())
+    }
+
+    fn keyword_emb(&self, hidden_size: usize) -> Option<Embedding> {
+        self.as_ranking()
+            .keyword_embedding
             .as_ref()
             .and_then(|s| Embedding::new(s, hidden_size).ok())
     }
@@ -134,7 +147,6 @@ impl<W: RankableWebpage, E: EmbeddingSignal<W>> Scorer<W> for EmbeddingScorer<W,
             for webpage in webpages.iter_mut() {
                 if let Some(emb) = E::embedding(webpage, hidden_size) {
                     let sim = query_emb.dot(&emb).unwrap_or_default();
-                    dbg!(sim);
                     E::insert_signal(webpage, sim, coefficient);
                 }
             }
@@ -199,47 +211,47 @@ impl EmbeddingSignal<RecallRankingWebpage> for TitleEmbeddings {
     }
 }
 
-// impl EmbeddingSignal<ScoredWebpagePointer> for KeywordEmbeddings {
-//     fn signal() -> Signal {
-//         Signal::KeywordEmbeddingSimilarity
-//     }
-//
-//     fn embedding(webpage: &ScoredWebpagePointer, hidden_size: usize) -> Option<Embedding> {
-//         webpage.keyword_emb(hidden_size)
-//     }
-//
-//     fn insert_signal(webpage: &mut ScoredWebpagePointer, score: f64, coefficient: f64) {
-//         let sig = <KeywordEmbeddings as EmbeddingSignal<ScoredWebpagePointer>>::signal();
-//         webpage.as_ranking_mut().signals.insert(
-//             sig,
-//             SignalScore {
-//                 coefficient,
-//                 value: score,
-//             },
-//         );
-//     }
-// }
-//
-// impl EmbeddingSignal<RecallRankingWebpage> for KeywordEmbeddings {
-//     fn signal() -> Signal {
-//         Signal::KeywordEmbeddingSimilarity
-//     }
-//
-//     fn embedding(webpage: &RecallRankingWebpage, hidden_size: usize) -> Option<Embedding> {
-//         webpage.keyword_emb(hidden_size)
-//     }
-//
-//     fn insert_signal(webpage: &mut RecallRankingWebpage, score: f64, coefficient: f64) {
-//         let sig = <KeywordEmbeddings as EmbeddingSignal<RecallRankingWebpage>>::signal();
-//         webpage.signals.insert(
-//             sig,
-//             SignalScore {
-//                 coefficient,
-//                 value: score,
-//             },
-//         );
-//     }
-// }
+impl EmbeddingSignal<ScoredWebpagePointer> for KeywordEmbeddings {
+    fn signal() -> Signal {
+        Signal::KeywordEmbeddingSimilarity
+    }
+
+    fn embedding(webpage: &ScoredWebpagePointer, hidden_size: usize) -> Option<Embedding> {
+        webpage.keyword_emb(hidden_size)
+    }
+
+    fn insert_signal(webpage: &mut ScoredWebpagePointer, score: f64, coefficient: f64) {
+        let sig = <KeywordEmbeddings as EmbeddingSignal<ScoredWebpagePointer>>::signal();
+        webpage.as_ranking_mut().signals.insert(
+            sig,
+            SignalScore {
+                coefficient,
+                value: score,
+            },
+        );
+    }
+}
+
+impl EmbeddingSignal<RecallRankingWebpage> for KeywordEmbeddings {
+    fn signal() -> Signal {
+        Signal::KeywordEmbeddingSimilarity
+    }
+
+    fn embedding(webpage: &RecallRankingWebpage, hidden_size: usize) -> Option<Embedding> {
+        webpage.keyword_emb(hidden_size)
+    }
+
+    fn insert_signal(webpage: &mut RecallRankingWebpage, score: f64, coefficient: f64) {
+        let sig = <KeywordEmbeddings as EmbeddingSignal<RecallRankingWebpage>>::signal();
+        webpage.signals.insert(
+            sig,
+            SignalScore {
+                coefficient,
+                value: score,
+            },
+        );
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -48,17 +48,33 @@ pub struct RecallRankingWebpage {
     pub signals: EnumMap<Signal, SignalScore>,
     pub optic_boost: Option<f64>,
     pub title_embedding: Option<StoredEmbeddings>,
+    pub keyword_embedding: Option<StoredEmbeddings>,
     pub score: f64,
 }
 
 impl RecallRankingWebpage {
     pub fn new(pointer: WebpagePointer, aggregator: &mut SignalAggregator) -> Self {
+        let title_embedding: Option<Vec<u8>> = aggregator
+            .fastfield_readers()
+            .unwrap()
+            .get_field_reader(pointer.address.doc_id)
+            .get(FastField::TitleEmbeddings)
+            .into();
+
+        let keyword_embedding: Option<Vec<u8>> = aggregator
+            .fastfield_readers()
+            .unwrap()
+            .get_field_reader(pointer.address.doc_id)
+            .get(FastField::KeywordEmbeddings)
+            .into();
+
         let mut res = RecallRankingWebpage {
             signals: EnumMap::new(),
             score: pointer.score.total,
             optic_boost: None,
             pointer: pointer.clone(),
-            title_embedding: None,
+            title_embedding: title_embedding.map(StoredEmbeddings),
+            keyword_embedding: keyword_embedding.map(StoredEmbeddings),
         };
 
         for computed_signal in aggregator.compute_signals(pointer.address.doc_id).flatten() {
@@ -69,15 +85,6 @@ impl RecallRankingWebpage {
         if let Some(boost) = aggregator.boosts(pointer.address.doc_id) {
             res.optic_boost = Some(boost);
         }
-
-        let title_embedding: Option<Vec<u8>> = aggregator
-            .fastfield_readers()
-            .unwrap()
-            .get_field_reader(pointer.address.doc_id)
-            .get(FastField::TitleEmbeddings)
-            .into();
-
-        res.title_embedding = title_embedding.map(StoredEmbeddings);
 
         res
     }

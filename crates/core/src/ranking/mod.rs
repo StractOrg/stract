@@ -877,8 +877,93 @@ mod tests {
         assert_eq!(result.webpages[0].url, "https://www.a.com/");
     }
 
-    // #[test]
-    // fn keyword_embeddings() {
-    //     todo!();
-    // }
+    #[test]
+    fn keyword_embeddings() {
+        let data_path = Path::new("../../data/summarizer/dual_encoder");
+        if !data_path.exists() {
+            // Skip the test if the test data is not available
+            return;
+        }
+
+        let worker = setup_worker(data_path);
+
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut a = Webpage::test_parse(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>Homemade Heart Brownie Recipe</title>
+                    </head>
+                    <body>
+                        best chocolate cake {CONTENT} {}
+                    </body>
+                </html>
+            "#,
+                crate::rand_words(100)
+            ),
+            "https://www.a.com/",
+        )
+        .unwrap();
+
+        a.keywords = vec![
+            "chocolate".to_string(),
+            "cake".to_string(),
+            "recipe".to_string(),
+        ];
+
+        let mut b = Webpage::test_parse(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>How To Best Use an iMac as a Monitor for a PC</title>
+                    </head>
+                    <body>
+                        best chocolate cake {CONTENT} {}
+                    </body>
+                </html>
+            "#,
+                crate::rand_words(100)
+            ),
+            "https://www.b.com/",
+        )
+        .unwrap();
+
+        b.keywords = vec!["imac".to_string()];
+
+        let mut pages = vec![a, b];
+
+        worker.set_keyword_embeddings(&mut pages);
+
+        assert!(pages.iter().all(|p| p.keyword_embedding.is_some()));
+
+        for page in pages {
+            index.insert(&page).expect("failed to insert webpage");
+        }
+
+        index.commit().expect("failed to commit index");
+
+        let mut searcher = LocalSearcher::new(index);
+        searcher
+            .set_dual_encoder(DualEncoder::open(data_path).expect("failed to open dual encoder"));
+
+        let result = searcher
+            .search(&SearchQuery {
+                query: "best chocolate cake".to_string(),
+                optic: Some(Optic {
+                    rankings: vec![RankingCoeff {
+                        target: RankingTarget::Signal("keyword_embedding_similarity".to_string()),
+                        value: 100_000.0,
+                    }],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
+            .expect("Search failed");
+
+        assert_eq!(result.webpages.len(), 2);
+        assert_eq!(result.webpages[0].url, "https://www.a.com/");
+    }
 }

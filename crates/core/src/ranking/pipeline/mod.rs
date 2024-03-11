@@ -221,6 +221,7 @@ mod tests {
                     signals,
                     optic_boost: None,
                     title_embedding: None,
+                    keyword_embedding: None,
                     score: 1.0 / i as f64,
                 }
             })

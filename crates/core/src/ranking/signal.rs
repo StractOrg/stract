@@ -136,6 +136,8 @@ pub enum Signal {
     LinkDensity,
     #[serde(rename = "title_embedding_similarity")]
     TitleEmbeddingSimilarity,
+    #[serde(rename = "keyword_embedding_similarity")]
+    KeywordEmbeddingSimilarity,
 }
 
 impl From<Signal> for usize {
@@ -144,7 +146,7 @@ impl From<Signal> for usize {
     }
 }
 
-pub const ALL_SIGNALS: [Signal; 39] = [
+pub const ALL_SIGNALS: [Signal; 40] = [
     Signal::Bm25Title,
     Signal::Bm25TitleBigrams,
     Signal::Bm25TitleTrigrams,
@@ -184,6 +186,7 @@ pub const ALL_SIGNALS: [Signal; 39] = [
     Signal::UrlSlashes,
     Signal::LinkDensity,
     Signal::TitleEmbeddingSimilarity,
+    Signal::KeywordEmbeddingSimilarity,
 ];
 
 fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f64 {
@@ -334,6 +337,7 @@ impl Signal {
             Signal::UrlDigits => 0.01,
             Signal::LinkDensity => 0.0,
             Signal::TitleEmbeddingSimilarity => 0.01,
+            Signal::KeywordEmbeddingSimilarity => 0.01,
         }
     }
 
@@ -474,9 +478,11 @@ impl Signal {
                 .get_mut(self.as_textfield().unwrap())
                 .map(|field| idf_sum(field, doc)),
 
-            Signal::CrossEncoderSnippet => None, // this is calculated in a later step
-            Signal::CrossEncoderTitle => None,   // this is calculated in a later step
-            Signal::TitleEmbeddingSimilarity => None, // this is calculated in a later step
+            Signal::CrossEncoderSnippet
+            | Signal::CrossEncoderTitle
+            | Signal::TitleEmbeddingSimilarity
+            | Signal::KeywordEmbeddingSimilarity => None, // these are calculated in a later step
+
             Signal::LambdaMART => None,
         };
 
@@ -584,6 +590,7 @@ impl Signal {
             | Signal::InboundSimilarity
             | Signal::LambdaMART
             | Signal::TitleEmbeddingSimilarity
+            | Signal::KeywordEmbeddingSimilarity
             | Signal::QueryCentrality => {
                 tracing::error!("signal {self:?} cannot be precomputed");
                 None

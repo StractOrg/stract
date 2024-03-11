@@ -555,6 +555,7 @@ impl Html {
                 | Field::Fast(FastField::Region)
                 | Field::Fast(FastField::HostNodeID)
                 | Field::Fast(FastField::TitleEmbeddings)
+                | Field::Fast(FastField::KeywordEmbeddings)
                 | Field::Text(TextField::Keywords)
                 | Field::Text(TextField::DmozDescription) => {}
             }
