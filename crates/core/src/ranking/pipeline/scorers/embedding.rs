@@ -142,6 +142,10 @@ impl ScoredWebpagePointer {
 
 impl<W: RankableWebpage, E: EmbeddingSignal<W>> Scorer<W> for EmbeddingScorer<W, E> {
     fn score(&self, webpages: &mut [W]) {
+        if !webpages.iter().any(E::has_embedding) {
+            return;
+        }
+
         if let Some((query_emb, coefficient)) = self.query_emb_and_coefficient(E::signal()) {
             let hidden_size = query_emb.size();
             for webpage in webpages.iter_mut() {
@@ -164,6 +168,7 @@ pub struct KeywordEmbeddings;
 
 pub trait EmbeddingSignal<W>: Send + Sync {
     fn signal() -> Signal;
+    fn has_embedding(webpage: &W) -> bool;
     fn embedding(webpage: &W, hidden_size: usize) -> Option<Embedding>;
     fn insert_signal(webpage: &mut W, score: f64, coefficient: f64);
 }
@@ -171,6 +176,10 @@ pub trait EmbeddingSignal<W>: Send + Sync {
 impl EmbeddingSignal<ScoredWebpagePointer> for TitleEmbeddings {
     fn signal() -> Signal {
         Signal::TitleEmbeddingSimilarity
+    }
+
+    fn has_embedding(webpage: &ScoredWebpagePointer) -> bool {
+        webpage.as_ranking().title_embedding.is_some()
     }
 
     fn embedding(webpage: &ScoredWebpagePointer, hidden_size: usize) -> Option<Embedding> {
@@ -192,6 +201,10 @@ impl EmbeddingSignal<ScoredWebpagePointer> for TitleEmbeddings {
 impl EmbeddingSignal<RecallRankingWebpage> for TitleEmbeddings {
     fn signal() -> Signal {
         Signal::TitleEmbeddingSimilarity
+    }
+
+    fn has_embedding(webpage: &RecallRankingWebpage) -> bool {
+        webpage.title_embedding.is_some()
     }
 
     fn embedding(webpage: &RecallRankingWebpage, hidden_size: usize) -> Option<Embedding> {
@@ -216,6 +229,10 @@ impl EmbeddingSignal<ScoredWebpagePointer> for KeywordEmbeddings {
         Signal::KeywordEmbeddingSimilarity
     }
 
+    fn has_embedding(webpage: &ScoredWebpagePointer) -> bool {
+        webpage.as_ranking().keyword_embedding.is_some()
+    }
+
     fn embedding(webpage: &ScoredWebpagePointer, hidden_size: usize) -> Option<Embedding> {
         webpage.keyword_emb(hidden_size)
     }
@@ -235,6 +252,10 @@ impl EmbeddingSignal<ScoredWebpagePointer> for KeywordEmbeddings {
 impl EmbeddingSignal<RecallRankingWebpage> for KeywordEmbeddings {
     fn signal() -> Signal {
         Signal::KeywordEmbeddingSimilarity
+    }
+
+    fn has_embedding(webpage: &RecallRankingWebpage) -> bool {
+        webpage.keyword_embedding.is_some()
     }
 
     fn embedding(webpage: &RecallRankingWebpage, hidden_size: usize) -> Option<Embedding> {

@@ -136,7 +136,7 @@ impl EmptyFieldScorer {
             .segment_reader
             .get_field_reader(doc)
             .get(self.num_tokens_fastfield)
-            .into();
+            .and_then(|v| v.as_u64());
         s.unwrap_or_default()
     }
 }
@@ -279,7 +279,7 @@ impl NormalPatternScorer {
             .segment_reader
             .get_field_reader(self.doc())
             .get(self.num_tokens_field)
-            .into();
+            .and_then(|v| v.as_u64());
         let num_tokens_doc = num_tokens_doc.unwrap();
 
         for (i, pattern_part) in self.pattern.iter().enumerate() {

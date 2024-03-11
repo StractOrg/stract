@@ -294,6 +294,10 @@ fn idf_sum(field: &mut TextFieldData, doc: DocId) -> f64 {
 impl Signal {
     fn is_computable_before_search(&self) -> bool {
         self.as_fastfield().is_some()
+            && !matches!(
+                self,
+                Signal::TitleEmbeddingSimilarity | Signal::KeywordEmbeddingSimilarity
+            )
     }
 
     pub fn default_coefficient(&self) -> f64 {
@@ -356,7 +360,7 @@ impl Signal {
 
         let node_id = fastfield_reader
             .get(FastField::HostNodeID)
-            .as_u64()
+            .and_then(|n| n.as_u64())
             .unwrap();
 
         let host_id: Option<NodeID> = if node_id == u64::MAX {
@@ -369,35 +373,35 @@ impl Signal {
             Signal::HostCentrality | Signal::PageCentrality => {
                 let val = fastfield_reader
                     .get(self.as_fastfield().unwrap())
-                    .as_u64()
+                    .and_then(|v| v.as_u64())
                     .unwrap();
                 Some(val as f64 / FLOAT_SCALING as f64)
             }
             Signal::HostCentralityRank | Signal::PageCentralityRank => {
                 let val = fastfield_reader
                     .get(self.as_fastfield().unwrap())
-                    .as_u64()
+                    .and_then(|v| v.as_u64())
                     .unwrap();
                 Some(score_rank(val as f64))
             }
             Signal::IsHomepage => {
                 let val = fastfield_reader
                     .get(self.as_fastfield().unwrap())
-                    .as_u64()
+                    .and_then(|v| v.as_u64())
                     .unwrap();
                 Some(val as f64)
             }
             Signal::LinkDensity => {
                 let val = fastfield_reader
                     .get(self.as_fastfield().unwrap())
-                    .as_u64()
+                    .and_then(|v| v.as_u64())
                     .unwrap();
                 Some(score_link_density(val as f64 / FLOAT_SCALING as f64))
             }
             Signal::FetchTimeMs => {
                 let fetch_time_ms = fastfield_reader
                     .get(self.as_fastfield().unwrap())
-                    .as_u64()
+                    .and_then(|v| v.as_u64())
                     .unwrap() as usize;
 
                 if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
@@ -409,7 +413,7 @@ impl Signal {
             Signal::UpdateTimestamp => {
                 let val = fastfield_reader
                     .get(self.as_fastfield().unwrap())
-                    .as_u64()
+                    .and_then(|v| v.as_u64())
                     .unwrap() as usize;
 
                 Some(score_timestamp(val, signal_aggregator))
@@ -417,28 +421,28 @@ impl Signal {
             Signal::TrackerScore => {
                 let val = fastfield_reader
                     .get(self.as_fastfield().unwrap())
-                    .as_u64()
+                    .and_then(|v| v.as_u64())
                     .unwrap();
                 Some(score_trackers(val as f64))
             }
             Signal::UrlDigits => {
                 let val = fastfield_reader
                     .get(self.as_fastfield().unwrap())
-                    .as_u64()
+                    .and_then(|v| v.as_u64())
                     .unwrap();
                 Some(score_digits(val as f64))
             }
             Signal::UrlSlashes => {
                 let val = fastfield_reader
                     .get(self.as_fastfield().unwrap())
-                    .as_u64()
+                    .and_then(|v| v.as_u64())
                     .unwrap();
                 Some(score_slashes(val as f64))
             }
             Signal::Region => {
                 let val = fastfield_reader
                     .get(self.as_fastfield().unwrap())
-                    .as_u64()
+                    .and_then(|v| v.as_u64())
                     .unwrap();
                 let region = Region::from_id(val);
                 Some(score_region(region, signal_aggregator))
@@ -621,6 +625,7 @@ impl Signal {
             Signal::UrlDigits => Some(FastField::NumPathAndQueryDigits),
             Signal::LinkDensity => Some(FastField::LinkDensity),
             Signal::TitleEmbeddingSimilarity => Some(FastField::TitleEmbeddings),
+            Signal::KeywordEmbeddingSimilarity => Some(FastField::KeywordEmbeddings),
             _ => None,
         }
     }

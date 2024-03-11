@@ -52,12 +52,14 @@ impl FastFieldReader {
             for field in Field::all().filter_map(Field::as_fast) {
                 match field.data_type() {
                     DataType::U64 => {
-                        let reader = fastfield_readers.u64(field.name()).unwrap();
-                        u64s.insert(field, reader);
+                        if let Ok(reader) = fastfield_readers.u64(field.name()) {
+                            u64s.insert(field, reader);
+                        }
                     }
                     DataType::Bytes => {
-                        let reader = fastfield_readers.bytes(field.name()).unwrap().unwrap();
-                        bytes.insert(field, reader);
+                        if let Some(reader) = fastfield_readers.bytes(field.name()).ok().flatten() {
+                            bytes.insert(field, reader);
+                        }
                     }
                 };
             }
@@ -83,7 +85,7 @@ struct AllReaders {
 
 pub enum Value {
     U64(u64),
-    Bytes(Option<Vec<u8>>),
+    Bytes(Vec<u8>),
 }
 
 impl Value {
@@ -96,7 +98,7 @@ impl Value {
 
     pub fn as_bytes(&self) -> Option<&[u8]> {
         match self {
-            Value::Bytes(Some(val)) => Some(val),
+            Value::Bytes(val) => Some(val),
             _ => None,
         }
     }
@@ -110,12 +112,6 @@ impl From<u64> for Value {
 
 impl From<Vec<u8>> for Value {
     fn from(val: Vec<u8>) -> Self {
-        Value::Bytes(Some(val))
-    }
-}
-
-impl From<Option<Vec<u8>>> for Value {
-    fn from(val: Option<Vec<u8>>) -> Self {
         Value::Bytes(val)
     }
 }
@@ -135,7 +131,7 @@ impl<'a> From<&'a Value> for Option<&'a [u8]> {
 impl From<Value> for Option<Vec<u8>> {
     fn from(val: Value) -> Self {
         match val {
-            Value::Bytes(val) => val,
+            Value::Bytes(val) => Some(val),
             _ => None,
         }
     }
@@ -147,32 +143,32 @@ pub struct FieldReader<'a> {
 }
 
 impl<'a> FieldReader<'a> {
-    pub fn get(&self, field: FastField) -> Value {
+    pub fn get(&self, field: FastField) -> Option<Value> {
         match field.data_type() {
-            DataType::U64 => self
-                .readers
-                .u64s
-                .get(field)
-                .unwrap()
-                .values
-                .get_val(self.doc)
-                .into(),
+            DataType::U64 => Some(
+                self.readers
+                    .u64s
+                    .get(field)?
+                    .values
+                    .get_val(self.doc)
+                    .into(),
+            ),
 
             DataType::Bytes => {
-                let reader = self.readers.bytes.get(field).unwrap();
+                let reader = self.readers.bytes.get(field)?;
                 let ord = reader.ords().values.get_val(self.doc);
 
-                if ord > reader.num_terms() as u64 {
-                    return Value::Bytes(None);
+                if ord > reader.num_terms() as u64 || reader.num_terms() == 0 {
+                    return None;
                 }
 
                 let mut bytes = Vec::new();
                 reader.ord_to_bytes(ord, &mut bytes).unwrap();
 
                 if bytes.is_empty() {
-                    Value::Bytes(None)
+                    None
                 } else {
-                    bytes.into()
+                    Some(bytes.into())
                 }
             }
         }

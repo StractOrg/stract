@@ -143,8 +143,8 @@ impl TopSegmentCollector {
         let field_reader = self.fastfield_segment_reader.get_field_reader(doc);
 
         let hash = [
-            field_reader.get(field1).as_u64().unwrap(),
-            field_reader.get(field2).as_u64().unwrap(),
+            field_reader.get(field1).unwrap().as_u64().unwrap(),
+            field_reader.get(field2).unwrap().as_u64().unwrap(),
         ];
         combine_u64s(hash).into()
     }
@@ -170,6 +170,7 @@ impl TopSegmentCollector {
             .fastfield_segment_reader
             .get_field_reader(doc)
             .get(FastField::SimHash)
+            .unwrap()
             .into();
 
         self.bucket_collector.insert(SegmentDoc {

@@ -59,14 +59,14 @@ impl RecallRankingWebpage {
             .unwrap()
             .get_field_reader(pointer.address.doc_id)
             .get(FastField::TitleEmbeddings)
-            .into();
+            .and_then(|v| v.into());
 
         let keyword_embedding: Option<Vec<u8>> = aggregator
             .fastfield_readers()
             .unwrap()
             .get_field_reader(pointer.address.doc_id)
             .get(FastField::KeywordEmbeddings)
-            .into();
+            .and_then(|v| v.into());
 
         let mut res = RecallRankingWebpage {
             signals: EnumMap::new(),
