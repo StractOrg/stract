@@ -15,12 +15,12 @@
       <div class="inline-block space-x-1">
         {#each meaning.similar as similar}
           <div class="float-left inline [&:not(:last-child)]:after:content-[',']">
-            <ResultLink
-              _class="float-left hover:underline"
+            <a
+              class="float-left hover:underline"
               href="/search?q={encodeURIComponent('definition of ' + similar)}"
             >
               {similar}
-            </ResultLink>
+            </a>
           </div>
         {/each}
       </div>

@@ -17,7 +17,7 @@
     {title}
     use:improvements={resultIndex}
     target={$resultsInNewTab ? '_blank' : null}
-    rel={$resultsInNewTab ? 'noopener noreferrer' : null}
+    rel={$resultsInNewTab ? 'noopener' : null}
   >
     <slot />
   </a>
@@ -27,7 +27,7 @@
     class={_class}
     {title}
     target={$resultsInNewTab ? '_blank' : null}
-    rel={$resultsInNewTab ? 'noopener noreferrer' : null}
+    rel={$resultsInNewTab ? 'noopener' : null}
   >
     <slot />
   </a>
