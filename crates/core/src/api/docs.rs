@@ -59,8 +59,8 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::search_prettifier::CodeOrText,
 
                 crate::snippet::TextSnippet,
-                crate::snippet::TextSnippetFragment,
-                crate::snippet::TextSnippetFragmentKind,
+                crate::highlighted::HighlightedFragment,
+                crate::highlighted::HighlightedKind,
 
                 crate::entity_index::entity::EntitySnippet,
                 crate::entity_index::entity::EntitySnippetFragment,

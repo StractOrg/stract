@@ -4,5 +4,5 @@ set -e
 cargo check
 cargo check --no-default-features
 
-# skip frontend check until https://github.com/sveltejs/kit/issues/11906 is fixed
-# cd frontend && npm run wasm && npm install && npm run check
+cd crates/client-wasm && wasm-pack build --target web && cd -
+cd frontend && npm install && npm run check && npm run lint

@@ -9,6 +9,7 @@
 </script>
 
 <Article>
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   {@html data.md}
 
   <div class="mt-10 flex justify-center">

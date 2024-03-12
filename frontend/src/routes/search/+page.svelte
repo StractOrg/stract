@@ -81,7 +81,7 @@
         <Searchbar {query} />
       </div>
       <div class="mx-auto flex w-full justify-end sm:justify-between">
-        <div class="hidden h-full flex-col space-x-2 text-xs text-neutral sm:flex">
+        <div class="text-neutral hidden h-full flex-col space-x-2 text-xs sm:flex">
           <p class="h-fit">
             {#if results.numHits != null}
               Found <span class="font-medium">{results.numHits.toLocaleString()}</span> results in
@@ -112,7 +112,13 @@
             <a
               class="font-medium"
               href="/search?q={encodeURIComponent(results.spellCorrection.raw)}"
-              >{@html results.spellCorrection.highlighted}</a
+              >{#each results.spellCorrection.highlighted as frag}
+                {#if frag.kind == 'highlighted'}
+                  <b><i>{frag.text}</i></b>
+                {:else}
+                  {frag.text}
+                {/if}
+              {/each}</a
             >
           </div>
         </div>
@@ -139,18 +145,18 @@
         <div class="grid grid-cols-[repeat(3,auto)] items-center justify-center gap-2">
           {#if data.prevPageSearchParams}
             <a href="/search?{data.prevPageSearchParams}">
-              <ChevronLeft class="text-xl text-primary hover:text-primary-focus" />
+              <ChevronLeft class="text-primary hover:text-primary-focus text-xl" />
             </a>
           {:else}
-            <ChevronLeft class="text-xl text-neutral" />
+            <ChevronLeft class="text-neutral text-xl" />
           {/if}
           <div>Page {data.currentPage}</div>
           {#if data.nextPageSearchParams}
             <a href="/search?{data.nextPageSearchParams}">
-              <ChevronRight class="text-xl text-primary hover:text-primary-focus" />
+              <ChevronRight class="text-primary hover:text-primary-focus text-xl" />
             </a>
           {:else}
-            <ChevronRight class="text-xl text-neutral" />
+            <ChevronRight class="text-neutral text-xl" />
           {/if}
         </div>
       </div>

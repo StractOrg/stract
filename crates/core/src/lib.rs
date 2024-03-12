@@ -51,6 +51,7 @@ mod executor;
 mod external_sort;
 mod fastfield_reader;
 pub mod feed;
+mod highlighted;
 mod human_website_annotations;
 pub mod hyperloglog;
 pub mod image_store;

@@ -105,7 +105,7 @@
       </div>
       <form
         class={twJoin(
-          'border-base-400 bg-base-100 mb-2 flex w-full max-w-lg rounded-full border p-[1px] pl-3 transition focus-within:shadow',
+          'mb-2 flex w-full max-w-lg rounded-full border border-base-400 bg-base-100 p-[1px] pl-3 transition focus-within:shadow',
         )}
         id="site-input-container"
         on:submit|preventDefault={() => addWebsite(inputWebsite, true)}
@@ -186,7 +186,7 @@
                 >
                   <PlusCircleOutline
                     class={twJoin(
-                      'text-success text-xl group-hover:scale-105 group-active:scale-95',
+                      'text-xl text-success group-hover:scale-105 group-active:scale-95',
                     )}
                   />
                 </button>
@@ -200,7 +200,7 @@
         </div>
         <div class="noscript:hidden flex w-full justify-center">
           <button
-            class="text-accent h-6 w-6 cursor-pointer rounded-full"
+            class="h-6 w-6 cursor-pointer rounded-full text-accent"
             aria-label="Show more similar sites"
             on:click={() => {
               if (limit == LIMIT_OPTIONS[LIMIT_OPTIONS.length - 1]) {
