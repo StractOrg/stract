@@ -1,3 +1,2 @@
 #!/bin/bash
-cd frontend && npm run format && cd -
 ./scripts/ci/all

@@ -81,7 +81,7 @@
         <Searchbar {query} />
       </div>
       <div class="mx-auto flex w-full justify-end sm:justify-between">
-        <div class="text-neutral hidden h-full flex-col space-x-2 text-xs sm:flex">
+        <div class="hidden h-full flex-col space-x-2 text-xs text-neutral sm:flex">
           <p class="h-fit">
             {#if results.numHits != null}
               Found <span class="font-medium">{results.numHits.toLocaleString()}</span> results in
@@ -145,18 +145,18 @@
         <div class="grid grid-cols-[repeat(3,auto)] items-center justify-center gap-2">
           {#if data.prevPageSearchParams}
             <a href="/search?{data.prevPageSearchParams}">
-              <ChevronLeft class="text-primary hover:text-primary-focus text-xl" />
+              <ChevronLeft class="text-xl text-primary hover:text-primary-focus" />
             </a>
           {:else}
-            <ChevronLeft class="text-neutral text-xl" />
+            <ChevronLeft class="text-xl text-neutral" />
           {/if}
           <div>Page {data.currentPage}</div>
           {#if data.nextPageSearchParams}
             <a href="/search?{data.nextPageSearchParams}">
-              <ChevronRight class="text-primary hover:text-primary-focus text-xl" />
+              <ChevronRight class="text-xl text-primary hover:text-primary-focus" />
             </a>
           {:else}
-            <ChevronRight class="text-neutral text-xl" />
+            <ChevronRight class="text-xl text-neutral" />
           {/if}
         </div>
       </div>
