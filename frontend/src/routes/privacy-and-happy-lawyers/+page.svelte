@@ -6,5 +6,6 @@
 </script>
 
 <Article>
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   {@html data.md}
 </Article>

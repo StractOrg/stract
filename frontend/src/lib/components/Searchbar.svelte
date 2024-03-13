@@ -1,7 +1,7 @@
 <script lang="ts">
   import MagnifyingGlass from '~icons/heroicons/magnifying-glass';
   import Button from '$lib/components/Button.svelte';
-  import { api } from '$lib/api';
+  import { api, type HighlightedFragment } from '$lib/api';
   import { safeSearchStore, hostRankingsStore, postSearchStore } from '$lib/stores';
   import { browser } from '$app/environment';
   import { derived } from 'svelte/store';
@@ -13,9 +13,12 @@
 
   export let query = '';
   let selected: 'none' | number = 'none';
-  let suggestions: string[] = [];
+  let suggestions: HighlightedFragment[][] = [];
 
   let cancelLastRequest: null | (() => void) = null;
+
+  const suggestionText = (s: HighlightedFragment[]): string => s.map((x) => x.text).join('');
+
   const updateSuggestions = (query: string) => {
     cancelLastRequest?.();
 
@@ -26,7 +29,7 @@
 
     const { data, cancel } = api.autosuggest({ q: query });
     cancelLastRequest = cancel;
-    data.then((res) => (suggestions = res.map((x) => x.raw)));
+    data.then((res) => (suggestions = res.map((x) => x.highlighted)));
   };
 
   let didChangeInput = false;
@@ -39,7 +42,7 @@
     compressRanked(rankingsToRanked($host_rankings)),
   );
 
-  const selectSuggestion = (s: string) => (query = s);
+  const selectSuggestion = (s: HighlightedFragment[]) => (query = suggestionText(s));
 
   const moveSelection = (step: number) => {
     selected = match(selected)
@@ -50,7 +53,7 @@
         () => 'none',
       )
       .otherwise((v) => (v + suggestions.length + step) % suggestions.length);
-    query = typeof selected == 'number' ? suggestions[selected] : (query = lastRealQuery);
+    query = typeof selected == 'number' ? suggestionText(suggestions[selected]) : lastRealQuery;
     didChangeInput = false;
   };
 
@@ -70,11 +73,6 @@
       .otherwise(() => {
         didChangeInput = true;
       });
-  };
-
-  const splitAtOverlap = (suggestion: string) => {
-    const lastIndex = [...suggestion].findLastIndex((a, i) => a == lastRealQuery[i]);
-    return [suggestion.slice(0, lastIndex + 1), suggestion.slice(lastIndex + 1)];
   };
 
   let suggestionsDiv: HTMLDivElement | undefined;
@@ -161,9 +159,13 @@
           >
             <MagnifyingGlass class="w-4 text-neutral" />
             <span>
-              {@html splitAtOverlap(s)[0]}<span class="font-medium"
-                >{@html splitAtOverlap(s)[1]}</span
-              >
+              {#each s as fragment}
+                {#if fragment.kind == 'highlighted'}
+                  <span class="font-medium">{fragment.text}</span>
+                {:else}
+                  {fragment.text}
+                {/if}
+              {/each}
             </span></button
           >
         {/each}

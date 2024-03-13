@@ -17,6 +17,7 @@
 use std::ops::Range;
 
 use crate::config::SnippetConfig;
+use crate::highlighted::{HighlightedFragment, HighlightedKind};
 use crate::query::Query;
 use crate::tokenizer::{BigramTokenizer, Normal, Stemmed, Tokenizer, TrigramTokenizer};
 use crate::web_spell::sentence_ranges;
@@ -46,37 +47,10 @@ struct PassageCandidate {
     doc_terms: HashMap<String, u64>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum TextSnippetFragmentKind {
-    Normal,
-    Highlighted,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct TextSnippetFragment {
-    pub kind: TextSnippetFragmentKind,
-    text: String,
-}
-
-impl TextSnippetFragment {
-    pub fn new_unhighlighted(text: String) -> Self {
-        TextSnippetFragment {
-            kind: TextSnippetFragmentKind::Normal,
-            text,
-        }
-    }
-
-    pub fn text(&self) -> &str {
-        &self.text
-    }
-}
-
 #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TextSnippet {
-    pub fragments: Vec<TextSnippetFragment>,
+    pub fragments: Vec<HighlightedFragment>,
 }
 
 impl TextSnippet {
@@ -125,14 +99,14 @@ impl SnippetBuilder {
 
         for range in self.highlights {
             if range.start > last_end {
-                fragments.push(TextSnippetFragment {
-                    kind: TextSnippetFragmentKind::Normal,
+                fragments.push(HighlightedFragment {
+                    kind: HighlightedKind::Normal,
                     text: self.fragment[last_end..range.start].to_string(),
                 });
             }
 
-            fragments.push(TextSnippetFragment {
-                kind: TextSnippetFragmentKind::Highlighted,
+            fragments.push(HighlightedFragment {
+                kind: HighlightedKind::Highlighted,
                 text: self.fragment[range.start..range.end].to_string(),
             });
 
@@ -140,8 +114,8 @@ impl SnippetBuilder {
         }
 
         if last_end < self.fragment.len() {
-            fragments.push(TextSnippetFragment {
-                kind: TextSnippetFragmentKind::Normal,
+            fragments.push(HighlightedFragment {
+                kind: HighlightedKind::Normal,
                 text: self.fragment[last_end..].to_string(),
             });
         }
@@ -301,7 +275,7 @@ fn snippet_string(
         && snip
             .fragments
             .iter()
-            .any(|f| f.kind == TextSnippetFragmentKind::Highlighted)
+            .any(|f| f.kind == HighlightedKind::Highlighted)
     {
         return snip;
     }
@@ -327,8 +301,8 @@ pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfi
 
     if text.is_empty() {
         return TextSnippet {
-            fragments: vec![TextSnippetFragment {
-                kind: TextSnippetFragmentKind::Normal,
+            fragments: vec![HighlightedFragment {
+                kind: HighlightedKind::Normal,
                 text: "".to_string(),
             }],
         };
@@ -373,9 +347,9 @@ Survey in 2016, 2017, and 2018."#;
 
         text.fragments
             .into_iter()
-            .map(|TextSnippetFragment { kind, text }| match kind {
-                TextSnippetFragmentKind::Normal => text,
-                TextSnippetFragmentKind::Highlighted => {
+            .map(|HighlightedFragment { kind, text }| match kind {
+                HighlightedKind::Normal => text,
+                HighlightedKind::Highlighted => {
                     format!("{HIGHLIGHTEN_PREFIX}{}{HIGHLIGHTEN_POSTFIX}", text)
                 }
             })

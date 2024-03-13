@@ -112,7 +112,13 @@
             <a
               class="font-medium"
               href="/search?q={encodeURIComponent(results.spellCorrection.raw)}"
-              >{@html results.spellCorrection.highlighted}</a
+              >{#each results.spellCorrection.highlighted as frag}
+                {#if frag.kind == 'highlighted'}
+                  <b><i>{frag.text}</i></b>
+                {:else}
+                  {frag.text}
+                {/if}
+              {/each}</a
             >
           </div>
         </div>

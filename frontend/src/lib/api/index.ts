@@ -297,8 +297,14 @@ export type FullEdge = {
   label: string;
   to: Node;
 };
+export type HighlightedFragment = {
+  kind: HighlightedKind;
+  text: string;
+};
+export type HighlightedKind = 'normal' | 'highlighted';
+export const HIGHLIGHTED_KINDS = ['normal', 'highlighted'] satisfies HighlightedKind[];
 export type HighlightedSpellCorrection = {
-  highlighted: string;
+  highlighted: HighlightedFragment[];
   raw: string;
 };
 export type HostRankings = {
@@ -374,21 +380,12 @@ export type StackOverflowQuestion = {
   body: CodeOrText[];
 };
 export type Suggestion = {
-  highlighted: string;
+  highlighted: HighlightedFragment[];
   raw: string;
 };
 export type TextSnippet = {
-  fragments: TextSnippetFragment[];
+  fragments: HighlightedFragment[];
 };
-export type TextSnippetFragment = {
-  kind: TextSnippetFragmentKind;
-  text: string;
-};
-export type TextSnippetFragmentKind = 'normal' | 'highlighted';
-export const TEXT_SNIPPET_FRAGMENT_KINDS = [
-  'normal',
-  'highlighted',
-] satisfies TextSnippetFragmentKind[];
 export type ThesaurusWidget = {
   meanings: PartOfSpeechMeaning[];
   term: Lemma;

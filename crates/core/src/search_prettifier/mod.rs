@@ -25,6 +25,7 @@ use url::Url;
 use utoipa::ToSchema;
 
 use crate::{
+    highlighted::HighlightedFragment,
     inverted_index::RetrievedWebpage,
     ranking::{Signal, SignalScore},
     snippet::TextSnippet,
@@ -57,12 +58,12 @@ pub enum RichSnippet {
 #[serde(rename_all = "camelCase")]
 pub struct HighlightedSpellCorrection {
     pub raw: String,
-    pub highlighted: String,
+    pub highlighted: Vec<HighlightedFragment>,
 }
 
 impl From<web_spell::Correction> for HighlightedSpellCorrection {
     fn from(correction: web_spell::Correction) -> Self {
-        let mut highlighted = String::new();
+        let mut highlighted = Vec::new();
         let mut raw = String::new();
 
         for term in correction.terms {
@@ -71,22 +72,27 @@ impl From<web_spell::Correction> for HighlightedSpellCorrection {
                     orig: _,
                     correction,
                 } => {
-                    highlighted
-                        .push_str(&("<b><i>".to_string() + correction.as_str() + "</i></b>"));
+                    let mut correction = correction.trim().to_string();
+                    correction.push(' ');
+
+                    highlighted.push(HighlightedFragment::new_highlighted(correction.clone()));
                     raw.push_str(&correction);
                 }
                 CorrectionTerm::NotCorrected(orig) => {
-                    highlighted.push_str(&orig);
+                    let mut orig = orig.trim().to_string();
+                    orig.push(' ');
+
+                    highlighted.push(HighlightedFragment::new_normal(orig.clone()));
                     raw.push_str(&orig);
                 }
             }
-
-            raw.push(' ');
-            highlighted.push(' ');
         }
 
         raw = raw.trim_end().to_string();
-        highlighted = highlighted.trim_end().to_string();
+
+        if let Some(last) = highlighted.last_mut() {
+            last.text = last.text.trim_end().to_string();
+        }
 
         Self { raw, highlighted }
     }

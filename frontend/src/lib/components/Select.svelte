@@ -1,21 +1,23 @@
 <script lang="ts" generics="T">
   import { createEventDispatcher } from 'svelte';
 
+  // eslint-disable-next-line no-undef
   type Option = { value: T; label: string; title?: string };
 
   interface $$Props extends Omit<Partial<HTMLSelectElement>, 'form' | 'value' | 'options'> {
     class?: string;
-    value: T;
+    value: T; // eslint-disable-line no-undef
     form?: string;
     submitOnChange?: boolean;
     options: Option[];
   }
 
-  export let value: T;
+  export let value: T; // eslint-disable-line no-undef
   export let form: string | undefined = void 0;
   export let submitOnChange = false;
   export let options: $$Props['options'];
 
+  // eslint-disable-next-line no-undef
   const dispatch = createEventDispatcher<{ change: T }>();
 </script>
 

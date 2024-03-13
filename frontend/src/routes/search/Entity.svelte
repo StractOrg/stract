@@ -45,7 +45,7 @@
       <div class="mb-2 mt-7 flex w-full flex-col px-4 text-sm">
         <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
           {#each entity.info as [key, value]}
-            <div class="text-neutral">{@html key}</div>
+            <div class="text-neutral">{key}</div>
             <div>
               <EntitySnippet snippet={value} />
             </div>

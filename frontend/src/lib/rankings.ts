@@ -26,7 +26,7 @@ export const rankingsToRanked = (rankings: SiteRankings): RankedSites => {
 export const rankedToRankings = (ranked: RankedSites): SiteRankings => {
   const result: SiteRankings = {};
 
-  for (const [_, ranking] of Object.entries(Ranking)) {
+  for (const [, ranking] of Object.entries(Ranking)) {
     for (const site of ranked[ranking]) {
       result[site] = ranking;
     }

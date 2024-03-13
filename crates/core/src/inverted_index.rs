@@ -39,6 +39,7 @@ use url::Url;
 use crate::collector::{Hashes, MainCollector};
 use crate::config::SnippetConfig;
 use crate::fastfield_reader::FastFieldReader;
+use crate::highlighted::HighlightedFragment;
 use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::initial::Score;
@@ -46,8 +47,8 @@ use crate::ranking::pipeline::RecallRankingWebpage;
 use crate::ranking::SignalAggregator;
 use crate::schema::{FastField, Field, TextField};
 use crate::search_ctx::Ctx;
+use crate::snippet;
 use crate::snippet::TextSnippet;
-use crate::snippet::{self, TextSnippetFragment};
 use crate::tokenizer::{
     BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, TrigramTokenizer,
 };
@@ -475,7 +476,7 @@ impl InvertedIndex {
                 };
 
                 page.snippet = TextSnippet {
-                    fragments: vec![TextSnippetFragment::new_unhighlighted(snippet)],
+                    fragments: vec![HighlightedFragment::new_unhighlighted(snippet)],
                 };
             } else {
                 let min_body_len = if url.is_homepage() {
