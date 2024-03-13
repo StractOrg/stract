@@ -32,6 +32,10 @@ where
     S: sonic::service::Service,
 {
     pub fn new(addr: SocketAddr) -> Self {
+        Self::create(addr)
+    }
+
+    pub fn create(addr: SocketAddr) -> Self {
         Self {
             addr,
             _phantom: std::marker::PhantomData,
@@ -43,7 +47,7 @@ impl<S> RemoteClient<S>
 where
     S: sonic::service::Service,
 {
-    async fn conn(&self) -> Result<sonic::service::ResilientConnection<S>> {
+    pub async fn conn(&self) -> Result<sonic::service::ResilientConnection<S>> {
         let retry = ExponentialBackoff::from_millis(30)
             .with_limit(Duration::from_millis(200))
             .take(5);
@@ -56,7 +60,7 @@ where
         .await
     }
 
-    async fn send<R: sonic::service::Wrapper<S>>(&self, req: &R) -> Result<R::Response> {
+    pub async fn send<R: sonic::service::Wrapper<S>>(&self, req: &R) -> Result<R::Response> {
         let conn = self.conn().await?;
         conn.send_with_timeout(req, Duration::from_secs(60)).await
     }
@@ -101,10 +105,10 @@ where
         Self { clients }
     }
 
-    pub async fn send<Req, Rep>(&self, req: &Req, selector: &Rep) -> Result<Vec<Req::Response>>
+    pub async fn send<Req, Sel>(&self, req: &Req, selector: &Sel) -> Result<Vec<Req::Response>>
     where
         Req: sonic::service::Wrapper<S>,
-        Rep: ReplicaSelector<S>,
+        Sel: ReplicaSelector<S>,
     {
         let mut futures = Vec::new();
         for client in selector.select(&self.clients) {
@@ -196,15 +200,15 @@ where
         Self { shards }
     }
 
-    async fn send_single<Req, RSel>(
+    async fn send_single<Req, Sel>(
         &self,
         req: &Req,
         shard: &Shard<S, Id>,
-        replica_selector: &RSel,
+        replica_selector: &Sel,
     ) -> Result<(Id, Vec<Req::Response>)>
     where
         Req: sonic::service::Wrapper<S>,
-        RSel: ReplicaSelector<S>,
+        Sel: ReplicaSelector<S>,
     {
         Ok((
             shard.id.clone(),

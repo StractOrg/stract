@@ -126,7 +126,12 @@ pub struct Node {
 impl fmt::Debug for Node {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{:?} @ {:?}", self.data, std::ptr::from_ref::<Node>(self))
+        write!(
+            f,
+            "{:?} @ {:?}",
+            self.data,
+            std::ptr::from_ref::<Node>(self)
+        )
     }
 }
 
@@ -267,14 +272,16 @@ impl NodeRef {
 
     /// Create a new document node.
     #[inline]
-    #[must_use] pub fn new_document() -> NodeRef {
+    #[must_use]
+    pub fn new_document() -> NodeRef {
         NodeRef::new(NodeData::Document(DocumentData {
             _quirks_mode: Cell::new(QuirksMode::NoQuirks),
         }))
     }
 
     /// Return the concatenation of all text nodes in this subtree.
-    #[must_use] pub fn text_contents(&self) -> String {
+    #[must_use]
+    pub fn text_contents(&self) -> String {
         let mut s = String::new();
         for text_node in self.inclusive_descendants().text_nodes() {
             s.push_str(&text_node.borrow());

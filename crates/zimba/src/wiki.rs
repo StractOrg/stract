@@ -210,7 +210,8 @@ pub struct Image {
     pub content: Vec<u8>,
 }
 impl Image {
-    #[must_use] pub fn bytes(&self) -> &[u8] {
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
         &self.content
     }
 }
