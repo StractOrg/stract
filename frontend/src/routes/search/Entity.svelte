@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getApiBase, type DisplayedEntity } from '$lib/api';
   import EntitySnippet from '$lib/components/EntitySnippet.svelte';
+  import ResultLink from './ResultLink.svelte';
 
   export let entity: DisplayedEntity;
 </script>
@@ -9,7 +10,7 @@
   <div class="flex w-full flex-col items-center">
     {#if entity.imageId}
       <div class="w-lg mb-5">
-        <a href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}">
+        <ResultLink href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}">
           <div class="h-40">
             <img
               alt="Image of {entity.title}"
@@ -17,24 +18,27 @@
               src="{getApiBase()}/beta/api/entity_image?imageId={entity.imageId}"
             />
           </div>
-        </a>
+        </ResultLink>
       </div>
     {/if}
     <div class="mb-5 text-xl">
-      <a class="hover:underline" href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}">
+      <ResultLink
+        _class="hover:underline"
+        href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}"
+      >
         {entity.title}
-      </a>
+      </ResultLink>
     </div>
     <div class="text-sm">
       <span><EntitySnippet snippet={entity.smallAbstract} /></span>{' '}
       <span class="italic">
         source:{' '}
-        <a
-          class="text-link visited:text-link-visited hover:underline"
+        <ResultLink
+          _class="text-link visited:text-link-visited hover:underline"
           href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}"
         >
           wikipedia
-        </a>
+        </ResultLink>
       </span>
     </div>
     {#if entity.info.length > 0}
@@ -56,7 +60,7 @@
           {#each entity.relatedEntities as related (related.title)}
             <div class="flex flex-col items-center p-4">
               {#if related.imageId != null}
-                <a href="/search?q={encodeURIComponent(related.title)}">
+                <ResultLink href="/search?q={encodeURIComponent(related.title)}">
                   <div class="h-20 w-20">
                     <img
                       alt="Image of {related.title}"
@@ -64,13 +68,13 @@
                       src="{getApiBase()}/beta/api/entity_image?imageId={related.imageId}&maxWidth=200&maxHeight=200"
                     />
                   </div>
-                </a>
+                </ResultLink>
               {/if}
 
               <div class="line-clamp-3 text-center">
-                <a href="/search?q={encodeURI(related.title)}">
+                <ResultLink href="/search?q={encodeURI(related.title)}">
                   {related.title}
-                </a>
+                </ResultLink>
               </div>
             </div>
           {/each}

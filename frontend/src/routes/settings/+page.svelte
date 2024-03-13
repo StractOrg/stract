@@ -4,6 +4,7 @@
   import SafeSearchSelect from './SafeSearchSelect.svelte';
   import MarkPagesWithAdsSelect from './MarkPagesWithAdsSelect.svelte';
   import MarkPagesWithPaywallSelect from './MarkPagesWithPaywallSelect.svelte';
+  import ResultsInNewTabs from './ResultsInNewTabs.svelte';
 
   const settings = [
     {
@@ -32,6 +33,11 @@
         'Add a marker to search results where it is likely that the page contains a paywall',
       type: 'mark-pages-with-paywall',
     },
+    {
+      title: 'Open results in a new tab',
+      description: 'Keep the search results window open and have links open in new tabs',
+      type: 'results-in-new-tabs',
+    },
   ] as const;
 </script>
 
@@ -57,6 +63,8 @@
                 <MarkPagesWithAdsSelect />
               {:else if setting.type == 'mark-pages-with-paywall'}
                 <MarkPagesWithPaywallSelect />
+              {:else if setting.type == 'results-in-new-tabs'}
+                <ResultsInNewTabs />
               {/if}
             </div>
           </div>

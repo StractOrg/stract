@@ -73,6 +73,9 @@ export const queryIdStore = writableLocalStorage<string | undefined>(QUERY_ID_KE
 const MARK_PAGES_WITH_ADS_KEY = 'markPagesWithAds';
 export const markPagesWithAdsStore = writableLocalStorage<boolean>(MARK_PAGES_WITH_ADS_KEY, false);
 
+const RESULTS_IN_NEW_TAB_KEY = 'resultsInNewTab';
+export const resultsInNewTab = writableLocalStorage<boolean>(RESULTS_IN_NEW_TAB_KEY, false);
+
 const MARK_PAGES_WITH_PAYWALL_KEY = 'markPagesWithPaywall';
 export const markPagesWithPaywallStore = writableLocalStorage<boolean>(
   MARK_PAGES_WITH_PAYWALL_KEY,
