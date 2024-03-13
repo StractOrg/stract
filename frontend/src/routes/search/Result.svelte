@@ -7,11 +7,9 @@
     summariesStore,
     markPagesWithAdsStore,
     markPagesWithPaywallStore,
-    resultsInNewTab,
   } from '$lib/stores';
   import Summary from './Summary.svelte';
   import { derived } from 'svelte/store';
-  import { improvements } from '$lib/improvements';
   import TextSnippet from '$lib/components/TextSnippet.svelte';
   import StackOverflowSnippet from './StackOverflowSnippet.svelte';
   import ResultLink from './ResultLink.svelte';

@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { WordMeaning } from '$lib/api';
-  import ResultLink from './ResultLink.svelte';
 
   export let meaning: WordMeaning;
 </script>
