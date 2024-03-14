@@ -14,19 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
 use openraft::{
     error::{InstallSnapshotError, RaftError},
     network::RPCOption,
-    BasicNode, RaftNetwork, RaftNetworkFactory,
+    BasicNode, Raft, RaftNetwork, RaftNetworkFactory,
 };
 
 use crate::{
-    distributed::{
-        cluster::Cluster,
-        sonic::{self, replication::RemoteClient, service::ResilientConnection},
-    },
+    distributed::sonic::{self, replication::RemoteClient, service::ResilientConnection},
     sonic_service,
 };
 
@@ -34,7 +31,7 @@ use super::{NodeId, TypeConfig};
 
 #[derive(Clone)]
 pub struct Network {
-    pub cluster: Arc<Cluster>,
+    pub raft: Raft<TypeConfig>,
 }
 
 impl RaftNetworkFactory<TypeConfig> for Network {
@@ -47,7 +44,7 @@ impl RaftNetworkFactory<TypeConfig> for Network {
 
         Self::Network {
             client,
-            owner: self.clone(),
+            raft: self.raft.clone(),
         }
     }
 }
@@ -73,7 +70,11 @@ impl sonic::service::Message<NetworkConnection> for AppendEntriesRequest {
     type Response = AppendEntriesResponse;
 
     async fn handle(self, server: &NetworkConnection) -> sonic::Result<Self::Response> {
-        todo!()
+        server
+            .raft
+            .append_entries(self)
+            .await
+            .map_err(|e| sonic::Error::Application(e.into()))
     }
 }
 
@@ -81,7 +82,11 @@ impl sonic::service::Message<NetworkConnection> for InstallSnapshotRequest {
     type Response = InstallSnapshotResponse;
 
     async fn handle(self, server: &NetworkConnection) -> sonic::Result<Self::Response> {
-        todo!()
+        server
+            .raft
+            .install_snapshot(self)
+            .await
+            .map_err(|e| sonic::Error::Application(e.into()))
     }
 }
 
@@ -89,13 +94,17 @@ impl sonic::service::Message<NetworkConnection> for VoteRequest {
     type Response = VoteResponse;
 
     async fn handle(self, server: &NetworkConnection) -> sonic::Result<Self::Response> {
-        todo!()
+        server
+            .raft
+            .vote(self)
+            .await
+            .map_err(|e| sonic::Error::Application(e.into()))
     }
 }
 
 pub struct NetworkConnection {
+    raft: Raft<TypeConfig>,
     client: RemoteClient<NetworkConnection>,
-    owner: Network,
 }
 
 impl NetworkConnection {

@@ -49,8 +49,11 @@ pub enum Error {
     #[error("The request could not be processed")]
     BadRequest,
 
-    #[error("Other")]
-    Other(#[from] anyhow::Error),
+    #[error("The body size ({body_size}) is larger than the maximum allowed ({max_size})")]
+    BodyTooLarge { body_size: usize, max_size: usize },
+
+    #[error("An application error occurred: {0}")]
+    Application(#[from] anyhow::Error),
 }
 
 pub struct Connection<Req, Res> {
@@ -104,11 +107,10 @@ where
         let header: Header = *bytemuck::from_bytes(&header_buf);
 
         if header.body_size > MAX_BODY_SIZE_BYTES {
-            return Err(Error::Other(anyhow::anyhow!(
-                "body size too large: {} (max: {})",
-                header.body_size,
-                MAX_BODY_SIZE_BYTES
-            )));
+            return Err(Error::BodyTooLarge {
+                body_size: header.body_size,
+                max_size: MAX_BODY_SIZE_BYTES,
+            });
         }
 
         let mut buf = vec![0; header.body_size];
@@ -162,11 +164,10 @@ where
         let header: Header = *bytemuck::from_bytes(&header_buf);
 
         if header.body_size > MAX_BODY_SIZE_BYTES {
-            return Err(Error::Other(anyhow::anyhow!(
-                "body size too large: {} (max: {})",
-                header.body_size,
-                MAX_BODY_SIZE_BYTES
-            )));
+            return Err(Error::BodyTooLarge {
+                body_size: header.body_size,
+                max_size: MAX_BODY_SIZE_BYTES,
+            });
         }
 
         let mut buf = vec![0; header.body_size];
