@@ -20,14 +20,15 @@ mod log_store;
 mod network;
 mod store;
 
+use network::api::{Get, Set};
+
 use std::fmt::Debug;
 use std::io::Cursor;
 
 use openraft::BasicNode;
 use openraft::TokioRuntime;
 
-use self::store::Request;
-use self::store::Response;
+use self::network::NetworkConnection;
 
 pub type NodeId = u64;
 
@@ -43,4 +44,43 @@ openraft::declare_raft_types!(
         AsyncRuntime = TokioRuntime,
 );
 
-pub type LogStore = log_store::LogStore<TypeConfig>;
+#[macro_export]
+macro_rules! raft_sonic_request_response {
+    ($service:ident, [$($req:ident),*$(,)?]) => {
+        #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+        pub enum Request {
+            $(
+                $req($req),
+            )*
+        }
+
+        #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+        pub enum Response {
+            $(
+                $req(<$req as crate::distributed::sonic::service::Message<$service>>::Response),
+            )*
+        }
+
+        $(
+        impl TryFrom<Response> for <$req as crate::distributed::sonic::service::Message<$service>>::Response {
+            type Error = crate::distributed::sonic::Error;
+            fn try_from(res: Response) -> Result<Self, Self::Error> {
+                match res {
+                    Response::$req(res) => Ok(res),
+                    _ => Err(crate::distributed::sonic::Error::Application(anyhow::anyhow!("Invalid response for request from Raft"))),
+                }
+            }
+        }
+        )*
+
+        $(
+        impl From<$req> for Request {
+            fn from(req: $req) -> Self {
+                Request::$req(req)
+            }
+        }
+        )*
+    };
+}
+
+raft_sonic_request_response!(NetworkConnection, [Get, Set]);

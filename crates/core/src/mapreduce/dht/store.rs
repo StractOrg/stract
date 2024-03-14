@@ -35,32 +35,11 @@ use serde::Deserialize;
 use serde::Serialize;
 use tokio::sync::RwLock;
 
+use crate::mapreduce::dht::network::api;
+
 use super::NodeId;
 use super::TypeConfig;
-
-/**
- * Here you will set the types of request that will interact with the raft nodes.
- * For example the `Set` will be used to write data (key and value) to the raft database.
- * The `AddNode` will append a new node to the current existing shared list of nodes.
- * You will want to add any request that can write data in all nodes here.
- */
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum Request {
-    Set { key: String, value: String },
-}
-
-/**
- * Here you will defined what type of answer you expect from reading the data of a node.
- * In this example it will return a optional value from a given key in
- * the `Request.Set`.
- *
- * TODO: Should we explain how to create multiple `AppDataResponse`?
- *
- */
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Response {
-    pub value: Option<String>,
-}
+use super::{Request, Response};
 
 #[derive(Debug)]
 pub struct StoredSnapshot {
@@ -174,21 +153,31 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
         for entry in entries {
             tracing::debug!(%entry.log_id, "replicate to sm");
 
+            if let Some(ref last) = sm.last_applied_log {
+                if last >= &entry.log_id {
+                    res.push(Response::Set(()));
+
+                    continue;
+                }
+            }
+
             sm.last_applied_log = Some(entry.log_id);
 
             match entry.payload {
-                EntryPayload::Blank => res.push(Response { value: None }),
+                EntryPayload::Blank => res.push(Response::Set(())),
                 EntryPayload::Normal(ref req) => match req {
-                    Request::Set { key, value } => {
+                    Request::Set(api::Set { key, value }) => {
                         sm.data.insert(key.clone(), value.clone());
-                        res.push(Response {
-                            value: Some(value.clone()),
-                        })
+                        res.push(Response::Set(()))
+                    }
+
+                    Request::Get(api::Get { key: _ }) => {
+                        unreachable!("Get requests should not be replicated")
                     }
                 },
                 EntryPayload::Membership(ref mem) => {
                     sm.last_membership = StoredMembership::new(Some(entry.log_id), mem.clone());
-                    res.push(Response { value: None })
+                    res.push(Response::Set(()))
                 }
             };
         }
@@ -259,7 +248,7 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
 mod tests {
     use openraft::testing::{StoreBuilder, Suite};
 
-    use crate::mapreduce::dht::LogStore;
+    type LogStore = crate::mapreduce::dht::log_store::LogStore<TypeConfig>;
 
     use super::*;
 
