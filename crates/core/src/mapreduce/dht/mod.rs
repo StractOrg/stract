@@ -202,8 +202,6 @@ mod tests {
         raft1.initialize(members.clone()).await?;
         raft2.initialize(members.clone()).await?;
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
         let c1 = RemoteClient::new(addr1);
         let c2 = RemoteClient::new(addr2);
 
@@ -225,6 +223,90 @@ mod tests {
         let c3 = RemoteClient::new(addr3);
         let res = c3.get("hello".to_string()).await?;
         assert_eq!(res, Some("world".to_string()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_node_crash() -> anyhow::Result<()> {
+        let (raft1, server1, addr1) = server(1).await?;
+        let (raft2, server2, addr2) = server(2).await?;
+        let (raft3, server3, addr3) = server(3).await?;
+
+        let servers = vec![server1, server2, server3];
+        let mut handles = Vec::new();
+
+        for server in servers {
+            handles.push(tokio::spawn(async move {
+                loop {
+                    server.accept().await.unwrap();
+                }
+            }));
+        }
+
+        let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2), (3, addr3)]
+            .into_iter()
+            .map(|(id, addr)| (id, BasicNode::new(addr)))
+            .collect();
+
+        raft1.initialize(members.clone()).await?;
+        raft2.initialize(members.clone()).await?;
+        raft3.initialize(members.clone()).await?;
+
+        let c1 = RemoteClient::new(addr1);
+        let c2 = RemoteClient::new(addr2);
+        let c3 = RemoteClient::new(addr3);
+
+        let rc1 = network::raft::RemoteClient::new(1, BasicNode::new(addr1));
+
+        c1.set("hello".to_string(), "world".to_string()).await?;
+
+        let res = c1.get("hello".to_string()).await?;
+        assert_eq!(res, Some("world".to_string()));
+
+        let res = c2.get("hello".to_string()).await?;
+        assert_eq!(res, Some("world".to_string()));
+
+        // crash node 2
+        handles[1].abort();
+        drop(raft2);
+
+        let (raft2, server2, addr2) = server(2).await?;
+        handles[1] = tokio::spawn(async move {
+            loop {
+                server2.accept().await.unwrap();
+            }
+        });
+
+        rc1.join(2, addr2, members.clone()).await?;
+
+        let c2 = RemoteClient::new(addr2);
+
+        let res = c2.get("hello".to_string()).await?;
+        assert_eq!(res, Some("world".to_string()));
+
+        // crash node 2 again
+        handles[1].abort();
+        drop(raft2);
+
+        c3.set("hello".to_string(), "world2".to_string()).await?;
+        let res = c1.get("hello".to_string()).await?;
+        assert_eq!(res, Some("world2".to_string()));
+
+        let (raft2, server2, addr2) = server(2).await?;
+        handles[1] = tokio::spawn(async move {
+            loop {
+                server2.accept().await.unwrap();
+            }
+        });
+        raft2.initialize(members.clone()).await?;
+        rc1.join(2, addr2, members.clone()).await?;
+
+        let c2 = RemoteClient::new(addr2);
+
+        let res = c2.get("hello".to_string()).await?;
+        assert_eq!(res, Some("world2".to_string()));
 
         Ok(())
     }

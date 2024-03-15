@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use std::{collections::BTreeMap, net::SocketAddr, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+    time::Duration,
+};
 
 use openraft::{
     error::{ClientWriteError, ForwardToLeader, InstallSnapshotError, RaftError},
@@ -69,6 +73,19 @@ impl sonic::service::Message<Server> for AddLearnerRequest {
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received add learner request: {:?}", self);
+
+        let mut rem = BTreeSet::new();
+        rem.insert(self.id);
+
+        server
+            .raft
+            .change_membership(ChangeMembers::RemoveVoters(rem.clone()), true)
+            .await?;
+        server
+            .raft
+            .change_membership(ChangeMembers::RemoveNodes(rem.clone()), true)
+            .await?;
+
         let node = BasicNode::new(self.addr);
         server.raft.add_learner(self.id, node, false).await?;
 
