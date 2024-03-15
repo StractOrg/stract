@@ -18,33 +18,24 @@ pub mod api;
 mod raft;
 
 use api::{Get, Set};
-use std::{net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 
-use openraft::{error::RaftError, BasicNode, Raft, RaftNetworkFactory};
+use openraft::{BasicNode, Raft, RaftNetworkFactory};
 
-use crate::{distributed::sonic::replication::RemoteClient, sonic_service};
+use crate::sonic_service;
+
+use self::raft::RemoteClient;
 
 use super::{store::StateMachineStore, NodeId, TypeConfig};
 
 #[derive(Clone)]
-pub struct Network {
-    pub raft: Raft<TypeConfig>,
-    pub state_machine_store: Arc<StateMachineStore>,
-}
+pub struct Network;
 
 impl RaftNetworkFactory<TypeConfig> for Network {
-    type Network = NetworkConnection;
+    type Network = RemoteClient;
 
-    async fn new_client(&mut self, _target: NodeId, node: &BasicNode) -> Self::Network {
-        let addr: SocketAddr = node.addr.parse().expect("addr is not a valid address");
-
-        let client = RemoteClient::new(addr);
-
-        Self::Network {
-            client,
-            raft: self.raft.clone(),
-            state_machine_store: self.state_machine_store.clone(),
-        }
+    async fn new_client(&mut self, target: NodeId, node: &BasicNode) -> Self::Network {
+        RemoteClient::new(target, node.clone())
     }
 }
 
@@ -57,11 +48,8 @@ pub type InstallSnapshotResponse = openraft::raft::InstallSnapshotResponse<NodeI
 pub type VoteRequest = openraft::raft::VoteRequest<NodeId>;
 pub type VoteResponse = openraft::raft::VoteResponse<NodeId>;
 
-type RPCError<E = openraft::error::Infallible> =
-    openraft::error::RPCError<NodeId, BasicNode, RaftError<NodeId, E>>;
-
 sonic_service!(
-    NetworkConnection,
+    Server,
     [
         AppendEntriesRequest,
         InstallSnapshotRequest,
@@ -71,8 +59,16 @@ sonic_service!(
     ]
 );
 
-pub struct NetworkConnection {
+pub struct Server {
     raft: Raft<TypeConfig>,
-    client: RemoteClient<NetworkConnection>,
     state_machine_store: Arc<StateMachineStore>,
+}
+
+impl Server {
+    pub fn new(raft: Raft<TypeConfig>, state_machine_store: Arc<StateMachineStore>) -> Self {
+        Self {
+            raft,
+            state_machine_store,
+        }
+    }
 }

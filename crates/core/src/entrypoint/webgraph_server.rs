@@ -29,7 +29,6 @@ use crate::config::WebgraphGranularity;
 use crate::distributed::cluster::Cluster;
 use crate::distributed::member::Member;
 use crate::distributed::member::Service;
-use crate::distributed::sonic;
 use crate::distributed::sonic::service::Message;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::searcher::DistributedSearcher;
@@ -79,9 +78,9 @@ pub struct Knows {
 impl Message<WebGraphService> for SimilarHosts {
     type Response = Vec<ScoredHost>;
 
-    async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
         if server.similar_hosts_finder.is_none() {
-            return Ok(vec![]);
+            return vec![];
         }
 
         let sites = &self.hosts[..std::cmp::min(self.hosts.len(), MAX_HOSTS)];
@@ -113,14 +112,14 @@ impl Message<WebGraphService> for SimilarHosts {
             })
             .collect_vec();
 
-        Ok(similar_hosts)
+        similar_hosts
     }
 }
 
 impl Message<WebGraphService> for Knows {
     type Response = Option<Node>;
 
-    async fn handle(mut self, server: &WebGraphService) -> sonic::Result<Self::Response> {
+    async fn handle(mut self, server: &WebGraphService) -> Self::Response {
         if let Some(suf) = self.host.strip_prefix("http://") {
             self.host = suf.to_string();
         }
@@ -129,8 +128,7 @@ impl Message<WebGraphService> for Knows {
             self.host = suf.to_string();
         }
 
-        let url = Url::parse(&("http://".to_string() + self.host.as_str()))
-            .map_err(|_| sonic::Error::BadRequest)?;
+        let url = Url::parse(&("http://".to_string() + self.host.as_str())).ok()?;
 
         let node = Node::from(url).into_host();
 
@@ -140,9 +138,9 @@ impl Message<WebGraphService> for Knows {
             .map(|finder| finder.knows_about(&node))
             .unwrap_or(false)
         {
-            Ok(Some(node))
+            Some(node)
         } else {
-            Ok(None)
+            None
         }
     }
 }
@@ -155,13 +153,13 @@ pub struct IngoingLinks {
 impl Message<WebGraphService> for IngoingLinks {
     type Response = Vec<FullEdge>;
 
-    async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
         match server.granularity {
             WebgraphGranularity::Host => {
                 let node = self.node.into_host();
-                Ok(server.graph.ingoing_edges(node))
+                server.graph.ingoing_edges(node)
             }
-            WebgraphGranularity::Page => Ok(server.graph.ingoing_edges(self.node)),
+            WebgraphGranularity::Page => server.graph.ingoing_edges(self.node),
         }
     }
 }
@@ -174,13 +172,13 @@ pub struct OutgoingLinks {
 impl Message<WebGraphService> for OutgoingLinks {
     type Response = Vec<FullEdge>;
 
-    async fn handle(self, server: &WebGraphService) -> sonic::Result<Self::Response> {
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
         match server.granularity {
             WebgraphGranularity::Host => {
                 let node = self.node.into_host();
-                Ok(server.graph.outgoing_edges(node))
+                server.graph.outgoing_edges(node)
             }
-            WebgraphGranularity::Page => Ok(server.graph.outgoing_edges(self.node)),
+            WebgraphGranularity::Page => server.graph.outgoing_edges(self.node),
         }
     }
 }

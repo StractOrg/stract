@@ -111,6 +111,7 @@ utoipa-swagger-ui = { version = "5.0.0", features = ["axum"] }
 uuid = "1.1.2"
 whatlang = { version = "0.16.0", features = ["serde"] }
 zstd = "0.13"
+tracing-test = "0.2.4"
 
 [profile.test.package]
 flate2.opt-level = 3

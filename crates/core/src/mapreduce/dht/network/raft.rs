@@ -14,59 +14,75 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use openraft::{error::InstallSnapshotError, network::RPCOption, RaftNetwork};
+use std::net::SocketAddr;
+
+use openraft::{
+    error::{InstallSnapshotError, RaftError},
+    network::RPCOption,
+    BasicNode, RaftNetwork,
+};
 
 use crate::{
     distributed::sonic::{self, service::ResilientConnection},
-    mapreduce::dht::TypeConfig,
+    mapreduce::dht::{NodeId, TypeConfig},
 };
 
 use super::{
     AppendEntriesRequest, AppendEntriesResponse, InstallSnapshotRequest, InstallSnapshotResponse,
-    NetworkConnection, RPCError, VoteRequest, VoteResponse,
+    Server, VoteRequest, VoteResponse,
 };
 
-impl sonic::service::Message<NetworkConnection> for AppendEntriesRequest {
-    type Response = AppendEntriesResponse;
+impl sonic::service::Message<Server> for AppendEntriesRequest {
+    type Response = Result<AppendEntriesResponse, RaftError<NodeId>>;
 
-    async fn handle(self, server: &NetworkConnection) -> sonic::Result<Self::Response> {
-        server
-            .raft
-            .append_entries(self)
-            .await
-            .map_err(|e| sonic::Error::Application(e.into()))
+    async fn handle(self, server: &Server) -> Self::Response {
+        tracing::debug!("received append entries request: {:?}", self);
+        server.raft.append_entries(self).await
     }
 }
 
-impl sonic::service::Message<NetworkConnection> for InstallSnapshotRequest {
-    type Response = InstallSnapshotResponse;
+impl sonic::service::Message<Server> for InstallSnapshotRequest {
+    type Response = Result<InstallSnapshotResponse, RaftError<NodeId, InstallSnapshotError>>;
 
-    async fn handle(self, server: &NetworkConnection) -> sonic::Result<Self::Response> {
-        server
-            .raft
-            .install_snapshot(self)
-            .await
-            .map_err(|e| sonic::Error::Application(e.into()))
+    async fn handle(self, server: &Server) -> Self::Response {
+        tracing::debug!("received install snapshot request: {:?}", self);
+        server.raft.install_snapshot(self).await
     }
 }
 
-impl sonic::service::Message<NetworkConnection> for VoteRequest {
-    type Response = VoteResponse;
+impl sonic::service::Message<Server> for VoteRequest {
+    type Response = Result<VoteResponse, RaftError<NodeId>>;
 
-    async fn handle(self, server: &NetworkConnection) -> sonic::Result<Self::Response> {
-        server
-            .raft
-            .vote(self)
-            .await
-            .map_err(|e| sonic::Error::Application(e.into()))
+    async fn handle(self, server: &Server) -> Self::Response {
+        tracing::debug!("received vote request: {:?}", self);
+        server.raft.vote(self).await
     }
 }
 
-impl NetworkConnection {
+type RPCError<E = openraft::error::Infallible> =
+    openraft::error::RPCError<NodeId, BasicNode, RaftError<NodeId, E>>;
+
+pub struct RemoteClient {
+    target: NodeId,
+    node: BasicNode,
+    inner: sonic::replication::RemoteClient<Server>,
+}
+
+impl RemoteClient {
+    pub fn new(target: NodeId, node: BasicNode) -> Self {
+        let addr: SocketAddr = node.addr.parse().expect("addr is not a valid address");
+        let inner = sonic::replication::RemoteClient::new(addr);
+
+        Self {
+            target,
+            node,
+            inner,
+        }
+    }
     async fn raft_conn<E: std::error::Error>(
         &self,
-    ) -> Result<ResilientConnection<NetworkConnection>, RPCError<E>> {
-        self.client
+    ) -> Result<ResilientConnection<Server>, RPCError<E>> {
+        self.inner
             .conn()
             .await
             .map_err(|e| RPCError::Unreachable(openraft::error::Unreachable::new(&e)))
@@ -78,7 +94,7 @@ impl NetworkConnection {
         option: RPCOption,
     ) -> Result<R::Response, RPCError<E>>
     where
-        R: sonic::service::Wrapper<NetworkConnection>,
+        R: sonic::service::Wrapper<Server>,
         E: std::error::Error,
     {
         let conn = self.raft_conn().await?;
@@ -95,13 +111,20 @@ impl NetworkConnection {
     }
 }
 
-impl RaftNetwork<TypeConfig> for NetworkConnection {
+impl RaftNetwork<TypeConfig> for RemoteClient {
     async fn append_entries(
         &mut self,
         rpc: AppendEntriesRequest,
         option: RPCOption,
     ) -> Result<AppendEntriesResponse, RPCError> {
-        self.send_raft_rpc(rpc, option).await
+        self.send_raft_rpc(rpc, option).await?.map_err(|e| {
+            openraft::error::RemoteError {
+                target: self.target,
+                target_node: Some(self.node.clone()),
+                source: e,
+            }
+            .into()
+        })
     }
 
     async fn install_snapshot(
@@ -109,7 +132,14 @@ impl RaftNetwork<TypeConfig> for NetworkConnection {
         rpc: InstallSnapshotRequest,
         option: RPCOption,
     ) -> Result<InstallSnapshotResponse, RPCError<InstallSnapshotError>> {
-        self.send_raft_rpc(rpc, option).await
+        self.send_raft_rpc(rpc, option).await?.map_err(|e| {
+            openraft::error::RemoteError {
+                target: self.target,
+                target_node: Some(self.node.clone()),
+                source: e,
+            }
+            .into()
+        })
     }
 
     async fn vote(
@@ -117,6 +147,13 @@ impl RaftNetwork<TypeConfig> for NetworkConnection {
         rpc: VoteRequest,
         option: RPCOption,
     ) -> Result<VoteResponse, RPCError> {
-        self.send_raft_rpc(rpc, option).await
+        self.send_raft_rpc(rpc, option).await?.map_err(|e| {
+            openraft::error::RemoteError {
+                target: self.target,
+                target_node: Some(self.node.clone()),
+                source: e,
+            }
+            .into()
+        })
     }
 }

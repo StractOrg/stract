@@ -116,6 +116,7 @@ insta = { workspace = true }
 maplit = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
+tracing-test = { workspace = true }
 
 [[bench]]
 harness = false

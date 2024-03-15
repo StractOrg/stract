@@ -142,7 +142,7 @@ struct Header {
 }
 
 pub struct Server<Req, Res> {
-    pub(super) listener: TcpListener,
+    listener: TcpListener,
     marker: PhantomData<(Req, Res)>,
 }
 
@@ -285,6 +285,8 @@ mod tests {
     use proptest_derive::Arbitrary;
     use serde::Deserialize;
 
+    use crate::free_socket_addr;
+
     use super::*;
 
     fn fixture<
@@ -303,8 +305,8 @@ mod tests {
             .build()
             .unwrap()
             .block_on(async move {
-                let server = Server::bind(("127.0.0.1", 0)).await.unwrap();
-                let addr = server.listener.local_addr().unwrap();
+                let addr = free_socket_addr();
+                let server = Server::bind(addr.clone()).await.unwrap();
                 let connection = Connection::create(addr).await.unwrap();
 
                 let svr_task = tokio::spawn(async move { svr_fn(server).await });

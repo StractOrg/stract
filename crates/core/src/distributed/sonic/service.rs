@@ -28,12 +28,12 @@ pub trait Service: Sized + Send + Sync + 'static {
     fn handle(
         req: Self::Request,
         server: &Self,
-    ) -> impl std::future::Future<Output = Result<Self::Response>> + Send + '_;
+    ) -> impl std::future::Future<Output = Self::Response> + Send + '_;
 }
 
 pub trait Message<S: Service> {
     type Response;
-    fn handle(self, server: &S) -> impl std::future::Future<Output = Result<Self::Response>>;
+    fn handle(self, server: &S) -> impl std::future::Future<Output = Self::Response>;
 }
 pub trait Wrapper<S: Service>: Message<S> {
     fn wrap_request_ref(req: &Self) -> S::RequestRef<'_>;
@@ -57,15 +57,9 @@ impl<S: Service> Server<S> {
 
         let service = Arc::clone(&self.service);
         tokio::spawn(async move {
-            match S::handle(req.take_body(), &service).await {
-                Ok(res) => {
-                    if let Err(e) = req.respond(res).await {
-                        tracing::error!("failed to respond to request: {}", e);
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("failed to handle request: {}", e);
-                }
+            let res = S::handle(req.take_body(), &service).await;
+            if let Err(e) = req.respond(res).await {
+                tracing::error!("failed to respond to request: {}", e);
             }
         });
 
@@ -192,11 +186,11 @@ macro_rules! sonic_service {
                 // don't have a Send bound by default, and there's currently no
                 // way of specifying that.
                 #[allow(clippy::manual_async_fn)]
-                fn handle(req: Request, server: &Self) -> impl std::future::Future<Output = sonic::Result<Self::Response>> + Send + '_ {
+                fn handle(req: Request, server: &Self) -> impl std::future::Future<Output = Self::Response> + Send + '_ {
                     async move {
                         match req {
                             $(
-                                Request::$req(value) => Ok(Response::$req(sonic::service::Message::handle(value, server).await?)),
+                                Request::$req(value) => Response::$req(sonic::service::Message::handle(value, server).await),
                             )*
                         }
                     }
@@ -280,8 +274,6 @@ mod tests {
         use proptest_derive::Arbitrary;
         use serde::{Deserialize, Serialize};
 
-        use crate::distributed::sonic;
-
         use super::super::Message;
 
         pub struct CounterService {
@@ -300,20 +292,19 @@ mod tests {
         impl Message<CounterService> for Change {
             type Response = i32;
 
-            async fn handle(self, server: &CounterService) -> sonic::Result<Self::Response> {
+            async fn handle(self, server: &CounterService) -> Self::Response {
                 let prev = server
                     .counter
                     .fetch_add(self.amount, std::sync::atomic::Ordering::SeqCst);
-                Ok(prev + self.amount)
+                prev + self.amount
             }
         }
 
         impl Message<CounterService> for Reset {
             type Response = ();
 
-            async fn handle(self, server: &CounterService) -> sonic::Result<Self::Response> {
+            async fn handle(self, server: &CounterService) -> Self::Response {
                 server.counter.store(0, std::sync::atomic::Ordering::SeqCst);
-                Ok(())
             }
         }
     }

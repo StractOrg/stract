@@ -28,7 +28,7 @@ use std::io::Cursor;
 use openraft::BasicNode;
 use openraft::TokioRuntime;
 
-use self::network::NetworkConnection;
+use self::network::Server;
 
 pub type NodeId = u64;
 
@@ -83,4 +83,149 @@ macro_rules! raft_sonic_request_response {
     };
 }
 
-raft_sonic_request_response!(NetworkConnection, [Get, Set]);
+raft_sonic_request_response!(Server, [Get, Set]);
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
+    use tests::network::api::RemoteClient;
+    use tracing_test::traced_test;
+
+    use crate::{distributed::sonic, free_socket_addr};
+    use openraft::Config;
+
+    use super::*;
+
+    async fn server(
+        id: u64,
+    ) -> anyhow::Result<(
+        openraft::Raft<TypeConfig>,
+        sonic::service::Server<Server>,
+        SocketAddr,
+    )> {
+        let config = Config {
+            heartbeat_interval: 500,
+            election_timeout_min: 1500,
+            election_timeout_max: 3000,
+            ..Default::default()
+        };
+
+        let config = Arc::new(config.validate().unwrap());
+
+        let log_store = log_store::LogStore::<TypeConfig>::default();
+        let state_machine_store = Arc::new(store::StateMachineStore::default());
+
+        let network = network::Network;
+
+        let raft = openraft::Raft::new(id, config, network, log_store, state_machine_store.clone())
+            .await?;
+
+        let addr = free_socket_addr();
+
+        let server = Server::new(raft.clone(), state_machine_store)
+            .bind(addr)
+            .await?;
+
+        Ok((raft, server, addr))
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_simple_set_get() -> anyhow::Result<()> {
+        let (raft1, server1, addr1) = server(1).await?;
+        let (raft2, server2, addr2) = server(2).await?;
+        let (raft3, server3, addr3) = server(3).await?;
+
+        let servers = vec![server1, server2, server3];
+
+        for server in servers {
+            tokio::spawn(async move {
+                loop {
+                    server.accept().await.unwrap();
+                }
+            });
+        }
+
+        let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2), (3, addr3)]
+            .into_iter()
+            .map(|(id, addr)| (id, BasicNode::new(addr)))
+            .collect();
+
+        raft1.initialize(members.clone()).await?;
+        raft2.initialize(members.clone()).await?;
+        raft3.initialize(members.clone()).await?;
+
+        let c1 = RemoteClient::new(addr1);
+        let c2 = RemoteClient::new(addr2);
+        let c3 = RemoteClient::new(addr3);
+
+        c1.set("hello".to_string(), "world".to_string()).await?;
+
+        let res = c1.get("hello".to_string()).await?;
+        assert_eq!(res, Some("world".to_string()));
+
+        let res = c2.get("hello".to_string()).await?;
+        assert_eq!(res, Some("world".to_string()));
+
+        c2.set("hello".to_string(), "world2".to_string()).await?;
+        let res = c3.get("hello".to_string()).await?;
+        assert_eq!(res, Some("world2".to_string()));
+
+        let res = c1.get("hello".to_string()).await?;
+        assert_eq!(res, Some("world2".to_string()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    #[ignore = "[WIP] need to figure out how to add a new node to the cluster"]
+    async fn test_member_join() -> anyhow::Result<()> {
+        let (raft1, server1, addr1) = server(1).await?;
+        let (raft2, server2, addr2) = server(2).await?;
+        let (raft3, server3, addr3) = server(3).await?;
+
+        let servers = vec![server1, server2, server3];
+
+        for server in servers {
+            tokio::spawn(async move {
+                loop {
+                    server.accept().await.unwrap();
+                }
+            });
+        }
+
+        let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2)]
+            .into_iter()
+            .map(|(id, addr)| (id, BasicNode::new(addr)))
+            .collect();
+
+        raft1.initialize(members.clone()).await?;
+        raft2.initialize(members.clone()).await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        let c1 = RemoteClient::new(addr1);
+        let c2 = RemoteClient::new(addr2);
+
+        c1.set("hello".to_string(), "world".to_string()).await?;
+
+        let res = c2.get("hello".to_string()).await?;
+
+        assert_eq!(res, Some("world".to_string()));
+
+        let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2), (3, addr3)]
+            .into_iter()
+            .map(|(id, addr)| (id, BasicNode::new(addr)))
+            .collect();
+
+        raft3.initialize(members.clone()).await?;
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+        let c3 = RemoteClient::new(addr3);
+        let res = c3.get("hello".to_string()).await?;
+        assert_eq!(res, Some("world".to_string()));
+
+        Ok(())
+    }
+}

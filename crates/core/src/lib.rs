@@ -170,6 +170,16 @@ fn rand_words(num_words: usize) -> String {
     res.trim().to_string()
 }
 
+#[cfg(test)]
+fn free_socket_addr() -> std::net::SocketAddr {
+    use std::net::{Ipv4Addr, TcpListener};
+
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    addr
+}
+
 fn ceil_char_boundary(str: &str, index: usize) -> usize {
     let mut res = index;
 

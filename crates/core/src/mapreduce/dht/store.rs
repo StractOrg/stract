@@ -155,7 +155,7 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
 
             if let Some(ref last) = sm.last_applied_log {
                 if last >= &entry.log_id {
-                    res.push(Response::Set(()));
+                    res.push(Response::Set(Ok(())));
 
                     continue;
                 }
@@ -164,11 +164,11 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
             sm.last_applied_log = Some(entry.log_id);
 
             match entry.payload {
-                EntryPayload::Blank => res.push(Response::Set(())),
+                EntryPayload::Blank => res.push(Response::Set(Ok(()))),
                 EntryPayload::Normal(ref req) => match req {
                     Request::Set(api::Set { key, value }) => {
                         sm.data.insert(key.clone(), value.clone());
-                        res.push(Response::Set(()))
+                        res.push(Response::Set(Ok(())))
                     }
 
                     Request::Get(api::Get { key: _ }) => {
@@ -177,7 +177,7 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
                 },
                 EntryPayload::Membership(ref mem) => {
                     sm.last_membership = StoredMembership::new(Some(entry.log_id), mem.clone());
-                    res.push(Response::Set(()))
+                    res.push(Response::Set(Ok(())))
                 }
             };
         }

@@ -81,24 +81,18 @@ impl SearchService {
 
 impl sonic::service::Message<SearchService> for RetrieveWebsites {
     type Response = Option<Vec<inverted_index::RetrievedWebpage>>;
-    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
-        match server
+    async fn handle(self, server: &SearchService) -> Self::Response {
+        server
             .local_searcher
             .retrieve_websites(&self.websites, &self.query)
-        {
-            Ok(response) => Ok(Some(response)),
-            Err(_) => Ok(None),
-        }
+            .ok()
     }
 }
 
 impl sonic::service::Message<SearchService> for Search {
     type Response = Option<InitialWebsiteResult>;
-    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
-        match server.local_searcher.search_initial(&self.query, true) {
-            Ok(result) => Ok(Some(result)),
-            Err(_) => Ok(None),
-        }
+    async fn handle(self, server: &SearchService) -> Self::Response {
+        server.local_searcher.search_initial(&self.query, true).ok()
     }
 }
 

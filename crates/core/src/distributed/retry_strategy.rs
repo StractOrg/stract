@@ -1,7 +1,8 @@
 /*
- * This file is copied from [tokio_retry](https://github.com/srijs/rust-tokio-retry/blob/master/src/strategy/exponential_backoff.rs)
- * as it seems silly to pull-in a new dependency for a single file.
+ * This file is partially copied from [tokio_retry](https://github.com/srijs/rust-tokio-retry/blob/master/src/strategy/exponential_backoff.rs)
+ * and modified as it seems silly to pull-in a new dependency for a single file.
  * */
+use rand::Rng;
 use std::iter::Iterator;
 use std::time::Duration;
 use std::u64::MAX as U64_MAX;
@@ -63,6 +64,28 @@ impl Iterator for ExponentialBackoff {
         }
 
         Some(duration)
+    }
+}
+
+pub struct RandomBackoff {
+    min: Duration,
+    max: Duration,
+}
+
+impl RandomBackoff {
+    pub fn new(min: Duration, max: Duration) -> RandomBackoff {
+        RandomBackoff { min, max }
+    }
+}
+
+impl Iterator for RandomBackoff {
+    type Item = Duration;
+
+    fn next(&mut self) -> Option<Duration> {
+        let mut rng = rand::thread_rng();
+        let range = self.max - self.min;
+        let duration = rng.gen_range(0..range.as_millis()) + self.min.as_millis();
+        Some(Duration::from_millis(duration as u64))
     }
 }
 
