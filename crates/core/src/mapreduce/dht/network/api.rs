@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 use crate::{distributed::retry_strategy::RandomBackoff, Result};
 use anyhow::anyhow;
@@ -93,10 +93,13 @@ impl RemoteClient {
                 .likely_leader
                 .read()
                 .await
-                .send(&Set {
-                    key: key.clone(),
-                    value: value.clone(),
-                })
+                .send_with_timeout(
+                    &Set {
+                        key: key.clone(),
+                        value: value.clone(),
+                    },
+                    Duration::from_secs(5),
+                )
                 .await;
 
             tracing::debug!(".set() got response: {res:?}");
@@ -151,7 +154,11 @@ impl RemoteClient {
 
     pub async fn get(&self, key: String) -> Result<Option<String>> {
         for backoff in Self::retry_strat() {
-            match self.self_remote.send(&Get { key: key.clone() }).await {
+            match self
+                .self_remote
+                .send_with_timeout(&Get { key: key.clone() }, Duration::from_secs(5))
+                .await
+            {
                 Ok(res) => return Ok(res),
                 Err(e) => match e {
                     sonic::Error::IO(_)

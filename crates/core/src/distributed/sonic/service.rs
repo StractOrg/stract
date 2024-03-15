@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use tokio::net::ToSocketAddrs;
 
@@ -78,6 +78,7 @@ impl<'a, S: Service> Connection<'a, S> {
             inner: super::Connection::create(server).await?,
         })
     }
+
     #[allow(dead_code)]
     pub async fn create_with_timeout(
         server: impl ToSocketAddrs,
@@ -87,6 +88,17 @@ impl<'a, S: Service> Connection<'a, S> {
             inner: super::Connection::create_with_timeout(server, timeout).await?,
         })
     }
+
+    pub async fn create_with_timeout_retry(
+        server: impl ToSocketAddrs + Clone,
+        timeout: Duration,
+        retry: impl Iterator<Item = Duration>,
+    ) -> Result<Connection<'a, S>> {
+        Ok(Connection {
+            inner: super::Connection::create_with_timeout_retry(server, timeout, retry).await?,
+        })
+    }
+
     #[allow(dead_code)]
     pub async fn send_without_timeout<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
         Ok(R::unwrap_response(
@@ -96,11 +108,12 @@ impl<'a, S: Service> Connection<'a, S> {
         )
         .unwrap())
     }
+
     #[allow(dead_code)]
     pub async fn send<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
         Ok(R::unwrap_response(self.inner.send(&R::wrap_request_ref(request)).await?).unwrap())
     }
-    #[allow(dead_code)]
+
     pub async fn send_with_timeout<R: Wrapper<S>>(
         self,
         request: &'a R,
@@ -112,31 +125,6 @@ impl<'a, S: Service> Connection<'a, S> {
                 .await?,
         )
         .unwrap())
-    }
-}
-
-pub struct ResilientConnection<'a, S: Service> {
-    inner: super::ResilientConnection<S::RequestRef<'a>, S::Response>,
-}
-
-impl<'a, S: Service> ResilientConnection<'a, S> {
-    pub async fn create_with_timeout<Rt: Iterator<Item = Duration>>(
-        addr: SocketAddr,
-        timeout: Duration,
-        retry: Rt,
-    ) -> Result<ResilientConnection<'a, S>> {
-        Ok(Self {
-            inner: super::ResilientConnection::create_with_timeout(addr, timeout, retry).await?,
-        })
-    }
-
-    pub async fn send_with_timeout<R: Wrapper<S>>(
-        self,
-        request: &'a R,
-        timeout: Duration,
-    ) -> Result<R::Response> {
-        let req_ref = R::wrap_request_ref(request);
-        Ok(R::unwrap_response(self.inner.send_with_timeout(&req_ref, timeout).await?).unwrap())
     }
 }
 

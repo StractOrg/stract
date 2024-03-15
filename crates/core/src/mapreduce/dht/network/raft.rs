@@ -30,7 +30,7 @@ use tokio::sync::RwLock;
 use crate::{
     distributed::{
         retry_strategy::ExponentialBackoff,
-        sonic::{self, service::ResilientConnection},
+        sonic::{self, service::Connection},
     },
     mapreduce::dht::{NodeId, TypeConfig},
     Result,
@@ -130,9 +130,7 @@ impl RemoteClient {
             likely_leader,
         }
     }
-    async fn raft_conn<E: std::error::Error>(
-        &self,
-    ) -> Result<ResilientConnection<Server>, RPCError<E>> {
+    async fn raft_conn<E: std::error::Error>(&self) -> Result<Connection<Server>, RPCError<E>> {
         self.inner
             .conn()
             .await
@@ -168,7 +166,12 @@ impl RemoteClient {
             .take(5);
 
         for backoff in retry {
-            let res = self.likely_leader.read().await.send(&rpc).await;
+            let res = self
+                .likely_leader
+                .read()
+                .await
+                .send_with_timeout(&rpc, Duration::from_secs(30))
+                .await;
 
             match res {
                 Ok(res) => match res {
@@ -221,7 +224,12 @@ impl RemoteClient {
         let retry = ExponentialBackoff::from_millis(500).with_limit(Duration::from_secs(10));
 
         for backoff in retry {
-            let res = self.likely_leader.read().await.send(&rpc).await;
+            let res = self
+                .likely_leader
+                .read()
+                .await
+                .send_with_timeout(&rpc, Duration::from_secs(30))
+                .await;
 
             match res {
                 Ok(res) => match res {
