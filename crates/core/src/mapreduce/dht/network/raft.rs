@@ -14,22 +14,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use std::net::SocketAddr;
+use std::{collections::BTreeMap, net::SocketAddr, time::Duration};
 
 use openraft::{
-    error::{InstallSnapshotError, RaftError},
+    error::{ClientWriteError, ForwardToLeader, InstallSnapshotError, RaftError},
     network::RPCOption,
-    BasicNode, RaftNetwork,
+    BasicNode, ChangeMembers, RaftNetwork,
 };
+use tokio::sync::RwLock;
 
 use crate::{
-    distributed::sonic::{self, service::ResilientConnection},
+    distributed::{
+        retry_strategy::ExponentialBackoff,
+        sonic::{self, service::ResilientConnection},
+    },
     mapreduce::dht::{NodeId, TypeConfig},
+    Result,
 };
 
 use super::{
-    AppendEntriesRequest, AppendEntriesResponse, InstallSnapshotRequest, InstallSnapshotResponse,
-    Server, VoteRequest, VoteResponse,
+    AddLearnerRequest, AddNodesRequest, AppendEntriesRequest, AppendEntriesResponse,
+    InstallSnapshotRequest, InstallSnapshotResponse, Server, VoteRequest, VoteResponse,
 };
 
 impl sonic::service::Message<Server> for AppendEntriesRequest {
@@ -59,6 +64,32 @@ impl sonic::service::Message<Server> for VoteRequest {
     }
 }
 
+impl sonic::service::Message<Server> for AddLearnerRequest {
+    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+
+    async fn handle(self, server: &Server) -> Self::Response {
+        tracing::debug!("received add learner request: {:?}", self);
+        let node = BasicNode::new(self.addr);
+        server.raft.add_learner(self.id, node, false).await?;
+
+        Ok(())
+    }
+}
+
+impl sonic::service::Message<Server> for AddNodesRequest {
+    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+
+    async fn handle(self, server: &Server) -> Self::Response {
+        tracing::debug!("received add nodes request: {:?}", self);
+        server
+            .raft
+            .change_membership(ChangeMembers::AddNodes(self.members), true)
+            .await?;
+
+        Ok(())
+    }
+}
+
 type RPCError<E = openraft::error::Infallible> =
     openraft::error::RPCError<NodeId, BasicNode, RaftError<NodeId, E>>;
 
@@ -66,17 +97,20 @@ pub struct RemoteClient {
     target: NodeId,
     node: BasicNode,
     inner: sonic::replication::RemoteClient<Server>,
+    likely_leader: RwLock<sonic::replication::RemoteClient<Server>>,
 }
 
 impl RemoteClient {
     pub fn new(target: NodeId, node: BasicNode) -> Self {
         let addr: SocketAddr = node.addr.parse().expect("addr is not a valid address");
         let inner = sonic::replication::RemoteClient::new(addr);
+        let likely_leader = RwLock::new(inner.clone());
 
         Self {
             target,
             node,
             inner,
+            likely_leader,
         }
     }
     async fn raft_conn<E: std::error::Error>(
@@ -89,7 +123,7 @@ impl RemoteClient {
     }
 
     async fn send_raft_rpc<R, E>(
-        &mut self,
+        &self,
         rpc: R,
         option: RPCOption,
     ) -> Result<R::Response, RPCError<E>>
@@ -108,6 +142,126 @@ impl RemoteClient {
                     panic!("unexpected error: {:?}", e)
                 }
             })
+    }
+
+    async fn add_learner(&self, id: NodeId, addr: SocketAddr) -> Result<()> {
+        let rpc = AddLearnerRequest { id, addr };
+        let retry = ExponentialBackoff::from_millis(500)
+            .with_limit(Duration::from_secs(60))
+            .take(5);
+
+        for backoff in retry {
+            let res = self.likely_leader.read().await.send(&rpc).await;
+
+            match res {
+                Ok(res) => match res {
+                    Ok(_) => return Ok(()),
+                    Err(RaftError::APIError(e)) => match e {
+                        ClientWriteError::ForwardToLeader(ForwardToLeader {
+                            leader_id: _,
+                            leader_node,
+                        }) => match leader_node {
+                            Some(leader_node) => {
+                                let mut likely_leader = self.likely_leader.write().await;
+                                *likely_leader = sonic::replication::RemoteClient::new(
+                                    leader_node
+                                        .addr
+                                        .parse()
+                                        .expect("node addr should always be valid addr"),
+                                );
+                            }
+                            None => tokio::time::sleep(backoff).await,
+                        },
+                        ClientWriteError::ChangeMembershipError(_) => {
+                            tokio::time::sleep(backoff).await
+                        }
+                    },
+                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                },
+                Err(e) => match e {
+                    sonic::Error::IO(_)
+                    | sonic::Error::Serialization(_)
+                    | sonic::Error::ConnectionTimeout
+                    | sonic::Error::RequestTimeout
+                    | sonic::Error::PoolCreation => {
+                        tokio::time::sleep(backoff).await;
+                    }
+                    sonic::Error::BadRequest
+                    | sonic::Error::BodyTooLarge {
+                        body_size: _,
+                        max_size: _,
+                    }
+                    | sonic::Error::Application(_) => return Err(e.into()),
+                },
+            }
+        }
+
+        Err(anyhow::anyhow!("failed to add learner"))
+    }
+
+    async fn add_nodes(&self, members: BTreeMap<NodeId, BasicNode>) -> Result<()> {
+        let rpc = AddNodesRequest { members };
+        let retry = ExponentialBackoff::from_millis(500).with_limit(Duration::from_secs(10));
+
+        for backoff in retry {
+            let res = self.likely_leader.read().await.send(&rpc).await;
+
+            match res {
+                Ok(res) => match res {
+                    Ok(_) => return Ok(()),
+                    Err(RaftError::APIError(e)) => match e {
+                        ClientWriteError::ForwardToLeader(ForwardToLeader {
+                            leader_id: _,
+                            leader_node,
+                        }) => match leader_node {
+                            Some(leader_node) => {
+                                let mut likely_leader = self.likely_leader.write().await;
+                                *likely_leader = sonic::replication::RemoteClient::new(
+                                    leader_node
+                                        .addr
+                                        .parse()
+                                        .expect("node addr should always be valid addr"),
+                                );
+                            }
+                            None => tokio::time::sleep(backoff).await,
+                        },
+                        ClientWriteError::ChangeMembershipError(_) => {
+                            tokio::time::sleep(backoff).await
+                        }
+                    },
+                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                },
+                Err(e) => match e {
+                    sonic::Error::IO(_)
+                    | sonic::Error::Serialization(_)
+                    | sonic::Error::ConnectionTimeout
+                    | sonic::Error::RequestTimeout
+                    | sonic::Error::PoolCreation => {
+                        tokio::time::sleep(backoff).await;
+                    }
+                    sonic::Error::BadRequest
+                    | sonic::Error::BodyTooLarge {
+                        body_size: _,
+                        max_size: _,
+                    }
+                    | sonic::Error::Application(_) => return Err(e.into()),
+                },
+            }
+        }
+
+        unreachable!("should continue to retry");
+    }
+
+    pub async fn join(
+        &self,
+        id: NodeId,
+        addr: SocketAddr,
+        new_all_nodes: BTreeMap<NodeId, BasicNode>,
+    ) -> Result<()> {
+        self.add_learner(id, addr).await?;
+        self.add_nodes(new_all_nodes).await?;
+
+        Ok(())
     }
 }
 

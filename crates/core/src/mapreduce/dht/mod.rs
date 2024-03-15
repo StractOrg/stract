@@ -179,7 +179,6 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore = "[WIP] need to figure out how to add a new node to the cluster"]
     async fn test_member_join() -> anyhow::Result<()> {
         let (raft1, server1, addr1) = server(1).await?;
         let (raft2, server2, addr2) = server(2).await?;
@@ -220,7 +219,8 @@ mod tests {
             .collect();
 
         raft3.initialize(members.clone()).await?;
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        let rc1 = network::raft::RemoteClient::new(1, BasicNode::new(addr1));
+        rc1.join(3, addr3, members.clone()).await?;
 
         let c3 = RemoteClient::new(addr3);
         let res = c3.get("hello".to_string()).await?;

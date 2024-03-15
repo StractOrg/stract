@@ -21,10 +21,19 @@ use super::Result;
 use crate::distributed::{retry_strategy::ExponentialBackoff, sonic};
 use std::{net::SocketAddr, time::Duration};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RemoteClient<S: sonic::service::Service> {
     addr: SocketAddr,
     _phantom: std::marker::PhantomData<S>,
+}
+
+impl<S> Clone for RemoteClient<S>
+where
+    S: sonic::service::Service,
+{
+    fn clone(&self) -> Self {
+        Self::create(self.addr)
+    }
 }
 
 impl<S> RemoteClient<S>

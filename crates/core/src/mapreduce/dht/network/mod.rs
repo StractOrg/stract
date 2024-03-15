@@ -15,10 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
 pub mod api;
-mod raft;
+pub mod raft;
 
 use api::{Get, Set};
-use std::sync::Arc;
+use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 
 use openraft::{BasicNode, Raft, RaftNetworkFactory};
 
@@ -48,14 +48,27 @@ pub type InstallSnapshotResponse = openraft::raft::InstallSnapshotResponse<NodeI
 pub type VoteRequest = openraft::raft::VoteRequest<NodeId>;
 pub type VoteResponse = openraft::raft::VoteResponse<NodeId>;
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct AddLearnerRequest {
+    pub id: NodeId,
+    pub addr: SocketAddr,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct AddNodesRequest {
+    members: BTreeMap<NodeId, BasicNode>,
+}
+
 sonic_service!(
     Server,
     [
         AppendEntriesRequest,
         InstallSnapshotRequest,
         VoteRequest,
+        AddLearnerRequest,
+        AddNodesRequest,
         Get,
-        Set
+        Set,
     ]
 );
 
