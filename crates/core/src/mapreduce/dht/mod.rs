@@ -59,6 +59,7 @@ macro_rules! raft_sonic_request_response {
             $(
                 $req(<$req as crate::distributed::sonic::service::Message<$service>>::Response),
             )*
+            Empty,
         }
 
         $(
