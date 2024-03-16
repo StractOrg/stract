@@ -90,10 +90,16 @@ raft_sonic_request_response!(Server, [Get, Set]);
 mod tests {
     use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
     use tests::network::api::RemoteClient;
+    use tokio::sync::Mutex;
     use tracing_test::traced_test;
 
     use crate::{distributed::sonic, free_socket_addr};
-    use openraft::Config;
+    use openraft::{error::InitializeError, Config};
+
+    use proptest::prelude::*;
+    use proptest_derive::Arbitrary;
+
+    use rand::seq::SliceRandom;
 
     use super::*;
 
@@ -152,9 +158,35 @@ mod tests {
             .map(|(id, addr)| (id, BasicNode::new(addr)))
             .collect();
 
-        raft1.initialize(members.clone()).await?;
-        raft2.initialize(members.clone()).await?;
-        raft3.initialize(members.clone()).await?;
+        if let Err(e) = raft1.initialize(members.clone()).await {
+            match e {
+                openraft::error::RaftError::APIError(e) => match e {
+                    InitializeError::NotAllowed(_) => {}
+                    InitializeError::NotInMembers(_) => panic!("{:?}", e),
+                },
+                openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
+            }
+        };
+
+        if let Err(e) = raft2.initialize(members.clone()).await {
+            match e {
+                openraft::error::RaftError::APIError(e) => match e {
+                    InitializeError::NotAllowed(_) => {}
+                    InitializeError::NotInMembers(_) => panic!("{:?}", e),
+                },
+                openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
+            }
+        };
+
+        if let Err(e) = raft3.initialize(members.clone()).await {
+            match e {
+                openraft::error::RaftError::APIError(e) => match e {
+                    InitializeError::NotAllowed(_) => {}
+                    InitializeError::NotInMembers(_) => panic!("{:?}", e),
+                },
+                openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
+            }
+        };
 
         let c1 = RemoteClient::new(addr1);
         let c2 = RemoteClient::new(addr2);
@@ -315,5 +347,118 @@ mod tests {
         assert_eq!(res, Some("world2".as_bytes().to_vec()));
 
         Ok(())
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Arbitrary)]
+    enum Action {
+        Set { key: Vec<u8>, value: Vec<u8> },
+        // get actions[prev_key % actions.len()]
+        // if actions[prev_key % actions.len()] is a get, then get a non-existent key
+        Get { prev_key: usize },
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+
+        #[test]
+        #[traced_test]
+        fn proptest_chaos(actions: Vec<Action>) {
+            let ground_truth = Arc::new(Mutex::new(BTreeMap::<Vec<u8>, Vec<u8>>::new()));
+
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async move {
+                    let (raft1, server1, addr1) = server(1).await.unwrap();
+                    let (raft2, server2, addr2) = server(2).await.unwrap();
+                    let (raft3, server3, addr3) = server(3).await.unwrap();
+
+                    let servers = vec![server1, server2, server3];
+
+                    let mut handles = Vec::new();
+                    for server in servers {
+                        handles.push(tokio::spawn(async move {
+                            loop {
+                                server.accept().await.unwrap();
+                            }
+                        }));
+                    }
+
+                    let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2), (3, addr3)]
+                        .into_iter()
+                        .map(|(id, addr)| (id, BasicNode::new(addr)))
+                        .collect();
+
+                    if let Err(e) = raft1.initialize(members.clone()).await {
+                        match e {
+                            openraft::error::RaftError::APIError(e) => match e {
+                                InitializeError::NotAllowed(_) => {}
+                                InitializeError::NotInMembers(_) => panic!("{:?}", e),
+                            },
+                            openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
+                        }
+                    };
+
+                    if let Err(e) = raft2.initialize(members.clone()).await {
+                        match e {
+                            openraft::error::RaftError::APIError(e) => match e {
+                                InitializeError::NotAllowed(_) => {}
+                                InitializeError::NotInMembers(_) => panic!("{:?}", e),
+                            },
+                            openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
+                        }
+                    };
+
+                    if let Err(e) = raft3.initialize(members.clone()).await {
+                        match e {
+                            openraft::error::RaftError::APIError(e) => match e {
+                                InitializeError::NotAllowed(_) => {}
+                                InitializeError::NotInMembers(_) => panic!("{:?}", e),
+                            },
+                            openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
+                        }
+                    };
+
+                    let c1 = RemoteClient::new(addr1);
+                    let c2 = RemoteClient::new(addr2);
+                    let c3 = RemoteClient::new(addr3);
+
+                    let clients = Arc::new(vec![c1, c2, c3]);
+
+                    let shared_actions = Arc::new(actions.clone());
+
+                    for (i, action) in actions.into_iter().enumerate() {
+                        match action {
+                            Action::Set { key, value } => {
+                                let client = clients.choose(&mut rand::thread_rng()).unwrap();
+
+                                client.set(key.clone(), value.clone()).await.unwrap();
+                                ground_truth.lock().await.insert(key.clone(), value.clone());
+                            }
+                            Action::Get { prev_key } => {
+                                let client = clients.choose(&mut rand::thread_rng()).unwrap();
+                                client.set(b"ensure-linearized-read".to_vec(), vec![]).await.unwrap();
+
+                                let key = if i == 0 {
+                                    b"non-existent-key".to_vec()
+                                } else {
+                                    match shared_actions[prev_key % i] {
+                                        Action::Set { ref key, .. } => {
+                                            key.clone()
+                                        },
+                                        Action::Get { .. } => b"non-existent-key".to_vec(),
+                                    }
+                                };
+
+                                let res = client.get(key.clone()).await.unwrap();
+                                let expected = ground_truth.lock().await.get(&key).cloned();
+
+                                assert_eq!(res, expected);
+                            }
+                        }
+                    }
+                });
+        }
     }
 }
