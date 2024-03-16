@@ -30,13 +30,13 @@ use super::Server;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Set {
-    pub key: String,
-    pub value: String,
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Get {
-    pub key: String,
+    pub key: Vec<u8>,
 }
 
 impl sonic::service::Message<Server> for Set {
@@ -53,7 +53,7 @@ impl sonic::service::Message<Server> for Set {
 }
 
 impl sonic::service::Message<Server> for Get {
-    type Response = Option<String>;
+    type Response = Option<Vec<u8>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
         server
@@ -87,7 +87,7 @@ impl RemoteClient {
         )
     }
 
-    pub async fn set(&self, key: String, value: String) -> Result<()> {
+    pub async fn set(&self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
         for backoff in Self::retry_strat() {
             let res = self
                 .likely_leader
@@ -152,7 +152,7 @@ impl RemoteClient {
         Err(anyhow!("failed to set key"))
     }
 
-    pub async fn get(&self, key: String) -> Result<Option<String>> {
+    pub async fn get(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>> {
         for backoff in Self::retry_strat() {
             match self
                 .self_remote

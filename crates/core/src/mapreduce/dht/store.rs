@@ -55,7 +55,7 @@ pub struct StateMachineData {
     pub last_membership: StoredMembership<NodeId, BasicNode>,
 
     /// Application data.
-    pub data: BTreeMap<String, String>,
+    pub data: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
 #[derive(Debug, Default)]
@@ -199,8 +199,8 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
 
         // Update the state machine.
         {
-            let data: BTreeMap<String, String> =
-                bincode::deserialize(&new_snapshot.data).map_err(|e| {
+            let data: BTreeMap<Vec<u8>, Vec<u8>> = bincode::deserialize(&new_snapshot.data)
+                .map_err(|e| {
                     StorageIOError::read_snapshot(Some(new_snapshot.meta.signature()), &e)
                 })?;
 

@@ -160,20 +160,22 @@ mod tests {
         let c2 = RemoteClient::new(addr2);
         let c3 = RemoteClient::new(addr3);
 
-        c1.set("hello".to_string(), "world".to_string()).await?;
+        c1.set("hello".as_bytes().to_vec(), "world".as_bytes().to_vec())
+            .await?;
 
-        let res = c1.get("hello".to_string()).await?;
-        assert_eq!(res, Some("world".to_string()));
+        let res = c1.get("hello".as_bytes().to_vec()).await?;
+        assert_eq!(res, Some("world".as_bytes().to_vec()));
 
-        let res = c2.get("hello".to_string()).await?;
-        assert_eq!(res, Some("world".to_string()));
+        let res = c2.get("hello".as_bytes().to_vec()).await?;
+        assert_eq!(res, Some("world".as_bytes().to_vec()));
 
-        c2.set("hello".to_string(), "world2".to_string()).await?;
-        let res = c3.get("hello".to_string()).await?;
-        assert_eq!(res, Some("world2".to_string()));
+        c2.set("hello".as_bytes().to_vec(), "world2".as_bytes().to_vec())
+            .await?;
+        let res = c3.get("hello".as_bytes().to_vec()).await?;
+        assert_eq!(res, Some("world2".as_bytes().to_vec()));
 
-        let res = c1.get("hello".to_string()).await?;
-        assert_eq!(res, Some("world2".to_string()));
+        let res = c1.get("hello".as_bytes().to_vec()).await?;
+        assert_eq!(res, Some("world2".as_bytes().to_vec()));
 
         Ok(())
     }
@@ -206,11 +208,12 @@ mod tests {
         let c1 = RemoteClient::new(addr1);
         let c2 = RemoteClient::new(addr2);
 
-        c1.set("hello".to_string(), "world".to_string()).await?;
+        c1.set("hello".as_bytes().to_vec(), "world".as_bytes().to_vec())
+            .await?;
 
-        let res = c2.get("hello".to_string()).await?;
+        let res = c2.get("hello".as_bytes().to_vec()).await?;
 
-        assert_eq!(res, Some("world".to_string()));
+        assert_eq!(res, Some("world".as_bytes().to_vec()));
 
         let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2), (3, addr3)]
             .into_iter()
@@ -222,8 +225,8 @@ mod tests {
         rc1.join(3, addr3, members.clone()).await?;
 
         let c3 = RemoteClient::new(addr3);
-        let res = c3.get("hello".to_string()).await?;
-        assert_eq!(res, Some("world".to_string()));
+        let res = c3.get("hello".as_bytes().to_vec()).await?;
+        assert_eq!(res, Some("world".as_bytes().to_vec()));
 
         Ok(())
     }
@@ -261,13 +264,14 @@ mod tests {
 
         let rc1 = network::raft::RemoteClient::new(1, BasicNode::new(addr1));
 
-        c1.set("hello".to_string(), "world".to_string()).await?;
+        c1.set("hello".as_bytes().to_vec(), "world".as_bytes().to_vec())
+            .await?;
 
-        let res = c1.get("hello".to_string()).await?;
-        assert_eq!(res, Some("world".to_string()));
+        let res = c1.get("hello".as_bytes().to_vec()).await?;
+        assert_eq!(res, Some("world".as_bytes().to_vec()));
 
-        let res = c2.get("hello".to_string()).await?;
-        assert_eq!(res, Some("world".to_string()));
+        let res = c2.get("hello".as_bytes().to_vec()).await?;
+        assert_eq!(res, Some("world".as_bytes().to_vec()));
 
         // crash node 2
         handles[1].abort();
@@ -284,16 +288,17 @@ mod tests {
 
         let c2 = RemoteClient::new(addr2);
 
-        let res = c2.get("hello".to_string()).await?;
-        assert_eq!(res, Some("world".to_string()));
+        let res = c2.get("hello".as_bytes().to_vec()).await?;
+        assert_eq!(res, Some("world".as_bytes().to_vec()));
 
         // crash node 2 again
         handles[1].abort();
         drop(raft2);
 
-        c3.set("hello".to_string(), "world2".to_string()).await?;
-        let res = c1.get("hello".to_string()).await?;
-        assert_eq!(res, Some("world2".to_string()));
+        c3.set("hello".as_bytes().to_vec(), "world2".as_bytes().to_vec())
+            .await?;
+        let res = c1.get("hello".as_bytes().to_vec()).await?;
+        assert_eq!(res, Some("world2".as_bytes().to_vec()));
 
         let (raft2, server2, addr2) = server(2).await?;
         handles[1] = tokio::spawn(async move {
@@ -306,8 +311,8 @@ mod tests {
 
         let c2 = RemoteClient::new(addr2);
 
-        let res = c2.get("hello".to_string()).await?;
-        assert_eq!(res, Some("world2".to_string()));
+        let res = c2.get("hello".as_bytes().to_vec()).await?;
+        assert_eq!(res, Some("world2".as_bytes().to_vec()));
 
         Ok(())
     }
