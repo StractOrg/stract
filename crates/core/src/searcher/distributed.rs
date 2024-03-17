@@ -17,7 +17,7 @@
 use crate::{
     distributed::{
         cluster::Cluster,
-        member::Service,
+        member::{Service, ShardId},
         sonic::replication::{
             AllShardsSelector, RandomReplicaSelector, RemoteClient, ReplicatedClient, Shard,
             ShardIdentifier, ShardedClient, SpecificShardSelector,
@@ -39,7 +39,6 @@ use std::{collections::HashMap, sync::Arc};
 use fnv::FnvHashMap;
 use futures::future::join_all;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 use std::future::Future;
 use thiserror::Error;
 use url::Url;
@@ -62,15 +61,6 @@ pub enum Error {
 pub struct ScoredWebpagePointer {
     pub website: RecallRankingWebpage,
     pub shard: ShardId,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy, Debug)]
-pub struct ShardId(u64);
-
-impl ShardId {
-    pub fn new(id: u64) -> Self {
-        Self(id)
-    }
 }
 
 impl ShardIdentifier for ShardId {}

@@ -44,7 +44,7 @@ mod bloom;
 mod collector;
 pub mod config;
 pub mod crawler;
-mod distributed;
+pub mod distributed;
 pub mod entity_index;
 mod enum_map;
 mod executor;

@@ -14,11 +14,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! Simple in-memory key-value store with Raft consensus where keys
+//! and values are arbitrary bytes. It is intended to be deployed
+//! across multiple nodes with multiple shards. Each shard cluster
+//! is a Raft cluster, and each key is then routed to the correct
+//! cluster based on hash(key) % number_of_shards. The keys
+//! are currently *not* rebalanced if the number of shards change, so
+//! if an entire shard becomes unavailable or a new shard is added, all
+//! keys in the entire DHT is essentially lost as the
+//! keys might hash incorrectly.
+//!
 //! Heavily inspired by https://github.com/datafuselabs/openraft/blob/main/examples/raft-kv-memstore/
 
-mod log_store;
+mod client;
+pub mod log_store;
 mod network;
-mod store;
+pub mod store;
 
 use network::api::{Get, Set};
 
@@ -29,6 +40,11 @@ use openraft::BasicNode;
 use openraft::TokioRuntime;
 
 use self::network::Server;
+
+pub use network::api::RemoteClient as ApiClient;
+pub use network::raft::RemoteClient as RaftClient;
+
+pub use client::Client;
 
 pub type NodeId = u64;
 
@@ -321,7 +337,6 @@ mod tests {
 
         let c1 = RemoteClient::new(addr1);
         let c2 = RemoteClient::new(addr2);
-        let c3 = RemoteClient::new(addr2);
 
         let rc1 = network::raft::RemoteClient::new(1, BasicNode::new(addr1));
 

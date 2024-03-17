@@ -6,11 +6,12 @@ use stract::{
         ApiConfig, ApiThresholds, CollectorConfig, CorrectionConfig, LLMConfig, SnippetConfig,
         WidgetsConfig,
     },
+    distributed::member::ShardId,
     image_store::Image,
     index::Index,
     inverted_index::RetrievedWebpage,
     ranking::{inbound_similarity::InboundSimilarity, pipeline::PrecisionRankingWebpage},
-    searcher::{api::ApiSearcher, live::LiveSearcher, LocalSearcher, SearchQuery, ShardId},
+    searcher::{api::ApiSearcher, live::LiveSearcher, LocalSearcher, SearchQuery},
     Result,
 };
 struct Searcher(LocalSearcher<Index>);

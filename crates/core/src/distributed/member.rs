@@ -18,7 +18,22 @@ use std::net::SocketAddr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{config::WebgraphGranularity, searcher::ShardId};
+use crate::config::WebgraphGranularity;
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy, Debug, PartialOrd, Ord)]
+pub struct ShardId(u64);
+
+impl ShardId {
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+}
+
+impl From<u64> for ShardId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
 pub enum Service {
@@ -42,6 +57,7 @@ pub enum Service {
     },
     Dht {
         host: SocketAddr,
+        shard: ShardId,
     },
 }
 
