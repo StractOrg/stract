@@ -20,12 +20,14 @@ pub struct ParseOpts {
 }
 
 /// Parse an HTML document with html5ever and the default configuration.
-#[must_use] pub fn parse_html() -> html5ever::Parser<Sink> {
+#[must_use]
+pub fn parse_html() -> html5ever::Parser<Sink> {
     parse_html_with_options(ParseOpts::default())
 }
 
 /// Parse an HTML document with html5ever with custom configuration.
-#[must_use] pub fn parse_html_with_options(opts: ParseOpts) -> html5ever::Parser<Sink> {
+#[must_use]
+pub fn parse_html_with_options(opts: ParseOpts) -> html5ever::Parser<Sink> {
     let sink = Sink {
         document_node: NodeRef::new_document(),
         on_parse_error: opts.on_parse_error,
@@ -38,7 +40,8 @@ pub struct ParseOpts {
 }
 
 /// Parse an HTML fragment with html5ever and the default configuration.
-#[must_use] pub fn parse_fragment(ctx_name: QualName, ctx_attr: Vec<Attribute>) -> html5ever::Parser<Sink> {
+#[must_use]
+pub fn parse_fragment(ctx_name: QualName, ctx_attr: Vec<Attribute>) -> html5ever::Parser<Sink> {
     parse_fragment_with_options(ParseOpts::default(), ctx_name, ctx_attr)
 }
 

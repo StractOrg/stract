@@ -17,8 +17,8 @@
 pub mod defaults;
 
 use super::Result;
+use crate::distributed::member::ShardId;
 use crate::feed::scheduler::SplitId;
-use crate::searcher::ShardId;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, BufRead};

@@ -77,7 +77,12 @@ impl From<Vec<RawOpticBlock>> for RawOptic {
             }
         }
 
-        RawOptic { rules, rankings, host_preferences, discard_non_matching }
+        RawOptic {
+            rules,
+            rankings,
+            host_preferences,
+            discard_non_matching,
+        }
     }
 }
 

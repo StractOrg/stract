@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use tokio::net::ToSocketAddrs;
 
@@ -28,12 +28,12 @@ pub trait Service: Sized + Send + Sync + 'static {
     fn handle(
         req: Self::Request,
         server: &Self,
-    ) -> impl std::future::Future<Output = Result<Self::Response>> + Send + '_;
+    ) -> impl std::future::Future<Output = Self::Response> + Send + '_;
 }
 
 pub trait Message<S: Service> {
     type Response;
-    fn handle(self, server: &S) -> impl std::future::Future<Output = Result<Self::Response>>;
+    fn handle(self, server: &S) -> impl std::future::Future<Output = Self::Response>;
 }
 pub trait Wrapper<S: Service>: Message<S> {
     fn wrap_request_ref(req: &Self) -> S::RequestRef<'_>;
@@ -57,15 +57,9 @@ impl<S: Service> Server<S> {
 
         let service = Arc::clone(&self.service);
         tokio::spawn(async move {
-            match S::handle(req.take_body(), &service).await {
-                Ok(res) => {
-                    if let Err(e) = req.respond(res).await {
-                        tracing::error!("failed to respond to request: {}", e);
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("failed to handle request: {}", e);
-                }
+            let res = S::handle(req.take_body(), &service).await;
+            if let Err(e) = req.respond(res).await {
+                tracing::error!("failed to respond to request: {}", e);
             }
         });
 
@@ -84,6 +78,7 @@ impl<'a, S: Service> Connection<'a, S> {
             inner: super::Connection::create(server).await?,
         })
     }
+
     #[allow(dead_code)]
     pub async fn create_with_timeout(
         server: impl ToSocketAddrs,
@@ -93,6 +88,17 @@ impl<'a, S: Service> Connection<'a, S> {
             inner: super::Connection::create_with_timeout(server, timeout).await?,
         })
     }
+
+    pub async fn create_with_timeout_retry(
+        server: impl ToSocketAddrs + Clone,
+        timeout: Duration,
+        retry: impl Iterator<Item = Duration>,
+    ) -> Result<Connection<'a, S>> {
+        Ok(Connection {
+            inner: super::Connection::create_with_timeout_retry(server, timeout, retry).await?,
+        })
+    }
+
     #[allow(dead_code)]
     pub async fn send_without_timeout<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
         Ok(R::unwrap_response(
@@ -102,11 +108,12 @@ impl<'a, S: Service> Connection<'a, S> {
         )
         .unwrap())
     }
+
     #[allow(dead_code)]
     pub async fn send<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
         Ok(R::unwrap_response(self.inner.send(&R::wrap_request_ref(request)).await?).unwrap())
     }
-    #[allow(dead_code)]
+
     pub async fn send_with_timeout<R: Wrapper<S>>(
         self,
         request: &'a R,
@@ -118,31 +125,6 @@ impl<'a, S: Service> Connection<'a, S> {
                 .await?,
         )
         .unwrap())
-    }
-}
-
-pub struct ResilientConnection<'a, S: Service> {
-    inner: super::ResilientConnection<S::RequestRef<'a>, S::Response>,
-}
-
-impl<'a, S: Service> ResilientConnection<'a, S> {
-    pub async fn create_with_timeout<Rt: Iterator<Item = Duration>>(
-        addr: SocketAddr,
-        timeout: Duration,
-        retry: Rt,
-    ) -> Result<ResilientConnection<'a, S>> {
-        Ok(Self {
-            inner: super::ResilientConnection::create_with_timeout(addr, timeout, retry).await?,
-        })
-    }
-
-    pub async fn send_with_timeout<R: Wrapper<S>>(
-        self,
-        request: &'a R,
-        timeout: Duration,
-    ) -> Result<R::Response> {
-        let req_ref = R::wrap_request_ref(request);
-        Ok(R::unwrap_response(self.inner.send_with_timeout(&req_ref, timeout).await?).unwrap())
     }
 }
 
@@ -192,11 +174,11 @@ macro_rules! sonic_service {
                 // don't have a Send bound by default, and there's currently no
                 // way of specifying that.
                 #[allow(clippy::manual_async_fn)]
-                fn handle(req: Request, server: &Self) -> impl std::future::Future<Output = sonic::Result<Self::Response>> + Send + '_ {
+                fn handle(req: Request, server: &Self) -> impl std::future::Future<Output = Self::Response> + Send + '_ {
                     async move {
                         match req {
                             $(
-                                Request::$req(value) => Ok(Response::$req(sonic::service::Message::handle(value, server).await?)),
+                                Request::$req(value) => Response::$req(sonic::service::Message::handle(value, server).await),
                             )*
                         }
                     }
@@ -280,8 +262,6 @@ mod tests {
         use proptest_derive::Arbitrary;
         use serde::{Deserialize, Serialize};
 
-        use crate::distributed::sonic;
-
         use super::super::Message;
 
         pub struct CounterService {
@@ -300,20 +280,19 @@ mod tests {
         impl Message<CounterService> for Change {
             type Response = i32;
 
-            async fn handle(self, server: &CounterService) -> sonic::Result<Self::Response> {
+            async fn handle(self, server: &CounterService) -> Self::Response {
                 let prev = server
                     .counter
                     .fetch_add(self.amount, std::sync::atomic::Ordering::SeqCst);
-                Ok(prev + self.amount)
+                prev + self.amount
             }
         }
 
         impl Message<CounterService> for Reset {
             type Response = ();
 
-            async fn handle(self, server: &CounterService) -> sonic::Result<Self::Response> {
+            async fn handle(self, server: &CounterService) -> Self::Response {
                 server.counter.store(0, std::sync::atomic::Ordering::SeqCst);
-                Ok(())
             }
         }
     }

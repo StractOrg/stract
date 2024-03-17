@@ -50,7 +50,9 @@ impl<'i> Parser<'i> for KuchikiParser {
         location: SourceLocation,
         name: CowRcStr<'i>,
     ) -> std::result::Result<PseudoClass, ParseError<'i, SelectorParseErrorKind<'i>>> {
-        use self::PseudoClass::{Active, AnyLink, Checked, Disabled, Enabled, Focus, Hover, Indeterminate, Link, Visited};
+        use self::PseudoClass::{
+            Active, AnyLink, Checked, Disabled, Enabled, Focus, Hover, Indeterminate, Link, Visited,
+        };
         if name.eq_ignore_ascii_case("any-link") {
             Ok(AnyLink)
         } else if name.eq_ignore_ascii_case("link") {
@@ -314,7 +316,9 @@ impl selectors::Element for NodeDataRef<ElementData> {
     where
         F: FnMut(&Self, matching::ElementSelectorFlags),
     {
-        use self::PseudoClass::{Active, AnyLink, Checked, Disabled, Enabled, Focus, Hover, Indeterminate, Link, Visited};
+        use self::PseudoClass::{
+            Active, AnyLink, Checked, Disabled, Enabled, Focus, Hover, Indeterminate, Link, Visited,
+        };
         match *pseudo {
             Active | Focus | Hover | Enabled | Disabled | Checked | Indeterminate | Visited => {
                 false
@@ -359,7 +363,8 @@ impl Selectors {
 
     /// Returns whether the given element matches this list of selectors.
     #[inline]
-    #[must_use] pub fn matches(&self, element: &NodeDataRef<ElementData>) -> bool {
+    #[must_use]
+    pub fn matches(&self, element: &NodeDataRef<ElementData>) -> bool {
         self.0.iter().any(|s| s.matches(element))
     }
 
@@ -379,7 +384,8 @@ impl Selectors {
 impl Selector {
     /// Returns whether the given element matches this selector.
     #[inline]
-    #[must_use] pub fn matches(&self, element: &NodeDataRef<ElementData>) -> bool {
+    #[must_use]
+    pub fn matches(&self, element: &NodeDataRef<ElementData>) -> bool {
         let mut context = matching::MatchingContext::new(
             matching::MatchingMode::Normal,
             None,
@@ -390,7 +396,8 @@ impl Selector {
     }
 
     /// Return the specificity of this selector.
-    #[must_use] pub fn specificity(&self) -> Specificity {
+    #[must_use]
+    pub fn specificity(&self) -> Specificity {
         Specificity(self.0.specificity())
     }
 }

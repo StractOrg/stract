@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use axum::{body::Body, extract, response::{IntoResponse, Response}};
+use axum::{
+    body::Body,
+    extract,
+    response::{IntoResponse, Response},
+};
 use http::StatusCode;
 use optics::{HostRankings, Optic};
 use utoipa::ToSchema;

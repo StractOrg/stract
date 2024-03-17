@@ -464,7 +464,8 @@ impl Display for HostRankings {
 }
 
 impl HostRankings {
-    #[must_use] pub fn rules(&self) -> Rule {
+    #[must_use]
+    pub fn rules(&self) -> Rule {
         let matches: Vec<_> = self
             .blocked
             .iter()
@@ -491,7 +492,8 @@ impl HostRankings {
         }
     }
 
-    #[must_use] pub fn into_optic(self) -> Optic {
+    #[must_use]
+    pub fn into_optic(self) -> Optic {
         Optic {
             host_rankings: self,
             ..Default::default()
