@@ -264,7 +264,9 @@ where
             .clone()
             .into_iter()
             .filter_map(|term| match *term {
-                query::parser::Term::Simple(t) => Some(String::from(t)),
+                query::parser::Term::SimpleOrPhrase(query::parser::SimpleOrPhrase::Simple(t)) => {
+                    Some(String::from(t))
+                }
                 _ => None,
             })
             .join(" ");
@@ -289,7 +291,7 @@ where
 
         for term in terms {
             match *term {
-                query::parser::Term::Simple(t) => {
+                query::parser::Term::SimpleOrPhrase(query::parser::SimpleOrPhrase::Simple(t)) => {
                     if let Some(term_correction) = correction_map.get(t.as_str()) {
                         correction.push(crate::web_spell::CorrectionTerm::Corrected {
                             orig: String::from(t),

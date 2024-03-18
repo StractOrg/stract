@@ -38,7 +38,10 @@ pub mod union;
 
 use parser::Term;
 
-use self::{optic::AsMultipleTantivyQuery, parser::CompoundAwareTerm};
+use self::{
+    optic::AsMultipleTantivyQuery,
+    parser::{CompoundAwareTerm, SimpleOrPhrase},
+};
 
 const MAX_SIMILAR_TERMS: usize = 10;
 
@@ -87,7 +90,9 @@ impl Query {
             for window in term_ids.windows(window_size) {
                 let mut window_terms = Vec::new();
                 for i in window {
-                    if let Term::Simple(t) = &compound_terms[*i].term {
+                    if let Term::SimpleOrPhrase(SimpleOrPhrase::Simple(t)) =
+                        &compound_terms[*i].term
+                    {
                         window_terms.push(t.clone());
                     }
                 }

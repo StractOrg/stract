@@ -35,7 +35,10 @@ impl WidgetManager {
             parsed_terms
                 .into_iter()
                 .filter_map(|term| {
-                    if let query::parser::Term::Simple(simple) = *term {
+                    if let query::parser::Term::SimpleOrPhrase(
+                        query::parser::SimpleOrPhrase::Simple(simple),
+                    ) = *term
+                    {
                         Some(String::from(simple))
                     } else {
                         None

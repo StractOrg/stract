@@ -4561,6 +4561,7 @@ dependencies = [
  "memmap2",
  "mime",
  "min-max-heap",
+ "nom",
  "num_cpus",
  "once_cell",
  "openraft",
