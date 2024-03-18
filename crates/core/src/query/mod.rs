@@ -47,8 +47,7 @@ const MAX_SIMILAR_TERMS: usize = 10;
 
 #[derive(Clone, Debug)]
 pub struct Query {
-    #[allow(clippy::vec_box)]
-    terms: Vec<Box<Term>>,
+    terms: Vec<Term>,
     simple_terms_text: Vec<String>,
     tantivy_query: Box<BooleanQuery>,
     host_rankings: HostRankings,
@@ -61,7 +60,7 @@ pub struct Query {
 
 impl Query {
     pub fn parse(ctx: &Ctx, query: &SearchQuery, index: &InvertedIndex) -> Result<Query> {
-        let parsed_terms = parser::parse(&query.query);
+        let parsed_terms = parser::parse(&query.query)?;
         let mut term_count = HashMap::new();
         let mut terms = Vec::new();
 
@@ -79,7 +78,7 @@ impl Query {
             .clone()
             .into_iter()
             .map(|term| CompoundAwareTerm {
-                term: *term,
+                term,
                 adjacent_terms: Vec::new(),
             })
             .collect();
@@ -185,7 +184,7 @@ impl Query {
         &self.simple_terms_text
     }
 
-    pub fn terms(&self) -> &[Box<Term>] {
+    pub fn terms(&self) -> &[Term] {
         &self.terms
     }
 

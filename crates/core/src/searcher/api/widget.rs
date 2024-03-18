@@ -29,7 +29,7 @@ impl WidgetManager {
     }
 
     pub async fn widget(&self, query: &str) -> Option<Widget> {
-        let parsed_terms = query::parser::parse(query);
+        let parsed_terms = query::parser::parse(query).ok()?;
 
         self.widgets.widget(
             parsed_terms
@@ -37,7 +37,7 @@ impl WidgetManager {
                 .filter_map(|term| {
                     if let query::parser::Term::SimpleOrPhrase(
                         query::parser::SimpleOrPhrase::Simple(simple),
-                    ) = *term
+                    ) = term
                     {
                         Some(String::from(simple))
                     } else {

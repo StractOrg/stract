@@ -14,134 +14,203 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{bangs::BANG_PREFIXES, floor_char_boundary};
+use crate::bangs::BANG_PREFIXES;
 
 mod as_tantivy;
 mod term;
 
 pub use term::*;
 
-fn parse_term(term: &str) -> Box<Term> {
-    // TODO: re-write this entire function once if-let chains become stable
-    if let Some(not_term) = term.strip_prefix('-') {
-        if !not_term.is_empty() && !not_term.starts_with('-') {
-            Box::new(Term::Not(parse_term(not_term)))
-        } else {
-            Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                term.to_string().into(),
-            )))
-        }
-    } else if let Some(site) = term.strip_prefix("site:") {
-        if !site.is_empty() {
-            Box::new(Term::Site(site.to_string()))
-        } else {
-            Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                term.to_string().into(),
-            )))
-        }
-    } else if let Some(title) = term.strip_prefix("intitle:") {
-        if !title.is_empty() {
-            Box::new(Term::Title(SimpleOrPhrase::Simple(
-                title.to_string().into(),
-            )))
-        } else {
-            Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                term.to_string().into(),
-            )))
-        }
-    } else if let Some(body) = term.strip_prefix("inbody:") {
-        if !body.is_empty() {
-            Box::new(Term::Body(SimpleOrPhrase::Simple(body.to_string().into())))
-        } else {
-            Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                term.to_string().into(),
-            )))
-        }
-    } else if let Some(url) = term.strip_prefix("inurl:") {
-        if !url.is_empty() {
-            Box::new(Term::Url(SimpleOrPhrase::Simple(url.to_string().into())))
-        } else {
-            Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                term.to_string().into(),
-            )))
-        }
-    } else {
-        for bang_prefix in BANG_PREFIXES {
-            if let Some(bang) = term.strip_prefix(bang_prefix) {
-                return Box::new(Term::PossibleBang(bang.to_string()));
-            }
-        }
-
-        Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-            term.to_string().into(),
-        )))
-    }
+fn trim_leading_whitespace(input: &str) -> nom::IResult<&str, &str> {
+    let (input, _) = nom::character::complete::multispace0(input)?;
+    Ok((input, input))
 }
 
-#[allow(clippy::vec_box)]
-pub fn parse(query: &str) -> Vec<Box<Term>> {
-    let query = query.to_lowercase().replace(['“', '”'], "\"");
+fn until_space_or_end(input: &str) -> nom::IResult<&str, &str> {
+    let (input, output) = nom::bytes::complete::take_while(|c: char| c != ' ')(input)?;
+    Ok((input, output))
+}
 
-    let mut res = Vec::new();
+fn simple_str(input: &str) -> nom::IResult<&str, &str> {
+    // parse until we find a space or the end of the string
+    if input.is_empty() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Eof,
+        )));
+    }
+    let (input, _) = trim_leading_whitespace(input)?;
+    let (input, output) = until_space_or_end(input)?;
+    Ok((input, output))
+}
 
-    let mut cur_term_begin = 0;
+fn simple(input: &str) -> nom::IResult<&str, SimpleOrPhrase> {
+    let (input, output) = simple_str(input)?;
+    Ok((input, SimpleOrPhrase::Simple(output.to_string().into())))
+}
 
-    for (offset, c) in query.char_indices() {
-        if cur_term_begin > offset {
-            continue;
-        }
+fn simple_term(input: &str) -> nom::IResult<&str, Term> {
+    let (input, output) = simple(input)?;
+    Ok((input, Term::SimpleOrPhrase(output)))
+}
 
-        cur_term_begin = floor_char_boundary(&query, cur_term_begin);
+fn phrase_helper(
+    input: &str,
+    start_quote: char,
+    end_quote: char,
+) -> nom::IResult<&str, SimpleOrPhrase> {
+    let (input, _) = nom::character::complete::char(start_quote)(input)?;
+    let (input, output) = nom::bytes::complete::take_until(end_quote.to_string().as_str())(input)?;
+    let (input, _) = nom::character::complete::char(end_quote)(input)?;
+    Ok((
+        input,
+        SimpleOrPhrase::Phrase(output.split_whitespace().map(|s| s.to_string()).collect()),
+    ))
+}
 
-        if query[cur_term_begin..].starts_with('"') {
-            if let Some(offset) = query[cur_term_begin + 1..].find('"') {
-                let offset = offset + cur_term_begin + 1;
-                res.push(Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Phrase(
-                    query[cur_term_begin + 1..offset]
-                        .split_whitespace()
-                        .map(|s| s.to_string())
-                        .collect(),
-                ))));
+fn phrase(input: &str) -> nom::IResult<&str, SimpleOrPhrase> {
+    let normal = |s| phrase_helper(s, '"', '"');
+    let apple1 = |s| phrase_helper(s, '“', '”');
+    let apple2 = |s| phrase_helper(s, '“', '“');
 
-                cur_term_begin = offset + 1;
-                continue;
-            }
-        }
-        if c.is_whitespace() {
-            if offset - cur_term_begin == 0 {
-                cur_term_begin = offset + 1;
-                continue;
-            }
+    nom::branch::alt((normal, apple1, apple2))(input)
+}
 
-            res.push(parse_term(&query[cur_term_begin..offset]));
-            cur_term_begin = offset + 1;
-        }
+fn phrase_term(input: &str) -> nom::IResult<&str, Term> {
+    let (input, output) = phrase(input)?;
+    Ok((input, Term::SimpleOrPhrase(output)))
+}
+
+fn simple_or_phrase(input: &str) -> nom::IResult<&str, SimpleOrPhrase> {
+    nom::branch::alt((phrase, simple))(input)
+}
+
+fn single_bang(input: &str, pref: char) -> nom::IResult<&str, Term> {
+    let (input, _) = nom::character::complete::char(pref)(input)?;
+    let (input, output) = until_space_or_end(input)?;
+    Ok((input, Term::PossibleBang(output.to_string())))
+}
+
+fn bang(input: &str) -> nom::IResult<&str, Term> {
+    for pref in BANG_PREFIXES.iter() {
+        let (input, output) = single_bang(input, *pref)?;
+        return Ok((input, output));
     }
 
-    if cur_term_begin < query.len() {
-        res.push(parse_term(
-            &query[floor_char_boundary(&query, cur_term_begin)..query.len()],
-        ));
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Fail,
+    )))
+}
+
+fn site_field(input: &str) -> nom::IResult<&str, Term> {
+    // parse 'site:' and then a simple term
+    let (input, _) = nom::bytes::complete::tag("site:")(input)?;
+    let (input, output) = simple_str(input)?;
+
+    Ok((input, Term::Site(output.to_string())))
+}
+
+fn title_field(input: &str) -> nom::IResult<&str, Term> {
+    // parse 'title:' and then a simple term
+    let (input, _) = nom::bytes::complete::tag("intitle:")(input)?;
+    let (input, output) = simple_or_phrase(input)?;
+
+    Ok((input, Term::Title(output)))
+}
+
+fn body_field(input: &str) -> nom::IResult<&str, Term> {
+    // parse 'body:' and then a simple term
+    let (input, _) = nom::bytes::complete::tag("inbody:")(input)?;
+    let (input, output) = simple_or_phrase(input)?;
+
+    Ok((input, Term::Body(output)))
+}
+
+fn url_field(input: &str) -> nom::IResult<&str, Term> {
+    // parse 'url:' and then a simple term
+    let (input, _) = nom::bytes::complete::tag("inurl:")(input)?;
+    let (input, output) = simple_or_phrase(input)?;
+
+    Ok((input, Term::Url(output)))
+}
+
+fn field_selector(input: &str) -> nom::IResult<&str, Term> {
+    nom::branch::alt((site_field, title_field, body_field, url_field))(input)
+}
+
+fn not(input: &str) -> nom::IResult<&str, Term> {
+    // ignore double negation
+    if let Ok((_, _)) = nom::bytes::complete::tag::<_, _, nom::error::Error<&str>>("--")(input) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Fail,
+        )));
     }
 
-    res
+    let (input, _) = nom::bytes::complete::tag("-")(input)?;
+    let (input, output) = term(input)?;
+    Ok((input, Term::Not(Box::new(output))))
+}
+
+fn ignore_quotes_helper(
+    input: &str,
+    start_quote: char,
+    end_quote: char,
+) -> nom::IResult<&str, &str> {
+    let (input, _) = nom::character::complete::char(start_quote)(input)?;
+    let (input, output) = nom::bytes::complete::take_until(end_quote.to_string().as_str())(input)?;
+    let (input, _) = nom::character::complete::char(end_quote)(input)?;
+    Ok((input, output))
+}
+
+fn ignore_weird_quotes(input: &str) -> nom::IResult<&str, &str> {
+    let guillemet = |s| ignore_quotes_helper(s, '«', '»');
+    let up_down_quotes = |s| ignore_quotes_helper(s, '„', '“');
+    let rev_guillemet = |s| ignore_quotes_helper(s, '»', '«');
+    let squares = |s| ignore_quotes_helper(s, '「', '」');
+
+    nom::branch::alt((guillemet, up_down_quotes, rev_guillemet, squares))(input)
+}
+
+fn term(input: &str) -> nom::IResult<&str, Term> {
+    let (mut input, _) = trim_leading_whitespace(input)?;
+
+    if let Ok((_, new_input)) = ignore_weird_quotes(input) {
+        input = new_input;
+    }
+
+    nom::branch::alt((phrase_term, bang, field_selector, not, simple_term))(input)
+}
+
+pub fn parse(query: &str) -> anyhow::Result<Vec<Term>> {
+    if query.is_empty() {
+        return Ok(vec![]);
+    }
+
+    nom::multi::many1(term)(query)
+        .map(|(_, res)| res)
+        .map_err(|e| anyhow::anyhow!("Failed to parse query: {:?}", e))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use proptest::prelude::*;
+
+    use super::{SimpleOrPhrase, Term};
+
+    fn parse(input: &str) -> Vec<Term> {
+        super::parse(input).unwrap()
+    }
 
     #[test]
     fn parse_not() {
         assert_eq!(
             parse("this -that"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "this".to_string().into()
-                ))),
-                Box::new(Term::Not(Box::new(Term::SimpleOrPhrase(
-                    SimpleOrPhrase::Simple("that".to_string().into())
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("this".to_string().into())),
+                Term::Not(Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
+                    "that".to_string().into()
                 ))))
             ]
         );
@@ -149,12 +218,8 @@ mod tests {
         assert_eq!(
             parse("this -"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "this".to_string().into()
-                ))),
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "-".to_string().into()
-                )))
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("this".to_string().into())),
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("-".to_string().into()))
             ]
         );
     }
@@ -164,12 +229,8 @@ mod tests {
         assert_eq!(
             parse("this --that"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "this".to_string().into()
-                ))),
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "--that".to_string().into()
-                )))
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("this".to_string().into())),
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("--that".to_string().into()))
             ]
         );
     }
@@ -179,10 +240,8 @@ mod tests {
         assert_eq!(
             parse("this site:test.com"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "this".to_string().into()
-                ))),
-                Box::new(Term::Site("test.com".to_string()))
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("this".to_string().into())),
+                Term::Site("test.com".to_string())
             ]
         );
     }
@@ -192,12 +251,8 @@ mod tests {
         assert_eq!(
             parse("this intitle:test"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "this".to_string().into()
-                ))),
-                Box::new(Term::Title(SimpleOrPhrase::Simple(
-                    "test".to_string().into()
-                )))
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("this".to_string().into())),
+                Term::Title(SimpleOrPhrase::Simple("test".to_string().into()))
             ]
         );
     }
@@ -207,12 +262,8 @@ mod tests {
         assert_eq!(
             parse("this inbody:test"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "this".to_string().into()
-                ))),
-                Box::new(Term::Body(SimpleOrPhrase::Simple(
-                    "test".to_string().into()
-                )))
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("this".to_string().into())),
+                Term::Body(SimpleOrPhrase::Simple("test".to_string().into()))
             ]
         );
     }
@@ -222,10 +273,8 @@ mod tests {
         assert_eq!(
             parse("this inurl:test"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "this".to_string().into()
-                ))),
-                Box::new(Term::Url(SimpleOrPhrase::Simple("test".to_string().into())))
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("this".to_string().into())),
+                Term::Url(SimpleOrPhrase::Simple("test".to_string().into()))
             ]
         );
     }
@@ -240,73 +289,74 @@ mod tests {
         assert_eq!(
             parse("\"this is a\" inurl:test"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Phrase(vec![
+                Term::SimpleOrPhrase(SimpleOrPhrase::Phrase(vec![
                     "this".to_string(),
                     "is".to_string(),
                     "a".to_string()
-                ]))),
-                Box::new(Term::Url(SimpleOrPhrase::Simple("test".to_string().into())))
+                ])),
+                Term::Url(SimpleOrPhrase::Simple("test".to_string().into()))
             ]
         );
         assert_eq!(
             parse("\"this is a inurl:test"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "\"this".to_string().into()
-                ))),
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "is".to_string().into()
-                ))),
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "a".to_string().into()
-                ))),
-                Box::new(Term::Url(SimpleOrPhrase::Simple("test".to_string().into())))
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("\"this".to_string().into())),
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("is".to_string().into())),
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("a".to_string().into())),
+                Term::Url(SimpleOrPhrase::Simple("test".to_string().into()))
             ]
         );
         assert_eq!(
             parse("this is a\" inurl:test"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "this".to_string().into()
-                ))),
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "is".to_string().into()
-                ))),
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Simple(
-                    "a\"".to_string().into()
-                ))),
-                Box::new(Term::Url(SimpleOrPhrase::Simple("test".to_string().into())))
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("this".to_string().into())),
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("is".to_string().into())),
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("a\"".to_string().into())),
+                Term::Url(SimpleOrPhrase::Simple("test".to_string().into()))
             ]
         );
 
         assert_eq!(
             parse("\"this is a inurl:test\""),
-            vec![Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Phrase(
-                vec![
-                    "this".to_string(),
-                    "is".to_string(),
-                    "a".to_string(),
-                    "inurl:test".to_string()
-                ]
-            )))]
+            vec![Term::SimpleOrPhrase(SimpleOrPhrase::Phrase(vec![
+                "this".to_string(),
+                "is".to_string(),
+                "a".to_string(),
+                "inurl:test".to_string()
+            ]))]
         );
 
         assert_eq!(
             parse("\"\""),
-            vec![Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Phrase(
-                vec![]
-            )))]
+            vec![Term::SimpleOrPhrase(SimpleOrPhrase::Phrase(vec![]))]
         );
         assert_eq!(
             parse("“this is a“ inurl:test"),
             vec![
-                Box::new(Term::SimpleOrPhrase(SimpleOrPhrase::Phrase(vec![
+                Term::SimpleOrPhrase(SimpleOrPhrase::Phrase(vec![
                     "this".to_string(),
                     "is".to_string(),
                     "a".to_string()
-                ]))),
-                Box::new(Term::Url(SimpleOrPhrase::Simple("test".to_string().into())))
+                ])),
+                Term::Url(SimpleOrPhrase::Simple("test".to_string().into()))
             ]
+        );
+
+        assert_eq!(
+            parse("that's not"),
+            vec![
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("that's".to_string().into())),
+                Term::SimpleOrPhrase(SimpleOrPhrase::Simple("not".to_string().into()))
+            ]
+        );
+
+        assert_eq!(
+            parse("inbody:\"this should work\""),
+            vec![Term::Body(SimpleOrPhrase::Phrase(vec![
+                "this".to_string(),
+                "should".to_string(),
+                "work".to_string()
+            ]))]
         );
     }
 
