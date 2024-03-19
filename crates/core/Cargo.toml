@@ -45,6 +45,7 @@ crossbeam-channel = { workspace = true }
 csv = { workspace = true }
 dashmap = { workspace = true }
 encoding_rs = { workspace = true }
+enum_dispatch = { workspace = true }
 eventsource-stream = { workspace = true }
 fend-core = { workspace = true }
 flate2 = { workspace = true }

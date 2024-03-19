@@ -93,8 +93,9 @@ fn single_bang(input: &str, pref: char) -> nom::IResult<&str, Term> {
 
 fn bang(input: &str) -> nom::IResult<&str, Term> {
     for pref in BANG_PREFIXES.iter() {
-        let (input, output) = single_bang(input, *pref)?;
-        return Ok((input, output));
+        if let Ok((input, output)) = single_bang(input, *pref) {
+            return Ok((input, output));
+        }
     }
 
     Err(nom::Err::Error(nom::error::Error::new(

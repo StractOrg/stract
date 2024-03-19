@@ -73,18 +73,18 @@ macro_rules! raft_sonic_request_response {
         #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
         pub enum Response {
             $(
-                $req(<$req as crate::distributed::sonic::service::Message<$service>>::Response),
+                $req(<$req as $crate::distributed::sonic::service::Message<$service>>::Response),
             )*
             Empty,
         }
 
         $(
-        impl TryFrom<Response> for <$req as crate::distributed::sonic::service::Message<$service>>::Response {
-            type Error = crate::distributed::sonic::Error;
+        impl TryFrom<Response> for <$req as $crate::distributed::sonic::service::Message<$service>>::Response {
+            type Error = $crate::distributed::sonic::Error;
             fn try_from(res: Response) -> Result<Self, Self::Error> {
                 match res {
                     Response::$req(res) => Ok(res),
-                    _ => Err(crate::distributed::sonic::Error::Application(anyhow::anyhow!("Invalid response for request from Raft"))),
+                    _ => Err($crate::distributed::sonic::Error::Application(anyhow::anyhow!("Invalid response for request from Raft"))),
                 }
             }
         }

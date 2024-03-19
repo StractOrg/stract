@@ -39,34 +39,34 @@ impl RaftNetworkFactory<TypeConfig> for Network {
     }
 }
 
-pub type AppendEntriesRequest = openraft::raft::AppendEntriesRequest<TypeConfig>;
+pub type AppendEntries = openraft::raft::AppendEntriesRequest<TypeConfig>;
 pub type AppendEntriesResponse = openraft::raft::AppendEntriesResponse<NodeId>;
 
-pub type InstallSnapshotRequest = openraft::raft::InstallSnapshotRequest<TypeConfig>;
+pub type InstallSnapshot = openraft::raft::InstallSnapshotRequest<TypeConfig>;
 pub type InstallSnapshotResponse = openraft::raft::InstallSnapshotResponse<NodeId>;
 
-pub type VoteRequest = openraft::raft::VoteRequest<NodeId>;
+pub type Vote = openraft::raft::VoteRequest<NodeId>;
 pub type VoteResponse = openraft::raft::VoteResponse<NodeId>;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct AddLearnerRequest {
+pub struct AddLearner {
     pub id: NodeId,
     pub addr: SocketAddr,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct AddNodesRequest {
+pub struct AddNodes {
     members: BTreeMap<NodeId, BasicNode>,
 }
 
 sonic_service!(
     Server,
     [
-        AppendEntriesRequest,
-        InstallSnapshotRequest,
-        VoteRequest,
-        AddLearnerRequest,
-        AddNodesRequest,
+        AppendEntries,
+        InstallSnapshot,
+        Vote,
+        AddLearner,
+        AddNodes,
         Get,
         Set,
     ]

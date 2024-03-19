@@ -28,6 +28,7 @@ use super::{adservers::AD_SERVERS, schema_org, Meta, Script};
 
 use super::url_ext::UrlExt;
 
+mod fn_cache;
 mod into_tantivy;
 mod links;
 mod microformats;
