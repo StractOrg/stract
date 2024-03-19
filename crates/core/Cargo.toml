@@ -68,6 +68,7 @@ memmap = { workspace = true }
 memmap2 = { workspace = true }
 mime = { workspace = true }
 min-max-heap = { workspace = true }
+nom = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 openraft = { workspace = true }

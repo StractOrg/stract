@@ -109,9 +109,9 @@ impl Bangs {
         }
     }
 
-    pub fn get(&self, terms: &[Box<Term>]) -> Option<BangHit> {
+    pub fn get(&self, terms: &[Term]) -> Option<BangHit> {
         for possible_bang in terms.iter().filter_map(|term| {
-            if let Term::PossibleBang(possible_bang) = term.as_ref() {
+            if let Term::PossibleBang(possible_bang) = term {
                 Some(possible_bang)
             } else {
                 None
@@ -122,13 +122,13 @@ impl Bangs {
                     terms
                         .iter()
                         .filter(|term| {
-                            if let Term::PossibleBang(bang) = term.as_ref() {
+                            if let Term::PossibleBang(bang) = term {
                                 bang != possible_bang
                             } else {
                                 true
                             }
                         })
-                        .map(|term| term.as_ref().to_string()),
+                        .map(|term| term.to_string()),
                     " ".to_string(),
                 )
                 .collect::<String>();
@@ -172,11 +172,11 @@ mod tests {
         }]"#,
         );
 
-        assert_eq!(bangs.get(&parse("no bangs")), None);
-        assert_eq!(bangs.get(&parse("!no bangs")), None);
+        assert_eq!(bangs.get(&parse("no bangs").unwrap()), None);
+        assert_eq!(bangs.get(&parse("!no bangs").unwrap()), None);
 
         assert_eq!(
-            bangs.get(&parse("!ty bangs")),
+            bangs.get(&parse("!ty bangs").unwrap()),
             Some(BangHit {
                 bang: Bang {
                     category: Some("Multimedia".to_string()),
