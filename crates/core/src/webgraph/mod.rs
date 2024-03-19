@@ -171,7 +171,7 @@ pub struct FullEdge {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
-    pub name: String,
+    name: String,
 }
 
 impl Node {
@@ -191,6 +191,10 @@ impl Node {
                 name: String::new(),
             },
         }
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.name.as_str()
     }
 
     pub fn id(&self) -> NodeID {
@@ -232,29 +236,7 @@ impl From<Url> for Node {
 
 pub fn normalize_url(url: &Url) -> String {
     let mut url = url.clone();
-    let allowed_queries: Vec<_> = url
-        .query_pairs()
-        .filter(|(key, _)| {
-            !key.starts_with("utm_")
-                && !key.starts_with("fbclid")
-                && !key.starts_with("gclid")
-                && !key.starts_with("msclkid")
-        })
-        .map(|(key, value)| (key.to_string(), value.to_string()))
-        .collect();
-
-    {
-        let mut queries = url.query_pairs_mut();
-        queries.clear();
-
-        if !allowed_queries.is_empty() {
-            queries.extend_pairs(allowed_queries);
-        }
-    }
-
-    if url.query().unwrap_or_default().is_empty() {
-        url.set_query(None);
-    }
+    url.normalize();
 
     let scheme = url.scheme();
     let mut normalized = url
@@ -1136,5 +1118,14 @@ mod test {
                 Node::from("http://b.com/second")
             ]
         );
+    }
+
+    #[test]
+    fn test_node_normalized() {
+        let n = Node::from("http://www.example.com/abc");
+        assert_eq!(n.as_str(), "example.com/abc");
+
+        let n = Node::from("http://www.example.com/abc#123");
+        assert_eq!(n.as_str(), "example.com/abc");
     }
 }

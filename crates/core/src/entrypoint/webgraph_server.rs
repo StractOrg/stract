@@ -92,7 +92,7 @@ impl Message<WebGraphService> for SimilarHosts {
 
         let urls = similar_hosts
             .iter()
-            .filter_map(|s| Url::parse(&("http://".to_string() + s.node.name.as_str())).ok())
+            .filter_map(|s| Url::parse(&("http://".to_string() + s.node.as_str())).ok())
             .collect_vec();
 
         let descriptions = server.searcher.get_homepage_descriptions(&urls).await;
@@ -100,12 +100,12 @@ impl Message<WebGraphService> for SimilarHosts {
         let similar_hosts = similar_hosts
             .into_iter()
             .map(|site| {
-                let description = Url::parse(&("http://".to_string() + site.node.name.as_str()))
+                let description = Url::parse(&("http://".to_string() + site.node.as_str()))
                     .ok()
                     .and_then(|url| descriptions.get(&url).cloned());
 
                 ScoredHost {
-                    host: site.node.name,
+                    host: site.node.as_str().to_string(),
                     score: site.score,
                     description,
                 }

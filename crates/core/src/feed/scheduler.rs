@@ -115,7 +115,7 @@ pub fn schedule(
 
     for host in top_hosts {
         let host = host_graph.id2node(&host).unwrap();
-        let url = Url::parse(&format!("http://{}", host.name));
+        let url = Url::parse(&format!("http://{}", host.as_str()));
 
         if url.is_err() {
             continue;
@@ -127,7 +127,7 @@ pub fn schedule(
         all_feeds
             .entry(domain)
             .or_insert(HashSet::new())
-            .extend(index.search(&host.name).unwrap().into_iter());
+            .extend(index.search(host.as_str()).unwrap().into_iter());
     }
 
     let mut splits = Vec::new();

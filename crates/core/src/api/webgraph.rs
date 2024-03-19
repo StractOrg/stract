@@ -157,7 +157,9 @@ pub mod host {
             )
             .await
         {
-            Ok(Some(node)) => Ok(Json(KnowsHost::Known { host: node.name })),
+            Ok(Some(node)) => Ok(Json(KnowsHost::Known {
+                host: node.as_str().to_string(),
+            })),
             Err(err) => {
                 tracing::error!("Failed to send request to webgraph: {}", err);
                 Ok(Json(KnowsHost::Unknown))
