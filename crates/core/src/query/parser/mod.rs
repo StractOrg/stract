@@ -184,7 +184,7 @@ fn term(input: &str) -> nom::IResult<&str, Term> {
 }
 
 pub fn parse(query: &str) -> anyhow::Result<Vec<Term>> {
-    if query.is_empty() {
+    if query.is_empty() || query.chars().all(char::is_whitespace) {
         return Ok(vec![]);
     }
 
@@ -282,6 +282,7 @@ mod tests {
     #[test]
     fn empty() {
         assert_eq!(parse(""), vec![]);
+        assert_eq!(parse(" "), vec![]);
     }
 
     #[test]
@@ -362,7 +363,7 @@ mod tests {
 
     #[test]
     fn unicode() {
-        let query = "\u{a0}";
+        let query = "🦀";
         assert_eq!(parse(query).len(), 1);
     }
 
