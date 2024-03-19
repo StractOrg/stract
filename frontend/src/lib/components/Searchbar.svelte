@@ -172,4 +172,7 @@
       </div>
     {/if}
   </label>
+  <noscript>
+    <input type="hidden" value="true" name="ssr" />
+  </noscript>
 </form>
