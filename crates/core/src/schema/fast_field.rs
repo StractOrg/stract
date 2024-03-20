@@ -24,7 +24,7 @@ use tantivy::{
 use crate::{
     enum_map::InsertEnumMapKey,
     from_discriminant, simhash,
-    webpage::{html::FnCache, Html},
+    webpage::{html::FnCache, Html, Webpage},
     Result,
 };
 
@@ -40,6 +40,15 @@ pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()>;
+
+    fn add_webpage_tantivy(
+        &self,
+        _webpage: &crate::webpage::Webpage,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
+    }
 
     fn data_type(&self) -> DataType {
         DataType::U64
@@ -231,6 +240,20 @@ impl FastField for HostCentrality {
     ) -> Result<()> {
         Ok(())
     }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            (webpage.host_centrality * FLOAT_SCALING as f64) as u64,
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -247,6 +270,17 @@ impl FastField for HostCentralityRank {
         _doc: &mut TantivyDocument,
         _schema: &tantivy::schema::Schema,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), webpage.host_centrality_rank);
+
         Ok(())
     }
 }
@@ -266,6 +300,20 @@ impl FastField for PageCentrality {
     ) -> Result<()> {
         Ok(())
     }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            (webpage.page_centrality * FLOAT_SCALING as f64) as u64,
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -283,6 +331,17 @@ impl FastField for PageCentralityRank {
     ) -> Result<()> {
         Ok(())
     }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), webpage.page_centrality_rank);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -298,6 +357,17 @@ impl FastField for FetchTimeMs {
         _doc: &mut TantivyDocument,
         _schema: &tantivy::schema::Schema,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), webpage.fetch_time_ms);
+
         Ok(())
     }
 }
@@ -368,6 +438,25 @@ impl FastField for Region {
         _doc: &mut TantivyDocument,
         _schema: &tantivy::schema::Schema,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let region = crate::webpage::region::Region::guess_from(webpage);
+        if let Ok(region) = region {
+            doc.add_u64(self.tantivy_field(schema), region.id());
+        } else {
+            doc.add_u64(
+                self.tantivy_field(schema),
+                crate::webpage::region::Region::All.id(),
+            );
+        }
+
         Ok(())
     }
 }
@@ -802,6 +891,20 @@ impl FastField for PreComputedScore {
     ) -> Result<()> {
         Ok(())
     }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            (webpage.pre_computed_score * FLOAT_SCALING as f64) as u64,
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -822,6 +925,24 @@ impl FastField for HostNodeID {
         _doc: &mut TantivyDocument,
         _schema: &tantivy::schema::Schema,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        match &webpage.node_id {
+            Some(node_id) => {
+                doc.add_u64(self.tantivy_field(schema), node_id.as_u64());
+            }
+            None => {
+                doc.add_u64(self.tantivy_field(schema), u64::MAX);
+            }
+        }
+
         Ok(())
     }
 }
@@ -1047,6 +1168,24 @@ impl FastField for TitleEmbeddings {
     ) -> Result<()> {
         Ok(())
     }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        if let Some(emb) = &webpage.title_embedding {
+            let mut serialized = Vec::new();
+            emb.write_bytes(&mut serialized)?;
+
+            doc.add_bytes(self.tantivy_field(schema), serialized);
+        } else {
+            doc.add_bytes(self.tantivy_field(schema), Vec::new());
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1071,6 +1210,24 @@ impl FastField for KeywordEmbeddings {
         _doc: &mut TantivyDocument,
         _schema: &tantivy::schema::Schema,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        if let Some(emb) = &webpage.keyword_embedding {
+            let mut serialized = Vec::new();
+            emb.write_bytes(&mut serialized)?;
+
+            doc.add_bytes(self.tantivy_field(schema), serialized);
+        } else {
+            doc.add_bytes(self.tantivy_field(schema), Vec::new());
+        }
+
         Ok(())
     }
 }

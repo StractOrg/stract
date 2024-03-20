@@ -18,6 +18,7 @@ use enum_dispatch::enum_dispatch;
 use strum::{EnumDiscriminants, VariantArray};
 use tantivy::{
     schema::{IndexRecordOption, TextFieldIndexing, TextOptions},
+    time::OffsetDateTime,
     tokenizer::PreTokenizedString,
     TantivyDocument,
 };
@@ -49,6 +50,15 @@ pub trait TextField:
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()>;
+
+    fn add_webpage_tantivy(
+        &self,
+        _webpage: &crate::webpage::Webpage,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
+    }
 
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::default()
@@ -919,6 +929,20 @@ impl TextField for BacklinkText {
     ) -> Result<()> {
         Ok(())
     }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &crate::webpage::Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_text(
+            self.tantivy_field(schema),
+            webpage.backlink_labels.join("\n"),
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -976,6 +1000,20 @@ impl TextField for DmozDescription {
         _doc: &mut TantivyDocument,
         _schema: &tantivy::schema::Schema,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &crate::webpage::Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_text(
+            self.tantivy_field(schema),
+            webpage.dmoz_description().unwrap_or_default(),
+        );
+
         Ok(())
     }
 }
@@ -1264,6 +1302,22 @@ impl TextField for SafetyClassification {
     ) -> Result<()> {
         Ok(())
     }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &crate::webpage::Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let safety = webpage
+            .safety_classification
+            .map(|label| label.to_string())
+            .unwrap_or_default();
+
+        doc.add_text(self.tantivy_field(schema), safety);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1288,6 +1342,22 @@ impl TextField for InsertionTimestamp {
         _doc: &mut TantivyDocument,
         _schema: &tantivy::schema::Schema,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &crate::webpage::Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_date(
+            self.tantivy_field(schema),
+            tantivy::DateTime::from_utc(OffsetDateTime::from_unix_timestamp(
+                webpage.inserted_at.timestamp(),
+            )?),
+        );
+
         Ok(())
     }
 }
@@ -1341,6 +1411,17 @@ impl TextField for Keywords {
         _doc: &mut TantivyDocument,
         _schema: &tantivy::schema::Schema,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_webpage_tantivy(
+        &self,
+        webpage: &crate::webpage::Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_text(self.tantivy_field(schema), webpage.keywords.join("\n"));
+
         Ok(())
     }
 }
