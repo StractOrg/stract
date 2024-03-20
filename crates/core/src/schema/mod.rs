@@ -25,6 +25,8 @@ use tantivy::{
 pub use fast_field::{DataType, FastFieldEnum};
 pub use text_field::TextFieldEnum;
 
+use self::{fast_field::FastField, text_field::TextField};
+
 pub const FLOAT_SCALING: u64 = 1_000_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

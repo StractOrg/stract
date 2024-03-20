@@ -27,7 +27,9 @@ use crate::{
 };
 
 #[enum_dispatch]
-pub trait TextField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {}
+pub trait TextField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
+    fn name(&self) -> &str;
+}
 
 #[enum_dispatch(TextField)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumDiscriminants)]
@@ -297,45 +299,6 @@ impl TextFieldEnum {
             TextFieldEnum::Keywords(_) => false,
         }
     }
-
-    pub fn name(&self) -> &str {
-        match self {
-            TextFieldEnum::Title(_) => "title",
-            TextFieldEnum::CleanBody(_) => "body",
-            TextFieldEnum::Url(_) => "url",
-            TextFieldEnum::UrlNoTokenizer(_) => "url_no_tokenizer",
-            TextFieldEnum::UrlForSiteOperator(_) => "url_for_site_operator",
-            TextFieldEnum::SiteWithout(_) => "site",
-            TextFieldEnum::Domain(_) => "domain",
-            TextFieldEnum::SiteNoTokenizer(_) => "site_no_tokenizer",
-            TextFieldEnum::SiteIfHomepageNoTokenizer(_) => "site_if_homepage_no_tokenizer",
-            TextFieldEnum::DomainNoTokenizer(_) => "domain_no_tokenizer",
-            TextFieldEnum::DomainNameNoTokenizer(_) => "domain_name_no_tokenizer",
-            TextFieldEnum::BacklinkText(_) => "backlink_text",
-            TextFieldEnum::StemmedTitle(_) => "stemmed_title",
-            TextFieldEnum::StemmedCleanBody(_) => "stemmed_body",
-            TextFieldEnum::DomainIfHomepage(_) => "domain_if_homepage",
-            TextFieldEnum::DomainNameIfHomepageNoTokenizer(_) => {
-                "domain_name_if_homepage_no_tokenizer"
-            }
-            TextFieldEnum::DomainIfHomepageNoTokenizer(_) => "domain_if_homepage_no_tokenizer",
-            TextFieldEnum::Description(_) => "description",
-            TextFieldEnum::TitleIfHomepage(_) => "title_if_homepage",
-            TextFieldEnum::AllBody(_) => "all_body",
-            TextFieldEnum::DmozDescription(_) => "dmoz_description",
-            TextFieldEnum::SchemaOrgJson(_) => "schema_org_json",
-            TextFieldEnum::FlattenedSchemaOrgJson(_) => "flattened_schema_org_json",
-            TextFieldEnum::CleanBodyBigrams(_) => "clean_body_bigrams",
-            TextFieldEnum::TitleBigrams(_) => "title_bigrams",
-            TextFieldEnum::CleanBodyTrigrams(_) => "clean_body_trigrams",
-            TextFieldEnum::TitleTrigrams(_) => "title_trigrams",
-            TextFieldEnum::MicroformatTags(_) => "microformat_tags",
-            TextFieldEnum::SafetyClassification(_) => "safety_classification",
-            TextFieldEnum::InsertionTimestamp(_) => "insertion_timestamp",
-            TextFieldEnum::RecipeFirstIngredientTagId(_) => "recipe_first_ingredient_tag_id",
-            TextFieldEnum::Keywords(_) => "keywords",
-        }
-    }
 }
 
 impl InsertEnumMapKey for TextFieldEnum {
@@ -346,128 +309,256 @@ impl InsertEnumMapKey for TextFieldEnum {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Title;
-impl TextField for Title {}
+impl TextField for Title {
+    fn name(&self) -> &str {
+        "title"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CleanBody;
-impl TextField for CleanBody {}
+impl TextField for CleanBody {
+    fn name(&self) -> &str {
+        "body"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StemmedTitle;
-impl TextField for StemmedTitle {}
+impl TextField for StemmedTitle {
+    fn name(&self) -> &str {
+        "stemmed_title"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StemmedCleanBody;
-impl TextField for StemmedCleanBody {}
+impl TextField for StemmedCleanBody {
+    fn name(&self) -> &str {
+        "stemmed_body"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AllBody;
-impl TextField for AllBody {}
+impl TextField for AllBody {
+    fn name(&self) -> &str {
+        "all_body"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Url;
-impl TextField for Url {}
+impl TextField for Url {
+    fn name(&self) -> &str {
+        "url"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlNoTokenizer;
-impl TextField for UrlNoTokenizer {}
+impl TextField for UrlNoTokenizer {
+    fn name(&self) -> &str {
+        "url_no_tokenizer"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlForSiteOperator;
-impl TextField for UrlForSiteOperator {}
+impl TextField for UrlForSiteOperator {
+    fn name(&self) -> &str {
+        "url_for_site_operator"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteWithout;
-impl TextField for SiteWithout {}
+impl TextField for SiteWithout {
+    fn name(&self) -> &str {
+        "site"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Domain;
-impl TextField for Domain {}
+impl TextField for Domain {
+    fn name(&self) -> &str {
+        "domain"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteNoTokenizer;
-impl TextField for SiteNoTokenizer {}
+impl TextField for SiteNoTokenizer {
+    fn name(&self) -> &str {
+        "site_no_tokenizer"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainNoTokenizer;
-impl TextField for DomainNoTokenizer {}
+impl TextField for DomainNoTokenizer {
+    fn name(&self) -> &str {
+        "domain_no_tokenizer"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainNameNoTokenizer;
-impl TextField for DomainNameNoTokenizer {}
+impl TextField for DomainNameNoTokenizer {
+    fn name(&self) -> &str {
+        "domain_name_no_tokenizer"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteIfHomepageNoTokenizer;
-impl TextField for SiteIfHomepageNoTokenizer {}
+impl TextField for SiteIfHomepageNoTokenizer {
+    fn name(&self) -> &str {
+        "site_if_homepage_no_tokenizer"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainIfHomepage;
-impl TextField for DomainIfHomepage {}
+impl TextField for DomainIfHomepage {
+    fn name(&self) -> &str {
+        "domain_if_homepage"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainNameIfHomepageNoTokenizer;
-impl TextField for DomainNameIfHomepageNoTokenizer {}
+impl TextField for DomainNameIfHomepageNoTokenizer {
+    fn name(&self) -> &str {
+        "domain_name_if_homepage_no_tokenizer"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainIfHomepageNoTokenizer;
-impl TextField for DomainIfHomepageNoTokenizer {}
+impl TextField for DomainIfHomepageNoTokenizer {
+    fn name(&self) -> &str {
+        "domain_if_homepage_no_tokenizer"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleIfHomepage;
-impl TextField for TitleIfHomepage {}
+impl TextField for TitleIfHomepage {
+    fn name(&self) -> &str {
+        "title_if_homepage"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BacklinkText;
-impl TextField for BacklinkText {}
+impl TextField for BacklinkText {
+    fn name(&self) -> &str {
+        "backlink_text"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Description;
-impl TextField for Description {}
+impl TextField for Description {
+    fn name(&self) -> &str {
+        "description"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DmozDescription;
-impl TextField for DmozDescription {}
+impl TextField for DmozDescription {
+    fn name(&self) -> &str {
+        "dmoz_description"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SchemaOrgJson;
-impl TextField for SchemaOrgJson {}
+impl TextField for SchemaOrgJson {
+    fn name(&self) -> &str {
+        "schema_org_json"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FlattenedSchemaOrgJson;
-impl TextField for FlattenedSchemaOrgJson {}
+impl TextField for FlattenedSchemaOrgJson {
+    fn name(&self) -> &str {
+        "flattened_schema_org_json"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CleanBodyBigrams;
-impl TextField for CleanBodyBigrams {}
+impl TextField for CleanBodyBigrams {
+    fn name(&self) -> &str {
+        "clean_body_bigrams"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleBigrams;
-impl TextField for TitleBigrams {}
+impl TextField for TitleBigrams {
+    fn name(&self) -> &str {
+        "title_bigrams"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CleanBodyTrigrams;
-impl TextField for CleanBodyTrigrams {}
+impl TextField for CleanBodyTrigrams {
+    fn name(&self) -> &str {
+        "clean_body_trigrams"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleTrigrams;
-impl TextField for TitleTrigrams {}
+impl TextField for TitleTrigrams {
+    fn name(&self) -> &str {
+        "title_trigrams"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MicroformatTags;
-impl TextField for MicroformatTags {}
+impl TextField for MicroformatTags {
+    fn name(&self) -> &str {
+        "microformat_tags"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SafetyClassification;
-impl TextField for SafetyClassification {}
+impl TextField for SafetyClassification {
+    fn name(&self) -> &str {
+        "safety_classification"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InsertionTimestamp;
-impl TextField for InsertionTimestamp {}
+impl TextField for InsertionTimestamp {
+    fn name(&self) -> &str {
+        "insertion_timestamp"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RecipeFirstIngredientTagId;
-impl TextField for RecipeFirstIngredientTagId {}
+impl TextField for RecipeFirstIngredientTagId {
+    fn name(&self) -> &str {
+        "recipe_first_ingredient_tag_id"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Keywords;
-impl TextField for Keywords {}
+impl TextField for Keywords {
+    fn name(&self) -> &str {
+        "keywords"
+    }
+}

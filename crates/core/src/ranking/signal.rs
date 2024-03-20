@@ -17,6 +17,7 @@
 use crate::enum_map::InsertEnumMapKey;
 use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
+use crate::schema::text_field::TextField;
 use crate::schema::{fast_field, text_field};
 use crate::Result;
 use crate::{

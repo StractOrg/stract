@@ -20,7 +20,9 @@ use strum::{EnumDiscriminants, VariantArray};
 use crate::{enum_map::InsertEnumMapKey, from_discriminant};
 
 #[enum_dispatch]
-pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {}
+pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
+    fn name(&self) -> &str;
+}
 
 #[enum_dispatch(FastField)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumDiscriminants)]
@@ -128,50 +130,6 @@ impl FastFieldEnum {
     pub fn num_variants() -> usize {
         FastFieldEnumDiscriminants::VARIANTS.len()
     }
-
-    pub fn name(&self) -> &str {
-        match self {
-            FastFieldEnum::HostCentrality(_) => "host_centrality",
-            FastFieldEnum::HostCentralityRank(_) => "host_centrality_rank",
-            FastFieldEnum::PageCentrality(_) => "page_centrality",
-            FastFieldEnum::PageCentralityRank(_) => "page_centrality_rank",
-            FastFieldEnum::IsHomepage(_) => "is_homepage",
-            FastFieldEnum::FetchTimeMs(_) => "fetch_time_ms",
-            FastFieldEnum::LastUpdated(_) => "last_updated",
-            FastFieldEnum::TrackerScore(_) => "tracker_score",
-            FastFieldEnum::Region(_) => "region",
-            FastFieldEnum::NumUrlTokens(_) => "num_url_tokens",
-            FastFieldEnum::NumTitleTokens(_) => "num_title_tokens",
-            FastFieldEnum::NumCleanBodyTokens(_) => "num_clean_body_tokens",
-            FastFieldEnum::NumDescriptionTokens(_) => "num_description_tokens",
-            FastFieldEnum::NumDomainTokens(_) => "num_domain_tokens",
-            FastFieldEnum::NumUrlForSiteOperatorTokens(_) => "num_url_for_site_operator_tokens",
-            FastFieldEnum::NumFlattenedSchemaTokens(_) => "num_flattened_schema_tokens",
-            FastFieldEnum::NumMicroformatTagsTokens(_) => "num_microformat_tags_tokens",
-            FastFieldEnum::SiteHash1(_) => "site_hash1",
-            FastFieldEnum::SiteHash2(_) => "site_hash2",
-            FastFieldEnum::UrlWithoutQueryHash1(_) => "url_without_query_hash1",
-            FastFieldEnum::UrlWithoutQueryHash2(_) => "url_without_query_hash2",
-            FastFieldEnum::TitleHash1(_) => "title_hash1",
-            FastFieldEnum::TitleHash2(_) => "title_hash2",
-            FastFieldEnum::UrlHash1(_) => "url_hash1",
-            FastFieldEnum::UrlHash2(_) => "url_hash2",
-            FastFieldEnum::DomainHash1(_) => "domain_hash1",
-            FastFieldEnum::DomainHash2(_) => "domain_hash2",
-            FastFieldEnum::UrlWithoutTldHash1(_) => "url_without_tld_hash1",
-            FastFieldEnum::UrlWithoutTldHash2(_) => "url_without_tld_hash2",
-            FastFieldEnum::PreComputedScore(_) => "pre_computed_score",
-            FastFieldEnum::HostNodeID(_) => "host_node_id",
-            FastFieldEnum::SimHash(_) => "sim_hash",
-            FastFieldEnum::NumPathAndQuerySlashes(_) => "num_path_and_query_slashes",
-            FastFieldEnum::NumPathAndQueryDigits(_) => "num_path_and_query_digits",
-            FastFieldEnum::LikelyHasAds(_) => "likely_has_ads",
-            FastFieldEnum::LikelyHasPaywall(_) => "likely_has_paywall",
-            FastFieldEnum::LinkDensity(_) => "link_density",
-            FastFieldEnum::TitleEmbeddings(_) => "title_embeddings",
-            FastFieldEnum::KeywordEmbeddings(_) => "keyword_embeddings",
-        }
-    }
 }
 
 pub enum DataType {
@@ -233,156 +191,312 @@ impl InsertEnumMapKey for FastFieldEnum {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IsHomepage;
-impl FastField for IsHomepage {}
+impl FastField for IsHomepage {
+    fn name(&self) -> &str {
+        "is_homepage"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HostCentrality;
-impl FastField for HostCentrality {}
+impl FastField for HostCentrality {
+    fn name(&self) -> &str {
+        "host_centrality"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HostCentralityRank;
-impl FastField for HostCentralityRank {}
+impl FastField for HostCentralityRank {
+    fn name(&self) -> &str {
+        "host_centrality_rank"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PageCentrality;
-impl FastField for PageCentrality {}
+impl FastField for PageCentrality {
+    fn name(&self) -> &str {
+        "page_centrality"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PageCentralityRank;
-impl FastField for PageCentralityRank {}
+impl FastField for PageCentralityRank {
+    fn name(&self) -> &str {
+        "page_centrality_rank"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FetchTimeMs;
-impl FastField for FetchTimeMs {}
+impl FastField for FetchTimeMs {
+    fn name(&self) -> &str {
+        "fetch_time_ms"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LastUpdated;
-impl FastField for LastUpdated {}
+impl FastField for LastUpdated {
+    fn name(&self) -> &str {
+        "last_updated"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TrackerScore;
-impl FastField for TrackerScore {}
+impl FastField for TrackerScore {
+    fn name(&self) -> &str {
+        "tracker_score"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Region;
-impl FastField for Region {}
+impl FastField for Region {
+    fn name(&self) -> &str {
+        "region"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumUrlTokens;
-impl FastField for NumUrlTokens {}
+impl FastField for NumUrlTokens {
+    fn name(&self) -> &str {
+        "num_url_tokens"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumTitleTokens;
-impl FastField for NumTitleTokens {}
+impl FastField for NumTitleTokens {
+    fn name(&self) -> &str {
+        "num_title_tokens"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumCleanBodyTokens;
-impl FastField for NumCleanBodyTokens {}
+impl FastField for NumCleanBodyTokens {
+    fn name(&self) -> &str {
+        "num_clean_body_tokens"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumDescriptionTokens;
-impl FastField for NumDescriptionTokens {}
+impl FastField for NumDescriptionTokens {
+    fn name(&self) -> &str {
+        "num_description_tokens"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumUrlForSiteOperatorTokens;
-impl FastField for NumUrlForSiteOperatorTokens {}
+impl FastField for NumUrlForSiteOperatorTokens {
+    fn name(&self) -> &str {
+        "num_url_for_site_operator_tokens"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumDomainTokens;
-impl FastField for NumDomainTokens {}
+impl FastField for NumDomainTokens {
+    fn name(&self) -> &str {
+        "num_domain_tokens"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumMicroformatTagsTokens;
-impl FastField for NumMicroformatTagsTokens {}
+impl FastField for NumMicroformatTagsTokens {
+    fn name(&self) -> &str {
+        "num_microformat_tags_tokens"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteHash1;
-impl FastField for SiteHash1 {}
+impl FastField for SiteHash1 {
+    fn name(&self) -> &str {
+        "site_hash1"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteHash2;
-impl FastField for SiteHash2 {}
+impl FastField for SiteHash2 {
+    fn name(&self) -> &str {
+        "site_hash2"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutQueryHash1;
-impl FastField for UrlWithoutQueryHash1 {}
+impl FastField for UrlWithoutQueryHash1 {
+    fn name(&self) -> &str {
+        "url_without_query_hash1"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutQueryHash2;
-impl FastField for UrlWithoutQueryHash2 {}
+impl FastField for UrlWithoutQueryHash2 {
+    fn name(&self) -> &str {
+        "url_without_query_hash2"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleHash1;
-impl FastField for TitleHash1 {}
+impl FastField for TitleHash1 {
+    fn name(&self) -> &str {
+        "title_hash1"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleHash2;
-impl FastField for TitleHash2 {}
+impl FastField for TitleHash2 {
+    fn name(&self) -> &str {
+        "title_hash2"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlHash1;
-impl FastField for UrlHash1 {}
+impl FastField for UrlHash1 {
+    fn name(&self) -> &str {
+        "url_hash1"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlHash2;
-impl FastField for UrlHash2 {}
+impl FastField for UrlHash2 {
+    fn name(&self) -> &str {
+        "url_hash2"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainHash1;
-impl FastField for DomainHash1 {}
+impl FastField for DomainHash1 {
+    fn name(&self) -> &str {
+        "domain_hash1"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainHash2;
-impl FastField for DomainHash2 {}
+impl FastField for DomainHash2 {
+    fn name(&self) -> &str {
+        "domain_hash2"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutTldHash1;
-impl FastField for UrlWithoutTldHash1 {}
+impl FastField for UrlWithoutTldHash1 {
+    fn name(&self) -> &str {
+        "url_without_tld_hash1"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutTldHash2;
-impl FastField for UrlWithoutTldHash2 {}
+impl FastField for UrlWithoutTldHash2 {
+    fn name(&self) -> &str {
+        "url_without_tld_hash2"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PreComputedScore;
-impl FastField for PreComputedScore {}
+impl FastField for PreComputedScore {
+    fn name(&self) -> &str {
+        "pre_computed_score"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HostNodeID;
-impl FastField for HostNodeID {}
+impl FastField for HostNodeID {
+    fn name(&self) -> &str {
+        "host_node_id"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SimHash;
-impl FastField for SimHash {}
+impl FastField for SimHash {
+    fn name(&self) -> &str {
+        "sim_hash"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumFlattenedSchemaTokens;
-impl FastField for NumFlattenedSchemaTokens {}
+impl FastField for NumFlattenedSchemaTokens {
+    fn name(&self) -> &str {
+        "num_flattened_schema_tokens"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumPathAndQuerySlashes;
-impl FastField for NumPathAndQuerySlashes {}
+impl FastField for NumPathAndQuerySlashes {
+    fn name(&self) -> &str {
+        "num_path_and_query_slashes"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumPathAndQueryDigits;
-impl FastField for NumPathAndQueryDigits {}
+impl FastField for NumPathAndQueryDigits {
+    fn name(&self) -> &str {
+        "num_path_and_query_digits"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LikelyHasAds;
-impl FastField for LikelyHasAds {}
+impl FastField for LikelyHasAds {
+    fn name(&self) -> &str {
+        "likely_has_ads"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LikelyHasPaywall;
-impl FastField for LikelyHasPaywall {}
+impl FastField for LikelyHasPaywall {
+    fn name(&self) -> &str {
+        "likely_has_paywall"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LinkDensity;
-impl FastField for LinkDensity {}
+impl FastField for LinkDensity {
+    fn name(&self) -> &str {
+        "link_density"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleEmbeddings;
-impl FastField for TitleEmbeddings {}
+impl FastField for TitleEmbeddings {
+    fn name(&self) -> &str {
+        "title_embeddings"
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct KeywordEmbeddings;
-impl FastField for KeywordEmbeddings {}
+impl FastField for KeywordEmbeddings {
+    fn name(&self) -> &str {
+        "keyword_embeddings"
+    }
+}

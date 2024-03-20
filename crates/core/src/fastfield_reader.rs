@@ -20,7 +20,7 @@ use tantivy::{columnar::ColumnValues, DocId, SegmentId};
 
 use crate::{
     enum_map::EnumMap,
-    schema::{DataType, FastFieldEnum, Field},
+    schema::{fast_field::FastField, DataType, FastFieldEnum, Field},
 };
 
 #[derive(Default, Clone)]
