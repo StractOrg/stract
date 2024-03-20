@@ -19,10 +19,11 @@ use crate::{
     prehashed::hash,
     rake::RakeModel,
     schema::{
+        fast_field::FastField,
         text_field::{self, TextField},
-        FastFieldEnum, TextFieldEnum,
+        TextFieldEnum,
     },
-    simhash, split_u128, tokenizer,
+    split_u128, tokenizer,
     webpage::url_ext::UrlExt,
     Error, Result,
 };
@@ -34,7 +35,7 @@ use whatlang::Lang;
 
 use super::{fn_cache::FnCache, Html};
 
-use crate::schema::{Field, FLOAT_SCALING};
+use crate::schema::Field;
 
 impl Html {
     pub fn pretokenize_title(&self) -> Result<PreTokenizedString> {
@@ -197,152 +198,9 @@ impl Html {
             .fields()
             .filter_map(|(field, _)| Field::get(field.field_id() as usize))
         {
-            let tantivy_field = schema
-                .get_field(field.name())
-                .unwrap_or_else(|_| unreachable!("Unknown field: {}", field.name()));
-
             match field {
                 Field::Text(f) => f.add_html_tantivy(self, &mut cache, &mut doc, schema)?,
-                Field::Fast(FastFieldEnum::IsHomepage(_)) => {
-                    doc.add_u64(tantivy_field, (self.is_homepage()).into());
-                }
-                Field::Fast(FastFieldEnum::LastUpdated(_)) => doc.add_u64(
-                    tantivy_field,
-                    self.updated_time()
-                        .map_or(0, |time| time.timestamp().max(0) as u64),
-                ),
-                Field::Fast(FastFieldEnum::TrackerScore(_)) => {
-                    doc.add_u64(tantivy_field, self.trackers().len() as u64)
-                }
-                Field::Fast(FastFieldEnum::NumUrlTokens(_)) => {
-                    doc.add_u64(tantivy_field, cache.pretokenize_url().tokens.len() as u64)
-                }
-                Field::Fast(FastFieldEnum::NumMicroformatTagsTokens(_)) => doc.add_u64(
-                    tantivy_field,
-                    cache.pretokenize_microformats().tokens.len() as u64,
-                ),
-                Field::Fast(FastFieldEnum::NumTitleTokens(_)) => doc.add_u64(
-                    tantivy_field,
-                    cache
-                        .pretokenize_title()
-                        .as_ref()
-                        .map(|n| n.tokens.len() as u64)
-                        .map_err(|e| anyhow::anyhow!("{}", e))?,
-                ),
-                Field::Fast(FastFieldEnum::NumCleanBodyTokens(_)) => doc.add_u64(
-                    tantivy_field,
-                    cache.pretokenize_clean_text().tokens.len() as u64,
-                ),
-                Field::Fast(FastFieldEnum::NumDescriptionTokens(_)) => doc.add_u64(
-                    tantivy_field,
-                    cache.pretokenize_description().tokens.len() as u64,
-                ),
-                Field::Fast(FastFieldEnum::NumUrlForSiteOperatorTokens(_)) => doc.add_u64(
-                    tantivy_field,
-                    cache.pretokenize_url_for_site_operator().tokens.len() as u64,
-                ),
-                Field::Fast(FastFieldEnum::NumDomainTokens(_)) => doc.add_u64(
-                    tantivy_field,
-                    cache.pretokenize_domain().tokens.len() as u64,
-                ),
-                Field::Fast(FastFieldEnum::NumFlattenedSchemaTokens(_)) => doc.add_u64(
-                    tantivy_field,
-                    cache.pretokenized_schema_json().tokens.len() as u64,
-                ),
-                Field::Fast(FastFieldEnum::SiteHash1(_)) => {
-                    doc.add_u64(tantivy_field, cache.site_hash()[0]);
-                }
-                Field::Fast(FastFieldEnum::SiteHash2(_)) => {
-                    doc.add_u64(tantivy_field, cache.site_hash()[1]);
-                }
-                Field::Fast(FastFieldEnum::UrlWithoutQueryHash1(_)) => {
-                    doc.add_u64(tantivy_field, cache.url_without_query_hash()[0]);
-                }
-                Field::Fast(FastFieldEnum::UrlWithoutQueryHash2(_)) => {
-                    doc.add_u64(tantivy_field, cache.url_without_query_hash()[1]);
-                }
-                Field::Fast(FastFieldEnum::UrlHash1(_)) => {
-                    doc.add_u64(tantivy_field, cache.url_hash()[0]);
-                }
-                Field::Fast(FastFieldEnum::UrlHash2(_)) => {
-                    doc.add_u64(tantivy_field, cache.url_hash()[1]);
-                }
-                Field::Fast(FastFieldEnum::UrlWithoutTldHash1(_)) => {
-                    doc.add_u64(tantivy_field, cache.url_without_tld_hash()[0]);
-                }
-                Field::Fast(FastFieldEnum::UrlWithoutTldHash2(_)) => {
-                    doc.add_u64(tantivy_field, cache.url_without_tld_hash()[1]);
-                }
-                Field::Fast(FastFieldEnum::DomainHash1(_)) => {
-                    doc.add_u64(tantivy_field, cache.domain_hash()[0]);
-                }
-                Field::Fast(FastFieldEnum::DomainHash2(_)) => {
-                    doc.add_u64(tantivy_field, cache.domain_hash()[1]);
-                }
-                Field::Fast(FastFieldEnum::TitleHash1(_)) => {
-                    doc.add_u64(tantivy_field, cache.title_hash()[0]);
-                }
-                Field::Fast(FastFieldEnum::TitleHash2(_)) => {
-                    doc.add_u64(tantivy_field, cache.title_hash()[1]);
-                }
-                Field::Fast(FastFieldEnum::SimHash(_)) => {
-                    let clean_text = cache.pretokenize_clean_text();
-
-                    let hash = if !clean_text.text.is_empty() {
-                        simhash::hash(&clean_text.text)
-                    } else {
-                        0
-                    };
-                    doc.add_u64(tantivy_field, hash);
-                }
-                Field::Fast(FastFieldEnum::NumPathAndQuerySlashes(_)) => {
-                    let num_slashes = self
-                        .url()
-                        .path_segments()
-                        .map(|segments| segments.count())
-                        .unwrap_or(0);
-
-                    doc.add_u64(tantivy_field, num_slashes as u64);
-                }
-                Field::Fast(FastFieldEnum::NumPathAndQueryDigits(_)) => {
-                    let num_digits = self
-                        .url()
-                        .path()
-                        .chars()
-                        .filter(|c| c.is_ascii_digit())
-                        .count()
-                        + self
-                            .url()
-                            .query()
-                            .unwrap_or_default()
-                            .chars()
-                            .filter(|c| c.is_ascii_digit())
-                            .count();
-
-                    doc.add_u64(tantivy_field, num_digits as u64);
-                }
-                Field::Fast(FastFieldEnum::LikelyHasAds(_)) => {
-                    doc.add_u64(tantivy_field, self.likely_has_ads() as u64);
-                }
-                Field::Fast(FastFieldEnum::LikelyHasPaywall(_)) => {
-                    doc.add_u64(tantivy_field, self.likely_has_paywall() as u64);
-                }
-                Field::Fast(FastFieldEnum::LinkDensity(_)) => {
-                    doc.add_u64(
-                        tantivy_field,
-                        (self.link_density() * FLOAT_SCALING as f64) as u64,
-                    );
-                }
-                Field::Fast(FastFieldEnum::HostCentrality(_))
-                | Field::Fast(FastFieldEnum::HostCentralityRank(_))
-                | Field::Fast(FastFieldEnum::PageCentrality(_))
-                | Field::Fast(FastFieldEnum::PageCentralityRank(_))
-                | Field::Fast(FastFieldEnum::FetchTimeMs(_))
-                | Field::Fast(FastFieldEnum::PreComputedScore(_))
-                | Field::Fast(FastFieldEnum::Region(_))
-                | Field::Fast(FastFieldEnum::HostNodeID(_))
-                | Field::Fast(FastFieldEnum::TitleEmbeddings(_))
-                | Field::Fast(FastFieldEnum::KeywordEmbeddings(_)) => {}
+                Field::Fast(f) => f.add_html_tantivy(self, &mut cache, &mut doc, schema)?,
             }
         }
 

@@ -16,15 +16,30 @@
 
 use enum_dispatch::enum_dispatch;
 use strum::{EnumDiscriminants, VariantArray};
-use tantivy::schema::{BytesOptions, NumericOptions};
+use tantivy::{
+    schema::{BytesOptions, NumericOptions},
+    TantivyDocument,
+};
 
-use crate::{enum_map::InsertEnumMapKey, from_discriminant};
+use crate::{
+    enum_map::InsertEnumMapKey,
+    from_discriminant, simhash,
+    webpage::{html::FnCache, Html},
+    Result,
+};
 
-use super::IndexingOption;
+use super::{IndexingOption, FLOAT_SCALING};
 
 #[enum_dispatch]
 pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
     fn name(&self) -> &str;
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()>;
 
     fn data_type(&self) -> DataType {
         DataType::U64
@@ -52,6 +67,12 @@ pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash
         }
 
         IndexingOption::Integer(opt)
+    }
+
+    fn tantivy_field(&self, schema: &tantivy::schema::Schema) -> tantivy::schema::Field {
+        schema
+            .get_field(self.name())
+            .unwrap_or_else(|_| unreachable!("Unknown field: {}", self.name()))
     }
 }
 
@@ -180,6 +201,18 @@ impl FastField for IsHomepage {
     fn name(&self) -> &str {
         "is_homepage"
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), (html.is_homepage()).into());
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -187,6 +220,16 @@ pub struct HostCentrality;
 impl FastField for HostCentrality {
     fn name(&self) -> &str {
         "host_centrality"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -196,6 +239,16 @@ impl FastField for HostCentralityRank {
     fn name(&self) -> &str {
         "host_centrality_rank"
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -203,6 +256,15 @@ pub struct PageCentrality;
 impl FastField for PageCentrality {
     fn name(&self) -> &str {
         "page_centrality"
+    }
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -212,6 +274,15 @@ impl FastField for PageCentralityRank {
     fn name(&self) -> &str {
         "page_centrality_rank"
     }
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -219,6 +290,15 @@ pub struct FetchTimeMs;
 impl FastField for FetchTimeMs {
     fn name(&self) -> &str {
         "fetch_time_ms"
+    }
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -232,6 +312,22 @@ impl FastField for LastUpdated {
     fn is_stored(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            html.updated_time()
+                .map_or(0, |time| time.timestamp().max(0) as u64),
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -239,6 +335,18 @@ pub struct TrackerScore;
 impl FastField for TrackerScore {
     fn name(&self) -> &str {
         "tracker_score"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), html.trackers().len() as u64);
+
+        Ok(())
     }
 }
 
@@ -252,6 +360,16 @@ impl FastField for Region {
     fn is_stored(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -259,6 +377,21 @@ pub struct NumUrlTokens;
 impl FastField for NumUrlTokens {
     fn name(&self) -> &str {
         "num_url_tokens"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            cache.pretokenize_url().tokens.len() as u64,
+        );
+
+        Ok(())
     }
 }
 
@@ -268,6 +401,25 @@ impl FastField for NumTitleTokens {
     fn name(&self) -> &str {
         "num_title_tokens"
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            cache
+                .pretokenize_title()
+                .as_ref()
+                .map(|n| n.tokens.len() as u64)
+                .map_err(|e| anyhow::anyhow!("{}", e))?,
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -275,6 +427,20 @@ pub struct NumCleanBodyTokens;
 impl FastField for NumCleanBodyTokens {
     fn name(&self) -> &str {
         "num_clean_body_tokens"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            cache.pretokenize_clean_text().tokens.len() as u64,
+        );
+        Ok(())
     }
 }
 
@@ -284,6 +450,21 @@ impl FastField for NumDescriptionTokens {
     fn name(&self) -> &str {
         "num_description_tokens"
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            cache.pretokenize_description().tokens.len() as u64,
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -291,6 +472,21 @@ pub struct NumUrlForSiteOperatorTokens;
 impl FastField for NumUrlForSiteOperatorTokens {
     fn name(&self) -> &str {
         "num_url_for_site_operator_tokens"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            cache.pretokenize_url_for_site_operator().tokens.len() as u64,
+        );
+
+        Ok(())
     }
 }
 
@@ -300,6 +496,21 @@ impl FastField for NumDomainTokens {
     fn name(&self) -> &str {
         "num_domain_tokens"
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            cache.pretokenize_domain().tokens.len() as u64,
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -307,6 +518,21 @@ pub struct NumMicroformatTagsTokens;
 impl FastField for NumMicroformatTagsTokens {
     fn name(&self) -> &str {
         "num_microformat_tags_tokens"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            cache.pretokenize_microformats().tokens.len() as u64,
+        );
+
+        Ok(())
     }
 }
 
@@ -316,6 +542,18 @@ impl FastField for SiteHash1 {
     fn name(&self) -> &str {
         "site_hash1"
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), cache.site_hash()[0]);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -323,6 +561,18 @@ pub struct SiteHash2;
 impl FastField for SiteHash2 {
     fn name(&self) -> &str {
         "site_hash2"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), cache.site_hash()[1]);
+
+        Ok(())
     }
 }
 
@@ -332,6 +582,21 @@ impl FastField for UrlWithoutQueryHash1 {
     fn name(&self) -> &str {
         "url_without_query_hash1"
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            cache.url_without_query_hash()[0],
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -339,6 +604,21 @@ pub struct UrlWithoutQueryHash2;
 impl FastField for UrlWithoutQueryHash2 {
     fn name(&self) -> &str {
         "url_without_query_hash2"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            cache.url_without_query_hash()[1],
+        );
+
+        Ok(())
     }
 }
 
@@ -348,6 +628,18 @@ impl FastField for TitleHash1 {
     fn name(&self) -> &str {
         "title_hash1"
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), cache.title_hash()[0]);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -355,6 +647,18 @@ pub struct TitleHash2;
 impl FastField for TitleHash2 {
     fn name(&self) -> &str {
         "title_hash2"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), cache.title_hash()[1]);
+
+        Ok(())
     }
 }
 
@@ -364,6 +668,18 @@ impl FastField for UrlHash1 {
     fn name(&self) -> &str {
         "url_hash1"
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), cache.url_hash()[0]);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -371,6 +687,18 @@ pub struct UrlHash2;
 impl FastField for UrlHash2 {
     fn name(&self) -> &str {
         "url_hash2"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), cache.url_hash()[1]);
+
+        Ok(())
     }
 }
 
@@ -380,6 +708,18 @@ impl FastField for DomainHash1 {
     fn name(&self) -> &str {
         "domain_hash1"
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), cache.domain_hash()[0]);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -387,6 +727,18 @@ pub struct DomainHash2;
 impl FastField for DomainHash2 {
     fn name(&self) -> &str {
         "domain_hash2"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), cache.domain_hash()[1]);
+
+        Ok(())
     }
 }
 
@@ -396,6 +748,18 @@ impl FastField for UrlWithoutTldHash1 {
     fn name(&self) -> &str {
         "url_without_tld_hash1"
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), cache.url_without_tld_hash()[0]);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -403,6 +767,18 @@ pub struct UrlWithoutTldHash2;
 impl FastField for UrlWithoutTldHash2 {
     fn name(&self) -> &str {
         "url_without_tld_hash2"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), cache.url_without_tld_hash()[1]);
+
+        Ok(())
     }
 }
 
@@ -416,6 +792,16 @@ impl FastField for PreComputedScore {
     fn is_stored(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -427,6 +813,16 @@ impl FastField for HostNodeID {
 
     fn is_stored(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -440,6 +836,25 @@ impl FastField for SimHash {
     fn is_stored(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let clean_text = cache.pretokenize_clean_text();
+
+        let hash = if !clean_text.text.is_empty() {
+            simhash::hash(&clean_text.text)
+        } else {
+            0
+        };
+        doc.add_u64(self.tantivy_field(schema), hash);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -447,6 +862,21 @@ pub struct NumFlattenedSchemaTokens;
 impl FastField for NumFlattenedSchemaTokens {
     fn name(&self) -> &str {
         "num_flattened_schema_tokens"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            cache.pretokenized_schema_json().tokens.len() as u64,
+        );
+
+        Ok(())
     }
 }
 
@@ -460,6 +890,24 @@ impl FastField for NumPathAndQuerySlashes {
     fn is_stored(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let num_slashes = html
+            .url()
+            .path_segments()
+            .map(|segments| segments.count())
+            .unwrap_or(0);
+
+        doc.add_u64(self.tantivy_field(schema), num_slashes as u64);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -471,6 +919,32 @@ impl FastField for NumPathAndQueryDigits {
 
     fn is_stored(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let num_digits = html
+            .url()
+            .path()
+            .chars()
+            .filter(|c| c.is_ascii_digit())
+            .count()
+            + html
+                .url()
+                .query()
+                .unwrap_or_default()
+                .chars()
+                .filter(|c| c.is_ascii_digit())
+                .count();
+
+        doc.add_u64(self.tantivy_field(schema), num_digits as u64);
+
+        Ok(())
     }
 }
 
@@ -484,6 +958,18 @@ impl FastField for LikelyHasAds {
     fn is_stored(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), html.likely_has_ads() as u64);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -496,6 +982,18 @@ impl FastField for LikelyHasPaywall {
     fn is_stored(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(self.tantivy_field(schema), html.likely_has_paywall() as u64);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -507,6 +1005,21 @@ impl FastField for LinkDensity {
 
     fn is_stored(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_u64(
+            self.tantivy_field(schema),
+            (html.link_density() * FLOAT_SCALING as f64) as u64,
+        );
+
+        Ok(())
     }
 }
 
@@ -524,6 +1037,16 @@ impl FastField for TitleEmbeddings {
     fn indexing_option(&self) -> IndexingOption {
         IndexingOption::Bytes(BytesOptions::default().set_fast().set_stored())
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -539,5 +1062,15 @@ impl FastField for KeywordEmbeddings {
 
     fn indexing_option(&self) -> IndexingOption {
         IndexingOption::Bytes(BytesOptions::default().set_fast().set_stored())
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
     }
 }
