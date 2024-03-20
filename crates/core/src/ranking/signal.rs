@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::enum_map::InsertEnumMapKey;
 use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
 use crate::Result;
@@ -143,9 +144,9 @@ pub enum Signal {
     KeywordEmbeddingSimilarity,
 }
 
-impl From<Signal> for usize {
-    fn from(signal: Signal) -> Self {
-        signal as usize
+impl InsertEnumMapKey for Signal {
+    fn into_usize(self) -> usize {
+        self as usize
     }
 }
 

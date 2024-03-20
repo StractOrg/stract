@@ -13,7 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use crate::{enum_map::EnumSet, Result};
+use crate::enum_map::{EnumSet, GetEnumMapKey, InsertEnumMapKey};
 
 use super::Html;
 
@@ -49,9 +49,9 @@ impl Microformat {
     }
 }
 
-impl From<Microformat> for usize {
-    fn from(value: Microformat) -> Self {
-        match value {
+impl InsertEnumMapKey for Microformat {
+    fn into_usize(self) -> usize {
+        match self {
             Microformat::HCard => 0,
             Microformat::HEvent => 1,
             Microformat::HEntry => 2,
@@ -62,18 +62,16 @@ impl From<Microformat> for usize {
     }
 }
 
-impl TryFrom<usize> for Microformat {
-    type Error = anyhow::Error;
-
-    fn try_from(value: usize) -> Result<Self> {
+impl GetEnumMapKey for Microformat {
+    fn from_usize(value: usize) -> Option<Self> {
         match value {
-            0 => Ok(Microformat::HCard),
-            1 => Ok(Microformat::HEvent),
-            2 => Ok(Microformat::HEntry),
-            3 => Ok(Microformat::HRecipe),
-            4 => Ok(Microformat::HReview),
-            5 => Ok(Microformat::HProduct),
-            _ => Err(anyhow::anyhow!("Unknown microformat")),
+            0 => Some(Microformat::HCard),
+            1 => Some(Microformat::HEvent),
+            2 => Some(Microformat::HEntry),
+            3 => Some(Microformat::HRecipe),
+            4 => Some(Microformat::HReview),
+            5 => Some(Microformat::HProduct),
+            _ => None,
         }
     }
 }
