@@ -24,7 +24,7 @@ use tantivy::{
 
 use crate::{
     fastfield_reader::FastFieldReader,
-    schema::{text_field, FastField, Field, TextFieldEnum},
+    schema::{fast_field, text_field, Field, TextFieldEnum},
 };
 
 use super::scorer::{
@@ -136,19 +136,23 @@ impl PatternWeight {
         }
 
         let num_tokens_fastfield = match Field::get(self.field.field_id() as usize) {
-            Some(Field::Text(TextFieldEnum::Title(_))) => Ok(FastField::NumTitleTokens),
-            Some(Field::Text(TextFieldEnum::CleanBody(_))) => Ok(FastField::NumCleanBodyTokens),
-            Some(Field::Text(TextFieldEnum::Url(_))) => Ok(FastField::NumUrlTokens),
-            Some(Field::Text(TextFieldEnum::Domain(_))) => Ok(FastField::NumDomainTokens),
-            Some(Field::Text(TextFieldEnum::UrlForSiteOperator(_))) => {
-                Ok(FastField::NumUrlForSiteOperatorTokens)
+            Some(Field::Text(TextFieldEnum::Title(_))) => Ok(fast_field::NumTitleTokens.into()),
+            Some(Field::Text(TextFieldEnum::CleanBody(_))) => {
+                Ok(fast_field::NumCleanBodyTokens.into())
             }
-            Some(Field::Text(TextFieldEnum::Description(_))) => Ok(FastField::NumDescriptionTokens),
+            Some(Field::Text(TextFieldEnum::Url(_))) => Ok(fast_field::NumUrlTokens.into()),
+            Some(Field::Text(TextFieldEnum::Domain(_))) => Ok(fast_field::NumDomainTokens.into()),
+            Some(Field::Text(TextFieldEnum::UrlForSiteOperator(_))) => {
+                Ok(fast_field::NumUrlForSiteOperatorTokens.into())
+            }
+            Some(Field::Text(TextFieldEnum::Description(_))) => {
+                Ok(fast_field::NumDescriptionTokens.into())
+            }
             Some(Field::Text(TextFieldEnum::MicroformatTags(_))) => {
-                Ok(FastField::NumMicroformatTagsTokens)
+                Ok(fast_field::NumMicroformatTagsTokens.into())
             }
             Some(Field::Text(TextFieldEnum::FlattenedSchemaOrgJson(_))) => {
-                Ok(FastField::NumFlattenedSchemaTokens)
+                Ok(fast_field::NumFlattenedSchemaTokens.into())
             }
             Some(field) => Err(TantivyError::InvalidArgument(format!(
                 "{} is not supported in pattern query",

@@ -14,23 +14,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-mod fast_field;
+pub mod fast_field;
 pub mod text_field;
 
-use strum::VariantArray;
 use tantivy::{
     schema::{BytesOptions, NumericOptions, TextFieldIndexing, TextOptions},
     DateOptions,
 };
 
-pub use fast_field::FastField;
+pub use fast_field::{DataType, FastFieldEnum};
 pub use text_field::TextFieldEnum;
 
 pub const FLOAT_SCALING: u64 = 1_000_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Field {
-    Fast(FastField),
+    Fast(FastFieldEnum),
     Text(TextFieldEnum),
 }
 
@@ -38,22 +37,23 @@ impl Field {
     #[inline]
     pub fn get(field_id: usize) -> Option<Field> {
         if field_id < TextFieldEnum::num_variants() {
-            Some(Field::Text(TextFieldEnum::get(field_id).unwrap()))
-        } else {
-            let fast_id = field_id - TextFieldEnum::num_variants();
-            if fast_id < FastField::VARIANTS.len() {
-                Some(Field::Fast(FastField::VARIANTS[fast_id]))
-            } else {
-                None
-            }
+            return Some(Field::Text(TextFieldEnum::get(field_id).unwrap()));
         }
+        let field_id = field_id - TextFieldEnum::num_variants();
+
+        if field_id < FastFieldEnum::num_variants() {
+            return Some(Field::Fast(FastFieldEnum::get(field_id).unwrap()));
+        }
+        let _field_id = field_id - FastFieldEnum::num_variants();
+
+        return None;
     }
 
     #[inline]
     pub fn all() -> impl Iterator<Item = Field> {
         TextFieldEnum::all()
-            .map(|text| Field::Text(text))
-            .chain(FastField::VARIANTS.iter().map(|&fast| Field::Fast(fast)))
+            .map(Field::Text)
+            .chain(FastFieldEnum::all().map(Field::Fast))
     }
 
     fn default_text_options(&self) -> tantivy::schema::TextOptions {
@@ -172,148 +172,148 @@ impl Field {
             Field::Text(TextFieldEnum::Keywords(_)) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
-            Field::Fast(FastField::IsHomepage) => {
+            Field::Fast(FastFieldEnum::IsHomepage(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::HostCentrality) => {
+            Field::Fast(FastFieldEnum::HostCentrality(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::HostCentralityRank) => {
+            Field::Fast(FastFieldEnum::HostCentralityRank(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::PageCentrality) => {
+            Field::Fast(FastFieldEnum::PageCentrality(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::PageCentralityRank) => {
+            Field::Fast(FastFieldEnum::PageCentralityRank(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::FetchTimeMs) => {
+            Field::Fast(FastFieldEnum::FetchTimeMs(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::TrackerScore) => {
+            Field::Fast(FastFieldEnum::TrackerScore(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::LastUpdated) => IndexingOption::Integer(
+            Field::Fast(FastFieldEnum::LastUpdated(_)) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_stored()
                     .set_indexed(),
             ),
-            Field::Fast(FastField::Region) => IndexingOption::Integer(
+            Field::Fast(FastFieldEnum::Region(_)) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_stored()
                     .set_indexed(),
             ),
-            Field::Fast(FastField::NumCleanBodyTokens) => {
+            Field::Fast(FastFieldEnum::NumCleanBodyTokens(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::NumDescriptionTokens) => {
+            Field::Fast(FastFieldEnum::NumDescriptionTokens(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::NumTitleTokens) => {
+            Field::Fast(FastFieldEnum::NumTitleTokens(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::NumMicroformatTagsTokens) => {
+            Field::Fast(FastFieldEnum::NumMicroformatTagsTokens(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::NumUrlTokens) => {
+            Field::Fast(FastFieldEnum::NumUrlTokens(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::NumDomainTokens) => {
+            Field::Fast(FastFieldEnum::NumDomainTokens(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::NumUrlForSiteOperatorTokens) => {
+            Field::Fast(FastFieldEnum::NumUrlForSiteOperatorTokens(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::NumFlattenedSchemaTokens) => {
+            Field::Fast(FastFieldEnum::NumFlattenedSchemaTokens(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_indexed())
             }
-            Field::Fast(FastField::SiteHash1) => {
+            Field::Fast(FastFieldEnum::SiteHash1(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::SiteHash2) => {
+            Field::Fast(FastFieldEnum::SiteHash2(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::UrlWithoutQueryHash1) => {
+            Field::Fast(FastFieldEnum::UrlWithoutQueryHash1(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::UrlWithoutQueryHash2) => {
+            Field::Fast(FastFieldEnum::UrlWithoutQueryHash2(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::UrlHash1) => {
+            Field::Fast(FastFieldEnum::UrlHash1(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::UrlHash2) => {
+            Field::Fast(FastFieldEnum::UrlHash2(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::UrlWithoutTldHash1) => {
+            Field::Fast(FastFieldEnum::UrlWithoutTldHash1(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::UrlWithoutTldHash2) => {
+            Field::Fast(FastFieldEnum::UrlWithoutTldHash2(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::DomainHash1) => {
+            Field::Fast(FastFieldEnum::DomainHash1(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::DomainHash2) => {
+            Field::Fast(FastFieldEnum::DomainHash2(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::TitleHash1) => {
+            Field::Fast(FastFieldEnum::TitleHash1(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::TitleHash2) => {
+            Field::Fast(FastFieldEnum::TitleHash2(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast())
             }
-            Field::Fast(FastField::PreComputedScore) => IndexingOption::Integer(
+            Field::Fast(FastFieldEnum::PreComputedScore(_)) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
-            Field::Fast(FastField::HostNodeID) => IndexingOption::Integer(
+            Field::Fast(FastFieldEnum::HostNodeID(_)) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
-            Field::Fast(FastField::SimHash) => IndexingOption::Integer(
+            Field::Fast(FastFieldEnum::SimHash(_)) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
-            Field::Fast(FastField::NumPathAndQuerySlashes) => IndexingOption::Integer(
+            Field::Fast(FastFieldEnum::NumPathAndQuerySlashes(_)) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
-            Field::Fast(FastField::NumPathAndQueryDigits) => IndexingOption::Integer(
+            Field::Fast(FastFieldEnum::NumPathAndQueryDigits(_)) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
-            Field::Fast(FastField::LikelyHasAds) => IndexingOption::Integer(
+            Field::Fast(FastFieldEnum::LikelyHasAds(_)) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
-            Field::Fast(FastField::LikelyHasPaywall) => IndexingOption::Integer(
+            Field::Fast(FastFieldEnum::LikelyHasPaywall(_)) => IndexingOption::Integer(
                 NumericOptions::default()
                     .set_fast()
                     .set_indexed()
                     .set_stored(),
             ),
-            Field::Fast(FastField::LinkDensity) => {
+            Field::Fast(FastFieldEnum::LinkDensity(_)) => {
                 IndexingOption::Integer(NumericOptions::default().set_fast().set_stored())
             }
-            Field::Fast(FastField::TitleEmbeddings) => {
+            Field::Fast(FastFieldEnum::TitleEmbeddings(_)) => {
                 IndexingOption::Bytes(BytesOptions::default().set_fast())
             }
-            Field::Fast(FastField::KeywordEmbeddings) => {
+            Field::Fast(FastFieldEnum::KeywordEmbeddings(_)) => {
                 IndexingOption::Bytes(BytesOptions::default().set_fast())
             }
         }
@@ -365,7 +365,7 @@ impl Field {
         }
     }
 
-    pub fn as_fast(&self) -> Option<FastField> {
+    pub fn as_fast(&self) -> Option<FastFieldEnum> {
         match self {
             Field::Fast(field) => Some(*field),
             Field::Text(_) => None,
@@ -395,53 +395,17 @@ pub enum IndexingOption {
     Bytes(BytesOptions),
 }
 
-pub enum DataType {
-    U64,
-    Bytes,
-}
-
-impl FastField {
-    pub fn data_type(&self) -> DataType {
-        match self {
-            FastField::IsHomepage => DataType::U64,
-            FastField::HostCentrality => DataType::U64,
-            FastField::HostCentralityRank => DataType::U64,
-            FastField::PageCentrality => DataType::U64,
-            FastField::PageCentralityRank => DataType::U64,
-            FastField::FetchTimeMs => DataType::U64,
-            FastField::LastUpdated => DataType::U64,
-            FastField::TrackerScore => DataType::U64,
-            FastField::Region => DataType::U64,
-            FastField::NumUrlTokens => DataType::U64,
-            FastField::NumTitleTokens => DataType::U64,
-            FastField::NumMicroformatTagsTokens => DataType::U64,
-            FastField::NumCleanBodyTokens => DataType::U64,
-            FastField::NumDescriptionTokens => DataType::U64,
-            FastField::NumDomainTokens => DataType::U64,
-            FastField::NumUrlForSiteOperatorTokens => DataType::U64,
-            FastField::NumFlattenedSchemaTokens => DataType::U64,
-            FastField::SiteHash1 => DataType::U64,
-            FastField::SiteHash2 => DataType::U64,
-            FastField::UrlWithoutQueryHash1 => DataType::U64,
-            FastField::UrlWithoutQueryHash2 => DataType::U64,
-            FastField::TitleHash1 => DataType::U64,
-            FastField::TitleHash2 => DataType::U64,
-            FastField::UrlHash1 => DataType::U64,
-            FastField::UrlHash2 => DataType::U64,
-            FastField::DomainHash1 => DataType::U64,
-            FastField::DomainHash2 => DataType::U64,
-            FastField::UrlWithoutTldHash1 => DataType::U64,
-            FastField::UrlWithoutTldHash2 => DataType::U64,
-            FastField::PreComputedScore => DataType::U64,
-            FastField::HostNodeID => DataType::U64,
-            FastField::SimHash => DataType::U64,
-            FastField::NumPathAndQuerySlashes => DataType::U64,
-            FastField::NumPathAndQueryDigits => DataType::U64,
-            FastField::LikelyHasAds => DataType::U64,
-            FastField::LikelyHasPaywall => DataType::U64,
-            FastField::LinkDensity => DataType::U64,
-            FastField::TitleEmbeddings => DataType::Bytes,
-            FastField::KeywordEmbeddings => DataType::Bytes,
+#[macro_export]
+macro_rules! from_discriminant {
+    ($discenum:ident => $enum:ident, [$($disc:ident),*$(,)?]) => {
+        impl From<$discenum> for $enum {
+            fn from(value: $discenum) -> Self {
+                match value {
+                    $(
+                    $discenum::$disc => $disc.into(),
+                    )*
+                }
+            }
         }
-    }
+    };
 }

@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    schema::{text_field, FastField, TextFieldEnum},
+    schema::{fast_field, text_field, FastFieldEnum, TextFieldEnum},
     webgraph::NodeID,
     Result,
 };
@@ -140,14 +140,14 @@ impl Webpage {
         if let Ok(region) = region {
             doc.add_u64(
                 schema
-                    .get_field(Field::Fast(FastField::Region).name())
+                    .get_field(Field::Fast(FastFieldEnum::from(fast_field::Region)).name())
                     .expect("Failed to get region field"),
                 region.id(),
             );
         } else {
             doc.add_u64(
                 schema
-                    .get_field(Field::Fast(FastField::Region).name())
+                    .get_field(Field::Fast(FastFieldEnum::from(fast_field::Region)).name())
                     .expect("Failed to get region field"),
                 Region::All.id(),
             );
@@ -195,42 +195,42 @@ impl Webpage {
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastField::HostCentrality).name())
+                .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostCentrality)).name())
                 .expect("Failed to get host_centrality field"),
             (self.host_centrality * FLOAT_SCALING as f64) as u64,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastField::HostCentralityRank).name())
+                .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostCentralityRank)).name())
                 .expect("Failed to get host_centrality_rank field"),
             self.host_centrality_rank,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastField::PageCentrality).name())
+                .get_field(Field::Fast(FastFieldEnum::from(fast_field::PageCentrality)).name())
                 .expect("Failed to get page_centrality field"),
             (self.page_centrality * FLOAT_SCALING as f64) as u64,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastField::PageCentralityRank).name())
+                .get_field(Field::Fast(FastFieldEnum::from(fast_field::PageCentralityRank)).name())
                 .expect("Failed to get page_centrality_rank field"),
             self.page_centrality_rank,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastField::FetchTimeMs).name())
+                .get_field(Field::Fast(FastFieldEnum::from(fast_field::FetchTimeMs)).name())
                 .expect("Failed to get fetch_time_ms field"),
             self.fetch_time_ms,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastField::PreComputedScore).name())
+                .get_field(Field::Fast(FastFieldEnum::from(fast_field::PreComputedScore)).name())
                 .expect("failed to get pre_computed_score field"),
             (self.pre_computed_score * FLOAT_SCALING as f64) as u64,
         );
@@ -241,14 +241,14 @@ impl Webpage {
 
             doc.add_bytes(
                 schema
-                    .get_field(Field::Fast(FastField::TitleEmbeddings).name())
+                    .get_field(Field::Fast(FastFieldEnum::from(fast_field::TitleEmbeddings)).name())
                     .expect("Failed to get title_embeddings field"),
                 serialized,
             );
         } else {
             doc.add_bytes(
                 schema
-                    .get_field(Field::Fast(FastField::TitleEmbeddings).name())
+                    .get_field(Field::Fast(FastFieldEnum::from(fast_field::TitleEmbeddings)).name())
                     .expect("Failed to get title_embeddings field"),
                 Vec::new(),
             );
@@ -260,14 +260,18 @@ impl Webpage {
 
             doc.add_bytes(
                 schema
-                    .get_field(Field::Fast(FastField::KeywordEmbeddings).name())
+                    .get_field(
+                        Field::Fast(FastFieldEnum::from(fast_field::KeywordEmbeddings)).name(),
+                    )
                     .expect("Failed to get keyword_embeddings field"),
                 serialized,
             );
         } else {
             doc.add_bytes(
                 schema
-                    .get_field(Field::Fast(FastField::KeywordEmbeddings).name())
+                    .get_field(
+                        Field::Fast(FastFieldEnum::from(fast_field::KeywordEmbeddings)).name(),
+                    )
                     .expect("Failed to get keyword_embeddings field"),
                 Vec::new(),
             );
@@ -277,7 +281,7 @@ impl Webpage {
             Some(node_id) => {
                 doc.add_u64(
                     schema
-                        .get_field(Field::Fast(FastField::HostNodeID).name())
+                        .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostNodeID)).name())
                         .expect("Failed to get node_id field"),
                     node_id.as_u64(),
                 );
@@ -285,7 +289,7 @@ impl Webpage {
             None => {
                 doc.add_u64(
                     schema
-                        .get_field(Field::Fast(FastField::HostNodeID).name())
+                        .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostNodeID)).name())
                         .expect("Failed to get node_id field"),
                     u64::MAX,
                 );

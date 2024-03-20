@@ -20,6 +20,7 @@ use tantivy::schema::IndexRecordOption;
 
 use crate::{
     enum_map::InsertEnumMapKey,
+    from_discriminant,
     tokenizer::{
         BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
     },
@@ -72,21 +73,8 @@ pub enum TextFieldEnum {
     Keywords,
 }
 
-macro_rules! from_discriminant {
-    ([$($disc:ident),*$(,)?]) => {
-        impl From<TextFieldEnumDiscriminants> for TextFieldEnum {
-            fn from(value: TextFieldEnumDiscriminants) -> Self {
-                match value {
-                    $(
-                    TextFieldEnumDiscriminants::$disc => $disc.into(),
-                    )*
-                }
-            }
-        }
-    };
-}
-
-from_discriminant!([
+from_discriminant!(TextFieldEnumDiscriminants => TextFieldEnum,
+[
     Title,
     CleanBody,
     StemmedTitle,

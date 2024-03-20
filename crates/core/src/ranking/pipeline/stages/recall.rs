@@ -30,7 +30,7 @@ use crate::{
         pipeline::{RankableWebpage, RankingPipeline, RankingStage, Recall, Scorer},
         Signal, SignalAggregator, SignalScore,
     },
-    schema::FastField,
+    schema::fast_field,
     searcher::SearchQuery,
 };
 
@@ -62,11 +62,11 @@ impl RecallRankingWebpage {
         let fastfields = fastfield_reader.get_field_reader(pointer.address.doc_id);
 
         let title_embedding: Option<Vec<u8>> = fastfields
-            .get(FastField::TitleEmbeddings)
+            .get(fast_field::TitleEmbeddings.into())
             .and_then(|v| v.into());
 
         let keyword_embedding: Option<Vec<u8>> = fastfields
-            .get(FastField::KeywordEmbeddings)
+            .get(fast_field::KeywordEmbeddings.into())
             .and_then(|v| v.into());
 
         let mut res = RecallRankingWebpage {

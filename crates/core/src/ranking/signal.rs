@@ -17,12 +17,12 @@
 use crate::enum_map::InsertEnumMapKey;
 use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
-use crate::schema::text_field;
+use crate::schema::{fast_field, text_field};
 use crate::Result;
 use crate::{
     enum_map::EnumMap,
     fastfield_reader,
-    schema::{FastField, TextFieldEnum},
+    schema::{FastFieldEnum, TextFieldEnum},
     webgraph::NodeID,
     webpage::Webpage,
 };
@@ -321,7 +321,7 @@ impl Signal {
         let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
 
         let node_id = fastfield_reader
-            .get(FastField::HostNodeID)
+            .get(fast_field::HostNodeID.into())
             .and_then(|n| n.as_u64())
             .unwrap();
 
@@ -572,22 +572,22 @@ impl Signal {
         })
     }
 
-    fn as_fastfield(&self) -> Option<FastField> {
+    fn as_fastfield(&self) -> Option<FastFieldEnum> {
         match self {
-            Signal::HostCentrality => Some(FastField::HostCentrality),
-            Signal::HostCentralityRank => Some(FastField::HostCentralityRank),
-            Signal::PageCentrality => Some(FastField::PageCentrality),
-            Signal::PageCentralityRank => Some(FastField::PageCentralityRank),
-            Signal::IsHomepage => Some(FastField::IsHomepage),
-            Signal::FetchTimeMs => Some(FastField::FetchTimeMs),
-            Signal::UpdateTimestamp => Some(FastField::LastUpdated),
-            Signal::TrackerScore => Some(FastField::TrackerScore),
-            Signal::Region => Some(FastField::Region),
-            Signal::UrlSlashes => Some(FastField::NumPathAndQuerySlashes),
-            Signal::UrlDigits => Some(FastField::NumPathAndQueryDigits),
-            Signal::LinkDensity => Some(FastField::LinkDensity),
-            Signal::TitleEmbeddingSimilarity => Some(FastField::TitleEmbeddings),
-            Signal::KeywordEmbeddingSimilarity => Some(FastField::KeywordEmbeddings),
+            Signal::HostCentrality => Some(fast_field::HostCentrality.into()),
+            Signal::HostCentralityRank => Some(fast_field::HostCentralityRank.into()),
+            Signal::PageCentrality => Some(fast_field::PageCentrality.into()),
+            Signal::PageCentralityRank => Some(fast_field::PageCentralityRank.into()),
+            Signal::IsHomepage => Some(fast_field::IsHomepage.into()),
+            Signal::FetchTimeMs => Some(fast_field::FetchTimeMs.into()),
+            Signal::UpdateTimestamp => Some(fast_field::LastUpdated.into()),
+            Signal::TrackerScore => Some(fast_field::TrackerScore.into()),
+            Signal::Region => Some(fast_field::Region.into()),
+            Signal::UrlSlashes => Some(fast_field::NumPathAndQuerySlashes.into()),
+            Signal::UrlDigits => Some(fast_field::NumPathAndQueryDigits.into()),
+            Signal::LinkDensity => Some(fast_field::LinkDensity.into()),
+            Signal::TitleEmbeddingSimilarity => Some(fast_field::TitleEmbeddings.into()),
+            Signal::KeywordEmbeddingSimilarity => Some(fast_field::KeywordEmbeddings.into()),
             _ => None,
         }
     }

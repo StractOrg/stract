@@ -45,7 +45,7 @@ use crate::query::Query;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RecallRankingWebpage;
 use crate::ranking::SignalAggregator;
-use crate::schema::{text_field, FastField, Field, TextFieldEnum};
+use crate::schema::{fast_field, text_field, FastFieldEnum, Field, TextFieldEnum};
 use crate::search_ctx::Ctx;
 use crate::snippet;
 use crate::snippet::TextSnippet;
@@ -177,7 +177,9 @@ impl InvertedIndex {
         } else {
             let index_settings = tantivy::IndexSettings {
                 sort_by_field: Some(tantivy::IndexSortByField {
-                    field: Field::Fast(FastField::PreComputedScore).name().to_string(),
+                    field: Field::Fast(FastFieldEnum::from(fast_field::PreComputedScore))
+                        .name()
+                        .to_string(),
                     order: tantivy::Order::Desc,
                 }),
                 ..Default::default()
@@ -425,7 +427,7 @@ impl InvertedIndex {
 
         let field = self
             .schema()
-            .get_field(Field::Fast(FastField::HostNodeID).name())
+            .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostNodeID)).name())
             .unwrap();
 
         let id = doc.get_first(field).unwrap().as_u64().unwrap();
@@ -741,7 +743,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
                 Some(Field::Text(TextFieldEnum::Url(_))) => {
                     webpage.url = str_value(TextFieldEnum::from(text_field::Url).name(), value);
                 }
-                Some(Field::Fast(FastField::LastUpdated)) => {
+                Some(Field::Fast(FastFieldEnum::LastUpdated(_))) => {
                     webpage.updated_time = {
                         let timestamp = value.value().as_value().as_u64().unwrap() as i64;
                         if timestamp == 0 {
@@ -755,7 +757,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
                     webpage.dirty_body =
                         str_value(TextFieldEnum::from(text_field::AllBody).name(), value);
                 }
-                Some(Field::Fast(FastField::Region)) => {
+                Some(Field::Fast(FastFieldEnum::Region(_))) => {
                     webpage.region = {
                         let id = value.value().as_value().as_u64().unwrap();
                         Region::from_id(id)
@@ -773,11 +775,11 @@ impl From<TantivyDocument> for RetrievedWebpage {
                         str_value(TextFieldEnum::from(text_field::SchemaOrgJson).name(), value);
                     webpage.schema_org = serde_json::from_str(&json).unwrap_or_default();
                 }
-                Some(Field::Fast(FastField::LikelyHasAds)) => {
+                Some(Field::Fast(FastFieldEnum::LikelyHasAds(_))) => {
                     webpage.likely_has_ads =
                         value.value().as_value().as_u64().unwrap_or_default() != 0;
                 }
-                Some(Field::Fast(FastField::LikelyHasPaywall)) => {
+                Some(Field::Fast(FastFieldEnum::LikelyHasPaywall(_))) => {
                     webpage.likely_has_paywall =
                         value.value().as_value().as_u64().unwrap_or_default() != 0;
                 }

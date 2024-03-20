@@ -18,7 +18,7 @@ use crate::{
     ceil_char_boundary,
     prehashed::hash,
     rake::RakeModel,
-    schema::{text_field, FastField, TextFieldEnum},
+    schema::{text_field, FastFieldEnum, TextFieldEnum},
     simhash, split_u128, tokenizer,
     webpage::url_ext::UrlExt,
     Error, Result,
@@ -467,25 +467,25 @@ impl Html {
                         cache.pretokenize_microformats().clone(),
                     );
                 }
-                Field::Fast(FastField::IsHomepage) => {
+                Field::Fast(FastFieldEnum::IsHomepage(_)) => {
                     doc.add_u64(tantivy_field, (self.is_homepage()).into());
                 }
-                Field::Fast(FastField::LastUpdated) => doc.add_u64(
+                Field::Fast(FastFieldEnum::LastUpdated(_)) => doc.add_u64(
                     tantivy_field,
                     self.updated_time()
                         .map_or(0, |time| time.timestamp().max(0) as u64),
                 ),
-                Field::Fast(FastField::TrackerScore) => {
+                Field::Fast(FastFieldEnum::TrackerScore(_)) => {
                     doc.add_u64(tantivy_field, self.trackers().len() as u64)
                 }
-                Field::Fast(FastField::NumUrlTokens) => {
+                Field::Fast(FastFieldEnum::NumUrlTokens(_)) => {
                     doc.add_u64(tantivy_field, cache.pretokenize_url().tokens.len() as u64)
                 }
-                Field::Fast(FastField::NumMicroformatTagsTokens) => doc.add_u64(
+                Field::Fast(FastFieldEnum::NumMicroformatTagsTokens(_)) => doc.add_u64(
                     tantivy_field,
                     cache.pretokenize_microformats().tokens.len() as u64,
                 ),
-                Field::Fast(FastField::NumTitleTokens) => doc.add_u64(
+                Field::Fast(FastFieldEnum::NumTitleTokens(_)) => doc.add_u64(
                     tantivy_field,
                     cache
                         .pretokenize_title()
@@ -493,63 +493,63 @@ impl Html {
                         .map(|n| n.tokens.len() as u64)
                         .map_err(|e| anyhow::anyhow!("{}", e))?,
                 ),
-                Field::Fast(FastField::NumCleanBodyTokens) => doc.add_u64(
+                Field::Fast(FastFieldEnum::NumCleanBodyTokens(_)) => doc.add_u64(
                     tantivy_field,
                     cache.pretokenize_clean_text().tokens.len() as u64,
                 ),
-                Field::Fast(FastField::NumDescriptionTokens) => doc.add_u64(
+                Field::Fast(FastFieldEnum::NumDescriptionTokens(_)) => doc.add_u64(
                     tantivy_field,
                     cache.pretokenize_description().tokens.len() as u64,
                 ),
-                Field::Fast(FastField::NumUrlForSiteOperatorTokens) => doc.add_u64(
+                Field::Fast(FastFieldEnum::NumUrlForSiteOperatorTokens(_)) => doc.add_u64(
                     tantivy_field,
                     cache.pretokenize_url_for_site_operator().tokens.len() as u64,
                 ),
-                Field::Fast(FastField::NumDomainTokens) => doc.add_u64(
+                Field::Fast(FastFieldEnum::NumDomainTokens(_)) => doc.add_u64(
                     tantivy_field,
                     cache.pretokenize_domain().tokens.len() as u64,
                 ),
-                Field::Fast(FastField::NumFlattenedSchemaTokens) => doc.add_u64(
+                Field::Fast(FastFieldEnum::NumFlattenedSchemaTokens(_)) => doc.add_u64(
                     tantivy_field,
                     cache.pretokenized_schema_json().tokens.len() as u64,
                 ),
-                Field::Fast(FastField::SiteHash1) => {
+                Field::Fast(FastFieldEnum::SiteHash1(_)) => {
                     doc.add_u64(tantivy_field, cache.site_hash()[0]);
                 }
-                Field::Fast(FastField::SiteHash2) => {
+                Field::Fast(FastFieldEnum::SiteHash2(_)) => {
                     doc.add_u64(tantivy_field, cache.site_hash()[1]);
                 }
-                Field::Fast(FastField::UrlWithoutQueryHash1) => {
+                Field::Fast(FastFieldEnum::UrlWithoutQueryHash1(_)) => {
                     doc.add_u64(tantivy_field, cache.url_without_query_hash()[0]);
                 }
-                Field::Fast(FastField::UrlWithoutQueryHash2) => {
+                Field::Fast(FastFieldEnum::UrlWithoutQueryHash2(_)) => {
                     doc.add_u64(tantivy_field, cache.url_without_query_hash()[1]);
                 }
-                Field::Fast(FastField::UrlHash1) => {
+                Field::Fast(FastFieldEnum::UrlHash1(_)) => {
                     doc.add_u64(tantivy_field, cache.url_hash()[0]);
                 }
-                Field::Fast(FastField::UrlHash2) => {
+                Field::Fast(FastFieldEnum::UrlHash2(_)) => {
                     doc.add_u64(tantivy_field, cache.url_hash()[1]);
                 }
-                Field::Fast(FastField::UrlWithoutTldHash1) => {
+                Field::Fast(FastFieldEnum::UrlWithoutTldHash1(_)) => {
                     doc.add_u64(tantivy_field, cache.url_without_tld_hash()[0]);
                 }
-                Field::Fast(FastField::UrlWithoutTldHash2) => {
+                Field::Fast(FastFieldEnum::UrlWithoutTldHash2(_)) => {
                     doc.add_u64(tantivy_field, cache.url_without_tld_hash()[1]);
                 }
-                Field::Fast(FastField::DomainHash1) => {
+                Field::Fast(FastFieldEnum::DomainHash1(_)) => {
                     doc.add_u64(tantivy_field, cache.domain_hash()[0]);
                 }
-                Field::Fast(FastField::DomainHash2) => {
+                Field::Fast(FastFieldEnum::DomainHash2(_)) => {
                     doc.add_u64(tantivy_field, cache.domain_hash()[1]);
                 }
-                Field::Fast(FastField::TitleHash1) => {
+                Field::Fast(FastFieldEnum::TitleHash1(_)) => {
                     doc.add_u64(tantivy_field, cache.title_hash()[0]);
                 }
-                Field::Fast(FastField::TitleHash2) => {
+                Field::Fast(FastFieldEnum::TitleHash2(_)) => {
                     doc.add_u64(tantivy_field, cache.title_hash()[1]);
                 }
-                Field::Fast(FastField::SimHash) => {
+                Field::Fast(FastFieldEnum::SimHash(_)) => {
                     let clean_text = cache.pretokenize_clean_text();
 
                     let hash = if !clean_text.text.is_empty() {
@@ -559,7 +559,7 @@ impl Html {
                     };
                     doc.add_u64(tantivy_field, hash);
                 }
-                Field::Fast(FastField::NumPathAndQuerySlashes) => {
+                Field::Fast(FastFieldEnum::NumPathAndQuerySlashes(_)) => {
                     let num_slashes = self
                         .url()
                         .path_segments()
@@ -568,7 +568,7 @@ impl Html {
 
                     doc.add_u64(tantivy_field, num_slashes as u64);
                 }
-                Field::Fast(FastField::NumPathAndQueryDigits) => {
+                Field::Fast(FastFieldEnum::NumPathAndQueryDigits(_)) => {
                     let num_digits = self
                         .url()
                         .path()
@@ -585,13 +585,13 @@ impl Html {
 
                     doc.add_u64(tantivy_field, num_digits as u64);
                 }
-                Field::Fast(FastField::LikelyHasAds) => {
+                Field::Fast(FastFieldEnum::LikelyHasAds(_)) => {
                     doc.add_u64(tantivy_field, self.likely_has_ads() as u64);
                 }
-                Field::Fast(FastField::LikelyHasPaywall) => {
+                Field::Fast(FastFieldEnum::LikelyHasPaywall(_)) => {
                     doc.add_u64(tantivy_field, self.likely_has_paywall() as u64);
                 }
-                Field::Fast(FastField::LinkDensity) => {
+                Field::Fast(FastFieldEnum::LinkDensity(_)) => {
                     doc.add_u64(
                         tantivy_field,
                         (self.link_density() * FLOAT_SCALING as f64) as u64,
@@ -600,16 +600,16 @@ impl Html {
                 Field::Text(TextFieldEnum::BacklinkText(_))
                 | Field::Text(TextFieldEnum::SafetyClassification(_))
                 | Field::Text(TextFieldEnum::InsertionTimestamp(_))
-                | Field::Fast(FastField::HostCentrality)
-                | Field::Fast(FastField::HostCentralityRank)
-                | Field::Fast(FastField::PageCentrality)
-                | Field::Fast(FastField::PageCentralityRank)
-                | Field::Fast(FastField::FetchTimeMs)
-                | Field::Fast(FastField::PreComputedScore)
-                | Field::Fast(FastField::Region)
-                | Field::Fast(FastField::HostNodeID)
-                | Field::Fast(FastField::TitleEmbeddings)
-                | Field::Fast(FastField::KeywordEmbeddings)
+                | Field::Fast(FastFieldEnum::HostCentrality(_))
+                | Field::Fast(FastFieldEnum::HostCentralityRank(_))
+                | Field::Fast(FastFieldEnum::PageCentrality(_))
+                | Field::Fast(FastFieldEnum::PageCentralityRank(_))
+                | Field::Fast(FastFieldEnum::FetchTimeMs(_))
+                | Field::Fast(FastFieldEnum::PreComputedScore(_))
+                | Field::Fast(FastFieldEnum::Region(_))
+                | Field::Fast(FastFieldEnum::HostNodeID(_))
+                | Field::Fast(FastFieldEnum::TitleEmbeddings(_))
+                | Field::Fast(FastFieldEnum::KeywordEmbeddings(_))
                 | Field::Text(TextFieldEnum::Keywords(_))
                 | Field::Text(TextFieldEnum::DmozDescription(_)) => {}
             }
