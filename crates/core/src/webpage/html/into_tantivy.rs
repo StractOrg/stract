@@ -18,7 +18,10 @@ use crate::{
     ceil_char_boundary,
     prehashed::hash,
     rake::RakeModel,
-    schema::{text_field, FastFieldEnum, TextFieldEnum},
+    schema::{
+        text_field::{self, TextField},
+        FastFieldEnum, TextFieldEnum,
+    },
     simhash, split_u128, tokenizer,
     webpage::url_ext::UrlExt,
     Error, Result,

@@ -22,6 +22,10 @@ use crate::{enum_map::InsertEnumMapKey, from_discriminant};
 #[enum_dispatch]
 pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
     fn name(&self) -> &str;
+
+    fn data_type(&self) -> DataType {
+        DataType::U64
+    }
 }
 
 #[enum_dispatch(FastField)]
@@ -135,52 +139,6 @@ impl FastFieldEnum {
 pub enum DataType {
     U64,
     Bytes,
-}
-
-impl FastFieldEnum {
-    pub fn data_type(&self) -> DataType {
-        match self {
-            FastFieldEnum::IsHomepage(_) => DataType::U64,
-            FastFieldEnum::HostCentrality(_) => DataType::U64,
-            FastFieldEnum::HostCentralityRank(_) => DataType::U64,
-            FastFieldEnum::PageCentrality(_) => DataType::U64,
-            FastFieldEnum::PageCentralityRank(_) => DataType::U64,
-            FastFieldEnum::FetchTimeMs(_) => DataType::U64,
-            FastFieldEnum::LastUpdated(_) => DataType::U64,
-            FastFieldEnum::TrackerScore(_) => DataType::U64,
-            FastFieldEnum::Region(_) => DataType::U64,
-            FastFieldEnum::NumUrlTokens(_) => DataType::U64,
-            FastFieldEnum::NumTitleTokens(_) => DataType::U64,
-            FastFieldEnum::NumMicroformatTagsTokens(_) => DataType::U64,
-            FastFieldEnum::NumCleanBodyTokens(_) => DataType::U64,
-            FastFieldEnum::NumDescriptionTokens(_) => DataType::U64,
-            FastFieldEnum::NumDomainTokens(_) => DataType::U64,
-            FastFieldEnum::NumUrlForSiteOperatorTokens(_) => DataType::U64,
-            FastFieldEnum::NumFlattenedSchemaTokens(_) => DataType::U64,
-            FastFieldEnum::SiteHash1(_) => DataType::U64,
-            FastFieldEnum::SiteHash2(_) => DataType::U64,
-            FastFieldEnum::UrlWithoutQueryHash1(_) => DataType::U64,
-            FastFieldEnum::UrlWithoutQueryHash2(_) => DataType::U64,
-            FastFieldEnum::TitleHash1(_) => DataType::U64,
-            FastFieldEnum::TitleHash2(_) => DataType::U64,
-            FastFieldEnum::UrlHash1(_) => DataType::U64,
-            FastFieldEnum::UrlHash2(_) => DataType::U64,
-            FastFieldEnum::DomainHash1(_) => DataType::U64,
-            FastFieldEnum::DomainHash2(_) => DataType::U64,
-            FastFieldEnum::UrlWithoutTldHash1(_) => DataType::U64,
-            FastFieldEnum::UrlWithoutTldHash2(_) => DataType::U64,
-            FastFieldEnum::PreComputedScore(_) => DataType::U64,
-            FastFieldEnum::HostNodeID(_) => DataType::U64,
-            FastFieldEnum::SimHash(_) => DataType::U64,
-            FastFieldEnum::NumPathAndQuerySlashes(_) => DataType::U64,
-            FastFieldEnum::NumPathAndQueryDigits(_) => DataType::U64,
-            FastFieldEnum::LikelyHasAds(_) => DataType::U64,
-            FastFieldEnum::LikelyHasPaywall(_) => DataType::U64,
-            FastFieldEnum::LinkDensity(_) => DataType::U64,
-            FastFieldEnum::TitleEmbeddings(_) => DataType::Bytes,
-            FastFieldEnum::KeywordEmbeddings(_) => DataType::Bytes,
-        }
-    }
 }
 
 impl InsertEnumMapKey for FastFieldEnum {
@@ -491,6 +449,10 @@ impl FastField for TitleEmbeddings {
     fn name(&self) -> &str {
         "title_embeddings"
     }
+
+    fn data_type(&self) -> DataType {
+        DataType::Bytes
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -498,5 +460,9 @@ pub struct KeywordEmbeddings;
 impl FastField for KeywordEmbeddings {
     fn name(&self) -> &str {
         "keyword_embeddings"
+    }
+
+    fn data_type(&self) -> DataType {
+        DataType::Bytes
     }
 }

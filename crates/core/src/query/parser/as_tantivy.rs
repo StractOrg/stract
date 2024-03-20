@@ -21,7 +21,7 @@ use tantivy::{
 
 use crate::{
     bangs::BANG_PREFIXES,
-    schema::{Field, TextFieldEnum},
+    schema::{text_field::TextField, Field, TextFieldEnum},
 };
 
 use super::{CompoundAwareTerm, SimpleOrPhrase, SimpleTerm, Term, TermCompound};

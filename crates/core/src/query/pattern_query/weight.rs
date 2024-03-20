@@ -24,7 +24,11 @@ use tantivy::{
 
 use crate::{
     fastfield_reader::FastFieldReader,
-    schema::{fast_field, text_field, Field, TextFieldEnum},
+    schema::{
+        fast_field,
+        text_field::{self, TextField},
+        Field, TextFieldEnum,
+    },
 };
 
 use super::scorer::{

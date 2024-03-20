@@ -27,8 +27,39 @@ use crate::{
 };
 
 #[enum_dispatch]
-pub trait TextField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
+pub trait TextField:
+    Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash + Into<TextFieldEnum>
+{
     fn name(&self) -> &str;
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::default()
+    }
+
+    fn query_tokenizer(&self) -> Tokenizer {
+        self.indexing_tokenizer()
+    }
+
+    fn ngram_size(&self) -> usize {
+        1
+    }
+
+    fn monogram_field(&self) -> TextFieldEnum {
+        debug_assert_eq!(self.ngram_size(), 1);
+        (*self).into()
+    }
+
+    fn has_pos(&self) -> bool {
+        false
+    }
+
+    fn index_option(&self) -> IndexRecordOption {
+        if self.has_pos() {
+            IndexRecordOption::WithFreqsAndPositions
+        } else {
+            IndexRecordOption::WithFreqs
+        }
+    }
 }
 
 #[enum_dispatch(TextField)]
@@ -129,176 +160,6 @@ impl TextFieldEnum {
             .copied()
             .map(TextFieldEnum::from)
     }
-
-    pub fn ngram_size(&self) -> usize {
-        match self {
-            TextFieldEnum::Title(_) => 1,
-            TextFieldEnum::CleanBody(_) => 1,
-            TextFieldEnum::StemmedTitle(_) => 1,
-            TextFieldEnum::StemmedCleanBody(_) => 1,
-            TextFieldEnum::AllBody(_) => 1,
-            TextFieldEnum::Url(_) => 1,
-            TextFieldEnum::UrlNoTokenizer(_) => 1,
-            TextFieldEnum::UrlForSiteOperator(_) => 1,
-            TextFieldEnum::SiteWithout(_) => 1,
-            TextFieldEnum::Domain(_) => 1,
-            TextFieldEnum::SiteNoTokenizer(_) => 1,
-            TextFieldEnum::DomainNoTokenizer(_) => 1,
-            TextFieldEnum::DomainNameNoTokenizer(_) => 1,
-            TextFieldEnum::SiteIfHomepageNoTokenizer(_) => 1,
-            TextFieldEnum::DomainIfHomepage(_) => 1,
-            TextFieldEnum::DomainNameIfHomepageNoTokenizer(_) => 1,
-            TextFieldEnum::DomainIfHomepageNoTokenizer(_) => 1,
-            TextFieldEnum::TitleIfHomepage(_) => 1,
-            TextFieldEnum::BacklinkText(_) => 1,
-            TextFieldEnum::Description(_) => 1,
-            TextFieldEnum::DmozDescription(_) => 1,
-            TextFieldEnum::SchemaOrgJson(_) => 1,
-            TextFieldEnum::FlattenedSchemaOrgJson(_) => 1,
-            TextFieldEnum::CleanBodyBigrams(_) => 2,
-            TextFieldEnum::TitleBigrams(_) => 2,
-            TextFieldEnum::CleanBodyTrigrams(_) => 3,
-            TextFieldEnum::TitleTrigrams(_) => 3,
-            TextFieldEnum::MicroformatTags(_) => 1,
-            TextFieldEnum::SafetyClassification(_) => 1,
-            TextFieldEnum::InsertionTimestamp(_) => 1,
-            TextFieldEnum::RecipeFirstIngredientTagId(_) => 1,
-            TextFieldEnum::Keywords(_) => 1,
-        }
-    }
-
-    pub fn monogram_field(&self) -> TextFieldEnum {
-        match self {
-            TextFieldEnum::Title(_) => Title.into(),
-            TextFieldEnum::CleanBody(_) => CleanBody.into(),
-            TextFieldEnum::StemmedTitle(_) => StemmedTitle.into(),
-            TextFieldEnum::StemmedCleanBody(_) => StemmedCleanBody.into(),
-            TextFieldEnum::AllBody(_) => AllBody.into(),
-            TextFieldEnum::Url(_) => Url.into(),
-            TextFieldEnum::UrlNoTokenizer(_) => UrlNoTokenizer.into(),
-            TextFieldEnum::UrlForSiteOperator(_) => UrlForSiteOperator.into(),
-            TextFieldEnum::SiteWithout(_) => SiteWithout.into(),
-            TextFieldEnum::Domain(_) => Domain.into(),
-            TextFieldEnum::SiteNoTokenizer(_) => SiteNoTokenizer.into(),
-            TextFieldEnum::DomainNoTokenizer(_) => DomainNoTokenizer.into(),
-            TextFieldEnum::DomainNameNoTokenizer(_) => DomainNameNoTokenizer.into(),
-            TextFieldEnum::SiteIfHomepageNoTokenizer(_) => SiteIfHomepageNoTokenizer.into(),
-            TextFieldEnum::DomainIfHomepage(_) => DomainIfHomepage.into(),
-            TextFieldEnum::DomainNameIfHomepageNoTokenizer(_) => {
-                DomainNameIfHomepageNoTokenizer.into()
-            }
-            TextFieldEnum::DomainIfHomepageNoTokenizer(_) => DomainIfHomepageNoTokenizer.into(),
-            TextFieldEnum::TitleIfHomepage(_) => TitleIfHomepage.into(),
-            TextFieldEnum::BacklinkText(_) => BacklinkText.into(),
-            TextFieldEnum::Description(_) => Description.into(),
-            TextFieldEnum::DmozDescription(_) => DmozDescription.into(),
-            TextFieldEnum::SchemaOrgJson(_) => SchemaOrgJson.into(),
-            TextFieldEnum::FlattenedSchemaOrgJson(_) => FlattenedSchemaOrgJson.into(),
-            TextFieldEnum::CleanBodyBigrams(_) => CleanBody.into(),
-            TextFieldEnum::TitleBigrams(_) => Title.into(),
-            TextFieldEnum::CleanBodyTrigrams(_) => CleanBody.into(),
-            TextFieldEnum::TitleTrigrams(_) => Title.into(),
-            TextFieldEnum::MicroformatTags(_) => MicroformatTags.into(),
-            TextFieldEnum::SafetyClassification(_) => SafetyClassification.into(),
-            TextFieldEnum::InsertionTimestamp(_) => InsertionTimestamp.into(),
-            TextFieldEnum::RecipeFirstIngredientTagId(_) => RecipeFirstIngredientTagId.into(),
-            TextFieldEnum::Keywords(_) => Keywords.into(),
-        }
-    }
-
-    pub fn query_tokenizer(&self) -> Tokenizer {
-        match self {
-            TextFieldEnum::TitleBigrams(_) => Tokenizer::default(),
-            TextFieldEnum::CleanBodyBigrams(_) => Tokenizer::default(),
-            TextFieldEnum::TitleTrigrams(_) => Tokenizer::default(),
-            TextFieldEnum::CleanBodyTrigrams(_) => Tokenizer::default(),
-            _ => self.indexing_tokenizer(),
-        }
-    }
-
-    pub fn indexing_tokenizer(&self) -> Tokenizer {
-        match self {
-            TextFieldEnum::Title(_) => Tokenizer::default(),
-            TextFieldEnum::CleanBody(_) => Tokenizer::default(),
-            TextFieldEnum::StemmedTitle(_) => Tokenizer::new_stemmed(),
-            TextFieldEnum::StemmedCleanBody(_) => Tokenizer::new_stemmed(),
-            TextFieldEnum::AllBody(_) => Tokenizer::default(),
-            TextFieldEnum::Url(_) => Tokenizer::default(),
-            TextFieldEnum::UrlNoTokenizer(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::UrlForSiteOperator(_) => {
-                Tokenizer::SiteOperator(SiteOperatorUrlTokenizer)
-            }
-            TextFieldEnum::SiteWithout(_) => Tokenizer::default(),
-            TextFieldEnum::Domain(_) => Tokenizer::default(),
-            TextFieldEnum::SiteNoTokenizer(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::SiteIfHomepageNoTokenizer(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::DomainNoTokenizer(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::DomainNameNoTokenizer(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::DomainIfHomepage(_) => Tokenizer::default(),
-            TextFieldEnum::DomainNameIfHomepageNoTokenizer(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::DomainIfHomepageNoTokenizer(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::TitleIfHomepage(_) => Tokenizer::default(),
-            TextFieldEnum::BacklinkText(_) => Tokenizer::default(),
-            TextFieldEnum::Description(_) => Tokenizer::default(),
-            TextFieldEnum::DmozDescription(_) => Tokenizer::default(),
-            TextFieldEnum::SchemaOrgJson(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::FlattenedSchemaOrgJson(_) => Tokenizer::Json(JsonField),
-            TextFieldEnum::CleanBodyBigrams(_) => Tokenizer::Bigram(BigramTokenizer::default()),
-            TextFieldEnum::TitleBigrams(_) => Tokenizer::Bigram(BigramTokenizer::default()),
-            TextFieldEnum::CleanBodyTrigrams(_) => Tokenizer::Trigram(TrigramTokenizer::default()),
-            TextFieldEnum::TitleTrigrams(_) => Tokenizer::Trigram(TrigramTokenizer::default()),
-            TextFieldEnum::MicroformatTags(_) => Tokenizer::default(),
-            TextFieldEnum::SafetyClassification(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::InsertionTimestamp(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::RecipeFirstIngredientTagId(_) => Tokenizer::Identity(Identity {}),
-            TextFieldEnum::Keywords(_) => Tokenizer::default(),
-        }
-    }
-
-    pub fn index_option(&self) -> IndexRecordOption {
-        if self.has_pos() {
-            IndexRecordOption::WithFreqsAndPositions
-        } else {
-            IndexRecordOption::WithFreqs
-        }
-    }
-
-    pub fn has_pos(&self) -> bool {
-        match self {
-            TextFieldEnum::Title(_) => true,
-            TextFieldEnum::CleanBody(_) => true,
-            TextFieldEnum::StemmedTitle(_) => false,
-            TextFieldEnum::StemmedCleanBody(_) => false,
-            TextFieldEnum::AllBody(_) => false,
-            TextFieldEnum::Url(_) => true,
-            TextFieldEnum::UrlNoTokenizer(_) => false,
-            TextFieldEnum::UrlForSiteOperator(_) => true,
-            TextFieldEnum::SiteWithout(_) => true,
-            TextFieldEnum::Domain(_) => true,
-            TextFieldEnum::SiteNoTokenizer(_) => false,
-            TextFieldEnum::SiteIfHomepageNoTokenizer(_) => false,
-            TextFieldEnum::DomainNoTokenizer(_) => false,
-            TextFieldEnum::DomainNameNoTokenizer(_) => false,
-            TextFieldEnum::DomainIfHomepage(_) => false,
-            TextFieldEnum::DomainNameIfHomepageNoTokenizer(_) => false,
-            TextFieldEnum::DomainIfHomepageNoTokenizer(_) => false,
-            TextFieldEnum::TitleIfHomepage(_) => false,
-            TextFieldEnum::BacklinkText(_) => false,
-            TextFieldEnum::Description(_) => true,
-            TextFieldEnum::DmozDescription(_) => true,
-            TextFieldEnum::SchemaOrgJson(_) => false,
-            TextFieldEnum::FlattenedSchemaOrgJson(_) => true,
-            TextFieldEnum::CleanBodyBigrams(_) => false,
-            TextFieldEnum::TitleBigrams(_) => false,
-            TextFieldEnum::CleanBodyTrigrams(_) => false,
-            TextFieldEnum::TitleTrigrams(_) => false,
-            TextFieldEnum::MicroformatTags(_) => true,
-            TextFieldEnum::SafetyClassification(_) => false,
-            TextFieldEnum::InsertionTimestamp(_) => false,
-            TextFieldEnum::RecipeFirstIngredientTagId(_) => false,
-            TextFieldEnum::Keywords(_) => false,
-        }
-    }
 }
 
 impl InsertEnumMapKey for TextFieldEnum {
@@ -313,6 +174,10 @@ impl TextField for Title {
     fn name(&self) -> &str {
         "title"
     }
+
+    fn has_pos(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -320,6 +185,10 @@ pub struct CleanBody;
 impl TextField for CleanBody {
     fn name(&self) -> &str {
         "body"
+    }
+
+    fn has_pos(&self) -> bool {
+        true
     }
 }
 
@@ -329,6 +198,10 @@ impl TextField for StemmedTitle {
     fn name(&self) -> &str {
         "stemmed_title"
     }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::new_stemmed()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -336,6 +209,10 @@ pub struct StemmedCleanBody;
 impl TextField for StemmedCleanBody {
     fn name(&self) -> &str {
         "stemmed_body"
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::new_stemmed()
     }
 }
 
@@ -353,6 +230,10 @@ impl TextField for Url {
     fn name(&self) -> &str {
         "url"
     }
+
+    fn has_pos(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -360,6 +241,10 @@ pub struct UrlNoTokenizer;
 impl TextField for UrlNoTokenizer {
     fn name(&self) -> &str {
         "url_no_tokenizer"
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
     }
 }
 
@@ -369,6 +254,14 @@ impl TextField for UrlForSiteOperator {
     fn name(&self) -> &str {
         "url_for_site_operator"
     }
+
+    fn has_pos(&self) -> bool {
+        true
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::SiteOperator(SiteOperatorUrlTokenizer)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -376,6 +269,10 @@ pub struct SiteWithout;
 impl TextField for SiteWithout {
     fn name(&self) -> &str {
         "site"
+    }
+
+    fn has_pos(&self) -> bool {
+        true
     }
 }
 
@@ -385,6 +282,10 @@ impl TextField for Domain {
     fn name(&self) -> &str {
         "domain"
     }
+
+    fn has_pos(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -392,6 +293,10 @@ pub struct SiteNoTokenizer;
 impl TextField for SiteNoTokenizer {
     fn name(&self) -> &str {
         "site_no_tokenizer"
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
     }
 }
 
@@ -401,6 +306,10 @@ impl TextField for DomainNoTokenizer {
     fn name(&self) -> &str {
         "domain_no_tokenizer"
     }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -409,6 +318,10 @@ impl TextField for DomainNameNoTokenizer {
     fn name(&self) -> &str {
         "domain_name_no_tokenizer"
     }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -416,6 +329,10 @@ pub struct SiteIfHomepageNoTokenizer;
 impl TextField for SiteIfHomepageNoTokenizer {
     fn name(&self) -> &str {
         "site_if_homepage_no_tokenizer"
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
     }
 }
 
@@ -433,6 +350,10 @@ impl TextField for DomainNameIfHomepageNoTokenizer {
     fn name(&self) -> &str {
         "domain_name_if_homepage_no_tokenizer"
     }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -440,6 +361,10 @@ pub struct DomainIfHomepageNoTokenizer;
 impl TextField for DomainIfHomepageNoTokenizer {
     fn name(&self) -> &str {
         "domain_if_homepage_no_tokenizer"
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
     }
 }
 
@@ -465,6 +390,10 @@ impl TextField for Description {
     fn name(&self) -> &str {
         "description"
     }
+
+    fn has_pos(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -472,6 +401,10 @@ pub struct DmozDescription;
 impl TextField for DmozDescription {
     fn name(&self) -> &str {
         "dmoz_description"
+    }
+
+    fn has_pos(&self) -> bool {
+        true
     }
 }
 
@@ -481,6 +414,10 @@ impl TextField for SchemaOrgJson {
     fn name(&self) -> &str {
         "schema_org_json"
     }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -488,6 +425,14 @@ pub struct FlattenedSchemaOrgJson;
 impl TextField for FlattenedSchemaOrgJson {
     fn name(&self) -> &str {
         "flattened_schema_org_json"
+    }
+
+    fn has_pos(&self) -> bool {
+        true
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Json(JsonField)
     }
 }
 
@@ -497,6 +442,22 @@ impl TextField for CleanBodyBigrams {
     fn name(&self) -> &str {
         "clean_body_bigrams"
     }
+
+    fn ngram_size(&self) -> usize {
+        2
+    }
+
+    fn monogram_field(&self) -> TextFieldEnum {
+        CleanBody.into()
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Bigram(BigramTokenizer::default())
+    }
+
+    fn query_tokenizer(&self) -> Tokenizer {
+        Tokenizer::default()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -504,6 +465,22 @@ pub struct TitleBigrams;
 impl TextField for TitleBigrams {
     fn name(&self) -> &str {
         "title_bigrams"
+    }
+
+    fn ngram_size(&self) -> usize {
+        2
+    }
+
+    fn monogram_field(&self) -> TextFieldEnum {
+        Title.into()
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Bigram(BigramTokenizer::default())
+    }
+
+    fn query_tokenizer(&self) -> Tokenizer {
+        Tokenizer::default()
     }
 }
 
@@ -513,6 +490,22 @@ impl TextField for CleanBodyTrigrams {
     fn name(&self) -> &str {
         "clean_body_trigrams"
     }
+
+    fn ngram_size(&self) -> usize {
+        3
+    }
+
+    fn monogram_field(&self) -> TextFieldEnum {
+        CleanBody.into()
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Trigram(TrigramTokenizer::default())
+    }
+
+    fn query_tokenizer(&self) -> Tokenizer {
+        Tokenizer::default()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -520,6 +513,22 @@ pub struct TitleTrigrams;
 impl TextField for TitleTrigrams {
     fn name(&self) -> &str {
         "title_trigrams"
+    }
+
+    fn ngram_size(&self) -> usize {
+        3
+    }
+
+    fn monogram_field(&self) -> TextFieldEnum {
+        Title.into()
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Trigram(TrigramTokenizer::default())
+    }
+
+    fn query_tokenizer(&self) -> Tokenizer {
+        Tokenizer::default()
     }
 }
 
@@ -529,6 +538,10 @@ impl TextField for MicroformatTags {
     fn name(&self) -> &str {
         "microformat_tags"
     }
+
+    fn has_pos(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -536,6 +549,10 @@ pub struct SafetyClassification;
 impl TextField for SafetyClassification {
     fn name(&self) -> &str {
         "safety_classification"
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
     }
 }
 
@@ -545,6 +562,10 @@ impl TextField for InsertionTimestamp {
     fn name(&self) -> &str {
         "insertion_timestamp"
     }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -552,6 +573,10 @@ pub struct RecipeFirstIngredientTagId;
 impl TextField for RecipeFirstIngredientTagId {
     fn name(&self) -> &str {
         "recipe_first_ingredient_tag_id"
+    }
+
+    fn indexing_tokenizer(&self) -> Tokenizer {
+        Tokenizer::Identity(Identity {})
     }
 }
 

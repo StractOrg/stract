@@ -23,7 +23,7 @@ use tantivy::tokenizer::Tokenizer;
 
 use crate::{
     fastfield_reader::FastFieldReader,
-    schema::{Field, TextFieldEnum},
+    schema::{text_field::TextField, Field, TextFieldEnum},
 };
 
 use self::weight::{FastSiteDomainPatternWeight, PatternWeight};
