@@ -16,8 +16,11 @@
 
 use enum_dispatch::enum_dispatch;
 use strum::{EnumDiscriminants, VariantArray};
+use tantivy::schema::{BytesOptions, NumericOptions};
 
 use crate::{enum_map::InsertEnumMapKey, from_discriminant};
+
+use super::IndexingOption;
 
 #[enum_dispatch]
 pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
@@ -25,6 +28,30 @@ pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash
 
     fn data_type(&self) -> DataType {
         DataType::U64
+    }
+
+    fn is_stored(&self) -> bool {
+        false
+    }
+
+    fn is_indexed(&self) -> bool {
+        true
+    }
+
+    fn indexing_option(&self) -> IndexingOption {
+        debug_assert!(matches!(self.data_type(), DataType::U64));
+
+        let mut opt = NumericOptions::default().set_fast();
+
+        if self.is_stored() {
+            opt = opt.set_stored();
+        }
+
+        if self.is_indexed() {
+            opt = opt.set_indexed();
+        }
+
+        IndexingOption::Integer(opt)
     }
 }
 
@@ -201,6 +228,10 @@ impl FastField for LastUpdated {
     fn name(&self) -> &str {
         "last_updated"
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -216,6 +247,10 @@ pub struct Region;
 impl FastField for Region {
     fn name(&self) -> &str {
         "region"
+    }
+
+    fn is_stored(&self) -> bool {
+        true
     }
 }
 
@@ -377,6 +412,10 @@ impl FastField for PreComputedScore {
     fn name(&self) -> &str {
         "pre_computed_score"
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -385,6 +424,10 @@ impl FastField for HostNodeID {
     fn name(&self) -> &str {
         "host_node_id"
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -392,6 +435,10 @@ pub struct SimHash;
 impl FastField for SimHash {
     fn name(&self) -> &str {
         "sim_hash"
+    }
+
+    fn is_stored(&self) -> bool {
+        true
     }
 }
 
@@ -409,6 +456,10 @@ impl FastField for NumPathAndQuerySlashes {
     fn name(&self) -> &str {
         "num_path_and_query_slashes"
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -416,6 +467,10 @@ pub struct NumPathAndQueryDigits;
 impl FastField for NumPathAndQueryDigits {
     fn name(&self) -> &str {
         "num_path_and_query_digits"
+    }
+
+    fn is_stored(&self) -> bool {
+        true
     }
 }
 
@@ -425,6 +480,10 @@ impl FastField for LikelyHasAds {
     fn name(&self) -> &str {
         "likely_has_ads"
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -433,6 +492,10 @@ impl FastField for LikelyHasPaywall {
     fn name(&self) -> &str {
         "likely_has_paywall"
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -440,6 +503,10 @@ pub struct LinkDensity;
 impl FastField for LinkDensity {
     fn name(&self) -> &str {
         "link_density"
+    }
+
+    fn is_stored(&self) -> bool {
+        true
     }
 }
 
@@ -453,6 +520,10 @@ impl FastField for TitleEmbeddings {
     fn data_type(&self) -> DataType {
         DataType::Bytes
     }
+
+    fn indexing_option(&self) -> IndexingOption {
+        IndexingOption::Bytes(BytesOptions::default().set_fast().set_stored())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -464,5 +535,9 @@ impl FastField for KeywordEmbeddings {
 
     fn data_type(&self) -> DataType {
         DataType::Bytes
+    }
+
+    fn indexing_option(&self) -> IndexingOption {
+        IndexingOption::Bytes(BytesOptions::default().set_fast().set_stored())
     }
 }

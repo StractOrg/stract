@@ -98,7 +98,7 @@ fn phrase_query(
         }
 
         if processed_terms.len() == 1 {
-            let options = field.as_text().unwrap().index_option();
+            let options = field.as_text().unwrap().record_option();
 
             phrases.push((
                 Occur::Should,
@@ -258,7 +258,7 @@ impl Term {
             .unwrap()
             .as_text()
             .unwrap()
-            .index_option();
+            .record_option();
 
         let processed_query = if processed_terms.len() == 1 {
             let term = processed_terms.remove(0);

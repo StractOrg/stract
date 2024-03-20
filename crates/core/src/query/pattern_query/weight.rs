@@ -71,7 +71,7 @@ impl FastSiteDomainPatternWeight {
             .unwrap();
 
         let opt = match field_no_tokenizer {
-            Field::Text(t) => t.index_option(),
+            Field::Text(t) => t.record_option(),
             Field::Fast(_) => unreachable!(),
         };
 

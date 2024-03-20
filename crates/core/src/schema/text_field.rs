@@ -16,7 +16,7 @@
 
 use enum_dispatch::enum_dispatch;
 use strum::{EnumDiscriminants, VariantArray};
-use tantivy::schema::IndexRecordOption;
+use tantivy::schema::{IndexRecordOption, TextFieldIndexing, TextOptions};
 
 use crate::{
     enum_map::InsertEnumMapKey,
@@ -25,6 +25,8 @@ use crate::{
         BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
     },
 };
+
+use super::IndexingOption;
 
 #[enum_dispatch]
 pub trait TextField:
@@ -49,16 +51,46 @@ pub trait TextField:
         (*self).into()
     }
 
+    /// Whether or not the field should be included
+    /// in the fields that the `Query` searches.
+    ///
+    /// The fields can still be searched by manually
+    /// constructing a tantivy query.
+    fn is_searchable(&self) -> bool {
+        false
+    }
+
     fn has_pos(&self) -> bool {
         false
     }
 
-    fn index_option(&self) -> IndexRecordOption {
+    fn is_stored(&self) -> bool {
+        false
+    }
+
+    fn record_option(&self) -> IndexRecordOption {
         if self.has_pos() {
             IndexRecordOption::WithFreqsAndPositions
         } else {
             IndexRecordOption::WithFreqs
         }
+    }
+
+    fn indexing_option(&self) -> IndexingOption {
+        let tokenizer = self.indexing_tokenizer();
+        let option = self.record_option();
+
+        let mut opt = TextOptions::default().set_indexing_options(
+            TextFieldIndexing::default()
+                .set_tokenizer(tokenizer.as_str())
+                .set_index_option(option),
+        );
+
+        if self.is_stored() {
+            opt = opt.set_stored();
+        }
+
+        IndexingOption::Text(opt)
     }
 }
 
@@ -178,6 +210,14 @@ impl TextField for Title {
     fn has_pos(&self) -> bool {
         true
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
+
+    fn is_searchable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -188,6 +228,10 @@ impl TextField for CleanBody {
     }
 
     fn has_pos(&self) -> bool {
+        true
+    }
+
+    fn is_searchable(&self) -> bool {
         true
     }
 }
@@ -202,6 +246,10 @@ impl TextField for StemmedTitle {
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::new_stemmed()
     }
+
+    fn is_searchable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -214,6 +262,14 @@ impl TextField for StemmedCleanBody {
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::new_stemmed()
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
+
+    fn is_searchable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -221,6 +277,10 @@ pub struct AllBody;
 impl TextField for AllBody {
     fn name(&self) -> &str {
         "all_body"
+    }
+
+    fn is_searchable(&self) -> bool {
+        true
     }
 }
 
@@ -234,6 +294,14 @@ impl TextField for Url {
     fn has_pos(&self) -> bool {
         true
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
+
+    fn is_searchable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -245,6 +313,10 @@ impl TextField for UrlNoTokenizer {
 
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
+    }
+
+    fn is_searchable(&self) -> bool {
+        true
     }
 }
 
@@ -298,6 +370,10 @@ impl TextField for SiteNoTokenizer {
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
+
+    fn is_searchable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -310,6 +386,10 @@ impl TextField for DomainNoTokenizer {
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
+
+    fn is_searchable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -321,6 +401,10 @@ impl TextField for DomainNameNoTokenizer {
 
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
+    }
+
+    fn is_searchable(&self) -> bool {
+        true
     }
 }
 
@@ -394,6 +478,14 @@ impl TextField for Description {
     fn has_pos(&self) -> bool {
         true
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
+
+    fn is_searchable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -404,6 +496,10 @@ impl TextField for DmozDescription {
     }
 
     fn has_pos(&self) -> bool {
+        true
+    }
+
+    fn is_stored(&self) -> bool {
         true
     }
 }
@@ -417,6 +513,10 @@ impl TextField for SchemaOrgJson {
 
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
+    }
+
+    fn is_stored(&self) -> bool {
+        true
     }
 }
 
@@ -458,6 +558,10 @@ impl TextField for CleanBodyBigrams {
     fn query_tokenizer(&self) -> Tokenizer {
         Tokenizer::default()
     }
+
+    fn is_searchable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -481,6 +585,10 @@ impl TextField for TitleBigrams {
 
     fn query_tokenizer(&self) -> Tokenizer {
         Tokenizer::default()
+    }
+
+    fn is_searchable(&self) -> bool {
+        true
     }
 }
 
@@ -506,6 +614,10 @@ impl TextField for CleanBodyTrigrams {
     fn query_tokenizer(&self) -> Tokenizer {
         Tokenizer::default()
     }
+
+    fn is_searchable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -529,6 +641,10 @@ impl TextField for TitleTrigrams {
 
     fn query_tokenizer(&self) -> Tokenizer {
         Tokenizer::default()
+    }
+
+    fn is_searchable(&self) -> bool {
+        true
     }
 }
 
@@ -566,6 +682,10 @@ impl TextField for InsertionTimestamp {
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
+
+    fn indexing_option(&self) -> IndexingOption {
+        IndexingOption::DateTime(tantivy::schema::DateOptions::default().set_indexed())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -578,6 +698,10 @@ impl TextField for RecipeFirstIngredientTagId {
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -585,5 +709,9 @@ pub struct Keywords;
 impl TextField for Keywords {
     fn name(&self) -> &str {
         "keywords"
+    }
+
+    fn is_stored(&self) -> bool {
+        true
     }
 }

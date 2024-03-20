@@ -15,7 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    schema::{fast_field, text_field, FastFieldEnum, TextFieldEnum},
+    schema::{
+        fast_field::{self, FastField},
+        text_field::{self, TextField},
+    },
     webgraph::NodeID,
     Result,
 };
@@ -26,7 +29,7 @@ use std::collections::HashMap;
 use tantivy::{time::OffsetDateTime, TantivyDocument};
 use url::Url;
 
-use crate::schema::{Field, FLOAT_SCALING};
+use crate::schema::FLOAT_SCALING;
 
 use self::region::Region;
 
@@ -140,14 +143,14 @@ impl Webpage {
         if let Ok(region) = region {
             doc.add_u64(
                 schema
-                    .get_field(Field::Fast(FastFieldEnum::from(fast_field::Region)).name())
+                    .get_field(fast_field::Region.name())
                     .expect("Failed to get region field"),
                 region.id(),
             );
         } else {
             doc.add_u64(
                 schema
-                    .get_field(Field::Fast(FastFieldEnum::from(fast_field::Region)).name())
+                    .get_field(fast_field::Region.name())
                     .expect("Failed to get region field"),
                 Region::All.id(),
             );
@@ -158,21 +161,21 @@ impl Webpage {
 
         doc.add_text(
             schema
-                .get_field(Field::Text(TextFieldEnum::from(text_field::BacklinkText)).name())
+                .get_field(text_field::BacklinkText.name())
                 .expect("Failed to get backlink-text field"),
             backlink_text,
         );
 
         doc.add_text(
             schema
-                .get_field(Field::Text(TextFieldEnum::from(text_field::Keywords)).name())
+                .get_field(text_field::Keywords.name())
                 .expect("Failed to get keywords field"),
             self.keywords.join("\n"),
         );
 
         doc.add_date(
             schema
-                .get_field(Field::Text(TextFieldEnum::from(text_field::InsertionTimestamp)).name())
+                .get_field(text_field::InsertionTimestamp.name())
                 .expect("Failed to get insertion-timestamp field"),
             tantivy::DateTime::from_utc(OffsetDateTime::from_unix_timestamp(
                 self.inserted_at.timestamp(),
@@ -186,51 +189,49 @@ impl Webpage {
 
         doc.add_text(
             schema
-                .get_field(
-                    Field::Text(TextFieldEnum::from(text_field::SafetyClassification)).name(),
-                )
+                .get_field(text_field::SafetyClassification.name())
                 .expect("Failed to get safety_classification field"),
             safety,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostCentrality)).name())
+                .get_field(fast_field::HostCentrality.name())
                 .expect("Failed to get host_centrality field"),
             (self.host_centrality * FLOAT_SCALING as f64) as u64,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostCentralityRank)).name())
+                .get_field(fast_field::HostCentralityRank.name())
                 .expect("Failed to get host_centrality_rank field"),
             self.host_centrality_rank,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastFieldEnum::from(fast_field::PageCentrality)).name())
+                .get_field(fast_field::PageCentrality.name())
                 .expect("Failed to get page_centrality field"),
             (self.page_centrality * FLOAT_SCALING as f64) as u64,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastFieldEnum::from(fast_field::PageCentralityRank)).name())
+                .get_field(fast_field::PageCentralityRank.name())
                 .expect("Failed to get page_centrality_rank field"),
             self.page_centrality_rank,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastFieldEnum::from(fast_field::FetchTimeMs)).name())
+                .get_field(fast_field::FetchTimeMs.name())
                 .expect("Failed to get fetch_time_ms field"),
             self.fetch_time_ms,
         );
 
         doc.add_u64(
             schema
-                .get_field(Field::Fast(FastFieldEnum::from(fast_field::PreComputedScore)).name())
+                .get_field(fast_field::PreComputedScore.name())
                 .expect("failed to get pre_computed_score field"),
             (self.pre_computed_score * FLOAT_SCALING as f64) as u64,
         );
@@ -241,14 +242,14 @@ impl Webpage {
 
             doc.add_bytes(
                 schema
-                    .get_field(Field::Fast(FastFieldEnum::from(fast_field::TitleEmbeddings)).name())
+                    .get_field(fast_field::TitleEmbeddings.name())
                     .expect("Failed to get title_embeddings field"),
                 serialized,
             );
         } else {
             doc.add_bytes(
                 schema
-                    .get_field(Field::Fast(FastFieldEnum::from(fast_field::TitleEmbeddings)).name())
+                    .get_field(fast_field::TitleEmbeddings.name())
                     .expect("Failed to get title_embeddings field"),
                 Vec::new(),
             );
@@ -260,18 +261,14 @@ impl Webpage {
 
             doc.add_bytes(
                 schema
-                    .get_field(
-                        Field::Fast(FastFieldEnum::from(fast_field::KeywordEmbeddings)).name(),
-                    )
+                    .get_field(fast_field::KeywordEmbeddings.name())
                     .expect("Failed to get keyword_embeddings field"),
                 serialized,
             );
         } else {
             doc.add_bytes(
                 schema
-                    .get_field(
-                        Field::Fast(FastFieldEnum::from(fast_field::KeywordEmbeddings)).name(),
-                    )
+                    .get_field(fast_field::KeywordEmbeddings.name())
                     .expect("Failed to get keyword_embeddings field"),
                 Vec::new(),
             );
@@ -281,7 +278,7 @@ impl Webpage {
             Some(node_id) => {
                 doc.add_u64(
                     schema
-                        .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostNodeID)).name())
+                        .get_field(fast_field::HostNodeID.name())
                         .expect("Failed to get node_id field"),
                     node_id.as_u64(),
                 );
@@ -289,7 +286,7 @@ impl Webpage {
             None => {
                 doc.add_u64(
                     schema
-                        .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostNodeID)).name())
+                        .get_field(fast_field::HostNodeID.name())
                         .expect("Failed to get node_id field"),
                     u64::MAX,
                 );
@@ -298,7 +295,7 @@ impl Webpage {
 
         doc.add_text(
             schema
-                .get_field(Field::Text(TextFieldEnum::from(text_field::DmozDescription)).name())
+                .get_field(text_field::DmozDescription.name())
                 .expect("failed to get dmoz_description field"),
             dmoz_description.unwrap_or_default(),
         );

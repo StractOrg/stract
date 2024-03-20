@@ -858,7 +858,7 @@ impl SignalAggregator {
                         let mut postings = Vec::with_capacity(terms.len());
                         for term in &terms {
                             if let Some(p) =
-                                inverted_index.read_postings(term, text_field.index_option())?
+                                inverted_index.read_postings(term, text_field.record_option())?
                             {
                                 postings.push(p);
                                 matching_terms.push(term.clone());
