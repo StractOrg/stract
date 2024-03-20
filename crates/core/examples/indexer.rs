@@ -62,6 +62,6 @@ fn main() -> anyhow::Result<()> {
 
     println!("Indexing took {:?}", start.elapsed());
 
-    std::fs::remove_dir(path)?;
+    std::fs::remove_dir_all(path)?;
     Ok(())
 }
