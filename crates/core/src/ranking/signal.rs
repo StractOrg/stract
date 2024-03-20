@@ -31,10 +31,11 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::str::FromStr;
 use std::sync::Arc;
+use strum::VariantArray;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
 use tantivy::query::{Query as _, Scorer};
-use tantivy::tokenizer::Tokenizer;
+use tantivy::tokenizer::Tokenizer as _;
 use thiserror::Error;
 use utoipa::ToSchema;
 
@@ -56,7 +57,9 @@ pub enum Error {
     UnknownSignal(#[from] serde_json::Error),
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash, VariantArray,
+)]
 pub enum Signal {
     #[serde(rename = "bm25_title")]
     Bm25Title,
@@ -145,49 +148,6 @@ impl From<Signal> for usize {
         signal as usize
     }
 }
-
-pub const ALL_SIGNALS: [Signal; 40] = [
-    Signal::Bm25Title,
-    Signal::Bm25TitleBigrams,
-    Signal::Bm25TitleTrigrams,
-    Signal::Bm25CleanBody,
-    Signal::Bm25CleanBodyBigrams,
-    Signal::Bm25CleanBodyTrigrams,
-    Signal::Bm25StemmedTitle,
-    Signal::Bm25StemmedCleanBody,
-    Signal::Bm25AllBody,
-    Signal::Bm25BacklinkText,
-    Signal::Bm25Keywords,
-    Signal::IdfSumUrl,
-    Signal::IdfSumSite,
-    Signal::IdfSumDomain,
-    Signal::IdfSumSiteNoTokenizer,
-    Signal::IdfSumDomainNoTokenizer,
-    Signal::IdfSumDomainNameNoTokenizer,
-    Signal::IdfSumDomainIfHomepage,
-    Signal::IdfSumDomainNameIfHomepageNoTokenizer,
-    Signal::IdfSumDomainIfHomepageNoTokenizer,
-    Signal::IdfSumTitleIfHomepage,
-    Signal::CrossEncoderSnippet,
-    Signal::CrossEncoderTitle,
-    Signal::HostCentrality,
-    Signal::HostCentralityRank,
-    Signal::PageCentrality,
-    Signal::PageCentralityRank,
-    Signal::IsHomepage,
-    Signal::FetchTimeMs,
-    Signal::UpdateTimestamp,
-    Signal::TrackerScore,
-    Signal::Region,
-    Signal::QueryCentrality,
-    Signal::InboundSimilarity,
-    Signal::LambdaMART,
-    Signal::UrlDigits,
-    Signal::UrlSlashes,
-    Signal::LinkDensity,
-    Signal::TitleEmbeddingSimilarity,
-    Signal::KeywordEmbeddingSimilarity,
-];
 
 fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f64 {
     if timestamp >= signal_aggregator.current_timestamp.unwrap_or(0) {
@@ -660,6 +620,10 @@ impl Signal {
             _ => None,
         }
     }
+
+    pub fn all() -> impl Iterator<Item = Self> {
+        Self::VARIANTS.iter().copied()
+    }
 }
 
 impl FromStr for Signal {
@@ -706,7 +670,7 @@ impl SignalCoefficient {
     }
 
     pub fn merge_into(&mut self, coeffs: SignalCoefficient) {
-        for signal in ALL_SIGNALS {
+        for signal in Signal::all() {
             if let Some(coeff) = coeffs.map.get(signal).copied() {
                 match self.map.get_mut(signal) {
                     Some(existing_coeff) => *existing_coeff += coeff,
@@ -862,7 +826,7 @@ impl SignalAggregator {
 
         if let Some(query) = &self.query_data {
             if !query.simple_terms.is_empty() {
-                for signal in ALL_SIGNALS {
+                for signal in Signal::all() {
                     if let Some(text_field) = signal.as_textfield() {
                         let tv_field = schema.get_field(text_field.name()).unwrap();
                         let simple_query = itertools::intersperse(
@@ -1043,8 +1007,7 @@ impl SignalAggregator {
     }
 
     pub fn precompute_score(&self, webpage: &Webpage) -> f64 {
-        ALL_SIGNALS
-            .into_iter()
+        Signal::all()
             .filter_map(|signal| signal.precompute(self, webpage))
             .map(|computed| computed.score.coefficient * computed.score.value)
             .sum()
@@ -1094,7 +1057,7 @@ impl SignalOrder {
         let mut text_signals = EnumMap::new();
         let mut other_signals = Vec::new();
 
-        for signal in ALL_SIGNALS {
+        for signal in Signal::all() {
             if signal_aggregator.coefficient(&signal) == 0.0 {
                 continue;
             }

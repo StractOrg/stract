@@ -53,7 +53,7 @@ impl FastFieldReader {
             let mut u64s = EnumMap::new();
             let mut bytes = EnumMap::new();
 
-            for field in Field::all().filter_map(Field::as_fast) {
+            for field in Field::all().filter_map(|f| f.as_fast()) {
                 match field.data_type() {
                     DataType::U64 => {
                         if let Ok(reader) = fastfield_readers.u64(field.name()) {

@@ -721,7 +721,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
         let mut webpage = RetrievedWebpage::default();
 
         for value in doc.field_values() {
-            match Field::get(value.field.field_id() as usize).copied() {
+            match Field::get(value.field.field_id() as usize) {
                 Some(Field::Text(TextField::Title)) => {
                     webpage.title = str_value(TextField::Title, value);
                 }

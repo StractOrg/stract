@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use strum::VariantArray;
 use tantivy::{
     schema::{BytesOptions, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions},
     DateOptions,
@@ -25,7 +26,7 @@ use crate::tokenizer::{
 
 pub const FLOAT_SCALING: u64 = 1_000_000_000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, VariantArray)]
 pub enum TextField {
     Title,
     CleanBody,
@@ -280,7 +281,7 @@ impl TextField {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, VariantArray)]
 pub enum FastField {
     IsHomepage,
     HostCentrality,
@@ -381,89 +382,27 @@ pub enum Field {
     Text(TextField),
 }
 
-static ALL_FIELDS: [Field; 70] = [
-    Field::Text(TextField::Title),
-    Field::Text(TextField::CleanBody),
-    Field::Text(TextField::StemmedTitle),
-    Field::Text(TextField::StemmedCleanBody),
-    Field::Text(TextField::AllBody),
-    Field::Text(TextField::Url),
-    Field::Text(TextField::UrlNoTokenizer),
-    Field::Text(TextField::UrlForSiteOperator),
-    Field::Text(TextField::SiteWithout),
-    Field::Text(TextField::Domain),
-    Field::Text(TextField::SiteNoTokenizer),
-    Field::Text(TextField::SiteIfHomepageNoTokenizer),
-    Field::Text(TextField::DomainNoTokenizer),
-    Field::Text(TextField::DomainNameNoTokenizer),
-    Field::Text(TextField::DomainIfHomepage),
-    Field::Text(TextField::DomainNameIfHomepageNoTokenizer),
-    Field::Text(TextField::DomainIfHomepageNoTokenizer),
-    Field::Text(TextField::TitleIfHomepage),
-    Field::Text(TextField::BacklinkText),
-    Field::Text(TextField::Description),
-    Field::Text(TextField::DmozDescription),
-    Field::Text(TextField::SchemaOrgJson),
-    Field::Text(TextField::FlattenedSchemaOrgJson),
-    Field::Text(TextField::CleanBodyBigrams),
-    Field::Text(TextField::TitleBigrams),
-    Field::Text(TextField::CleanBodyTrigrams),
-    Field::Text(TextField::TitleTrigrams),
-    Field::Text(TextField::MicroformatTags),
-    Field::Text(TextField::SafetyClassification),
-    Field::Text(TextField::InsertionTimestamp),
-    Field::Text(TextField::Keywords),
-    // FAST FIELDS
-    Field::Fast(FastField::IsHomepage),
-    Field::Fast(FastField::HostCentrality),
-    Field::Fast(FastField::HostCentralityRank),
-    Field::Fast(FastField::PageCentrality),
-    Field::Fast(FastField::PageCentralityRank),
-    Field::Fast(FastField::FetchTimeMs),
-    Field::Fast(FastField::LastUpdated),
-    Field::Fast(FastField::TrackerScore),
-    Field::Fast(FastField::Region),
-    Field::Fast(FastField::NumUrlTokens),
-    Field::Fast(FastField::NumTitleTokens),
-    Field::Fast(FastField::NumCleanBodyTokens),
-    Field::Fast(FastField::NumDescriptionTokens),
-    Field::Fast(FastField::NumDomainTokens),
-    Field::Fast(FastField::NumUrlForSiteOperatorTokens),
-    Field::Fast(FastField::NumFlattenedSchemaTokens),
-    Field::Fast(FastField::NumMicroformatTagsTokens),
-    Field::Fast(FastField::SiteHash1),
-    Field::Fast(FastField::SiteHash2),
-    Field::Fast(FastField::UrlWithoutQueryHash1),
-    Field::Fast(FastField::UrlWithoutQueryHash2),
-    Field::Fast(FastField::TitleHash1),
-    Field::Fast(FastField::TitleHash2),
-    Field::Fast(FastField::UrlHash1),
-    Field::Fast(FastField::UrlHash2),
-    Field::Fast(FastField::DomainHash1),
-    Field::Fast(FastField::DomainHash2),
-    Field::Fast(FastField::UrlWithoutTldHash1),
-    Field::Fast(FastField::UrlWithoutTldHash2),
-    Field::Fast(FastField::PreComputedScore),
-    Field::Fast(FastField::HostNodeID),
-    Field::Fast(FastField::SimHash),
-    Field::Fast(FastField::NumPathAndQuerySlashes),
-    Field::Fast(FastField::NumPathAndQueryDigits),
-    Field::Fast(FastField::LikelyHasAds),
-    Field::Fast(FastField::LikelyHasPaywall),
-    Field::Fast(FastField::LinkDensity),
-    Field::Fast(FastField::TitleEmbeddings),
-    Field::Fast(FastField::KeywordEmbeddings),
-];
-
 impl Field {
     #[inline]
-    pub fn get(field_id: usize) -> Option<&'static Field> {
-        ALL_FIELDS.get(field_id)
+    pub fn get(field_id: usize) -> Option<Field> {
+        if field_id < TextField::VARIANTS.len() {
+            Some(Field::Text(TextField::VARIANTS[field_id]))
+        } else {
+            let fast_id = field_id - TextField::VARIANTS.len();
+            if fast_id < FastField::VARIANTS.len() {
+                Some(Field::Fast(FastField::VARIANTS[fast_id]))
+            } else {
+                None
+            }
+        }
     }
 
     #[inline]
-    pub fn all() -> impl Iterator<Item = &'static Field> {
-        ALL_FIELDS.iter()
+    pub fn all() -> impl Iterator<Item = Field> {
+        TextField::VARIANTS
+            .iter()
+            .map(|&text| Field::Text(text))
+            .chain(FastField::VARIANTS.iter().map(|&fast| Field::Fast(fast)))
     }
     fn default_text_options(&self) -> tantivy::schema::TextOptions {
         let tokenizer = self.as_text().unwrap().indexing_tokenizer();
@@ -779,7 +718,7 @@ impl Field {
 pub fn create_schema() -> tantivy::schema::Schema {
     let mut builder = tantivy::schema::Schema::builder();
 
-    for field in &ALL_FIELDS {
+    for field in Field::all() {
         match field.options() {
             IndexingOption::Text(options) => builder.add_text_field(field.name(), options),
             IndexingOption::Integer(options) => builder.add_u64_field(field.name(), options),
