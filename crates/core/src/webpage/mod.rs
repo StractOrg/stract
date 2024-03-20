@@ -34,7 +34,7 @@ use crate::schema::FLOAT_SCALING;
 use self::region::Region;
 
 mod adservers;
-mod html;
+pub mod html;
 mod just_text;
 pub mod region;
 pub mod safety_classifier;

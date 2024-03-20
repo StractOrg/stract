@@ -16,7 +16,12 @@
 
 use enum_dispatch::enum_dispatch;
 use strum::{EnumDiscriminants, VariantArray};
-use tantivy::schema::{IndexRecordOption, TextFieldIndexing, TextOptions};
+use tantivy::{
+    schema::{IndexRecordOption, TextFieldIndexing, TextOptions},
+    tokenizer::PreTokenizedString,
+    TantivyDocument,
+};
+use whatlang::Lang;
 
 use crate::{
     enum_map::InsertEnumMapKey,
@@ -24,7 +29,11 @@ use crate::{
     tokenizer::{
         BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
     },
+    webpage::Html,
+    Result,
 };
+
+use crate::webpage::html::FnCache;
 
 use super::IndexingOption;
 
@@ -33,6 +42,13 @@ pub trait TextField:
     Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash + Into<TextFieldEnum>
 {
     fn name(&self) -> &str;
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()>;
 
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::default()
@@ -91,6 +107,12 @@ pub trait TextField:
         }
 
         IndexingOption::Text(opt)
+    }
+
+    fn tantivy_field(&self, schema: &tantivy::schema::Schema) -> tantivy::schema::Field {
+        schema
+            .get_field(self.name())
+            .unwrap_or_else(|_| unreachable!("Unknown field: {}", self.name()))
     }
 }
 
@@ -200,6 +222,40 @@ impl InsertEnumMapKey for TextFieldEnum {
     }
 }
 
+fn stemmer_from_lang(lang: &Lang) -> rust_stemmers::Stemmer {
+    match lang {
+        Lang::Ara => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Arabic),
+        Lang::Dan => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Danish),
+        Lang::Nld => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Dutch),
+        Lang::Fin => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Finnish),
+        Lang::Fra => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::French),
+        Lang::Deu => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::German),
+        Lang::Ell => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Greek),
+        Lang::Hun => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Hungarian),
+        Lang::Ita => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Italian),
+        Lang::Por => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Portuguese),
+        Lang::Ron => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Romanian),
+        Lang::Rus => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Russian),
+        Lang::Spa => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Spanish),
+        Lang::Swe => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Swedish),
+        Lang::Tam => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Tamil),
+        Lang::Tur => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::Turkish),
+        _ => rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::English),
+    }
+}
+
+fn stem_tokens(tokens: &mut [tantivy::tokenizer::Token], lang: Lang) {
+    let stemmer = stemmer_from_lang(&lang);
+    for token in tokens {
+        // TODO remove allocation
+        if let Ok(stemmed_str) = std::panic::catch_unwind(|| stemmer.stem(&token.text).into_owned())
+        {
+            token.text.clear();
+            token.text.push_str(&stemmed_str);
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Title;
 impl TextField for Title {
@@ -218,6 +274,25 @@ impl TextField for Title {
     fn is_searchable(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            cache
+                .pretokenize_title()
+                .as_ref()
+                .map(Clone::clone)
+                .map_err(|e| anyhow::anyhow!("{}", e))?,
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -234,6 +309,21 @@ impl TextField for CleanBody {
     fn is_searchable(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            cache.pretokenize_clean_text().clone(),
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -249,6 +339,32 @@ impl TextField for StemmedTitle {
 
     fn is_searchable(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let title = cache
+            .pretokenize_title()
+            .as_ref()
+            .map(Clone::clone)
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let mut tokens = title.tokens.clone();
+        stem_tokens(&mut tokens, html.lang().copied().unwrap_or(Lang::Eng));
+
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            PreTokenizedString {
+                text: title.text.clone(),
+                tokens,
+            },
+        );
+
+        Ok(())
     }
 }
 
@@ -270,6 +386,28 @@ impl TextField for StemmedCleanBody {
     fn is_searchable(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let clean_text = cache.pretokenize_clean_text();
+        let mut tokens = clean_text.tokens.clone();
+        stem_tokens(&mut tokens, html.lang().copied().unwrap_or(Lang::Eng));
+
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            PreTokenizedString {
+                text: clean_text.text.clone(),
+                tokens,
+            },
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -281,6 +419,24 @@ impl TextField for AllBody {
 
     fn is_searchable(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let all_text = cache
+            .pretokenize_all_text()
+            .as_ref()
+            .map(Clone::clone)
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        doc.add_pre_tokenized_text(self.tantivy_field(schema), all_text.clone());
+
+        Ok(())
     }
 }
 
@@ -302,6 +458,19 @@ impl TextField for Url {
     fn is_searchable(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let url = cache.pretokenize_url();
+        doc.add_pre_tokenized_text(self.tantivy_field(schema), url.clone());
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -317,6 +486,32 @@ impl TextField for UrlNoTokenizer {
 
     fn is_searchable(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let url = html.url().to_string();
+
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            PreTokenizedString {
+                text: url.clone(),
+                tokens: vec![tantivy::tokenizer::Token {
+                    offset_from: 0,
+                    offset_to: url.len(),
+                    position: 0,
+                    text: url,
+                    position_length: 1,
+                }],
+            },
+        );
+
+        Ok(())
     }
 }
 
@@ -334,6 +529,21 @@ impl TextField for UrlForSiteOperator {
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::SiteOperator(SiteOperatorUrlTokenizer)
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            cache.pretokenize_url_for_site_operator().clone(),
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -346,6 +556,17 @@ impl TextField for SiteWithout {
     fn has_pos(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_pre_tokenized_text(self.tantivy_field(schema), cache.pretokenize_site().clone());
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -357,6 +578,21 @@ impl TextField for Domain {
 
     fn has_pos(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            cache.pretokenize_domain().clone(),
+        );
+
+        Ok(())
     }
 }
 
@@ -374,6 +610,32 @@ impl TextField for SiteNoTokenizer {
     fn is_searchable(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let site = cache.pretokenize_site();
+
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            PreTokenizedString {
+                text: site.text.clone(),
+                tokens: vec![tantivy::tokenizer::Token {
+                    offset_from: 0,
+                    offset_to: site.text.len(),
+                    position: 0,
+                    text: site.text.clone(),
+                    position_length: 1,
+                }],
+            },
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -389,6 +651,32 @@ impl TextField for DomainNoTokenizer {
 
     fn is_searchable(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let domain = cache.pretokenize_domain();
+
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            PreTokenizedString {
+                text: domain.text.clone(),
+                tokens: vec![tantivy::tokenizer::Token {
+                    offset_from: 0,
+                    offset_to: domain.text.len(),
+                    position: 0,
+                    text: domain.text.clone(),
+                    position_length: 1,
+                }],
+            },
+        );
+
+        Ok(())
     }
 }
 
@@ -406,6 +694,32 @@ impl TextField for DomainNameNoTokenizer {
     fn is_searchable(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let domain_name = cache.domain_name();
+
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            PreTokenizedString {
+                text: domain_name.clone(),
+                tokens: vec![tantivy::tokenizer::Token {
+                    offset_from: 0,
+                    offset_to: domain_name.len(),
+                    position: 0,
+                    text: domain_name.clone(),
+                    position_length: 1,
+                }],
+            },
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -418,6 +732,36 @@ impl TextField for SiteIfHomepageNoTokenizer {
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let site = cache.pretokenize_site();
+
+        if html.is_homepage() {
+            doc.add_pre_tokenized_text(
+                self.tantivy_field(schema),
+                PreTokenizedString {
+                    text: site.text.clone(),
+                    tokens: vec![tantivy::tokenizer::Token {
+                        offset_from: 0,
+                        offset_to: site.text.len(),
+                        position: 0,
+                        text: site.text.clone(),
+                        position_length: 1,
+                    }],
+                },
+            );
+        } else {
+            doc.add_text(self.tantivy_field(schema), "");
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -425,6 +769,23 @@ pub struct DomainIfHomepage;
 impl TextField for DomainIfHomepage {
     fn name(&self) -> &str {
         "domain_if_homepage"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let domain = cache.pretokenize_domain();
+        if html.is_homepage() {
+            doc.add_text(self.tantivy_field(schema), domain.text.clone());
+        } else {
+            doc.add_text(self.tantivy_field(schema), "");
+        }
+
+        Ok(())
     }
 }
 
@@ -438,6 +799,36 @@ impl TextField for DomainNameIfHomepageNoTokenizer {
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let domain_name = cache.domain_name();
+
+        if html.is_homepage() {
+            doc.add_pre_tokenized_text(
+                self.tantivy_field(schema),
+                PreTokenizedString {
+                    text: domain_name.clone(),
+                    tokens: vec![tantivy::tokenizer::Token {
+                        offset_from: 0,
+                        offset_to: domain_name.len(),
+                        position: 0,
+                        text: domain_name.clone(),
+                        position_length: 1,
+                    }],
+                },
+            );
+        } else {
+            doc.add_text(self.tantivy_field(schema), "");
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -450,6 +841,36 @@ impl TextField for DomainIfHomepageNoTokenizer {
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let domain = cache.pretokenize_domain();
+
+        if html.is_homepage() {
+            doc.add_pre_tokenized_text(
+                self.tantivy_field(schema),
+                PreTokenizedString {
+                    text: domain.text.clone(),
+                    tokens: vec![tantivy::tokenizer::Token {
+                        offset_from: 0,
+                        offset_to: domain.text.len(),
+                        position: 0,
+                        text: domain.text.clone(),
+                        position_length: 1,
+                    }],
+                },
+            );
+        } else {
+            doc.add_text(self.tantivy_field(schema), "");
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -458,6 +879,28 @@ impl TextField for TitleIfHomepage {
     fn name(&self) -> &str {
         "title_if_homepage"
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let title = cache
+            .pretokenize_title()
+            .as_ref()
+            .map(Clone::clone)
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        if html.is_homepage() {
+            doc.add_pre_tokenized_text(self.tantivy_field(schema), title);
+        } else {
+            doc.add_text(self.tantivy_field(schema), "");
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -465,6 +908,16 @@ pub struct BacklinkText;
 impl TextField for BacklinkText {
     fn name(&self) -> &str {
         "backlink_text"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -486,6 +939,19 @@ impl TextField for Description {
     fn is_searchable(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let description = cache.pretokenize_description();
+        doc.add_pre_tokenized_text(self.tantivy_field(schema), description.clone());
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -501,6 +967,16 @@ impl TextField for DmozDescription {
 
     fn is_stored(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -518,6 +994,18 @@ impl TextField for SchemaOrgJson {
     fn is_stored(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_text(self.tantivy_field(schema), cache.schema_json());
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -533,6 +1021,21 @@ impl TextField for FlattenedSchemaOrgJson {
 
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Json(JsonField)
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            cache.pretokenized_schema_json().clone(),
+        );
+
+        Ok(())
     }
 }
 
@@ -562,6 +1065,21 @@ impl TextField for CleanBodyBigrams {
     fn is_searchable(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_text(
+            self.tantivy_field(schema),
+            html.clean_text().cloned().unwrap_or_default(),
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -589,6 +1107,24 @@ impl TextField for TitleBigrams {
 
     fn is_searchable(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let title = cache
+            .pretokenize_title()
+            .as_ref()
+            .map(Clone::clone)
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        doc.add_text(self.tantivy_field(schema), title.text.clone());
+
+        Ok(())
     }
 }
 
@@ -618,6 +1154,21 @@ impl TextField for CleanBodyTrigrams {
     fn is_searchable(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_text(
+            self.tantivy_field(schema),
+            html.clean_text().cloned().unwrap_or_default(),
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -646,6 +1197,24 @@ impl TextField for TitleTrigrams {
     fn is_searchable(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        let title = cache
+            .pretokenize_title()
+            .as_ref()
+            .map(Clone::clone)
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        doc.add_text(self.tantivy_field(schema), title.text.clone());
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -658,6 +1227,21 @@ impl TextField for MicroformatTags {
     fn has_pos(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema),
+            cache.pretokenize_microformats().clone(),
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -669,6 +1253,16 @@ impl TextField for SafetyClassification {
 
     fn indexing_tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -686,6 +1280,16 @@ impl TextField for InsertionTimestamp {
     fn indexing_option(&self) -> IndexingOption {
         IndexingOption::DateTime(tantivy::schema::DateOptions::default().set_indexed())
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -702,6 +1306,21 @@ impl TextField for RecipeFirstIngredientTagId {
     fn is_stored(&self) -> bool {
         true
     }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_text(
+            self.tantivy_field(schema),
+            cache.first_ingredient_tag_id().cloned().unwrap_or_default(),
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -713,5 +1332,15 @@ impl TextField for Keywords {
 
     fn is_stored(&self) -> bool {
         true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _html: &Html,
+        _cache: &mut FnCache,
+        _doc: &mut TantivyDocument,
+        _schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
     }
 }
