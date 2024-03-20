@@ -32,7 +32,7 @@ use crate::inverted_index::RetrievedWebpage;
 use crate::models::dual_encoder::DualEncoder;
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
 use crate::ranking::pipeline::{PrecisionRankingWebpage, RankableWebpage, RecallRankingWebpage};
-use crate::ranking::ALL_SIGNALS;
+use crate::ranking::Signal;
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::web_spell::SpellChecker;
 use crate::widgets::{Widget, Widgets};
@@ -145,9 +145,9 @@ pub fn combine_results(
 }
 pub fn add_ranking_signals(websites: &mut [DisplayedWebpage], pointers: &[ScoredWebpagePointer]) {
     for (website, pointer) in websites.iter_mut().zip(pointers.iter()) {
-        let mut signals = HashMap::with_capacity(ALL_SIGNALS.len());
+        let mut signals = HashMap::new();
 
-        for signal in ALL_SIGNALS {
+        for signal in Signal::all() {
             if let Some(signal_value) = pointer.as_ranking().signals.get(signal) {
                 signals.insert(signal, *signal_value);
             }

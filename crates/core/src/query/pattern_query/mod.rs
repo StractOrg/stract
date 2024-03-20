@@ -23,7 +23,7 @@ use tantivy::tokenizer::Tokenizer;
 
 use crate::{
     fastfield_reader::FastFieldReader,
-    schema::{Field, TextField},
+    schema::{text_field::TextField, Field, TextFieldEnum},
 };
 
 use self::weight::{FastSiteDomainPatternWeight, PatternWeight};
@@ -50,7 +50,7 @@ impl std::fmt::Debug for PatternQuery {
 impl PatternQuery {
     pub fn new(
         patterns: Vec<PatternPart>,
-        field: TextField,
+        field: TextFieldEnum,
         schema: &tantivy::schema::Schema,
         fastfield_reader: FastFieldReader,
     ) -> Self {
@@ -165,6 +165,6 @@ fn can_optimize_site_domain(patterns: &[PatternPart], field: Field) -> bool {
         && patterns[1..patterns.len() - 1]
             .iter()
             .all(|pattern| matches!(pattern, PatternPart::Raw(_)))
-        && (matches!(field, Field::Text(TextField::UrlForSiteOperator))
-            || matches!(field, Field::Text(TextField::Domain)))
+        && (matches!(field, Field::Text(TextFieldEnum::UrlForSiteOperator(_)))
+            || matches!(field, Field::Text(TextFieldEnum::Domain(_))))
 }

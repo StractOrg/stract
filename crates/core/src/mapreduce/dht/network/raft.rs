@@ -37,11 +37,11 @@ use crate::{
 };
 
 use super::{
-    AddLearnerRequest, AddNodesRequest, AppendEntriesRequest, AppendEntriesResponse,
-    InstallSnapshotRequest, InstallSnapshotResponse, Server, VoteRequest, VoteResponse,
+    AddLearner, AddNodes, AppendEntries, AppendEntriesResponse, InstallSnapshot,
+    InstallSnapshotResponse, Server, Vote, VoteResponse,
 };
 
-impl sonic::service::Message<Server> for AppendEntriesRequest {
+impl sonic::service::Message<Server> for AppendEntries {
     type Response = Result<AppendEntriesResponse, RaftError<NodeId>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
@@ -50,7 +50,7 @@ impl sonic::service::Message<Server> for AppendEntriesRequest {
     }
 }
 
-impl sonic::service::Message<Server> for InstallSnapshotRequest {
+impl sonic::service::Message<Server> for InstallSnapshot {
     type Response = Result<InstallSnapshotResponse, RaftError<NodeId, InstallSnapshotError>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
@@ -59,7 +59,7 @@ impl sonic::service::Message<Server> for InstallSnapshotRequest {
     }
 }
 
-impl sonic::service::Message<Server> for VoteRequest {
+impl sonic::service::Message<Server> for Vote {
     type Response = Result<VoteResponse, RaftError<NodeId>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
@@ -68,7 +68,7 @@ impl sonic::service::Message<Server> for VoteRequest {
     }
 }
 
-impl sonic::service::Message<Server> for AddLearnerRequest {
+impl sonic::service::Message<Server> for AddLearner {
     type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
@@ -93,7 +93,7 @@ impl sonic::service::Message<Server> for AddLearnerRequest {
     }
 }
 
-impl sonic::service::Message<Server> for AddNodesRequest {
+impl sonic::service::Message<Server> for AddNodes {
     type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
@@ -160,7 +160,7 @@ impl RemoteClient {
     }
 
     async fn add_learner(&self, id: NodeId, addr: SocketAddr) -> Result<()> {
-        let rpc = AddLearnerRequest { id, addr };
+        let rpc = AddLearner { id, addr };
         let retry = ExponentialBackoff::from_millis(500)
             .with_limit(Duration::from_secs(60))
             .take(5);
@@ -220,7 +220,7 @@ impl RemoteClient {
     }
 
     async fn add_nodes(&self, members: BTreeMap<NodeId, BasicNode>) -> Result<()> {
-        let rpc = AddNodesRequest { members };
+        let rpc = AddNodes { members };
         let retry = ExponentialBackoff::from_millis(500).with_limit(Duration::from_secs(10));
 
         for backoff in retry {
@@ -293,7 +293,7 @@ impl RemoteClient {
 impl RaftNetwork<TypeConfig> for RemoteClient {
     async fn append_entries(
         &mut self,
-        rpc: AppendEntriesRequest,
+        rpc: AppendEntries,
         option: RPCOption,
     ) -> Result<AppendEntriesResponse, RPCError> {
         self.send_raft_rpc(rpc, option).await?.map_err(|e| {
@@ -308,7 +308,7 @@ impl RaftNetwork<TypeConfig> for RemoteClient {
 
     async fn install_snapshot(
         &mut self,
-        rpc: InstallSnapshotRequest,
+        rpc: InstallSnapshot,
         option: RPCOption,
     ) -> Result<InstallSnapshotResponse, RPCError<InstallSnapshotError>> {
         self.send_raft_rpc(rpc, option).await?.map_err(|e| {
@@ -321,11 +321,7 @@ impl RaftNetwork<TypeConfig> for RemoteClient {
         })
     }
 
-    async fn vote(
-        &mut self,
-        rpc: VoteRequest,
-        option: RPCOption,
-    ) -> Result<VoteResponse, RPCError> {
+    async fn vote(&mut self, rpc: Vote, option: RPCOption) -> Result<VoteResponse, RPCError> {
         self.send_raft_rpc(rpc, option).await?.map_err(|e| {
             openraft::error::RemoteError {
                 target: self.target,

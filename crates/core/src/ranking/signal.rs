@@ -14,13 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::enum_map::InsertEnumMapKey;
 use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
+use crate::schema::text_field::TextField;
+use crate::schema::{fast_field, text_field};
 use crate::Result;
 use crate::{
     enum_map::EnumMap,
     fastfield_reader,
-    schema::{FastField, TextField},
+    schema::{FastFieldEnum, TextFieldEnum},
     webgraph::NodeID,
     webpage::Webpage,
 };
@@ -31,10 +34,11 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::str::FromStr;
 use std::sync::Arc;
+use strum::VariantArray;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
 use tantivy::query::{Query as _, Scorer};
-use tantivy::tokenizer::Tokenizer;
+use tantivy::tokenizer::Tokenizer as _;
 use thiserror::Error;
 use utoipa::ToSchema;
 
@@ -56,7 +60,9 @@ pub enum Error {
     UnknownSignal(#[from] serde_json::Error),
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash, VariantArray,
+)]
 pub enum Signal {
     #[serde(rename = "bm25_title")]
     Bm25Title,
@@ -140,54 +146,11 @@ pub enum Signal {
     KeywordEmbeddingSimilarity,
 }
 
-impl From<Signal> for usize {
-    fn from(signal: Signal) -> Self {
-        signal as usize
+impl InsertEnumMapKey for Signal {
+    fn into_usize(self) -> usize {
+        self as usize
     }
 }
-
-pub const ALL_SIGNALS: [Signal; 40] = [
-    Signal::Bm25Title,
-    Signal::Bm25TitleBigrams,
-    Signal::Bm25TitleTrigrams,
-    Signal::Bm25CleanBody,
-    Signal::Bm25CleanBodyBigrams,
-    Signal::Bm25CleanBodyTrigrams,
-    Signal::Bm25StemmedTitle,
-    Signal::Bm25StemmedCleanBody,
-    Signal::Bm25AllBody,
-    Signal::Bm25BacklinkText,
-    Signal::Bm25Keywords,
-    Signal::IdfSumUrl,
-    Signal::IdfSumSite,
-    Signal::IdfSumDomain,
-    Signal::IdfSumSiteNoTokenizer,
-    Signal::IdfSumDomainNoTokenizer,
-    Signal::IdfSumDomainNameNoTokenizer,
-    Signal::IdfSumDomainIfHomepage,
-    Signal::IdfSumDomainNameIfHomepageNoTokenizer,
-    Signal::IdfSumDomainIfHomepageNoTokenizer,
-    Signal::IdfSumTitleIfHomepage,
-    Signal::CrossEncoderSnippet,
-    Signal::CrossEncoderTitle,
-    Signal::HostCentrality,
-    Signal::HostCentralityRank,
-    Signal::PageCentrality,
-    Signal::PageCentralityRank,
-    Signal::IsHomepage,
-    Signal::FetchTimeMs,
-    Signal::UpdateTimestamp,
-    Signal::TrackerScore,
-    Signal::Region,
-    Signal::QueryCentrality,
-    Signal::InboundSimilarity,
-    Signal::LambdaMART,
-    Signal::UrlDigits,
-    Signal::UrlSlashes,
-    Signal::LinkDensity,
-    Signal::TitleEmbeddingSimilarity,
-    Signal::KeywordEmbeddingSimilarity,
-];
 
 fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f64 {
     if timestamp >= signal_aggregator.current_timestamp.unwrap_or(0) {
@@ -359,7 +322,7 @@ impl Signal {
         let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
 
         let node_id = fastfield_reader
-            .get(FastField::HostNodeID)
+            .get(fast_field::HostNodeID.into())
             .and_then(|n| n.as_u64())
             .unwrap();
 
@@ -610,55 +573,59 @@ impl Signal {
         })
     }
 
-    fn as_fastfield(&self) -> Option<FastField> {
+    fn as_fastfield(&self) -> Option<FastFieldEnum> {
         match self {
-            Signal::HostCentrality => Some(FastField::HostCentrality),
-            Signal::HostCentralityRank => Some(FastField::HostCentralityRank),
-            Signal::PageCentrality => Some(FastField::PageCentrality),
-            Signal::PageCentralityRank => Some(FastField::PageCentralityRank),
-            Signal::IsHomepage => Some(FastField::IsHomepage),
-            Signal::FetchTimeMs => Some(FastField::FetchTimeMs),
-            Signal::UpdateTimestamp => Some(FastField::LastUpdated),
-            Signal::TrackerScore => Some(FastField::TrackerScore),
-            Signal::Region => Some(FastField::Region),
-            Signal::UrlSlashes => Some(FastField::NumPathAndQuerySlashes),
-            Signal::UrlDigits => Some(FastField::NumPathAndQueryDigits),
-            Signal::LinkDensity => Some(FastField::LinkDensity),
-            Signal::TitleEmbeddingSimilarity => Some(FastField::TitleEmbeddings),
-            Signal::KeywordEmbeddingSimilarity => Some(FastField::KeywordEmbeddings),
+            Signal::HostCentrality => Some(fast_field::HostCentrality.into()),
+            Signal::HostCentralityRank => Some(fast_field::HostCentralityRank.into()),
+            Signal::PageCentrality => Some(fast_field::PageCentrality.into()),
+            Signal::PageCentralityRank => Some(fast_field::PageCentralityRank.into()),
+            Signal::IsHomepage => Some(fast_field::IsHomepage.into()),
+            Signal::FetchTimeMs => Some(fast_field::FetchTimeMs.into()),
+            Signal::UpdateTimestamp => Some(fast_field::LastUpdated.into()),
+            Signal::TrackerScore => Some(fast_field::TrackerScore.into()),
+            Signal::Region => Some(fast_field::Region.into()),
+            Signal::UrlSlashes => Some(fast_field::NumPathAndQuerySlashes.into()),
+            Signal::UrlDigits => Some(fast_field::NumPathAndQueryDigits.into()),
+            Signal::LinkDensity => Some(fast_field::LinkDensity.into()),
+            Signal::TitleEmbeddingSimilarity => Some(fast_field::TitleEmbeddings.into()),
+            Signal::KeywordEmbeddingSimilarity => Some(fast_field::KeywordEmbeddings.into()),
             _ => None,
         }
     }
 
-    fn as_textfield(&self) -> Option<TextField> {
+    fn as_textfield(&self) -> Option<TextFieldEnum> {
         match self {
-            Signal::Bm25Title => Some(TextField::Title),
-            Signal::Bm25TitleBigrams => Some(TextField::TitleBigrams),
-            Signal::Bm25TitleTrigrams => Some(TextField::TitleTrigrams),
-            Signal::Bm25CleanBody => Some(TextField::CleanBody),
-            Signal::Bm25CleanBodyBigrams => Some(TextField::CleanBodyBigrams),
-            Signal::Bm25CleanBodyTrigrams => Some(TextField::CleanBodyTrigrams),
-            Signal::Bm25StemmedTitle => Some(TextField::StemmedTitle),
-            Signal::Bm25StemmedCleanBody => Some(TextField::StemmedCleanBody),
-            Signal::Bm25AllBody => Some(TextField::AllBody),
-            Signal::Bm25BacklinkText => Some(TextField::BacklinkText),
-            Signal::Bm25Keywords => Some(TextField::Keywords),
-            Signal::IdfSumUrl => Some(TextField::Url),
-            Signal::IdfSumSite => Some(TextField::SiteWithout),
-            Signal::IdfSumDomain => Some(TextField::Domain),
-            Signal::IdfSumSiteNoTokenizer => Some(TextField::SiteNoTokenizer),
-            Signal::IdfSumDomainNoTokenizer => Some(TextField::DomainNoTokenizer),
-            Signal::IdfSumDomainNameNoTokenizer => Some(TextField::DomainNameNoTokenizer),
-            Signal::IdfSumDomainIfHomepage => Some(TextField::DomainIfHomepage),
+            Signal::Bm25Title => Some(text_field::Title.into()),
+            Signal::Bm25TitleBigrams => Some(text_field::TitleBigrams.into()),
+            Signal::Bm25TitleTrigrams => Some(text_field::TitleTrigrams.into()),
+            Signal::Bm25CleanBody => Some(text_field::CleanBody.into()),
+            Signal::Bm25CleanBodyBigrams => Some(text_field::CleanBodyBigrams.into()),
+            Signal::Bm25CleanBodyTrigrams => Some(text_field::CleanBodyTrigrams.into()),
+            Signal::Bm25StemmedTitle => Some(text_field::StemmedTitle.into()),
+            Signal::Bm25StemmedCleanBody => Some(text_field::StemmedCleanBody.into()),
+            Signal::Bm25AllBody => Some(text_field::AllBody.into()),
+            Signal::Bm25BacklinkText => Some(text_field::BacklinkText.into()),
+            Signal::Bm25Keywords => Some(text_field::Keywords.into()),
+            Signal::IdfSumUrl => Some(text_field::Url.into()),
+            Signal::IdfSumSite => Some(text_field::SiteWithout.into()),
+            Signal::IdfSumDomain => Some(text_field::Domain.into()),
+            Signal::IdfSumSiteNoTokenizer => Some(text_field::SiteNoTokenizer.into()),
+            Signal::IdfSumDomainNoTokenizer => Some(text_field::DomainNoTokenizer.into()),
+            Signal::IdfSumDomainNameNoTokenizer => Some(text_field::DomainNameNoTokenizer.into()),
+            Signal::IdfSumDomainIfHomepage => Some(text_field::DomainIfHomepage.into()),
             Signal::IdfSumDomainNameIfHomepageNoTokenizer => {
-                Some(TextField::DomainNameIfHomepageNoTokenizer)
+                Some(text_field::DomainNameIfHomepageNoTokenizer.into())
             }
-            Signal::IdfSumTitleIfHomepage => Some(TextField::TitleIfHomepage),
+            Signal::IdfSumTitleIfHomepage => Some(text_field::TitleIfHomepage.into()),
             Signal::IdfSumDomainIfHomepageNoTokenizer => {
-                Some(TextField::DomainIfHomepageNoTokenizer)
+                Some(text_field::DomainIfHomepageNoTokenizer.into())
             }
             _ => None,
         }
+    }
+
+    pub fn all() -> impl Iterator<Item = Self> {
+        Self::VARIANTS.iter().copied()
     }
 }
 
@@ -706,7 +673,7 @@ impl SignalCoefficient {
     }
 
     pub fn merge_into(&mut self, coeffs: SignalCoefficient) {
-        for signal in ALL_SIGNALS {
+        for signal in Signal::all() {
             if let Some(coeff) = coeffs.map.get(signal).copied() {
                 match self.map.get_mut(signal) {
                     Some(existing_coeff) => *existing_coeff += coeff,
@@ -736,7 +703,7 @@ struct OpticBoosts {
 }
 
 struct SegmentReader {
-    text_fields: EnumMap<TextField, TextFieldData>,
+    text_fields: EnumMap<TextFieldEnum, TextFieldData>,
     optic_boosts: OpticBoosts,
     fastfield_reader: Arc<fastfield_reader::SegmentReader>,
 }
@@ -856,13 +823,13 @@ impl SignalAggregator {
         &self,
         tv_searcher: &tantivy::Searcher,
         segment_reader: &tantivy::SegmentReader,
-    ) -> Result<EnumMap<TextField, TextFieldData>> {
+    ) -> Result<EnumMap<TextFieldEnum, TextFieldData>> {
         let mut text_fields = EnumMap::new();
         let schema = tv_searcher.schema();
 
         if let Some(query) = &self.query_data {
             if !query.simple_terms.is_empty() {
-                for signal in ALL_SIGNALS {
+                for signal in Signal::all() {
                     if let Some(text_field) = signal.as_textfield() {
                         let tv_field = schema.get_field(text_field.name()).unwrap();
                         let simple_query = itertools::intersperse(
@@ -891,7 +858,7 @@ impl SignalAggregator {
                         let mut postings = Vec::with_capacity(terms.len());
                         for term in &terms {
                             if let Some(p) =
-                                inverted_index.read_postings(term, text_field.index_option())?
+                                inverted_index.read_postings(term, text_field.record_option())?
                             {
                                 postings.push(p);
                                 matching_terms.push(term.clone());
@@ -1043,8 +1010,7 @@ impl SignalAggregator {
     }
 
     pub fn precompute_score(&self, webpage: &Webpage) -> f64 {
-        ALL_SIGNALS
-            .into_iter()
+        Signal::all()
             .filter_map(|signal| signal.precompute(self, webpage))
             .map(|computed| computed.score.coefficient * computed.score.value)
             .sum()
@@ -1078,7 +1044,7 @@ pub struct SignalScore {
 
 #[derive(Clone)]
 pub struct SignalOrder {
-    text_signals: EnumMap<TextField, NGramSignalOrder>,
+    text_signals: EnumMap<TextFieldEnum, NGramSignalOrder>,
     other_signals: Vec<Signal>,
 }
 
@@ -1094,7 +1060,7 @@ impl SignalOrder {
         let mut text_signals = EnumMap::new();
         let mut other_signals = Vec::new();
 
-        for signal in ALL_SIGNALS {
+        for signal in Signal::all() {
             if signal_aggregator.coefficient(&signal) == 0.0 {
                 continue;
             }

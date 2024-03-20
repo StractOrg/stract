@@ -16,3 +16,4 @@ proptest-regressions
 *.pending-snap
 .ipynb_checkpoints
 .zed
+rustc-ice-*

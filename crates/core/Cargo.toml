@@ -45,6 +45,7 @@ crossbeam-channel = { workspace = true }
 csv = { workspace = true }
 dashmap = { workspace = true }
 encoding_rs = { workspace = true }
+enum_dispatch = { workspace = true }
 eventsource-stream = { workspace = true }
 fend-core = { workspace = true }
 flate2 = { workspace = true }
@@ -91,6 +92,7 @@ scylla = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_urlencoded = { workspace = true }
+strum = { workspace = true }
 tantivy = { workspace = true }
 thiserror = { workspace = true }
 tokenizers = { workspace = true }

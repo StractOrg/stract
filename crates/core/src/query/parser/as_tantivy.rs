@@ -21,7 +21,7 @@ use tantivy::{
 
 use crate::{
     bangs::BANG_PREFIXES,
-    schema::{Field, TextField},
+    schema::{text_field::TextField, Field, TextFieldEnum},
 };
 
 use super::{CompoundAwareTerm, SimpleOrPhrase, SimpleTerm, Term, TermCompound};
@@ -53,9 +53,9 @@ fn simple_into_tantivy(
         .filter(|field| {
             matches!(
                 Field::get(field.field_id() as usize),
-                Some(Field::Text(TextField::AllBody))
-                    | Some(Field::Text(TextField::Title))
-                    | Some(Field::Text(TextField::Url))
+                Some(Field::Text(TextFieldEnum::AllBody(_)))
+                    | Some(Field::Text(TextFieldEnum::Title(_)))
+                    | Some(Field::Text(TextFieldEnum::Url(_)))
             )
         })
         .copied()
@@ -98,7 +98,7 @@ fn phrase_query(
         }
 
         if processed_terms.len() == 1 {
-            let options = field.as_text().unwrap().index_option();
+            let options = field.as_text().unwrap().record_option();
 
             phrases.push((
                 Occur::Should,
@@ -140,7 +140,7 @@ impl Term {
                     .find(|field| {
                         matches!(
                             Field::get(field.field_id() as usize),
-                            Some(Field::Text(TextField::Title))
+                            Some(Field::Text(TextFieldEnum::Title(_)))
                         )
                     })
                     .unwrap();
@@ -156,7 +156,7 @@ impl Term {
                     .find(|field| {
                         matches!(
                             Field::get(field.field_id() as usize),
-                            Some(Field::Text(TextField::AllBody))
+                            Some(Field::Text(TextFieldEnum::AllBody(_)))
                         )
                     })
                     .unwrap();
@@ -172,7 +172,7 @@ impl Term {
                     .find(|field| {
                         matches!(
                             Field::get(field.field_id() as usize),
-                            Some(Field::Text(TextField::Url))
+                            Some(Field::Text(TextFieldEnum::Url(_)))
                         )
                     })
                     .unwrap();
@@ -222,7 +222,7 @@ impl Term {
             .filter(|field| {
                 matches!(
                     Field::get(field.field_id() as usize),
-                    Some(Field::Text(TextField::UrlForSiteOperator))
+                    Some(Field::Text(TextFieldEnum::UrlForSiteOperator(_)))
                 )
             })
             .map(|field| {
@@ -258,7 +258,7 @@ impl Term {
             .unwrap()
             .as_text()
             .unwrap()
-            .index_option();
+            .record_option();
 
         let processed_query = if processed_terms.len() == 1 {
             let term = processed_terms.remove(0);

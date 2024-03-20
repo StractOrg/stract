@@ -16,7 +16,10 @@
 
 use std::str::FromStr;
 
-use crate::{enum_map::EnumSet, Error, Result};
+use crate::{
+    enum_map::{EnumSet, InsertEnumMapKey},
+    Error, Result,
+};
 
 use super::Html;
 
@@ -38,9 +41,9 @@ impl FromStr for RobotsMeta {
     }
 }
 
-impl From<RobotsMeta> for usize {
-    fn from(val: RobotsMeta) -> Self {
-        match val {
+impl InsertEnumMapKey for RobotsMeta {
+    fn into_usize(self) -> usize {
+        match self {
             RobotsMeta::NoIndex => 0,
             RobotsMeta::NoFollow => 1,
         }
