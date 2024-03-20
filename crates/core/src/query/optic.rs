@@ -22,7 +22,7 @@ use tantivy::{
     schema::Schema,
 };
 
-use crate::{fastfield_reader::FastFieldReader, schema::TextField};
+use crate::{fastfield_reader::FastFieldReader, schema::text_field};
 
 use super::{const_query::ConstQuery, pattern_query::PatternQuery, union::UnionQuery};
 
@@ -173,7 +173,7 @@ impl AsTantivyQuery for Matching {
             MatchLocation::Site => ConstQuery::new(
                 PatternQuery::new(
                     self.pattern.clone(),
-                    TextField::UrlForSiteOperator,
+                    text_field::UrlForSiteOperator.into(),
                     schema,
                     fastfield_reader.clone(),
                 )
@@ -184,7 +184,7 @@ impl AsTantivyQuery for Matching {
             MatchLocation::Url => Box::new(ConstQuery::new(
                 Box::new(PatternQuery::new(
                     self.pattern.clone(),
-                    TextField::Url,
+                    text_field::Url.into(),
                     schema,
                     fastfield_reader.clone(),
                 )),
@@ -193,7 +193,7 @@ impl AsTantivyQuery for Matching {
             MatchLocation::Domain => Box::new(ConstQuery::new(
                 Box::new(PatternQuery::new(
                     self.pattern.clone(),
-                    TextField::Domain,
+                    text_field::Domain.into(),
                     schema,
                     fastfield_reader.clone(),
                 )),
@@ -202,7 +202,7 @@ impl AsTantivyQuery for Matching {
             MatchLocation::Title => Box::new(ConstQuery::new(
                 Box::new(PatternQuery::new(
                     self.pattern.clone(),
-                    TextField::Title,
+                    text_field::Title.into(),
                     schema,
                     fastfield_reader.clone(),
                 )),
@@ -212,7 +212,7 @@ impl AsTantivyQuery for Matching {
                 Box::new(ConstQuery::new(
                     Box::new(PatternQuery::new(
                         self.pattern.clone(),
-                        TextField::Description,
+                        text_field::Description.into(),
                         schema,
                         fastfield_reader.clone(),
                     )),
@@ -221,7 +221,7 @@ impl AsTantivyQuery for Matching {
                 Box::new(ConstQuery::new(
                     Box::new(PatternQuery::new(
                         self.pattern.clone(),
-                        TextField::DmozDescription,
+                        text_field::DmozDescription.into(),
                         schema,
                         fastfield_reader.clone(),
                     )),
@@ -232,7 +232,7 @@ impl AsTantivyQuery for Matching {
             MatchLocation::Content => Box::new(ConstQuery::new(
                 Box::new(PatternQuery::new(
                     self.pattern.clone(),
-                    TextField::CleanBody,
+                    text_field::CleanBody.into(),
                     schema,
                     fastfield_reader.clone(),
                 )),
@@ -241,7 +241,7 @@ impl AsTantivyQuery for Matching {
             MatchLocation::MicroformatTag => Box::new(ConstQuery::new(
                 Box::new(PatternQuery::new(
                     self.pattern.clone(),
-                    TextField::MicroformatTags,
+                    text_field::MicroformatTags.into(),
                     schema,
                     fastfield_reader.clone(),
                 )),
@@ -250,7 +250,7 @@ impl AsTantivyQuery for Matching {
             MatchLocation::Schema => Box::new(ConstQuery::new(
                 Box::new(PatternQuery::new(
                     self.pattern.clone(),
-                    TextField::FlattenedSchemaOrgJson,
+                    text_field::FlattenedSchemaOrgJson.into(),
                     schema,
                     fastfield_reader.clone(),
                 )),

@@ -18,7 +18,7 @@ use crate::{
     ceil_char_boundary,
     prehashed::hash,
     rake::RakeModel,
-    schema::{FastField, TextField},
+    schema::{text_field, FastField, TextFieldEnum},
     simhash, split_u128, tokenizer,
     webpage::url_ext::UrlExt,
     Error, Result,
@@ -42,7 +42,7 @@ impl Html {
         }
         let title = title.unwrap();
 
-        Ok(self.pretokenize_string(title, TextField::Title))
+        Ok(self.pretokenize_string(title, text_field::Title.into()))
     }
 
     pub fn pretokenize_all_text(&self) -> Result<PreTokenizedString> {
@@ -53,17 +53,17 @@ impl Html {
         }
         let all_text = all_text.unwrap();
 
-        Ok(self.pretokenize_string(all_text, TextField::AllBody))
+        Ok(self.pretokenize_string(all_text, text_field::AllBody.into()))
     }
 
     pub fn pretokenize_clean_text(&self) -> PreTokenizedString {
         let clean_text = self.clean_text().cloned().unwrap_or_default();
-        self.pretokenize_string(clean_text, TextField::CleanBody)
+        self.pretokenize_string(clean_text, text_field::CleanBody.into())
     }
 
     pub fn pretokenize_url(&self) -> PreTokenizedString {
         let url = self.url().to_string();
-        self.pretokenize_string(url, TextField::Url)
+        self.pretokenize_string(url, text_field::Url.into())
     }
 
     pub fn pretokenize_url_for_site_operator(&self) -> PreTokenizedString {
@@ -76,19 +76,19 @@ impl Html {
     pub fn pretokenize_domain(&self) -> PreTokenizedString {
         let domain = self.url().root_domain().unwrap_or_default().to_string();
 
-        self.pretokenize_string(domain, TextField::Domain)
+        self.pretokenize_string(domain, text_field::Domain.into())
     }
 
     pub fn pretokenize_site(&self) -> PreTokenizedString {
         let site = self.url().normalized_host().unwrap_or_default().to_string();
 
-        self.pretokenize_string(site, TextField::SiteWithout)
+        self.pretokenize_string(site, text_field::SiteWithout.into())
     }
 
     pub fn pretokenize_description(&self) -> PreTokenizedString {
         let text = self.description().unwrap_or_default();
 
-        self.pretokenize_string(text, TextField::Description)
+        self.pretokenize_string(text, text_field::Description.into())
     }
 
     pub fn pretokenize_microformats(&self) -> PreTokenizedString {
@@ -99,10 +99,10 @@ impl Html {
             text.push(' ');
         }
 
-        self.pretokenize_string(text, TextField::MicroformatTags)
+        self.pretokenize_string(text, text_field::MicroformatTags.into())
     }
 
-    fn pretokenize_string(&self, text: String, field: TextField) -> PreTokenizedString {
+    fn pretokenize_string(&self, text: String, field: TextFieldEnum) -> PreTokenizedString {
         self.pretokenize_string_with(text, field.indexing_tokenizer())
     }
 
@@ -199,7 +199,7 @@ impl Html {
                 .unwrap_or_else(|_| panic!("Unknown field: {}", field.name()));
 
             match field {
-                Field::Text(TextField::Title) => doc.add_pre_tokenized_text(
+                Field::Text(TextFieldEnum::Title(_)) => doc.add_pre_tokenized_text(
                     tantivy_field,
                     cache
                         .pretokenize_title()
@@ -207,7 +207,7 @@ impl Html {
                         .map(Clone::clone)
                         .map_err(|e| anyhow::anyhow!("{}", e))?,
                 ),
-                Field::Text(TextField::StemmedTitle) => {
+                Field::Text(TextFieldEnum::StemmedTitle(_)) => {
                     let title = cache
                         .pretokenize_title()
                         .as_ref()
@@ -224,9 +224,9 @@ impl Html {
                         },
                     );
                 }
-                Field::Text(TextField::CleanBody) => doc
+                Field::Text(TextFieldEnum::CleanBody(_)) => doc
                     .add_pre_tokenized_text(tantivy_field, cache.pretokenize_clean_text().clone()),
-                Field::Text(TextField::StemmedCleanBody) => {
+                Field::Text(TextFieldEnum::StemmedCleanBody(_)) => {
                     let clean_text = cache.pretokenize_clean_text();
                     let mut tokens = clean_text.tokens.clone();
                     stem_tokens(&mut tokens, self.lang.unwrap_or(Lang::Eng));
@@ -239,19 +239,19 @@ impl Html {
                         },
                     );
                 }
-                Field::Text(TextField::CleanBodyBigrams) => {
+                Field::Text(TextFieldEnum::CleanBodyBigrams(_)) => {
                     doc.add_text(
                         tantivy_field,
                         self.clean_text().cloned().unwrap_or_default(),
                     );
                 }
-                Field::Text(TextField::CleanBodyTrigrams) => {
+                Field::Text(TextFieldEnum::CleanBodyTrigrams(_)) => {
                     doc.add_text(
                         tantivy_field,
                         self.clean_text().cloned().unwrap_or_default(),
                     );
                 }
-                Field::Text(TextField::TitleBigrams) => {
+                Field::Text(TextFieldEnum::TitleBigrams(_)) => {
                     let title = cache
                         .pretokenize_title()
                         .as_ref()
@@ -259,7 +259,7 @@ impl Html {
                         .map_err(|e| anyhow::anyhow!("{}", e))?;
                     doc.add_text(tantivy_field, title.text.clone());
                 }
-                Field::Text(TextField::TitleTrigrams) => {
+                Field::Text(TextFieldEnum::TitleTrigrams(_)) => {
                     let title = cache
                         .pretokenize_title()
                         .as_ref()
@@ -267,19 +267,19 @@ impl Html {
                         .map_err(|e| anyhow::anyhow!("{}", e))?;
                     doc.add_text(tantivy_field, title.text.clone());
                 }
-                Field::Text(TextField::Description) => {
+                Field::Text(TextFieldEnum::Description(_)) => {
                     let description = cache.pretokenize_description();
                     doc.add_pre_tokenized_text(tantivy_field, description.clone());
                 }
-                Field::Text(TextField::Url) => {
+                Field::Text(TextFieldEnum::Url(_)) => {
                     let url = cache.pretokenize_url();
                     doc.add_pre_tokenized_text(tantivy_field, url.clone())
                 }
-                Field::Text(TextField::UrlForSiteOperator) => doc.add_pre_tokenized_text(
+                Field::Text(TextFieldEnum::UrlForSiteOperator(_)) => doc.add_pre_tokenized_text(
                     tantivy_field,
                     cache.pretokenize_url_for_site_operator().clone(),
                 ),
-                Field::Text(TextField::UrlNoTokenizer) => {
+                Field::Text(TextFieldEnum::UrlNoTokenizer(_)) => {
                     let url = self.url().to_string();
 
                     doc.add_pre_tokenized_text(
@@ -296,13 +296,13 @@ impl Html {
                         },
                     );
                 }
-                Field::Text(TextField::SiteWithout) => {
+                Field::Text(TextFieldEnum::SiteWithout(_)) => {
                     doc.add_pre_tokenized_text(tantivy_field, cache.pretokenize_site().clone())
                 }
-                Field::Text(TextField::Domain) => {
+                Field::Text(TextFieldEnum::Domain(_)) => {
                     doc.add_pre_tokenized_text(tantivy_field, cache.pretokenize_domain().clone())
                 }
-                Field::Text(TextField::SiteNoTokenizer) => {
+                Field::Text(TextFieldEnum::SiteNoTokenizer(_)) => {
                     let site = cache.pretokenize_site();
 
                     doc.add_pre_tokenized_text(
@@ -319,7 +319,7 @@ impl Html {
                         },
                     )
                 }
-                Field::Text(TextField::SiteIfHomepageNoTokenizer) => {
+                Field::Text(TextFieldEnum::SiteIfHomepageNoTokenizer(_)) => {
                     let site = cache.pretokenize_site();
 
                     if self.is_homepage() {
@@ -340,7 +340,7 @@ impl Html {
                         doc.add_text(tantivy_field, "");
                     }
                 }
-                Field::Text(TextField::DomainNoTokenizer) => {
+                Field::Text(TextFieldEnum::DomainNoTokenizer(_)) => {
                     let domain = cache.pretokenize_domain();
 
                     doc.add_pre_tokenized_text(
@@ -357,7 +357,7 @@ impl Html {
                         },
                     )
                 }
-                Field::Text(TextField::TitleIfHomepage) => {
+                Field::Text(TextFieldEnum::TitleIfHomepage(_)) => {
                     let title = cache
                         .pretokenize_title()
                         .as_ref()
@@ -370,7 +370,7 @@ impl Html {
                         doc.add_text(tantivy_field, "");
                     }
                 }
-                Field::Text(TextField::DomainIfHomepage) => {
+                Field::Text(TextFieldEnum::DomainIfHomepage(_)) => {
                     let domain = cache.pretokenize_domain();
                     if self.is_homepage() {
                         doc.add_text(tantivy_field, domain.text.clone());
@@ -378,7 +378,7 @@ impl Html {
                         doc.add_text(tantivy_field, "");
                     }
                 }
-                Field::Text(TextField::DomainNameNoTokenizer) => {
+                Field::Text(TextFieldEnum::DomainNameNoTokenizer(_)) => {
                     let domain_name = cache.domain_name();
 
                     doc.add_pre_tokenized_text(
@@ -395,7 +395,7 @@ impl Html {
                         },
                     );
                 }
-                Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => {
+                Field::Text(TextFieldEnum::DomainNameIfHomepageNoTokenizer(_)) => {
                     let domain_name = cache.domain_name();
 
                     if self.is_homepage() {
@@ -416,7 +416,7 @@ impl Html {
                         doc.add_text(tantivy_field, "");
                     }
                 }
-                Field::Text(TextField::DomainIfHomepageNoTokenizer) => {
+                Field::Text(TextFieldEnum::DomainIfHomepageNoTokenizer(_)) => {
                     let domain = cache.pretokenize_domain();
 
                     if self.url().is_homepage() {
@@ -437,7 +437,7 @@ impl Html {
                         doc.add_text(tantivy_field, "");
                     }
                 }
-                Field::Text(TextField::AllBody) => {
+                Field::Text(TextFieldEnum::AllBody(_)) => {
                     let all_text = cache
                         .pretokenize_all_text()
                         .as_ref()
@@ -446,22 +446,22 @@ impl Html {
 
                     doc.add_pre_tokenized_text(tantivy_field, all_text.clone())
                 }
-                Field::Text(TextField::RecipeFirstIngredientTagId) => {
+                Field::Text(TextFieldEnum::RecipeFirstIngredientTagId(_)) => {
                     doc.add_text(
                         tantivy_field,
                         cache.first_ingredient_tag_id().cloned().unwrap_or_default(),
                     );
                 }
-                Field::Text(TextField::SchemaOrgJson) => {
+                Field::Text(TextFieldEnum::SchemaOrgJson(_)) => {
                     doc.add_text(tantivy_field, cache.schema_json());
                 }
-                Field::Text(TextField::FlattenedSchemaOrgJson) => {
+                Field::Text(TextFieldEnum::FlattenedSchemaOrgJson(_)) => {
                     doc.add_pre_tokenized_text(
                         tantivy_field,
                         cache.pretokenized_schema_json().clone(),
                     );
                 }
-                Field::Text(TextField::MicroformatTags) => {
+                Field::Text(TextFieldEnum::MicroformatTags(_)) => {
                     doc.add_pre_tokenized_text(
                         tantivy_field,
                         cache.pretokenize_microformats().clone(),
@@ -597,9 +597,9 @@ impl Html {
                         (self.link_density() * FLOAT_SCALING as f64) as u64,
                     );
                 }
-                Field::Text(TextField::BacklinkText)
-                | Field::Text(TextField::SafetyClassification)
-                | Field::Text(TextField::InsertionTimestamp)
+                Field::Text(TextFieldEnum::BacklinkText(_))
+                | Field::Text(TextFieldEnum::SafetyClassification(_))
+                | Field::Text(TextFieldEnum::InsertionTimestamp(_))
                 | Field::Fast(FastField::HostCentrality)
                 | Field::Fast(FastField::HostCentralityRank)
                 | Field::Fast(FastField::PageCentrality)
@@ -610,8 +610,8 @@ impl Html {
                 | Field::Fast(FastField::HostNodeID)
                 | Field::Fast(FastField::TitleEmbeddings)
                 | Field::Fast(FastField::KeywordEmbeddings)
-                | Field::Text(TextField::Keywords)
-                | Field::Text(TextField::DmozDescription) => {}
+                | Field::Text(TextFieldEnum::Keywords(_))
+                | Field::Text(TextFieldEnum::DmozDescription(_)) => {}
             }
         }
 

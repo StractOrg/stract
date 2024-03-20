@@ -24,7 +24,7 @@ use tantivy::{
 
 use crate::{
     fastfield_reader::FastFieldReader,
-    schema::{FastField, Field, TextField},
+    schema::{text_field, FastField, Field, TextFieldEnum},
 };
 
 use super::scorer::{
@@ -52,10 +52,12 @@ impl FastSiteDomainPatternWeight {
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
 
         let field_no_tokenizer = match Field::get(self.field.field_id() as usize) {
-            Some(Field::Text(TextField::UrlForSiteOperator)) => {
-                Field::Text(TextField::SiteNoTokenizer)
+            Some(Field::Text(TextFieldEnum::UrlForSiteOperator(_))) => {
+                Field::Text(text_field::SiteNoTokenizer.into())
             }
-            Some(Field::Text(TextField::Domain)) => Field::Text(TextField::DomainNoTokenizer),
+            Some(Field::Text(TextFieldEnum::Domain(_))) => {
+                Field::Text(text_field::DomainNoTokenizer.into())
+            }
             _ => unreachable!(),
         };
 
@@ -134,18 +136,18 @@ impl PatternWeight {
         }
 
         let num_tokens_fastfield = match Field::get(self.field.field_id() as usize) {
-            Some(Field::Text(TextField::Title)) => Ok(FastField::NumTitleTokens),
-            Some(Field::Text(TextField::CleanBody)) => Ok(FastField::NumCleanBodyTokens),
-            Some(Field::Text(TextField::Url)) => Ok(FastField::NumUrlTokens),
-            Some(Field::Text(TextField::Domain)) => Ok(FastField::NumDomainTokens),
-            Some(Field::Text(TextField::UrlForSiteOperator)) => {
+            Some(Field::Text(TextFieldEnum::Title(_))) => Ok(FastField::NumTitleTokens),
+            Some(Field::Text(TextFieldEnum::CleanBody(_))) => Ok(FastField::NumCleanBodyTokens),
+            Some(Field::Text(TextFieldEnum::Url(_))) => Ok(FastField::NumUrlTokens),
+            Some(Field::Text(TextFieldEnum::Domain(_))) => Ok(FastField::NumDomainTokens),
+            Some(Field::Text(TextFieldEnum::UrlForSiteOperator(_))) => {
                 Ok(FastField::NumUrlForSiteOperatorTokens)
             }
-            Some(Field::Text(TextField::Description)) => Ok(FastField::NumDescriptionTokens),
-            Some(Field::Text(TextField::MicroformatTags)) => {
+            Some(Field::Text(TextFieldEnum::Description(_))) => Ok(FastField::NumDescriptionTokens),
+            Some(Field::Text(TextFieldEnum::MicroformatTags(_))) => {
                 Ok(FastField::NumMicroformatTagsTokens)
             }
-            Some(Field::Text(TextField::FlattenedSchemaOrgJson)) => {
+            Some(Field::Text(TextFieldEnum::FlattenedSchemaOrgJson(_))) => {
                 Ok(FastField::NumFlattenedSchemaTokens)
             }
             Some(field) => Err(TantivyError::InvalidArgument(format!(

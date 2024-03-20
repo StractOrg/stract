@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod fast_field;
-mod text_field;
+pub mod text_field;
 
 use strum::VariantArray;
 use tantivy::{
@@ -24,23 +24,23 @@ use tantivy::{
 };
 
 pub use fast_field::FastField;
-pub use text_field::TextField;
+pub use text_field::TextFieldEnum;
 
 pub const FLOAT_SCALING: u64 = 1_000_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Field {
     Fast(FastField),
-    Text(TextField),
+    Text(TextFieldEnum),
 }
 
 impl Field {
     #[inline]
     pub fn get(field_id: usize) -> Option<Field> {
-        if field_id < TextField::VARIANTS.len() {
-            Some(Field::Text(TextField::VARIANTS[field_id]))
+        if field_id < TextFieldEnum::num_variants() {
+            Some(Field::Text(TextFieldEnum::get(field_id).unwrap()))
         } else {
-            let fast_id = field_id - TextField::VARIANTS.len();
+            let fast_id = field_id - TextFieldEnum::num_variants();
             if fast_id < FastField::VARIANTS.len() {
                 Some(Field::Fast(FastField::VARIANTS[fast_id]))
             } else {
@@ -51,11 +51,11 @@ impl Field {
 
     #[inline]
     pub fn all() -> impl Iterator<Item = Field> {
-        TextField::VARIANTS
-            .iter()
-            .map(|&text| Field::Text(text))
+        TextFieldEnum::all()
+            .map(|text| Field::Text(text))
             .chain(FastField::VARIANTS.iter().map(|&fast| Field::Fast(fast)))
     }
+
     fn default_text_options(&self) -> tantivy::schema::TextOptions {
         let tokenizer = self.as_text().unwrap().indexing_tokenizer();
         let option = self.as_text().unwrap().index_option();
@@ -76,94 +76,100 @@ impl Field {
 
     pub fn options(&self) -> IndexingOption {
         match self {
-            Field::Text(TextField::Title) => {
+            Field::Text(TextFieldEnum::Title(_)) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
-            Field::Text(TextField::CleanBody) => IndexingOption::Text(self.default_text_options()),
-            Field::Text(TextField::Url) => {
+            Field::Text(TextFieldEnum::CleanBody(_)) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextFieldEnum::Url(_)) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
-            Field::Text(TextField::UrlNoTokenizer) => {
+            Field::Text(TextFieldEnum::UrlNoTokenizer(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::UrlForSiteOperator) => {
+            Field::Text(TextFieldEnum::UrlForSiteOperator(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::SiteWithout) => {
+            Field::Text(TextFieldEnum::SiteWithout(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::SiteIfHomepageNoTokenizer) => {
+            Field::Text(TextFieldEnum::SiteIfHomepageNoTokenizer(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::Domain) => IndexingOption::Text(self.default_text_options()),
-            Field::Text(TextField::SiteNoTokenizer) => {
+            Field::Text(TextFieldEnum::Domain(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::DomainNoTokenizer) => {
+            Field::Text(TextFieldEnum::SiteNoTokenizer(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::DomainNameNoTokenizer) => {
+            Field::Text(TextFieldEnum::DomainNoTokenizer(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::AllBody) => IndexingOption::Text(self.default_text_options()),
-            Field::Text(TextField::DomainIfHomepage) => {
+            Field::Text(TextFieldEnum::DomainNameNoTokenizer(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::TitleIfHomepage) => {
+            Field::Text(TextFieldEnum::AllBody(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::DomainNameIfHomepageNoTokenizer) => {
+            Field::Text(TextFieldEnum::DomainIfHomepage(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::DomainIfHomepageNoTokenizer) => {
+            Field::Text(TextFieldEnum::TitleIfHomepage(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::BacklinkText) => {
+            Field::Text(TextFieldEnum::DomainNameIfHomepageNoTokenizer(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::StemmedTitle) => {
+            Field::Text(TextFieldEnum::DomainIfHomepageNoTokenizer(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::StemmedCleanBody) => {
+            Field::Text(TextFieldEnum::BacklinkText(_)) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextFieldEnum::StemmedTitle(_)) => {
+                IndexingOption::Text(self.default_text_options())
+            }
+            Field::Text(TextFieldEnum::StemmedCleanBody(_)) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
-            Field::Text(TextField::Description) => {
+            Field::Text(TextFieldEnum::Description(_)) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
-            Field::Text(TextField::DmozDescription) => {
+            Field::Text(TextFieldEnum::DmozDescription(_)) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
-            Field::Text(TextField::SchemaOrgJson) => {
+            Field::Text(TextFieldEnum::SchemaOrgJson(_)) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
-            Field::Text(TextField::FlattenedSchemaOrgJson) => {
+            Field::Text(TextFieldEnum::FlattenedSchemaOrgJson(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::CleanBodyBigrams) => {
+            Field::Text(TextFieldEnum::CleanBodyBigrams(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::TitleBigrams) => {
+            Field::Text(TextFieldEnum::TitleBigrams(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::CleanBodyTrigrams) => {
+            Field::Text(TextFieldEnum::CleanBodyTrigrams(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::TitleTrigrams) => {
+            Field::Text(TextFieldEnum::TitleTrigrams(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::MicroformatTags) => {
+            Field::Text(TextFieldEnum::MicroformatTags(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::SafetyClassification) => {
+            Field::Text(TextFieldEnum::SafetyClassification(_)) => {
                 IndexingOption::Text(self.default_text_options())
             }
-            Field::Text(TextField::RecipeFirstIngredientTagId) => {
+            Field::Text(TextFieldEnum::RecipeFirstIngredientTagId(_)) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
-            Field::Text(TextField::InsertionTimestamp) => {
+            Field::Text(TextFieldEnum::InsertionTimestamp(_)) => {
                 IndexingOption::DateTime(tantivy::schema::DateOptions::default().set_indexed())
             }
-            Field::Text(TextField::Keywords) => {
+            Field::Text(TextFieldEnum::Keywords(_)) => {
                 IndexingOption::Text(self.default_text_options().set_stored())
             }
             Field::Fast(FastField::IsHomepage) => {
@@ -328,23 +334,23 @@ impl Field {
     pub fn is_searchable(&self) -> bool {
         !matches!(
             self,
-            Field::Text(TextField::BacklinkText)
-                | Field::Text(TextField::SchemaOrgJson)
-                | Field::Text(TextField::MicroformatTags)
-                | Field::Text(TextField::SafetyClassification)
-                | Field::Text(TextField::FlattenedSchemaOrgJson)
-                | Field::Text(TextField::UrlForSiteOperator)
-                | Field::Text(TextField::Description)
-                | Field::Text(TextField::DmozDescription)
-                | Field::Text(TextField::SiteIfHomepageNoTokenizer)
-                | Field::Text(TextField::DomainIfHomepage)
-                | Field::Text(TextField::DomainNameIfHomepageNoTokenizer)
-                | Field::Text(TextField::DomainIfHomepageNoTokenizer)
-                | Field::Text(TextField::TitleIfHomepage)
-                | Field::Text(TextField::SiteWithout) // will match url
-                | Field::Text(TextField::Domain) // will match url
-                | Field::Text(TextField::InsertionTimestamp)
-                | Field::Text(TextField::RecipeFirstIngredientTagId)
+            Field::Text(TextFieldEnum::BacklinkText(_))
+                | Field::Text(TextFieldEnum::SchemaOrgJson(_))
+                | Field::Text(TextFieldEnum::MicroformatTags(_))
+                | Field::Text(TextFieldEnum::SafetyClassification(_))
+                | Field::Text(TextFieldEnum::FlattenedSchemaOrgJson(_))
+                | Field::Text(TextFieldEnum::UrlForSiteOperator(_))
+                | Field::Text(TextFieldEnum::Description(_))
+                | Field::Text(TextFieldEnum::DmozDescription(_))
+                | Field::Text(TextFieldEnum::SiteIfHomepageNoTokenizer(_))
+                | Field::Text(TextFieldEnum::DomainIfHomepage(_))
+                | Field::Text(TextFieldEnum::DomainNameIfHomepageNoTokenizer(_))
+                | Field::Text(TextFieldEnum::DomainIfHomepageNoTokenizer(_))
+                | Field::Text(TextFieldEnum::TitleIfHomepage(_))
+                | Field::Text(TextFieldEnum::SiteWithout(_)) // will match url
+                | Field::Text(TextFieldEnum::Domain(_)) // will match url
+                | Field::Text(TextFieldEnum::InsertionTimestamp(_))
+                | Field::Text(TextFieldEnum::RecipeFirstIngredientTagId(_))
         ) && !self.is_fast()
     }
 
@@ -352,7 +358,7 @@ impl Field {
         matches!(self, Field::Fast(_))
     }
 
-    pub fn as_text(&self) -> Option<TextField> {
+    pub fn as_text(&self) -> Option<TextFieldEnum> {
         match self {
             Field::Fast(_) => None,
             Field::Text(field) => Some(*field),

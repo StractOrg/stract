@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    schema::{FastField, TextField},
+    schema::{text_field, FastField, TextFieldEnum},
     webgraph::NodeID,
     Result,
 };
@@ -158,21 +158,21 @@ impl Webpage {
 
         doc.add_text(
             schema
-                .get_field(Field::Text(TextField::BacklinkText).name())
+                .get_field(Field::Text(TextFieldEnum::from(text_field::BacklinkText)).name())
                 .expect("Failed to get backlink-text field"),
             backlink_text,
         );
 
         doc.add_text(
             schema
-                .get_field(Field::Text(TextField::Keywords).name())
+                .get_field(Field::Text(TextFieldEnum::from(text_field::Keywords)).name())
                 .expect("Failed to get keywords field"),
             self.keywords.join("\n"),
         );
 
         doc.add_date(
             schema
-                .get_field(Field::Text(TextField::InsertionTimestamp).name())
+                .get_field(Field::Text(TextFieldEnum::from(text_field::InsertionTimestamp)).name())
                 .expect("Failed to get insertion-timestamp field"),
             tantivy::DateTime::from_utc(OffsetDateTime::from_unix_timestamp(
                 self.inserted_at.timestamp(),
@@ -186,7 +186,9 @@ impl Webpage {
 
         doc.add_text(
             schema
-                .get_field(Field::Text(TextField::SafetyClassification).name())
+                .get_field(
+                    Field::Text(TextFieldEnum::from(text_field::SafetyClassification)).name(),
+                )
                 .expect("Failed to get safety_classification field"),
             safety,
         );
@@ -292,7 +294,7 @@ impl Webpage {
 
         doc.add_text(
             schema
-                .get_field(Field::Text(TextField::DmozDescription).name())
+                .get_field(Field::Text(TextFieldEnum::from(text_field::DmozDescription)).name())
                 .expect("failed to get dmoz_description field"),
             dmoz_description.unwrap_or_default(),
         );

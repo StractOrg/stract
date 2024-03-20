@@ -18,7 +18,7 @@ use crate::{
     inverted_index::InvertedIndex,
     query::parser::TermCompound,
     ranking::SignalCoefficient,
-    schema::{Field, TextField},
+    schema::{text_field, Field},
     search_ctx::Ctx,
     searcher::SearchQuery,
     webpage::{region::Region, safety_classifier},
@@ -116,7 +116,7 @@ impl Query {
             .collect();
 
         if query.safe_search {
-            let field = Field::Text(TextField::SafetyClassification);
+            let field = Field::Text(text_field::SafetyClassification.into());
             let field = schema.get_field(field.name()).unwrap();
 
             queries.push((

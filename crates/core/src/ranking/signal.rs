@@ -17,11 +17,12 @@
 use crate::enum_map::InsertEnumMapKey;
 use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
+use crate::schema::text_field;
 use crate::Result;
 use crate::{
     enum_map::EnumMap,
     fastfield_reader,
-    schema::{FastField, TextField},
+    schema::{FastField, TextFieldEnum},
     webgraph::NodeID,
     webpage::Webpage,
 };
@@ -591,32 +592,32 @@ impl Signal {
         }
     }
 
-    fn as_textfield(&self) -> Option<TextField> {
+    fn as_textfield(&self) -> Option<TextFieldEnum> {
         match self {
-            Signal::Bm25Title => Some(TextField::Title),
-            Signal::Bm25TitleBigrams => Some(TextField::TitleBigrams),
-            Signal::Bm25TitleTrigrams => Some(TextField::TitleTrigrams),
-            Signal::Bm25CleanBody => Some(TextField::CleanBody),
-            Signal::Bm25CleanBodyBigrams => Some(TextField::CleanBodyBigrams),
-            Signal::Bm25CleanBodyTrigrams => Some(TextField::CleanBodyTrigrams),
-            Signal::Bm25StemmedTitle => Some(TextField::StemmedTitle),
-            Signal::Bm25StemmedCleanBody => Some(TextField::StemmedCleanBody),
-            Signal::Bm25AllBody => Some(TextField::AllBody),
-            Signal::Bm25BacklinkText => Some(TextField::BacklinkText),
-            Signal::Bm25Keywords => Some(TextField::Keywords),
-            Signal::IdfSumUrl => Some(TextField::Url),
-            Signal::IdfSumSite => Some(TextField::SiteWithout),
-            Signal::IdfSumDomain => Some(TextField::Domain),
-            Signal::IdfSumSiteNoTokenizer => Some(TextField::SiteNoTokenizer),
-            Signal::IdfSumDomainNoTokenizer => Some(TextField::DomainNoTokenizer),
-            Signal::IdfSumDomainNameNoTokenizer => Some(TextField::DomainNameNoTokenizer),
-            Signal::IdfSumDomainIfHomepage => Some(TextField::DomainIfHomepage),
+            Signal::Bm25Title => Some(text_field::Title.into()),
+            Signal::Bm25TitleBigrams => Some(text_field::TitleBigrams.into()),
+            Signal::Bm25TitleTrigrams => Some(text_field::TitleTrigrams.into()),
+            Signal::Bm25CleanBody => Some(text_field::CleanBody.into()),
+            Signal::Bm25CleanBodyBigrams => Some(text_field::CleanBodyBigrams.into()),
+            Signal::Bm25CleanBodyTrigrams => Some(text_field::CleanBodyTrigrams.into()),
+            Signal::Bm25StemmedTitle => Some(text_field::StemmedTitle.into()),
+            Signal::Bm25StemmedCleanBody => Some(text_field::StemmedCleanBody.into()),
+            Signal::Bm25AllBody => Some(text_field::AllBody.into()),
+            Signal::Bm25BacklinkText => Some(text_field::BacklinkText.into()),
+            Signal::Bm25Keywords => Some(text_field::Keywords.into()),
+            Signal::IdfSumUrl => Some(text_field::Url.into()),
+            Signal::IdfSumSite => Some(text_field::SiteWithout.into()),
+            Signal::IdfSumDomain => Some(text_field::Domain.into()),
+            Signal::IdfSumSiteNoTokenizer => Some(text_field::SiteNoTokenizer.into()),
+            Signal::IdfSumDomainNoTokenizer => Some(text_field::DomainNoTokenizer.into()),
+            Signal::IdfSumDomainNameNoTokenizer => Some(text_field::DomainNameNoTokenizer.into()),
+            Signal::IdfSumDomainIfHomepage => Some(text_field::DomainIfHomepage.into()),
             Signal::IdfSumDomainNameIfHomepageNoTokenizer => {
-                Some(TextField::DomainNameIfHomepageNoTokenizer)
+                Some(text_field::DomainNameIfHomepageNoTokenizer.into())
             }
-            Signal::IdfSumTitleIfHomepage => Some(TextField::TitleIfHomepage),
+            Signal::IdfSumTitleIfHomepage => Some(text_field::TitleIfHomepage.into()),
             Signal::IdfSumDomainIfHomepageNoTokenizer => {
-                Some(TextField::DomainIfHomepageNoTokenizer)
+                Some(text_field::DomainIfHomepageNoTokenizer.into())
             }
             _ => None,
         }
@@ -701,7 +702,7 @@ struct OpticBoosts {
 }
 
 struct SegmentReader {
-    text_fields: EnumMap<TextField, TextFieldData>,
+    text_fields: EnumMap<TextFieldEnum, TextFieldData>,
     optic_boosts: OpticBoosts,
     fastfield_reader: Arc<fastfield_reader::SegmentReader>,
 }
@@ -821,7 +822,7 @@ impl SignalAggregator {
         &self,
         tv_searcher: &tantivy::Searcher,
         segment_reader: &tantivy::SegmentReader,
-    ) -> Result<EnumMap<TextField, TextFieldData>> {
+    ) -> Result<EnumMap<TextFieldEnum, TextFieldData>> {
         let mut text_fields = EnumMap::new();
         let schema = tv_searcher.schema();
 
@@ -1042,7 +1043,7 @@ pub struct SignalScore {
 
 #[derive(Clone)]
 pub struct SignalOrder {
-    text_signals: EnumMap<TextField, NGramSignalOrder>,
+    text_signals: EnumMap<TextFieldEnum, NGramSignalOrder>,
     other_signals: Vec<Signal>,
 }
 
