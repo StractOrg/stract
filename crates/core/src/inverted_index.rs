@@ -44,7 +44,7 @@ use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::initial::Score;
 use crate::ranking::pipeline::RecallRankingWebpage;
-use crate::ranking::SignalAggregator;
+use crate::ranking::SignalComputer;
 use crate::schema::text_field::TextField;
 use crate::schema::{fast_field, text_field, FastFieldEnum, Field, TextFieldEnum};
 use crate::search_ctx::Ctx;
@@ -374,7 +374,7 @@ impl InvertedIndex {
         &self,
         ctx: &Ctx,
         pointers: Vec<WebpagePointer>,
-        mut aggregator: SignalAggregator,
+        mut computer: SignalComputer,
         fastfield_reader: &FastFieldReader,
     ) -> Result<Vec<RecallRankingWebpage>> {
         let mut top_websites = Vec::new();
@@ -397,7 +397,7 @@ impl InvertedIndex {
 
             let segment_reader = ctx.tv_searcher.segment_reader(pointer.address.segment);
             if update_segment {
-                aggregator.register_segment(&ctx.tv_searcher, segment_reader, fastfield_reader)?;
+                computer.register_segment(&ctx.tv_searcher, segment_reader, fastfield_reader)?;
             }
 
             prev_segment = Some(pointer.address.segment);
@@ -407,7 +407,7 @@ impl InvertedIndex {
                 RecallRankingWebpage::new(
                     pointer,
                     fastfield_reader.borrow_segment(&segment_reader.segment_id()),
-                    &mut aggregator,
+                    &mut computer,
                 ),
             ));
         }
@@ -836,7 +836,7 @@ mod tests {
         .expect("Failed to parse query");
 
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -868,7 +868,7 @@ mod tests {
         let ctx = index.local_search_ctx();
 
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -917,7 +917,7 @@ mod tests {
         .expect("Failed to parse query");
 
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -964,7 +964,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1012,7 +1012,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1084,7 +1084,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1142,7 +1142,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1189,7 +1189,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1265,7 +1265,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1292,7 +1292,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1325,7 +1325,7 @@ mod tests {
 
         let ctx = index.local_search_ctx();
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1372,7 +1372,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1423,7 +1423,7 @@ mod tests {
         )
         .expect("Failed to parse query");
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1600,7 +1600,7 @@ mod tests {
         .expect("Failed to parse query");
 
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1620,7 +1620,7 @@ mod tests {
         let ctx = index.local_search_ctx();
 
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1694,7 +1694,7 @@ mod tests {
         .expect("Failed to parse query");
 
         let ranker = Ranker::new(
-            SignalAggregator::new(Some(&query)),
+            SignalComputer::new(Some(&query)),
             ctx.fastfield_reader.clone(),
             CollectorConfig::default(),
         );
@@ -1709,7 +1709,7 @@ mod tests {
             .retrieve_ranking_websites(
                 &ctx,
                 res.top_websites,
-                ranker.aggregator(),
+                ranker.computer(),
                 &fastfield_reader,
             )
             .unwrap();

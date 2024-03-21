@@ -28,7 +28,7 @@ use crate::{
     ranking::{
         models::lambdamart::LambdaMART,
         pipeline::{RankableWebpage, RankingPipeline, RankingStage, Recall, Scorer},
-        SignalAggregator, SignalEnum, SignalScore,
+        SignalComputer, SignalEnum, SignalScore,
     },
     schema::fast_field,
     searcher::SearchQuery,
@@ -57,7 +57,7 @@ impl RecallRankingWebpage {
     pub fn new(
         pointer: WebpagePointer,
         fastfield_reader: &fastfield_reader::SegmentReader,
-        aggregator: &mut SignalAggregator,
+        computer: &mut SignalComputer,
     ) -> Self {
         let fastfields = fastfield_reader.get_field_reader(pointer.address.doc_id);
 
@@ -78,12 +78,12 @@ impl RecallRankingWebpage {
             keyword_embedding: keyword_embedding.map(StoredEmbeddings),
         };
 
-        for computed_signal in aggregator.compute_signals(pointer.address.doc_id).flatten() {
+        for computed_signal in computer.compute_signals(pointer.address.doc_id).flatten() {
             res.signals
                 .insert(computed_signal.signal, computed_signal.score);
         }
 
-        if let Some(boost) = aggregator.boosts(pointer.address.doc_id) {
+        if let Some(boost) = computer.boosts(pointer.address.doc_id) {
             res.optic_boost = Some(boost);
         }
 

@@ -31,7 +31,7 @@ use crate::index::Index;
 use crate::kv::rocksdb_store::RocksDbStore;
 use crate::kv::Kv;
 use crate::rake::RakeModel;
-use crate::ranking::SignalAggregator;
+use crate::ranking::SignalComputer;
 use crate::webgraph::{Node, NodeID, Webgraph, WebgraphBuilder};
 use crate::webpage::{safety_classifier, Html, Webpage};
 
@@ -374,7 +374,7 @@ impl IndexingWorker {
 
     pub fn prepare_webpages(&self, batch: &[IndexableWebpage]) -> Vec<Webpage> {
         let mut res = Vec::with_capacity(batch.len());
-        let mut signal_aggregator = SignalAggregator::new(None);
+        let mut signal_computer = SignalComputer::new(None);
 
         for page in batch {
             let mut prepared = match self.prepare(page) {
@@ -415,8 +415,8 @@ impl IndexingWorker {
                 keyword_embedding: None, // set later
             };
 
-            signal_aggregator.set_current_timestamp(Utc::now().timestamp().max(0) as usize);
-            webpage.pre_computed_score = signal_aggregator.precompute_score(&webpage);
+            signal_computer.set_current_timestamp(Utc::now().timestamp().max(0) as usize);
+            webpage.pre_computed_score = signal_computer.precompute_score(&webpage);
 
             res.push(webpage);
         }

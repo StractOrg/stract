@@ -40,7 +40,7 @@ pub use self::signal::*;
 pub struct Ranker {
     max_docs: Option<MaxDocsConsidered>,
     offset: Option<usize>,
-    aggregator: SignalAggregator,
+    computer: SignalComputer,
     fastfield_reader: FastFieldReader,
     de_rank_similar: bool,
     num_results: Option<usize>,
@@ -49,13 +49,13 @@ pub struct Ranker {
 
 impl Ranker {
     pub fn new(
-        aggregator: SignalAggregator,
+        computer: SignalComputer,
         fastfield_reader: FastFieldReader,
         collector_config: CollectorConfig,
     ) -> Self {
         Ranker {
             offset: None,
-            aggregator,
+            computer,
             max_docs: None,
             de_rank_similar: true,
             fastfield_reader,
@@ -86,15 +86,15 @@ impl Ranker {
         self.de_rank_similar = de_rank_similar;
     }
 
-    pub fn aggregator(&self) -> SignalAggregator {
-        self.aggregator.clone()
+    pub fn computer(&self) -> SignalComputer {
+        self.computer.clone()
     }
 
     pub fn collector(&self, ctx: Ctx) -> MainCollector {
-        let aggregator = self.aggregator();
+        let computer = self.computer();
 
         let score_tweaker =
-            InitialScoreTweaker::new(ctx.tv_searcher, aggregator, self.fastfield_reader.clone());
+            InitialScoreTweaker::new(ctx.tv_searcher, computer, self.fastfield_reader.clone());
 
         let mut collector = TopDocs::with_limit(
             self.num_results.unwrap_or(NUM_RESULTS_PER_PAGE),
@@ -119,7 +119,7 @@ impl Ranker {
     }
 
     pub fn set_query_centrality(&mut self, query_centrality: query_centrality::Scorer) {
-        self.aggregator.set_query_centrality(query_centrality);
+        self.computer.set_query_centrality(query_centrality);
     }
 }
 

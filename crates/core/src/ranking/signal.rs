@@ -65,9 +65,9 @@ pub trait Signal:
 {
     fn default_coefficient(&self) -> f64;
     fn as_field(&self) -> Option<Field>;
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64>;
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64>;
 
-    fn precompute(self, _webpage: &Webpage, _signal_aggregator: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, _webpage: &Webpage, _signal_computer: &SignalComputer) -> Option<f64> {
         None
     }
 
@@ -184,8 +184,8 @@ impl Signal for Bm25Title {
         Some(Field::Text(schema::text_field::Title.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -209,8 +209,8 @@ impl Signal for Bm25TitleBigrams {
         Some(Field::Text(schema::text_field::TitleBigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -234,8 +234,8 @@ impl Signal for Bm25TitleTrigrams {
         Some(Field::Text(schema::text_field::TitleTrigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -259,8 +259,8 @@ impl Signal for Bm25CleanBody {
         Some(Field::Text(schema::text_field::CleanBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -284,8 +284,8 @@ impl Signal for Bm25CleanBodyBigrams {
         Some(Field::Text(schema::text_field::CleanBodyBigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -309,8 +309,8 @@ impl Signal for Bm25CleanBodyTrigrams {
         Some(Field::Text(schema::text_field::CleanBodyTrigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -334,8 +334,8 @@ impl Signal for Bm25StemmedTitle {
         Some(Field::Text(schema::text_field::StemmedTitle.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -359,8 +359,8 @@ impl Signal for Bm25StemmedCleanBody {
         Some(Field::Text(schema::text_field::StemmedCleanBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -384,8 +384,8 @@ impl Signal for Bm25AllBody {
         Some(Field::Text(schema::text_field::AllBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -409,8 +409,8 @@ impl Signal for Bm25Keywords {
         Some(Field::Text(schema::text_field::Keywords.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -434,8 +434,8 @@ impl Signal for Bm25BacklinkText {
         Some(Field::Text(schema::text_field::BacklinkText.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -459,8 +459,8 @@ impl Signal for IdfSumUrl {
         Some(Field::Text(schema::text_field::Url.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -484,8 +484,8 @@ impl Signal for IdfSumSite {
         Some(Field::Text(schema::text_field::SiteWithout.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -509,8 +509,8 @@ impl Signal for IdfSumDomain {
         Some(Field::Text(schema::text_field::Domain.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -534,8 +534,8 @@ impl Signal for IdfSumSiteNoTokenizer {
         Some(Field::Text(schema::text_field::SiteNoTokenizer.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -559,8 +559,8 @@ impl Signal for IdfSumDomainNoTokenizer {
         Some(Field::Text(schema::text_field::DomainNoTokenizer.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -586,8 +586,8 @@ impl Signal for IdfSumDomainNameNoTokenizer {
         ))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -611,8 +611,8 @@ impl Signal for IdfSumDomainIfHomepage {
         Some(Field::Text(schema::text_field::DomainIfHomepage.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -638,8 +638,8 @@ impl Signal for IdfSumDomainNameIfHomepageNoTokenizer {
         ))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -665,8 +665,8 @@ impl Signal for IdfSumDomainIfHomepageNoTokenizer {
         ))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -690,8 +690,8 @@ impl Signal for IdfSumTitleIfHomepage {
         Some(Field::Text(schema::text_field::TitleIfHomepage.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let mut seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -715,7 +715,7 @@ impl Signal for CrossEncoderSnippet {
         None
     }
 
-    fn compute(&self, _: DocId, _: &SignalAggregator) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
         None // computed in later ranking stage
     }
 }
@@ -731,7 +731,7 @@ impl Signal for CrossEncoderTitle {
         None
     }
 
-    fn compute(&self, _: DocId, _: &SignalAggregator) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
         None // computed in later ranking stage
     }
 }
@@ -747,12 +747,12 @@ impl Signal for HostCentrality {
         Some(Field::Fast(schema::fast_field::HostCentrality.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
         Some(webpage.host_centrality)
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -778,12 +778,12 @@ impl Signal for HostCentralityRank {
         Some(Field::Fast(schema::fast_field::HostCentralityRank.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
         Some(score_rank(webpage.host_centrality_rank as f64))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -809,12 +809,12 @@ impl Signal for PageCentrality {
         Some(Field::Fast(schema::fast_field::PageCentrality.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
         Some(webpage.page_centrality)
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -840,12 +840,12 @@ impl Signal for PageCentralityRank {
         Some(Field::Fast(schema::fast_field::PageCentralityRank.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
         Some(score_rank(webpage.page_centrality_rank as f64))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -871,12 +871,12 @@ impl Signal for IsHomepage {
         Some(Field::Fast(schema::fast_field::IsHomepage.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
         Some(webpage.html.is_homepage().into())
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -902,17 +902,17 @@ impl Signal for FetchTimeMs {
         Some(Field::Fast(schema::fast_field::FetchTimeMs.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, signal_aggregator: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
         let fetch_time_ms = webpage.fetch_time_ms as usize;
-        if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
+        if fetch_time_ms >= signal_computer.fetch_time_ms_cache.len() {
             Some(0.0)
         } else {
-            Some(signal_aggregator.fetch_time_ms_cache[fetch_time_ms])
+            Some(signal_computer.fetch_time_ms_cache[fetch_time_ms])
         }
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -924,10 +924,10 @@ impl Signal for FetchTimeMs {
             .and_then(|v| v.as_u64())
             .unwrap() as usize;
 
-        if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
+        if fetch_time_ms >= signal_computer.fetch_time_ms_cache.len() {
             Some(0.0)
         } else {
-            Some(signal_aggregator.fetch_time_ms_cache[fetch_time_ms])
+            Some(signal_computer.fetch_time_ms_cache[fetch_time_ms])
         }
     }
 }
@@ -943,18 +943,18 @@ impl Signal for UpdateTimestamp {
         Some(Field::Fast(schema::fast_field::LastUpdated.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, signal_aggregator: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
         let update_timestamp = webpage
             .html
             .updated_time()
             .map(|date| date.timestamp().max(0))
             .unwrap_or(0) as usize;
 
-        Some(score_timestamp(update_timestamp, signal_aggregator))
+        Some(score_timestamp(update_timestamp, signal_computer))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -966,7 +966,7 @@ impl Signal for UpdateTimestamp {
             .and_then(|v| v.as_u64())
             .unwrap() as usize;
 
-        Some(score_timestamp(val, signal_aggregator))
+        Some(score_timestamp(val, signal_computer))
     }
 }
 
@@ -981,13 +981,13 @@ impl Signal for TrackerScore {
         Some(Field::Fast(schema::fast_field::TrackerScore.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
         let num_trackers = webpage.html.trackers().len() as f64;
         Some(score_trackers(num_trackers))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -1013,14 +1013,14 @@ impl Signal for Region {
         Some(Field::Fast(schema::fast_field::Region.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, signal_aggregator: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
         let region =
             crate::webpage::Region::guess_from(webpage).unwrap_or(crate::webpage::Region::All);
-        Some(score_region(region, signal_aggregator))
+        Some(score_region(region, signal_computer))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -1032,7 +1032,7 @@ impl Signal for Region {
             .and_then(|v| v.as_u64())
             .unwrap();
         let region = crate::webpage::Region::from_id(val);
-        Some(score_region(region, signal_aggregator))
+        Some(score_region(region, signal_computer))
     }
 }
 
@@ -1047,8 +1047,8 @@ impl Signal for QueryCentrality {
         None
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -1056,7 +1056,7 @@ impl Signal for QueryCentrality {
         let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
         let host_id = host_id(&fastfield_reader);
 
-        host_id.and_then(|host_id| signal_aggregator.query_centrality(host_id))
+        host_id.and_then(|host_id| signal_computer.query_centrality(host_id))
     }
 }
 
@@ -1071,8 +1071,8 @@ impl Signal for InboundSimilarity {
         None
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -1080,7 +1080,7 @@ impl Signal for InboundSimilarity {
         let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
         let host_id = host_id(&fastfield_reader);
 
-        host_id.map(|host_id| signal_aggregator.inbound_similarity(host_id))
+        host_id.map(|host_id| signal_computer.inbound_similarity(host_id))
     }
 }
 
@@ -1095,7 +1095,7 @@ impl Signal for LambdaMart {
         None
     }
 
-    fn compute(&self, _: DocId, _: &SignalAggregator) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
         None // computed in later ranking stage
     }
 }
@@ -1113,7 +1113,7 @@ impl Signal for UrlDigits {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
         let num_digits = (webpage
             .html
             .url()
@@ -1133,8 +1133,8 @@ impl Signal for UrlDigits {
         Some(score_digits(num_digits))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -1162,7 +1162,7 @@ impl Signal for UrlSlashes {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
         let num_slashes = webpage
             .html
             .url()
@@ -1173,8 +1173,8 @@ impl Signal for UrlSlashes {
         Some(score_slashes(num_slashes))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -1200,13 +1200,13 @@ impl Signal for LinkDensity {
         Some(Field::Fast(schema::fast_field::LinkDensity.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
         let link_density = webpage.html.link_density();
         Some(score_link_density(link_density))
     }
 
-    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
-        let seg_reader = signal_aggregator
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer
             .segment_reader
             .as_ref()
             .unwrap()
@@ -1232,7 +1232,7 @@ impl Signal for TitleEmbeddingSimilarity {
         Some(Field::Fast(schema::fast_field::TitleEmbeddings.into()))
     }
 
-    fn compute(&self, _: DocId, _: &SignalAggregator) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
         None // computed in later ranking stage
     }
 }
@@ -1248,7 +1248,7 @@ impl Signal for KeywordEmbeddingSimilarity {
         Some(Field::Fast(schema::fast_field::KeywordEmbeddings.into()))
     }
 
-    fn compute(&self, _: DocId, _: &SignalAggregator) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
         None // computed in later ranking stage
     }
 }
@@ -1279,16 +1279,15 @@ impl InsertEnumMapKey for SignalEnum {
     }
 }
 
-fn score_timestamp(timestamp: usize, signal_aggregator: &SignalAggregator) -> f64 {
-    if timestamp >= signal_aggregator.current_timestamp.unwrap_or(0) {
+fn score_timestamp(timestamp: usize, signal_computer: &SignalComputer) -> f64 {
+    if timestamp >= signal_computer.current_timestamp.unwrap_or(0) {
         return 0.0;
     }
 
-    let hours_since_update =
-        (signal_aggregator.current_timestamp.unwrap() - timestamp).max(1) / 3600;
+    let hours_since_update = (signal_computer.current_timestamp.unwrap() - timestamp).max(1) / 3600;
 
-    if hours_since_update < signal_aggregator.update_time_cache.len() {
-        signal_aggregator.update_time_cache[hours_since_update]
+    if hours_since_update < signal_computer.update_time_cache.len() {
+        signal_computer.update_time_cache[hours_since_update]
     } else {
         0.0
     }
@@ -1323,10 +1322,10 @@ fn score_link_density(link_density: f64) -> f64 {
     }
 }
 
-fn score_region(webpage_region: crate::webpage::Region, aggregator: &SignalAggregator) -> f64 {
-    match aggregator.region_count.as_ref() {
+fn score_region(webpage_region: crate::webpage::Region, computer: &SignalComputer) -> f64 {
+    match computer.region_count.as_ref() {
         Some(region_count) => {
-            let boost = aggregator
+            let boost = computer
                 .query_data
                 .as_ref()
                 .and_then(|q| q.selected_region)
@@ -1480,7 +1479,7 @@ struct QueryData {
     selected_region: Option<crate::webpage::Region>,
 }
 
-pub struct SignalAggregator {
+pub struct SignalComputer {
     query_data: Option<QueryData>,
     query_signal_coefficients: Option<SignalCoefficient>,
     segment_reader: Option<RefCell<SegmentReader>>,
@@ -1494,7 +1493,7 @@ pub struct SignalAggregator {
     order: SignalOrder,
 }
 
-impl Clone for SignalAggregator {
+impl Clone for SignalComputer {
     fn clone(&self) -> Self {
         let inbound_similarity = self
             .inbound_similarity
@@ -1522,9 +1521,9 @@ impl Clone for SignalAggregator {
     }
 }
 
-impl std::fmt::Debug for SignalAggregator {
+impl std::fmt::Debug for SignalComputer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SignalAggregator")
+        f.debug_struct("SignalComputer")
             .field(
                 "query",
                 &self
@@ -1537,7 +1536,7 @@ impl std::fmt::Debug for SignalAggregator {
     }
 }
 
-impl SignalAggregator {
+impl SignalComputer {
     pub fn new(query: Option<&Query>) -> Self {
         let query_signal_coefficients = query.as_ref().and_then(|q| q.signal_coefficients());
 
@@ -1831,12 +1830,12 @@ impl SignalOrder {
         }
     }
 
-    pub fn new(signal_aggregator: &SignalAggregator) -> Self {
+    pub fn new(signal_computer: &SignalComputer) -> Self {
         let mut text_signals = EnumMap::new();
         let mut other_signals = Vec::new();
 
         for signal in SignalEnum::all() {
-            if signal_aggregator.coefficient(&signal) == 0.0 {
+            if signal_computer.coefficient(&signal) == 0.0 {
                 continue;
             }
 
@@ -1863,17 +1862,17 @@ impl SignalOrder {
     fn compute<'a>(
         &'a self,
         doc: DocId,
-        signal_aggregator: &'a SignalAggregator,
+        signal_computer: &'a SignalComputer,
     ) -> impl Iterator<Item = Option<ComputedSignal>> + 'a {
         self.text_signals
             .values()
-            .flat_map(move |ngram| ngram.compute(doc, signal_aggregator))
+            .flat_map(move |ngram| ngram.compute(doc, signal_computer))
             .map(Some)
             .chain(
                 self.other_signals
                     .iter()
                     .filter_map(|signal| {
-                        let coefficient = signal_aggregator.coefficient(signal);
+                        let coefficient = signal_computer.coefficient(signal);
 
                         if coefficient > 0.0 {
                             Some((signal, coefficient))
@@ -1883,7 +1882,7 @@ impl SignalOrder {
                     })
                     .map(move |(signal, coefficient)| {
                         signal
-                            .compute(doc, signal_aggregator)
+                            .compute(doc, signal_computer)
                             .map(|value| ComputedSignal {
                                 signal: *signal,
                                 score: SignalScore { coefficient, value },
@@ -1915,7 +1914,7 @@ impl NGramSignalOrder {
     fn compute<'a>(
         &'a self,
         doc: DocId,
-        signal_aggregator: &'a SignalAggregator,
+        signal_computer: &'a SignalComputer,
     ) -> impl Iterator<Item = ComputedSignal> + 'a {
         let mut hits = 0;
 
@@ -1924,9 +1923,9 @@ impl NGramSignalOrder {
             .map(|(_, s)| s)
             .filter_map(move |signal| {
                 signal
-                    .compute(doc, signal_aggregator)
+                    .compute(doc, signal_computer)
                     .map(|value| {
-                        let coefficient = signal_aggregator.coefficient(signal);
+                        let coefficient = signal_computer.coefficient(signal);
 
                         ComputedSignal {
                             signal: *signal,
