@@ -429,9 +429,7 @@ impl SignalComputer {
     }
 
     pub fn region_count(&self) -> Option<&RegionCount> {
-        self.region_count
-            .as_ref()
-            .map(|region_count| &**region_count)
+        self.region_count.as_deref()
     }
 
     pub fn query_data(&self) -> Option<&QueryData> {

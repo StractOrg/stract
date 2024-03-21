@@ -88,7 +88,7 @@ fn score_region(webpage_region: crate::webpage::Region, computer: &SignalCompute
     }
 }
 
-fn host_id<'a>(fastfield_reader: &FieldReader<'a>) -> Option<NodeID> {
+fn host_id(fastfield_reader: &FieldReader<'_>) -> Option<NodeID> {
     let node_id = fastfield_reader
         .get(schema::fast_field::HostNodeID.into())
         .and_then(|n| n.as_u64())
