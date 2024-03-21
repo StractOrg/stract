@@ -15,11 +15,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::enum_map::InsertEnumMapKey;
+use crate::fastfield_reader::FieldReader;
 use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
 use crate::schema::text_field::TextField;
-use crate::schema::{fast_field, text_field};
-use crate::Result;
+use crate::schema::{self, Field};
+use crate::{enum_dispatch_from_discriminant, Result};
 use crate::{
     enum_map::EnumMap,
     fastfield_reader,
@@ -27,6 +28,7 @@ use crate::{
     webgraph::NodeID,
     webpage::Webpage,
 };
+use enum_dispatch::enum_dispatch;
 use itertools::Itertools;
 use optics::ast::RankingTarget;
 use optics::Optic;
@@ -34,7 +36,7 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::str::FromStr;
 use std::sync::Arc;
-use strum::VariantArray;
+use strum::{EnumDiscriminants, VariantArray};
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
 use tantivy::query::{Query as _, Scorer};
@@ -45,10 +47,7 @@ use utoipa::ToSchema;
 use tantivy::DocSet;
 use tantivy::{DocId, Postings};
 
-use crate::{
-    schema::FLOAT_SCALING,
-    webpage::region::{Region, RegionCount},
-};
+use crate::{schema::FLOAT_SCALING, webpage::region::RegionCount};
 
 use super::bm25::MultiBm25Weight;
 use super::models::linear::LinearRegression;
@@ -60,95 +59,1223 @@ pub enum Error {
     UnknownSignal(#[from] serde_json::Error),
 }
 
+#[enum_dispatch]
+pub trait Signal:
+    Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash + Into<SignalEnum>
+{
+    fn default_coefficient(&self) -> f64;
+    fn as_field(&self) -> Option<Field>;
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64>;
+
+    fn precompute(self, _webpage: &Webpage, _signal_aggregator: &SignalAggregator) -> Option<f64> {
+        None
+    }
+
+    fn as_textfield(&self) -> Option<TextFieldEnum> {
+        self.as_field().and_then(|field| field.as_text())
+    }
+
+    fn as_fastfield(&self) -> Option<FastFieldEnum> {
+        self.as_field().and_then(|field| field.as_fast())
+    }
+}
+
+#[enum_dispatch(Signal)]
 #[derive(
-    Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash, VariantArray,
+    Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash, EnumDiscriminants,
 )]
-pub enum Signal {
-    #[serde(rename = "bm25_title")]
+#[strum_discriminants(derive(VariantArray, serde::Serialize, serde::Deserialize, Hash))]
+#[strum_discriminants(serde(rename_all = "snake_case"))]
+pub enum SignalEnum {
     Bm25Title,
-    #[serde(rename = "bm25_title_bigrams")]
     Bm25TitleBigrams,
-    #[serde(rename = "bm25_title_trigrams")]
     Bm25TitleTrigrams,
-    #[serde(rename = "bm25_clean_body")]
     Bm25CleanBody,
-    #[serde(rename = "bm25_clean_body_bigrams")]
     Bm25CleanBodyBigrams,
-    #[serde(rename = "bm25_clean_body_trigrams")]
     Bm25CleanBodyTrigrams,
-    #[serde(rename = "bm25_stemmed_title")]
     Bm25StemmedTitle,
-    #[serde(rename = "bm25_stemmed_clean_body")]
     Bm25StemmedCleanBody,
-    #[serde(rename = "bm25_all_body")]
     Bm25AllBody,
-    #[serde(rename = "bm25_keywords")]
     Bm25Keywords,
-    #[serde(rename = "bm25_backlink_text")]
     Bm25BacklinkText,
-    #[serde(rename = "idf_sum_url")]
     IdfSumUrl,
-    #[serde(rename = "idf_sum_site")]
     IdfSumSite,
-    #[serde(rename = "idf_sum_domain")]
     IdfSumDomain,
-    #[serde(rename = "idf_sum_site_no_tokenizer")]
     IdfSumSiteNoTokenizer,
-    #[serde(rename = "idf_sum_domain_no_tokenizer")]
     IdfSumDomainNoTokenizer,
-    #[serde(rename = "idf_sum_domain_name_no_tokenizer")]
     IdfSumDomainNameNoTokenizer,
-    #[serde(rename = "idf_sum_domain_if_homepage")]
     IdfSumDomainIfHomepage,
-    #[serde(rename = "idf_sum_domain_name_if_homepage_no_tokenizer")]
     IdfSumDomainNameIfHomepageNoTokenizer,
-    #[serde(rename = "idf_sum_domain_if_homepage_no_tokenizer")]
     IdfSumDomainIfHomepageNoTokenizer,
-    #[serde(rename = "idf_sum_title_if_homepage")]
     IdfSumTitleIfHomepage,
-    #[serde(rename = "cross_encoder_snippet")]
     CrossEncoderSnippet,
-    #[serde(rename = "cross_encoder_title")]
     CrossEncoderTitle,
-    #[serde(rename = "host_centrality")]
     HostCentrality,
-    #[serde(rename = "host_centrality_rank")]
     HostCentralityRank,
-    #[serde(rename = "page_centrality")]
     PageCentrality,
-    #[serde(rename = "page_centrality_rank")]
     PageCentralityRank,
-    #[serde(rename = "is_homepage")]
     IsHomepage,
-    #[serde(rename = "fetch_time_ms")]
     FetchTimeMs,
-    #[serde(rename = "update_timestamp")]
     UpdateTimestamp,
-    #[serde(rename = "tracker_score")]
     TrackerScore,
-    #[serde(rename = "region")]
     Region,
-    #[serde(rename = "query_centrality")]
     QueryCentrality,
-    #[serde(rename = "inbound_similarity")]
     InboundSimilarity,
-    #[serde(rename = "lambda_mart")]
-    LambdaMART,
-    #[serde(rename = "url_digits")]
+    LambdaMart,
     UrlDigits,
-    #[serde(rename = "url_slashes")]
     UrlSlashes,
-    #[serde(rename = "link_density")]
     LinkDensity,
-    #[serde(rename = "title_embedding_similarity")]
     TitleEmbeddingSimilarity,
-    #[serde(rename = "keyword_embedding_similarity")]
     KeywordEmbeddingSimilarity,
 }
 
-impl InsertEnumMapKey for Signal {
+enum_dispatch_from_discriminant!(SignalEnumDiscriminants => SignalEnum,
+[
+    Bm25Title,
+    Bm25TitleBigrams,
+    Bm25TitleTrigrams,
+    Bm25CleanBody,
+    Bm25CleanBodyBigrams,
+    Bm25CleanBodyTrigrams,
+    Bm25StemmedTitle,
+    Bm25StemmedCleanBody,
+    Bm25AllBody,
+    Bm25Keywords,
+    Bm25BacklinkText,
+    IdfSumUrl,
+    IdfSumSite,
+    IdfSumDomain,
+    IdfSumSiteNoTokenizer,
+    IdfSumDomainNoTokenizer,
+    IdfSumDomainNameNoTokenizer,
+    IdfSumDomainIfHomepage,
+    IdfSumDomainNameIfHomepageNoTokenizer,
+    IdfSumDomainIfHomepageNoTokenizer,
+    IdfSumTitleIfHomepage,
+    CrossEncoderSnippet,
+    CrossEncoderTitle,
+    HostCentrality,
+    HostCentralityRank,
+    PageCentrality,
+    PageCentralityRank,
+    IsHomepage,
+    FetchTimeMs,
+    UpdateTimestamp,
+    TrackerScore,
+    Region,
+    QueryCentrality,
+    InboundSimilarity,
+    LambdaMart,
+    UrlDigits,
+    UrlSlashes,
+    LinkDensity,
+    TitleEmbeddingSimilarity,
+    KeywordEmbeddingSimilarity,
+]);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25Title;
+impl Signal for Bm25Title {
+    fn default_coefficient(&self) -> f64 {
+        0.0063
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::Title.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25TitleBigrams;
+impl Signal for Bm25TitleBigrams {
+    fn default_coefficient(&self) -> f64 {
+        0.01
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::TitleBigrams.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25TitleTrigrams;
+impl Signal for Bm25TitleTrigrams {
+    fn default_coefficient(&self) -> f64 {
+        0.01
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::TitleTrigrams.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25CleanBody;
+impl Signal for Bm25CleanBody {
+    fn default_coefficient(&self) -> f64 {
+        0.0063
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::CleanBody.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25CleanBodyBigrams;
+impl Signal for Bm25CleanBodyBigrams {
+    fn default_coefficient(&self) -> f64 {
+        0.005
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::CleanBodyBigrams.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25CleanBodyTrigrams;
+impl Signal for Bm25CleanBodyTrigrams {
+    fn default_coefficient(&self) -> f64 {
+        0.005
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::CleanBodyTrigrams.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25StemmedTitle;
+impl Signal for Bm25StemmedTitle {
+    fn default_coefficient(&self) -> f64 {
+        0.003
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::StemmedTitle.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25StemmedCleanBody;
+impl Signal for Bm25StemmedCleanBody {
+    fn default_coefficient(&self) -> f64 {
+        0.001
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::StemmedCleanBody.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25AllBody;
+impl Signal for Bm25AllBody {
+    fn default_coefficient(&self) -> f64 {
+        0.0
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::AllBody.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25Keywords;
+impl Signal for Bm25Keywords {
+    fn default_coefficient(&self) -> f64 {
+        0.001
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::Keywords.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Bm25BacklinkText;
+impl Signal for Bm25BacklinkText {
+    fn default_coefficient(&self) -> f64 {
+        0.003
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::BacklinkText.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| bm25(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IdfSumUrl;
+impl Signal for IdfSumUrl {
+    fn default_coefficient(&self) -> f64 {
+        0.0003
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::Url.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| idf_sum(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IdfSumSite;
+impl Signal for IdfSumSite {
+    fn default_coefficient(&self) -> f64 {
+        0.00015
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::SiteWithout.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| idf_sum(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IdfSumDomain;
+impl Signal for IdfSumDomain {
+    fn default_coefficient(&self) -> f64 {
+        0.0003
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::Domain.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| idf_sum(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IdfSumSiteNoTokenizer;
+impl Signal for IdfSumSiteNoTokenizer {
+    fn default_coefficient(&self) -> f64 {
+        0.00015
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::SiteNoTokenizer.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| idf_sum(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IdfSumDomainNoTokenizer;
+impl Signal for IdfSumDomainNoTokenizer {
+    fn default_coefficient(&self) -> f64 {
+        0.0002
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::DomainNoTokenizer.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| idf_sum(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IdfSumDomainNameNoTokenizer;
+impl Signal for IdfSumDomainNameNoTokenizer {
+    fn default_coefficient(&self) -> f64 {
+        0.0002
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(
+            schema::text_field::DomainNameNoTokenizer.into(),
+        ))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| idf_sum(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IdfSumDomainIfHomepage;
+impl Signal for IdfSumDomainIfHomepage {
+    fn default_coefficient(&self) -> f64 {
+        0.0004
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::DomainIfHomepage.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| idf_sum(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IdfSumDomainNameIfHomepageNoTokenizer;
+impl Signal for IdfSumDomainNameIfHomepageNoTokenizer {
+    fn default_coefficient(&self) -> f64 {
+        0.0036
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(
+            schema::text_field::DomainNameIfHomepageNoTokenizer.into(),
+        ))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| idf_sum(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IdfSumDomainIfHomepageNoTokenizer;
+impl Signal for IdfSumDomainIfHomepageNoTokenizer {
+    fn default_coefficient(&self) -> f64 {
+        0.0036
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(
+            schema::text_field::DomainIfHomepageNoTokenizer.into(),
+        ))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| idf_sum(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IdfSumTitleIfHomepage;
+impl Signal for IdfSumTitleIfHomepage {
+    fn default_coefficient(&self) -> f64 {
+        0.00022
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::TitleIfHomepage.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let mut seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+
+        seg_reader
+            .text_fields
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| idf_sum(field, doc))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct CrossEncoderSnippet;
+impl Signal for CrossEncoderSnippet {
+    fn default_coefficient(&self) -> f64 {
+        0.17
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        None
+    }
+
+    fn compute(&self, _: DocId, _: &SignalAggregator) -> Option<f64> {
+        None // computed in later ranking stage
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct CrossEncoderTitle;
+impl Signal for CrossEncoderTitle {
+    fn default_coefficient(&self) -> f64 {
+        0.17
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        None
+    }
+
+    fn compute(&self, _: DocId, _: &SignalAggregator) -> Option<f64> {
+        None // computed in later ranking stage
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct HostCentrality;
+impl Signal for HostCentrality {
+    fn default_coefficient(&self) -> f64 {
+        0.5
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::HostCentrality.into()))
+    }
+
+    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+        Some(webpage.host_centrality)
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap();
+        Some(val as f64 / FLOAT_SCALING as f64)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct HostCentralityRank;
+impl Signal for HostCentralityRank {
+    fn default_coefficient(&self) -> f64 {
+        0.0
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::HostCentralityRank.into()))
+    }
+
+    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+        Some(score_rank(webpage.host_centrality_rank as f64))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap();
+        Some(score_rank(val as f64))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct PageCentrality;
+impl Signal for PageCentrality {
+    fn default_coefficient(&self) -> f64 {
+        0.25
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::PageCentrality.into()))
+    }
+
+    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+        Some(webpage.page_centrality)
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap();
+        Some(val as f64 / FLOAT_SCALING as f64)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct PageCentralityRank;
+impl Signal for PageCentralityRank {
+    fn default_coefficient(&self) -> f64 {
+        0.0
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::PageCentralityRank.into()))
+    }
+
+    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+        Some(score_rank(webpage.page_centrality_rank as f64))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap();
+        Some(score_rank(val as f64))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct IsHomepage;
+impl Signal for IsHomepage {
+    fn default_coefficient(&self) -> f64 {
+        0.0005
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::IsHomepage.into()))
+    }
+
+    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+        Some(webpage.html.is_homepage().into())
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap();
+        Some(val as f64)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct FetchTimeMs;
+impl Signal for FetchTimeMs {
+    fn default_coefficient(&self) -> f64 {
+        0.001
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::FetchTimeMs.into()))
+    }
+
+    fn precompute(self, webpage: &Webpage, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let fetch_time_ms = webpage.fetch_time_ms as usize;
+        if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
+            Some(0.0)
+        } else {
+            Some(signal_aggregator.fetch_time_ms_cache[fetch_time_ms])
+        }
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let fetch_time_ms = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap() as usize;
+
+        if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
+            Some(0.0)
+        } else {
+            Some(signal_aggregator.fetch_time_ms_cache[fetch_time_ms])
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct UpdateTimestamp;
+impl Signal for UpdateTimestamp {
+    fn default_coefficient(&self) -> f64 {
+        0.001
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::LastUpdated.into()))
+    }
+
+    fn precompute(self, webpage: &Webpage, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let update_timestamp = webpage
+            .html
+            .updated_time()
+            .map(|date| date.timestamp().max(0))
+            .unwrap_or(0) as usize;
+
+        Some(score_timestamp(update_timestamp, signal_aggregator))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap() as usize;
+
+        Some(score_timestamp(val, signal_aggregator))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct TrackerScore;
+impl Signal for TrackerScore {
+    fn default_coefficient(&self) -> f64 {
+        0.05
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::TrackerScore.into()))
+    }
+
+    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+        let num_trackers = webpage.html.trackers().len() as f64;
+        Some(score_trackers(num_trackers))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap();
+        Some(score_trackers(val as f64))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Region;
+impl Signal for Region {
+    fn default_coefficient(&self) -> f64 {
+        0.15
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::Region.into()))
+    }
+
+    fn precompute(self, webpage: &Webpage, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let region =
+            crate::webpage::Region::guess_from(webpage).unwrap_or(crate::webpage::Region::All);
+        Some(score_region(region, signal_aggregator))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap();
+        let region = crate::webpage::Region::from_id(val);
+        Some(score_region(region, signal_aggregator))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct QueryCentrality;
+impl Signal for QueryCentrality {
+    fn default_coefficient(&self) -> f64 {
+        0.0
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        None
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+        let host_id = host_id(&fastfield_reader);
+
+        host_id.and_then(|host_id| signal_aggregator.query_centrality(host_id))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct InboundSimilarity;
+impl Signal for InboundSimilarity {
+    fn default_coefficient(&self) -> f64 {
+        0.25
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        None
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+        let host_id = host_id(&fastfield_reader);
+
+        host_id.map(|host_id| signal_aggregator.inbound_similarity(host_id))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct LambdaMart;
+impl Signal for LambdaMart {
+    fn default_coefficient(&self) -> f64 {
+        10.0
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        None
+    }
+
+    fn compute(&self, _: DocId, _: &SignalAggregator) -> Option<f64> {
+        None // computed in later ranking stage
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct UrlDigits;
+impl Signal for UrlDigits {
+    fn default_coefficient(&self) -> f64 {
+        0.01
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(
+            schema::fast_field::NumPathAndQueryDigits.into(),
+        ))
+    }
+
+    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+        let num_digits = (webpage
+            .html
+            .url()
+            .path()
+            .chars()
+            .filter(|c| c.is_ascii_digit())
+            .count()
+            + webpage
+                .html
+                .url()
+                .query()
+                .unwrap_or_default()
+                .chars()
+                .filter(|c| c.is_ascii_digit())
+                .count()) as f64;
+
+        Some(score_digits(num_digits))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap();
+        Some(score_digits(val as f64))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct UrlSlashes;
+impl Signal for UrlSlashes {
+    fn default_coefficient(&self) -> f64 {
+        0.01
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(
+            schema::fast_field::NumPathAndQuerySlashes.into(),
+        ))
+    }
+
+    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+        let num_slashes = webpage
+            .html
+            .url()
+            .path()
+            .chars()
+            .filter(|c| c == &'/')
+            .count() as f64;
+        Some(score_slashes(num_slashes))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap();
+        Some(score_slashes(val as f64))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct LinkDensity;
+impl Signal for LinkDensity {
+    fn default_coefficient(&self) -> f64 {
+        0.0
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::LinkDensity.into()))
+    }
+
+    fn precompute(self, webpage: &Webpage, _: &SignalAggregator) -> Option<f64> {
+        let link_density = webpage.html.link_density();
+        Some(score_link_density(link_density))
+    }
+
+    fn compute(&self, doc: DocId, signal_aggregator: &SignalAggregator) -> Option<f64> {
+        let seg_reader = signal_aggregator
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut();
+        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
+
+        let val = fastfield_reader
+            .get(self.as_fastfield().unwrap())
+            .and_then(|v| v.as_u64())
+            .unwrap();
+        Some(score_link_density(val as f64 / FLOAT_SCALING as f64))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct TitleEmbeddingSimilarity;
+impl Signal for TitleEmbeddingSimilarity {
+    fn default_coefficient(&self) -> f64 {
+        0.01
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::TitleEmbeddings.into()))
+    }
+
+    fn compute(&self, _: DocId, _: &SignalAggregator) -> Option<f64> {
+        None // computed in later ranking stage
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct KeywordEmbeddingSimilarity;
+impl Signal for KeywordEmbeddingSimilarity {
+    fn default_coefficient(&self) -> f64 {
+        0.01
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Fast(schema::fast_field::KeywordEmbeddings.into()))
+    }
+
+    fn compute(&self, _: DocId, _: &SignalAggregator) -> Option<f64> {
+        None // computed in later ranking stage
+    }
+}
+
+impl SignalEnum {
+    pub fn num_variants() -> usize {
+        SignalEnumDiscriminants::VARIANTS.len()
+    }
+
+    pub fn all() -> impl Iterator<Item = SignalEnum> {
+        SignalEnumDiscriminants::VARIANTS
+            .iter()
+            .copied()
+            .map(|v| v.into())
+    }
+
+    pub fn get(field_id: usize) -> Option<SignalEnum> {
+        SignalEnumDiscriminants::VARIANTS
+            .get(field_id)
+            .copied()
+            .map(SignalEnum::from)
+    }
+}
+
+impl InsertEnumMapKey for SignalEnum {
     fn into_usize(self) -> usize {
-        self as usize
+        SignalEnumDiscriminants::from(self) as usize
     }
 }
 
@@ -196,7 +1323,7 @@ fn score_link_density(link_density: f64) -> f64 {
     }
 }
 
-fn score_region(webpage_region: Region, aggregator: &SignalAggregator) -> f64 {
+fn score_region(webpage_region: crate::webpage::Region, aggregator: &SignalAggregator) -> f64 {
     match aggregator.region_count.as_ref() {
         Some(region_count) => {
             let boost = aggregator
@@ -204,7 +1331,7 @@ fn score_region(webpage_region: Region, aggregator: &SignalAggregator) -> f64 {
                 .as_ref()
                 .and_then(|q| q.selected_region)
                 .map_or(0.0, |region| {
-                    if region != Region::All && region == webpage_region {
+                    if region != crate::webpage::Region::All && region == webpage_region {
                         50.0
                     } else {
                         0.0
@@ -254,382 +1381,20 @@ fn idf_sum(field: &mut TextFieldData, doc: DocId) -> f64 {
         .sum::<f32>() as f64
 }
 
-impl Signal {
-    fn is_computable_before_search(&self) -> bool {
-        self.as_fastfield().is_some()
-            && !matches!(
-                self,
-                Signal::TitleEmbeddingSimilarity | Signal::KeywordEmbeddingSimilarity
-            )
-    }
+fn host_id<'a>(fastfield_reader: &FieldReader<'a>) -> Option<NodeID> {
+    let node_id = fastfield_reader
+        .get(schema::fast_field::HostNodeID.into())
+        .and_then(|n| n.as_u64())
+        .unwrap();
 
-    pub fn default_coefficient(&self) -> f64 {
-        match self {
-            Signal::Bm25Title => 0.0063,
-            Signal::Bm25TitleBigrams => 0.01,
-            Signal::Bm25TitleTrigrams => 0.01,
-            Signal::Bm25CleanBody => 0.0063,
-            Signal::Bm25CleanBodyBigrams => 0.005,
-            Signal::Bm25CleanBodyTrigrams => 0.005,
-            Signal::Bm25StemmedTitle => 0.003,
-            Signal::Bm25StemmedCleanBody => 0.001,
-            Signal::Bm25AllBody => 0.0,
-            Signal::IdfSumUrl => 0.0003,
-            Signal::IdfSumSite => 0.00015,
-            Signal::IdfSumDomain => 0.0003,
-            Signal::IdfSumSiteNoTokenizer => 0.00015,
-            Signal::IdfSumDomainNoTokenizer => 0.0002,
-            Signal::IdfSumDomainNameNoTokenizer => 0.0002,
-            Signal::IdfSumDomainIfHomepage => 0.0004,
-            Signal::IdfSumDomainNameIfHomepageNoTokenizer => 0.0036,
-            Signal::IdfSumDomainIfHomepageNoTokenizer => 0.0036,
-            Signal::IdfSumTitleIfHomepage => 0.00022,
-            Signal::Bm25BacklinkText => 0.003,
-            Signal::Bm25Keywords => 0.001,
-            Signal::CrossEncoderSnippet => 0.17,
-            Signal::CrossEncoderTitle => 0.17,
-            Signal::HostCentrality => 0.5,
-            Signal::HostCentralityRank => 0.0,
-            Signal::PageCentrality => 0.25,
-            Signal::PageCentralityRank => 0.0,
-            Signal::QueryCentrality => 0.0,
-            Signal::IsHomepage => 0.0005,
-            Signal::FetchTimeMs => 0.001,
-            Signal::UpdateTimestamp => 0.001,
-            Signal::TrackerScore => 0.05,
-            Signal::Region => 0.15,
-            Signal::InboundSimilarity => 0.25,
-            Signal::LambdaMART => 10.0,
-            Signal::UrlSlashes => 0.01,
-            Signal::UrlDigits => 0.01,
-            Signal::LinkDensity => 0.0,
-            Signal::TitleEmbeddingSimilarity => 0.01,
-            Signal::KeywordEmbeddingSimilarity => 0.01,
-        }
-    }
-
-    fn compute(self, signal_aggregator: &SignalAggregator, doc: DocId) -> Option<ComputedSignal> {
-        let coefficient = signal_aggregator.coefficient(&self);
-        if coefficient == 0.0 {
-            return None;
-        }
-
-        let mut seg_reader = signal_aggregator
-            .segment_reader
-            .as_ref()
-            .unwrap()
-            .borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader.get_field_reader(doc);
-
-        let node_id = fastfield_reader
-            .get(fast_field::HostNodeID.into())
-            .and_then(|n| n.as_u64())
-            .unwrap();
-
-        let host_id: Option<NodeID> = if node_id == u64::MAX {
-            None
-        } else {
-            Some(node_id.into())
-        };
-
-        let value: Option<f64> = match self {
-            Signal::HostCentrality | Signal::PageCentrality => {
-                let val = fastfield_reader
-                    .get(self.as_fastfield().unwrap())
-                    .and_then(|v| v.as_u64())
-                    .unwrap();
-                Some(val as f64 / FLOAT_SCALING as f64)
-            }
-            Signal::HostCentralityRank | Signal::PageCentralityRank => {
-                let val = fastfield_reader
-                    .get(self.as_fastfield().unwrap())
-                    .and_then(|v| v.as_u64())
-                    .unwrap();
-                Some(score_rank(val as f64))
-            }
-            Signal::IsHomepage => {
-                let val = fastfield_reader
-                    .get(self.as_fastfield().unwrap())
-                    .and_then(|v| v.as_u64())
-                    .unwrap();
-                Some(val as f64)
-            }
-            Signal::LinkDensity => {
-                let val = fastfield_reader
-                    .get(self.as_fastfield().unwrap())
-                    .and_then(|v| v.as_u64())
-                    .unwrap();
-                Some(score_link_density(val as f64 / FLOAT_SCALING as f64))
-            }
-            Signal::FetchTimeMs => {
-                let fetch_time_ms = fastfield_reader
-                    .get(self.as_fastfield().unwrap())
-                    .and_then(|v| v.as_u64())
-                    .unwrap() as usize;
-
-                if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
-                    Some(0.0)
-                } else {
-                    Some(signal_aggregator.fetch_time_ms_cache[fetch_time_ms])
-                }
-            }
-            Signal::UpdateTimestamp => {
-                let val = fastfield_reader
-                    .get(self.as_fastfield().unwrap())
-                    .and_then(|v| v.as_u64())
-                    .unwrap() as usize;
-
-                Some(score_timestamp(val, signal_aggregator))
-            }
-            Signal::TrackerScore => {
-                let val = fastfield_reader
-                    .get(self.as_fastfield().unwrap())
-                    .and_then(|v| v.as_u64())
-                    .unwrap();
-                Some(score_trackers(val as f64))
-            }
-            Signal::UrlDigits => {
-                let val = fastfield_reader
-                    .get(self.as_fastfield().unwrap())
-                    .and_then(|v| v.as_u64())
-                    .unwrap();
-                Some(score_digits(val as f64))
-            }
-            Signal::UrlSlashes => {
-                let val = fastfield_reader
-                    .get(self.as_fastfield().unwrap())
-                    .and_then(|v| v.as_u64())
-                    .unwrap();
-                Some(score_slashes(val as f64))
-            }
-            Signal::Region => {
-                let val = fastfield_reader
-                    .get(self.as_fastfield().unwrap())
-                    .and_then(|v| v.as_u64())
-                    .unwrap();
-                let region = Region::from_id(val);
-                Some(score_region(region, signal_aggregator))
-            }
-            Signal::QueryCentrality => {
-                host_id.and_then(|host_id| signal_aggregator.query_centrality(host_id))
-            }
-            Signal::InboundSimilarity => {
-                host_id.map(|host_id| signal_aggregator.inbound_similarity(host_id))
-            }
-            Signal::Bm25Title
-            | Signal::Bm25TitleBigrams
-            | Signal::Bm25TitleTrigrams
-            | Signal::Bm25CleanBody
-            | Signal::Bm25CleanBodyBigrams
-            | Signal::Bm25CleanBodyTrigrams
-            | Signal::Bm25StemmedTitle
-            | Signal::Bm25StemmedCleanBody
-            | Signal::Bm25AllBody
-            | Signal::Bm25Keywords
-            | Signal::Bm25BacklinkText => seg_reader
-                .text_fields
-                .get_mut(self.as_textfield().unwrap())
-                .map(|field| bm25(field, doc)),
-
-            Signal::IdfSumUrl
-            | Signal::IdfSumSite
-            | Signal::IdfSumDomain
-            | Signal::IdfSumSiteNoTokenizer
-            | Signal::IdfSumDomainNoTokenizer
-            | Signal::IdfSumDomainNameNoTokenizer
-            | Signal::IdfSumDomainIfHomepage
-            | Signal::IdfSumDomainNameIfHomepageNoTokenizer
-            | Signal::IdfSumDomainIfHomepageNoTokenizer
-            | Signal::IdfSumTitleIfHomepage => seg_reader
-                .text_fields
-                .get_mut(self.as_textfield().unwrap())
-                .map(|field| idf_sum(field, doc)),
-
-            Signal::CrossEncoderSnippet
-            | Signal::CrossEncoderTitle
-            | Signal::TitleEmbeddingSimilarity
-            | Signal::KeywordEmbeddingSimilarity => None, // these are calculated in a later step
-
-            Signal::LambdaMART => None,
-        };
-
-        value.map(|value| ComputedSignal {
-            signal: self,
-            score: SignalScore { coefficient, value },
-        })
-    }
-
-    pub fn precompute(
-        self,
-        signal_aggregator: &SignalAggregator,
-        webpage: &Webpage,
-    ) -> Option<ComputedSignal> {
-        if !self.is_computable_before_search() {
-            return None;
-        }
-
-        let value = match self {
-            Signal::HostCentrality => Some(webpage.host_centrality),
-            Signal::PageCentrality => Some(webpage.page_centrality),
-            Signal::HostCentralityRank => Some(score_rank(webpage.host_centrality_rank as f64)),
-            Signal::PageCentralityRank => Some(score_rank(webpage.page_centrality_rank as f64)),
-            Signal::IsHomepage => Some(webpage.html.is_homepage().into()),
-            Signal::FetchTimeMs => {
-                let fetch_time_ms = webpage.fetch_time_ms as usize;
-                if fetch_time_ms >= signal_aggregator.fetch_time_ms_cache.len() {
-                    Some(0.0)
-                } else {
-                    Some(signal_aggregator.fetch_time_ms_cache[fetch_time_ms])
-                }
-            }
-            Signal::UpdateTimestamp => {
-                let update_timestamp = webpage
-                    .html
-                    .updated_time()
-                    .map(|date| date.timestamp().max(0))
-                    .unwrap_or(0) as usize;
-
-                Some(score_timestamp(update_timestamp, signal_aggregator))
-            }
-            Signal::TrackerScore => {
-                let num_trackers = webpage.html.trackers().len() as f64;
-                Some(score_trackers(num_trackers))
-            }
-            Signal::Region => {
-                let region = Region::guess_from(webpage).unwrap_or(Region::All);
-                Some(score_region(region, signal_aggregator))
-            }
-            Signal::UrlDigits => {
-                let num_digits = (webpage
-                    .html
-                    .url()
-                    .path()
-                    .chars()
-                    .filter(|c| c.is_ascii_digit())
-                    .count()
-                    + webpage
-                        .html
-                        .url()
-                        .query()
-                        .unwrap_or_default()
-                        .chars()
-                        .filter(|c| c.is_ascii_digit())
-                        .count()) as f64;
-                Some(score_digits(num_digits))
-            }
-            Signal::UrlSlashes => {
-                let num_slashes = webpage
-                    .html
-                    .url()
-                    .path()
-                    .chars()
-                    .filter(|c| c == &'/')
-                    .count() as f64;
-                Some(score_slashes(num_slashes))
-            }
-            Signal::LinkDensity => {
-                let link_density = webpage.html.link_density();
-                Some(score_link_density(link_density))
-            }
-            Signal::Bm25Title
-            | Signal::Bm25TitleBigrams
-            | Signal::Bm25TitleTrigrams
-            | Signal::Bm25CleanBody
-            | Signal::Bm25CleanBodyBigrams
-            | Signal::Bm25CleanBodyTrigrams
-            | Signal::Bm25StemmedTitle
-            | Signal::Bm25StemmedCleanBody
-            | Signal::Bm25AllBody
-            | Signal::Bm25BacklinkText
-            | Signal::Bm25Keywords
-            | Signal::IdfSumUrl
-            | Signal::IdfSumSite
-            | Signal::IdfSumDomain
-            | Signal::IdfSumSiteNoTokenizer
-            | Signal::IdfSumDomainNoTokenizer
-            | Signal::IdfSumDomainNameNoTokenizer
-            | Signal::IdfSumDomainIfHomepage
-            | Signal::IdfSumDomainNameIfHomepageNoTokenizer
-            | Signal::IdfSumDomainIfHomepageNoTokenizer
-            | Signal::IdfSumTitleIfHomepage
-            | Signal::CrossEncoderSnippet
-            | Signal::CrossEncoderTitle
-            | Signal::InboundSimilarity
-            | Signal::LambdaMART
-            | Signal::TitleEmbeddingSimilarity
-            | Signal::KeywordEmbeddingSimilarity
-            | Signal::QueryCentrality => {
-                tracing::error!("signal {self:?} cannot be precomputed");
-                None
-            }
-        };
-
-        value.map(|value| ComputedSignal {
-            signal: self,
-            score: SignalScore {
-                coefficient: signal_aggregator.coefficient(&self),
-                value,
-            },
-        })
-    }
-
-    fn as_fastfield(&self) -> Option<FastFieldEnum> {
-        match self {
-            Signal::HostCentrality => Some(fast_field::HostCentrality.into()),
-            Signal::HostCentralityRank => Some(fast_field::HostCentralityRank.into()),
-            Signal::PageCentrality => Some(fast_field::PageCentrality.into()),
-            Signal::PageCentralityRank => Some(fast_field::PageCentralityRank.into()),
-            Signal::IsHomepage => Some(fast_field::IsHomepage.into()),
-            Signal::FetchTimeMs => Some(fast_field::FetchTimeMs.into()),
-            Signal::UpdateTimestamp => Some(fast_field::LastUpdated.into()),
-            Signal::TrackerScore => Some(fast_field::TrackerScore.into()),
-            Signal::Region => Some(fast_field::Region.into()),
-            Signal::UrlSlashes => Some(fast_field::NumPathAndQuerySlashes.into()),
-            Signal::UrlDigits => Some(fast_field::NumPathAndQueryDigits.into()),
-            Signal::LinkDensity => Some(fast_field::LinkDensity.into()),
-            Signal::TitleEmbeddingSimilarity => Some(fast_field::TitleEmbeddings.into()),
-            Signal::KeywordEmbeddingSimilarity => Some(fast_field::KeywordEmbeddings.into()),
-            _ => None,
-        }
-    }
-
-    fn as_textfield(&self) -> Option<TextFieldEnum> {
-        match self {
-            Signal::Bm25Title => Some(text_field::Title.into()),
-            Signal::Bm25TitleBigrams => Some(text_field::TitleBigrams.into()),
-            Signal::Bm25TitleTrigrams => Some(text_field::TitleTrigrams.into()),
-            Signal::Bm25CleanBody => Some(text_field::CleanBody.into()),
-            Signal::Bm25CleanBodyBigrams => Some(text_field::CleanBodyBigrams.into()),
-            Signal::Bm25CleanBodyTrigrams => Some(text_field::CleanBodyTrigrams.into()),
-            Signal::Bm25StemmedTitle => Some(text_field::StemmedTitle.into()),
-            Signal::Bm25StemmedCleanBody => Some(text_field::StemmedCleanBody.into()),
-            Signal::Bm25AllBody => Some(text_field::AllBody.into()),
-            Signal::Bm25BacklinkText => Some(text_field::BacklinkText.into()),
-            Signal::Bm25Keywords => Some(text_field::Keywords.into()),
-            Signal::IdfSumUrl => Some(text_field::Url.into()),
-            Signal::IdfSumSite => Some(text_field::SiteWithout.into()),
-            Signal::IdfSumDomain => Some(text_field::Domain.into()),
-            Signal::IdfSumSiteNoTokenizer => Some(text_field::SiteNoTokenizer.into()),
-            Signal::IdfSumDomainNoTokenizer => Some(text_field::DomainNoTokenizer.into()),
-            Signal::IdfSumDomainNameNoTokenizer => Some(text_field::DomainNameNoTokenizer.into()),
-            Signal::IdfSumDomainIfHomepage => Some(text_field::DomainIfHomepage.into()),
-            Signal::IdfSumDomainNameIfHomepageNoTokenizer => {
-                Some(text_field::DomainNameIfHomepageNoTokenizer.into())
-            }
-            Signal::IdfSumTitleIfHomepage => Some(text_field::TitleIfHomepage.into()),
-            Signal::IdfSumDomainIfHomepageNoTokenizer => {
-                Some(text_field::DomainIfHomepageNoTokenizer.into())
-            }
-            _ => None,
-        }
-    }
-
-    pub fn all() -> impl Iterator<Item = Self> {
-        Self::VARIANTS.iter().copied()
+    if node_id == u64::MAX {
+        None
+    } else {
+        Some(node_id.into())
     }
 }
 
-impl FromStr for Signal {
+impl FromStr for SignalEnumDiscriminants {
     type Err = Error;
 
     fn from_str(name: &str) -> std::result::Result<Self, Self::Err> {
@@ -641,18 +1406,18 @@ impl FromStr for Signal {
 
 #[derive(Debug, Clone, Default)]
 pub struct SignalCoefficient {
-    map: EnumMap<Signal, f64>,
+    map: EnumMap<SignalEnum, f64>,
 }
 
 impl SignalCoefficient {
-    pub fn get(&self, signal: &Signal) -> f64 {
+    pub fn get(&self, signal: &SignalEnum) -> f64 {
         self.map
             .get(*signal)
             .copied()
             .unwrap_or(signal.default_coefficient())
     }
 
-    pub fn new(coefficients: impl Iterator<Item = (Signal, f64)>) -> Self {
+    pub fn new(coefficients: impl Iterator<Item = (SignalEnum, f64)>) -> Self {
         let mut map = EnumMap::default();
 
         for (signal, coefficient) in coefficients {
@@ -665,15 +1430,15 @@ impl SignalCoefficient {
     pub fn from_optic(optic: &Optic) -> Self {
         SignalCoefficient::new(optic.rankings.iter().filter_map(|coeff| {
             match &coeff.target {
-                RankingTarget::Signal(signal) => Signal::from_str(signal)
+                RankingTarget::Signal(signal) => SignalEnumDiscriminants::from_str(signal)
                     .ok()
-                    .map(|signal| (signal, coeff.value)),
+                    .map(|signal| (signal.into(), coeff.value)),
             }
         }))
     }
 
     pub fn merge_into(&mut self, coeffs: SignalCoefficient) {
-        for signal in Signal::all() {
+        for signal in SignalEnum::all() {
             if let Some(coeff) = coeffs.map.get(signal).copied() {
                 match self.map.get_mut(signal) {
                     Some(existing_coeff) => *existing_coeff += coeff,
@@ -712,7 +1477,7 @@ struct SegmentReader {
 struct QueryData {
     simple_terms: Vec<String>,
     optic_rules: Vec<optics::Rule>,
-    selected_region: Option<Region>,
+    selected_region: Option<crate::webpage::Region>,
 }
 
 pub struct SignalAggregator {
@@ -829,7 +1594,7 @@ impl SignalAggregator {
 
         if let Some(query) = &self.query_data {
             if !query.simple_terms.is_empty() {
-                for signal in Signal::all() {
+                for signal in SignalEnum::all() {
                     if let Some(text_field) = signal.as_textfield() {
                         let tv_field = schema.get_field(text_field.name()).unwrap();
                         let simple_query = itertools::intersperse(
@@ -1010,13 +1775,23 @@ impl SignalAggregator {
     }
 
     pub fn precompute_score(&self, webpage: &Webpage) -> f64 {
-        Signal::all()
-            .filter_map(|signal| signal.precompute(self, webpage))
+        SignalEnum::all()
+            .filter_map(|signal| {
+                signal
+                    .precompute(webpage, self)
+                    .map(|value| ComputedSignal {
+                        signal,
+                        score: SignalScore {
+                            coefficient: self.coefficient(&signal),
+                            value,
+                        },
+                    })
+            })
             .map(|computed| computed.score.coefficient * computed.score.value)
             .sum()
     }
 
-    pub fn coefficient(&self, signal: &Signal) -> f64 {
+    pub fn coefficient(&self, signal: &SignalEnum) -> f64 {
         self.query_signal_coefficients
             .as_ref()
             .map(|coefficients| coefficients.get(signal))
@@ -1031,7 +1806,7 @@ impl SignalAggregator {
 
 #[derive(Debug, Clone, Copy)]
 pub struct ComputedSignal {
-    pub signal: Signal,
+    pub signal: SignalEnum,
     pub score: SignalScore,
 }
 
@@ -1045,7 +1820,7 @@ pub struct SignalScore {
 #[derive(Clone)]
 pub struct SignalOrder {
     text_signals: EnumMap<TextFieldEnum, NGramSignalOrder>,
-    other_signals: Vec<Signal>,
+    other_signals: Vec<SignalEnum>,
 }
 
 impl SignalOrder {
@@ -1060,7 +1835,7 @@ impl SignalOrder {
         let mut text_signals = EnumMap::new();
         let mut other_signals = Vec::new();
 
-        for signal in Signal::all() {
+        for signal in SignalEnum::all() {
             if signal_aggregator.coefficient(&signal) == 0.0 {
                 continue;
             }
@@ -1097,7 +1872,23 @@ impl SignalOrder {
             .chain(
                 self.other_signals
                     .iter()
-                    .map(move |signal| signal.compute(signal_aggregator, doc)),
+                    .filter_map(|signal| {
+                        let coefficient = signal_aggregator.coefficient(signal);
+
+                        if coefficient > 0.0 {
+                            Some((signal, coefficient))
+                        } else {
+                            None
+                        }
+                    })
+                    .map(move |(signal, coefficient)| {
+                        signal
+                            .compute(doc, signal_aggregator)
+                            .map(|value| ComputedSignal {
+                                signal: *signal,
+                                score: SignalScore { coefficient, value },
+                            })
+                    }),
             )
     }
 }
@@ -1112,11 +1903,11 @@ const NGRAM_DAMPENING: f64 = 0.4;
 #[derive(Debug, Default, Clone)]
 pub struct NGramSignalOrder {
     /// ordered by descending ngram size. e.g. [title_bm25_trigram, title_bm25_bigram, title_bm25]
-    signals: Vec<(usize, Signal)>,
+    signals: Vec<(usize, SignalEnum)>,
 }
 
 impl NGramSignalOrder {
-    fn push(&mut self, signal: Signal, ngram: usize) {
+    fn push(&mut self, signal: SignalEnum, ngram: usize) {
         self.signals.push((ngram, signal));
         self.signals.sort_unstable_by(|(a, _), (b, _)| b.cmp(a));
     }
@@ -1132,15 +1923,25 @@ impl NGramSignalOrder {
             .iter()
             .map(|(_, s)| s)
             .filter_map(move |signal| {
-                signal.compute(signal_aggregator, doc).map(|mut c| {
-                    c.score.coefficient *= NGRAM_DAMPENING.powi(hits);
+                signal
+                    .compute(doc, signal_aggregator)
+                    .map(|value| {
+                        let coefficient = signal_aggregator.coefficient(signal);
 
-                    if c.score.value > 0.0 {
-                        hits += 1;
-                    }
+                        ComputedSignal {
+                            signal: *signal,
+                            score: SignalScore { coefficient, value },
+                        }
+                    })
+                    .map(|mut c| {
+                        c.score.coefficient *= NGRAM_DAMPENING.powi(hits);
 
-                    c
-                })
+                        if c.score.value > 0.0 {
+                            hits += 1;
+                        }
+
+                        c
+                    })
             })
     }
 }

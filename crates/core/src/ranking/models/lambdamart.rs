@@ -16,9 +16,11 @@
 
 use std::{path::Path, str::FromStr};
 
+use signal::SignalEnumDiscriminants;
+
 use crate::{
     enum_map::EnumMap,
-    ranking::{signal, Signal},
+    ranking::{signal, SignalEnum},
 };
 
 type Result<T> = std::result::Result<T, Error>;
@@ -65,14 +67,14 @@ impl AsValue for f64 {
 #[derive(Debug)]
 struct Node {
     threshold: f64,
-    feature: Option<Signal>,
+    feature: Option<SignalEnum>,
     leaf_value: f64,
     left: Option<NodeOrLeaf>,
     right: Option<NodeOrLeaf>,
 }
 
 impl Node {
-    fn next<V: AsValue>(&self, features: &EnumMap<Signal, V>) -> Option<&NodeOrLeaf> {
+    fn next<V: AsValue>(&self, features: &EnumMap<SignalEnum, V>) -> Option<&NodeOrLeaf> {
         self.feature.and_then(|feature| {
             let value = features.get(feature).map(|v| v.as_value()).unwrap_or(0.0);
             if value <= self.threshold {
@@ -192,7 +194,7 @@ impl Tree {
         Ok(Self { nodes })
     }
 
-    fn predict<V: AsValue>(&self, features: &EnumMap<Signal, V>) -> Result<f64> {
+    fn predict<V: AsValue>(&self, features: &EnumMap<SignalEnum, V>) -> Result<f64> {
         let mut node = &self.nodes[0];
         while let Some(next) = node.next(features) {
             node = match next {
@@ -206,7 +208,7 @@ impl Tree {
 }
 
 struct Header {
-    features: Vec<Signal>,
+    features: Vec<SignalEnum>,
 }
 
 impl Header {
@@ -217,7 +219,7 @@ impl Header {
             if let Some((key, value)) = lin.split_once('=') {
                 if key == "feature_names" {
                     for name in value.split(' ') {
-                        features.push(Signal::from_str(name)?);
+                        features.push(SignalEnum::from(SignalEnumDiscriminants::from_str(name)?));
                     }
                 }
             }
@@ -290,7 +292,7 @@ impl LambdaMART {
         Self::parse(&s)
     }
 
-    pub fn predict<V: AsValue>(&self, features: &EnumMap<Signal, V>) -> f64 {
+    pub fn predict<V: AsValue>(&self, features: &EnumMap<SignalEnum, V>) -> f64 {
         self.trees
             .iter()
             .map(|t| t.predict(features).unwrap())
@@ -301,6 +303,8 @@ impl LambdaMART {
 
 #[cfg(test)]
 mod tests {
+    use crate::ranking;
+
     use super::*;
 
     #[test]
@@ -310,35 +314,44 @@ mod tests {
         assert!(!model.trees.is_empty());
 
         let mut features = EnumMap::new();
-        features.insert(Signal::Bm25BacklinkText, 85.7750244140625);
-        features.insert(Signal::Bm25CleanBody, 67.41311645507812);
-        features.insert(Signal::Bm25CleanBodyBigrams, 0.0);
-        features.insert(Signal::Bm25CleanBodyTrigrams, 0.0);
-        features.insert(Signal::IdfSumDomain, 43.332096099853516);
-        features.insert(Signal::IdfSumDomainIfHomepage, 0.0);
-        features.insert(Signal::IdfSumDomainIfHomepageNoTokenizer, 0.0);
-        features.insert(Signal::IdfSumDomainNameIfHomepageNoTokenizer, 0.0);
-        features.insert(Signal::IdfSumDomainNameNoTokenizer, 0.0);
-        features.insert(Signal::IdfSumDomainNoTokenizer, 0.0);
-        features.insert(Signal::IdfSumSite, 61.47410202026367);
-        features.insert(Signal::IdfSumSiteNoTokenizer, 0.0);
-        features.insert(Signal::Bm25StemmedCleanBody, 65.94627380371094);
-        features.insert(Signal::Bm25StemmedTitle, 0.0);
-        features.insert(Signal::Bm25Title, 59.817813873291016);
-        features.insert(Signal::Bm25TitleBigrams, 0.0);
-        features.insert(Signal::IdfSumTitleIfHomepage, 0.0);
-        features.insert(Signal::Bm25TitleTrigrams, 0.0);
-        features.insert(Signal::IdfSumUrl, 57.07925033569336);
-        features.insert(Signal::FetchTimeMs, 0.023255813953488372);
-        features.insert(Signal::HostCentrality, 0.017958538);
-        features.insert(Signal::InboundSimilarity, 0.0);
-        features.insert(Signal::IsHomepage, 0.0);
-        features.insert(Signal::PageCentrality, 0.008253236);
-        features.insert(Signal::Region, 0.16622349570454012);
-        features.insert(Signal::TrackerScore, 0.07692307692307693);
-        features.insert(Signal::UpdateTimestamp, 0.0);
-        features.insert(Signal::UrlDigits, 0.25);
-        features.insert(Signal::UrlSlashes, 0.3333333333333333);
+        features.insert(ranking::signal::Bm25BacklinkText.into(), 85.7750244140625);
+        features.insert(ranking::signal::Bm25CleanBody.into(), 67.41311645507812);
+        features.insert(ranking::signal::Bm25CleanBodyBigrams.into(), 0.0);
+        features.insert(ranking::signal::Bm25CleanBodyTrigrams.into(), 0.0);
+        features.insert(ranking::signal::IdfSumDomain.into(), 43.332096099853516);
+        features.insert(ranking::signal::IdfSumDomainIfHomepage.into(), 0.0);
+        features.insert(
+            ranking::signal::IdfSumDomainIfHomepageNoTokenizer.into(),
+            0.0,
+        );
+        features.insert(
+            ranking::signal::IdfSumDomainNameIfHomepageNoTokenizer.into(),
+            0.0,
+        );
+        features.insert(ranking::signal::IdfSumDomainNameNoTokenizer.into(), 0.0);
+        features.insert(ranking::signal::IdfSumDomainNoTokenizer.into(), 0.0);
+        features.insert(ranking::signal::IdfSumSite.into(), 61.47410202026367);
+        features.insert(ranking::signal::IdfSumSiteNoTokenizer.into(), 0.0);
+        features.insert(
+            ranking::signal::Bm25StemmedCleanBody.into(),
+            65.94627380371094,
+        );
+        features.insert(ranking::signal::Bm25StemmedTitle.into(), 0.0);
+        features.insert(ranking::signal::Bm25Title.into(), 59.817813873291016);
+        features.insert(ranking::signal::Bm25TitleBigrams.into(), 0.0);
+        features.insert(ranking::signal::IdfSumTitleIfHomepage.into(), 0.0);
+        features.insert(ranking::signal::Bm25TitleTrigrams.into(), 0.0);
+        features.insert(ranking::signal::IdfSumUrl.into(), 57.07925033569336);
+        features.insert(ranking::signal::FetchTimeMs.into(), 0.023255813953488372);
+        features.insert(ranking::signal::HostCentrality.into(), 0.017958538);
+        features.insert(ranking::signal::InboundSimilarity.into(), 0.0);
+        features.insert(ranking::signal::IsHomepage.into(), 0.0);
+        features.insert(ranking::signal::PageCentrality.into(), 0.008253236);
+        features.insert(ranking::signal::Region.into(), 0.16622349570454012);
+        features.insert(ranking::signal::TrackerScore.into(), 0.07692307692307693);
+        features.insert(ranking::signal::UpdateTimestamp.into(), 0.0);
+        features.insert(ranking::signal::UrlDigits.into(), 0.25);
+        features.insert(ranking::signal::UrlSlashes.into(), 0.3333333333333333);
 
         assert_eq!((model.predict(&features) * 1000.0) as u64, 1050);
     }

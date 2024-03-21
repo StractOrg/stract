@@ -25,8 +25,8 @@ use tantivy::{
 use whatlang::Lang;
 
 use crate::{
+    enum_dispatch_from_discriminant,
     enum_map::InsertEnumMapKey,
-    from_discriminant,
     tokenizer::{
         BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
     },
@@ -170,7 +170,7 @@ pub enum TextFieldEnum {
     Keywords,
 }
 
-from_discriminant!(TextFieldEnumDiscriminants => TextFieldEnum,
+enum_dispatch_from_discriminant!(TextFieldEnumDiscriminants => TextFieldEnum,
 [
     Title,
     CleanBody,

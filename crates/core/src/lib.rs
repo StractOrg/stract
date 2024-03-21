@@ -254,3 +254,18 @@ mod tests {
         }
     }
 }
+
+#[macro_export]
+macro_rules! enum_dispatch_from_discriminant {
+    ($discenum:ident => $enum:ident, [$($disc:ident),*$(,)?]) => {
+        impl From<$discenum> for $enum {
+            fn from(value: $discenum) -> Self {
+                match value {
+                    $(
+                    $discenum::$disc => $disc.into(),
+                    )*
+                }
+            }
+        }
+    };
+}

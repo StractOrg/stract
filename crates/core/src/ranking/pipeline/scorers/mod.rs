@@ -25,7 +25,7 @@ pub use reranker::ReRanker;
 
 use crate::{
     enum_map::EnumMap,
-    ranking::{models::lambdamart::LambdaMART, Signal, SignalCoefficient, SignalScore},
+    ranking::{self, models::lambdamart::LambdaMART, SignalCoefficient, SignalEnum, SignalScore},
     searcher::SearchQuery,
 };
 
@@ -45,11 +45,11 @@ impl<T: RankableWebpage> Scorer<T> for IdentityScorer {
 fn calculate_score(
     model: &Option<Arc<LambdaMART>>,
     coefficients: SignalCoefficient,
-    signals: &EnumMap<Signal, SignalScore>,
+    signals: &EnumMap<SignalEnum, SignalScore>,
 ) -> f64 {
     let lambda_score = match model {
         Some(model) => {
-            let coeff = coefficients.get(&Signal::LambdaMART);
+            let coeff = coefficients.get(&ranking::signal::LambdaMart.into());
             if coeff == 0.0 {
                 signals
                     .values()

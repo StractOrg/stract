@@ -35,6 +35,8 @@ pub mod schema_org;
 pub mod url_ext;
 pub use self::html::Html;
 
+pub use region::Region;
+
 #[derive(Debug)]
 pub struct Webpage {
     pub html: Html,

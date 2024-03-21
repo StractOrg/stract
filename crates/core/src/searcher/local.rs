@@ -29,7 +29,7 @@ use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{PrecisionRankingWebpage, RankingPipeline, RecallRankingWebpage};
-use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator};
+use crate::ranking::{self, query_centrality, Ranker, SignalAggregator, SignalEnum};
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::DisplayedWebpage;
 use crate::webgraph::Node;
@@ -186,7 +186,8 @@ where
         de_rank_similar: bool,
         aggregator: SignalAggregator,
     ) -> Result<Ranker> {
-        let query_centrality_coeff = aggregator.coefficient(&Signal::QueryCentrality);
+        let query_centrality_coeff =
+            aggregator.coefficient(&ranking::signal::QueryCentrality.into());
 
         let mut ranker = Ranker::new(
             aggregator,
@@ -409,9 +410,9 @@ where
         for (webpage, ranking) in webpages.iter_mut().zip(top_websites) {
             let mut ranking_signals = HashMap::new();
 
-            for signal in Signal::all() {
+            for signal in SignalEnum::all() {
                 if let Some(score) = ranking.ranking.signals.get(signal) {
-                    ranking_signals.insert(signal, *score);
+                    ranking_signals.insert(signal.into(), *score);
                 }
             }
 

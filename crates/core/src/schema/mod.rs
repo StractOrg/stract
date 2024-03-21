@@ -122,18 +122,3 @@ pub enum IndexingOption {
     DateTime(DateOptions),
     Bytes(BytesOptions),
 }
-
-#[macro_export]
-macro_rules! from_discriminant {
-    ($discenum:ident => $enum:ident, [$($disc:ident),*$(,)?]) => {
-        impl From<$discenum> for $enum {
-            fn from(value: $discenum) -> Self {
-                match value {
-                    $(
-                    $discenum::$disc => $disc.into(),
-                    )*
-                }
-            }
-        }
-    };
-}

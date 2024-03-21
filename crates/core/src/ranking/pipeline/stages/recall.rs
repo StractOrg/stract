@@ -28,7 +28,7 @@ use crate::{
     ranking::{
         models::lambdamart::LambdaMART,
         pipeline::{RankableWebpage, RankingPipeline, RankingStage, Recall, Scorer},
-        Signal, SignalAggregator, SignalScore,
+        SignalAggregator, SignalEnum, SignalScore,
     },
     schema::fast_field,
     searcher::SearchQuery,
@@ -46,7 +46,7 @@ impl StoredEmbeddings {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RecallRankingWebpage {
     pub pointer: WebpagePointer,
-    pub signals: EnumMap<Signal, SignalScore>,
+    pub signals: EnumMap<SignalEnum, SignalScore>,
     pub optic_boost: Option<f64>,
     pub title_embedding: Option<StoredEmbeddings>,
     pub keyword_embedding: Option<StoredEmbeddings>,

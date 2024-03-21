@@ -22,8 +22,9 @@ use tantivy::{
 };
 
 use crate::{
+    enum_dispatch_from_discriminant,
     enum_map::InsertEnumMapKey,
-    from_discriminant, simhash,
+    simhash,
     webpage::{html::FnCache, Html, Webpage},
     Result,
 };
@@ -130,7 +131,7 @@ pub enum FastFieldEnum {
     KeywordEmbeddings,
 }
 
-from_discriminant!(FastFieldEnumDiscriminants => FastFieldEnum,
+enum_dispatch_from_discriminant!(FastFieldEnumDiscriminants => FastFieldEnum,
 [
     IsHomepage,
     HostCentrality,
