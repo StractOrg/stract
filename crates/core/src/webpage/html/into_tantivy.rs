@@ -135,7 +135,7 @@ impl Html {
             .root_domain()
             .unwrap_or_default()
             .find('.')
-            .map(|index| &domain[..ceil_char_boundary(&domain, index).min(domain.len())])
+            .map(|index| &domain[..ceil_char_boundary(domain, index).min(domain.len())])
             .unwrap_or_default()
             .to_string()
     }

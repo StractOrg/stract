@@ -20,7 +20,6 @@ mod lexer;
 use ast::RankingCoeff;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 use std::fmt::Display;
 use thiserror::Error;
 use utoipa::ToSchema;
@@ -509,7 +508,7 @@ impl HostRankings {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{RankingCoeff, RankingTarget};
+    use crate::ast::RankingTarget;
 
     use super::*;
     #[test]

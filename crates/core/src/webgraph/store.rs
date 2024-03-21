@@ -647,8 +647,6 @@ impl EdgeStore {
 
 #[cfg(test)]
 mod tests {
-    use crate::webgraph::FullNodeID;
-
     use super::*;
 
     #[test]

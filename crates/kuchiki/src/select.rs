@@ -3,7 +3,7 @@ use crate::iter::{NodeIterator, Select};
 use crate::node_data_ref::NodeDataRef;
 use crate::tree::{ElementData, Node, NodeData, NodeRef};
 use crate::{Error, Result};
-use cssparser::{self, CowRcStr, ParseError, SourceLocation, ToCss};
+use cssparser::{CowRcStr, ParseError, SourceLocation, ToCss};
 use html5ever::{LocalName, Namespace};
 use selectors::attr::{AttrSelectorOperation, CaseSensitivity, NamespaceConstraint};
 use selectors::context::QuirksMode;
@@ -11,7 +11,7 @@ use selectors::parser::SelectorParseErrorKind;
 use selectors::parser::{
     NonTSPseudoClass, Parser, Selector as GenericSelector, SelectorImpl, SelectorList,
 };
-use selectors::{self, matching, OpaqueElement};
+use selectors::{matching, OpaqueElement};
 use std::fmt;
 
 /// The definition of whitespace per CSS Selectors Level 3 § 4.

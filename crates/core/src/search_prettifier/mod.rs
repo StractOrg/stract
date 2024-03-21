@@ -233,7 +233,7 @@ pub enum DisplayedSidebar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{DateTime, Utc};
+    use chrono::DateTime;
 
     #[test]
     fn prettify_date_in_hours() {

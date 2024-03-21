@@ -82,7 +82,7 @@ impl WarcSource {
                 }
             }
             WarcSource::Local(config) => {
-                warc_paths = config.names.clone();
+                warc_paths.clone_from(&config.names);
             }
             WarcSource::S3(config) => {
                 let bucket = s3::Bucket::new(

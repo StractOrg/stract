@@ -244,12 +244,7 @@ impl tantivy::query::Query for Query {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        index::Index,
-        rand_words,
-        searcher::{LocalSearcher, SearchQuery},
-        webpage::Webpage,
-    };
+    use crate::{index::Index, rand_words, searcher::LocalSearcher, webpage::Webpage};
 
     use super::*;
 

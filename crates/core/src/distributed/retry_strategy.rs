@@ -3,7 +3,6 @@
  * and modified as it seems silly to pull-in a new dependency for a single file.
  * */
 use rand::Rng;
-use std::iter::Iterator;
 use std::time::Duration;
 use std::u64::MAX as U64_MAX;
 

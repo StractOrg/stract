@@ -14,37 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::Hash;
 
 use serde::{Deserialize, Serialize};
-
-struct PrehashBuilder {}
-
-impl BuildHasher for PrehashBuilder {
-    type Hasher = Prehasher;
-
-    fn build_hasher(&self) -> Self::Hasher {
-        Prehasher { val: 0 }
-    }
-}
-
-struct Prehasher {
-    val: u128,
-}
-
-impl Hasher for Prehasher {
-    fn finish(&self) -> u64 {
-        self.val as u64
-    }
-
-    fn write(&mut self, _bytes: &[u8]) {
-        unimplemented!("This hasher only supports u128")
-    }
-
-    fn write_u128(&mut self, i: u128) {
-        self.val = i;
-    }
-}
 
 #[derive(Debug, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct Prehashed(pub u128);

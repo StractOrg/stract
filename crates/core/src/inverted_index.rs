@@ -796,12 +796,7 @@ mod tests {
     use candle_core::Tensor;
     use maplit::hashmap;
 
-    use crate::{
-        config::CollectorConfig,
-        ranking::{Ranker, SignalAggregator},
-        searcher::SearchQuery,
-        webpage::Html,
-    };
+    use crate::{config::CollectorConfig, ranking::Ranker, searcher::SearchQuery, webpage::Html};
 
     use super::*;
 

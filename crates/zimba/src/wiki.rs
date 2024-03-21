@@ -122,7 +122,7 @@ impl<'a> Iterator for ArticleIterator<'a> {
         let mut title = article_ref.title;
 
         if title.is_empty() {
-            title = article_ref.url.clone();
+            title.clone_from(&article_ref.url);
         }
 
         let article = Article {

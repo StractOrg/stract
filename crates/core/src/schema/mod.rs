@@ -48,7 +48,7 @@ impl Field {
         }
         let _field_id = field_id - FastFieldEnum::num_variants();
 
-        return None;
+        None
     }
 
     #[inline]

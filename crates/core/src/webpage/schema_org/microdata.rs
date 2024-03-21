@@ -345,8 +345,6 @@ mod tests {
     use kuchiki::traits::TendrilSink;
     use maplit::hashmap;
 
-    use crate::webpage::schema_org::RawOneOrMany;
-
     use super::*;
 
     #[test]
@@ -613,13 +611,13 @@ mod tests {
                 <img src="mexico-beach.jpg"
                 alt="Sunny, sandy beach."
                 itemprop="contentUrl" />
-        
+
                 By <span itemprop="author">Jane Doe</span>
                 Photographed in
                 <span itemprop="contentLocation">Puerto Vallarta, Mexico</span>
                 Date uploaded:
                 <meta itemprop="datePublished" content="2008-01-25">Jan 25, 2008
-        
+
                 <span itemprop="description">I took this picture while on vacation last year.</span>
                 </div>
             </html>
@@ -651,7 +649,7 @@ mod tests {
             <div itemscope itemtype="https://schema.org/Person">
             <span itemprop="name">Jane Doe</span>
             <img src="janedoe.jpg" itemprop="image" alt="Photo of Jane Doe"/>
-      
+
             <span itemprop="jobTitle">Professor</span>
             <div itemprop="address" itemscope itemtype="https://schema.org/PostalAddress">
               <span itemprop="streetAddress">
@@ -665,10 +663,10 @@ mod tests {
             <span itemprop="telephone">(425) 123-4567</span>
             <a href="mailto:jane-doe@xyz.edu" itemprop="email">
               jane-doe@xyz.edu</a>
-      
+
             Jane's home page:
             <a href="http://www.janedoe.com" itemprop="url">janedoe.com</a>
-      
+
             Graduate students:
             <a href="http://www.xyz.edu/students/alicejones.html" itemprop="colleague">
               Alice Jones</a>

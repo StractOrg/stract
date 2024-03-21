@@ -1,6 +1,6 @@
 use html5ever::tendril::StrTendril;
 use html5ever::tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink};
-use html5ever::{self, Attribute, ExpandedName, QualName};
+use html5ever::{Attribute, ExpandedName, QualName};
 use std::borrow::Cow;
 
 use crate::attributes;

@@ -297,7 +297,7 @@ impl TextField for Title {
             cache
                 .pretokenize_title()
                 .as_ref()
-                .map(Clone::clone)
+                .cloned()
                 .map_err(|e| anyhow::anyhow!("{}", e))?,
         );
 
@@ -361,7 +361,7 @@ impl TextField for StemmedTitle {
         let title = cache
             .pretokenize_title()
             .as_ref()
-            .map(Clone::clone)
+            .cloned()
             .map_err(|e| anyhow::anyhow!("{}", e))?;
         let mut tokens = title.tokens.clone();
         stem_tokens(&mut tokens, html.lang().copied().unwrap_or(Lang::Eng));
@@ -441,7 +441,7 @@ impl TextField for AllBody {
         let all_text = cache
             .pretokenize_all_text()
             .as_ref()
-            .map(Clone::clone)
+            .cloned()
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         doc.add_pre_tokenized_text(self.tantivy_field(schema), all_text.clone());
@@ -900,7 +900,7 @@ impl TextField for TitleIfHomepage {
         let title = cache
             .pretokenize_title()
             .as_ref()
-            .map(Clone::clone)
+            .cloned()
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         if html.is_homepage() {
@@ -1157,7 +1157,7 @@ impl TextField for TitleBigrams {
         let title = cache
             .pretokenize_title()
             .as_ref()
-            .map(Clone::clone)
+            .cloned()
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         doc.add_text(self.tantivy_field(schema), title.text.clone());
@@ -1246,7 +1246,7 @@ impl TextField for TitleTrigrams {
         let title = cache
             .pretokenize_title()
             .as_ref()
-            .map(Clone::clone)
+            .cloned()
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         doc.add_text(self.tantivy_field(schema), title.text.clone());

@@ -476,10 +476,7 @@ mod tests {
 
     use std::collections::HashMap;
 
-    use crate::{
-        schema::create_schema,
-        webpage::{url_ext::UrlExt, Link},
-    };
+    use crate::{schema::create_schema, webpage::Link};
 
     use super::*;
 
