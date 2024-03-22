@@ -7,7 +7,8 @@
   import RegionSelect from '$lib/components/RegionSelect.svelte';
   import type { DisplayedWebpage } from '$lib/api';
   import { onMount } from 'svelte';
-  import { searchQueryStore } from '$lib/stores';
+  import { searchQueryStore, useKeyboardShortcuts } from '$lib/stores';
+  import { Keys, Keybind, searchCb } from '$lib/keybind';
   import { flip } from 'svelte/animate';
   import Result from './Result.svelte';
   import Sidebar from './Sidebar.svelte';
@@ -23,6 +24,30 @@
   $: query = data.query;
 
   let modal: { top: number; left: number; site: DisplayedWebpage } | undefined;
+
+  const keybind = new Keybind([
+    { key: Keys.J, callback: searchCb.focusNextResult },
+    { key: Keys.ARROW_DOWN, callback: searchCb.focusNextResult },
+    { key: Keys.K, callback: searchCb.focusPrevResult },
+    { key: Keys.ARROW_UP, callback: searchCb.focusPrevResult },
+    { key: Keys.H, callback: searchCb.focusSearchBar },
+    { key: Keys.FORWARD_SLASH, callback: searchCb.focusSearchBar },
+    { key: Keys.V, callback: searchCb.openResultInNewTab },
+    { key: Keys.SINGLE_QUOTE, callback: searchCb.openResultInNewTab },
+    { key: Keys.T, callback: searchCb.scrollToTop },
+    { key: Keys.D, callback: searchCb.domainSearch },
+    { key: Keys.L, callback: searchCb.openResult },
+    { key: Keys.O, callback: searchCb.openResult },
+    { key: Keys.M, callback: searchCb.focusMainResult },
+    { key: Keys.S, callback: searchCb.goToMisspellLink },
+  ]);
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    // Only call onKeyDown if the target is not an input element (ie. search bar)
+    if (!((event.target as HTMLElement).nodeName === 'INPUT')) {
+      keybind.onKeyDown(event, $useKeyboardShortcuts);
+    }
+  };
 
   onMount(() => {
     const listener = () => {
@@ -67,6 +92,8 @@
   }
 </script>
 
+<svelte:window on:keydown={onKeyDown} />
+
 {#if modal}
   <Modal {query} {modal} />
 {/if}
@@ -110,6 +137,7 @@
           <div>
             Did you mean:{' '}
             <a
+              id="misspell-link"
               class="font-medium"
               href="/search?q={encodeURIComponent(results.spellCorrection.raw)}"
               >{#each results.spellCorrection.highlighted as frag}

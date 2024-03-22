@@ -76,6 +76,9 @@ export const markPagesWithAdsStore = writableLocalStorage<boolean>(MARK_PAGES_WI
 const RESULTS_IN_NEW_TAB_KEY = 'resultsInNewTab';
 export const resultsInNewTab = writableLocalStorage<boolean>(RESULTS_IN_NEW_TAB_KEY, false);
 
+const USE_KEYBOARD_SHORTCUTS = 'useKeyboardShortcuts';
+export const useKeyboardShortcuts = writableLocalStorage<boolean>(USE_KEYBOARD_SHORTCUTS, true);
+
 const MARK_PAGES_WITH_PAYWALL_KEY = 'markPagesWithPaywall';
 export const markPagesWithPaywallStore = writableLocalStorage<boolean>(
   MARK_PAGES_WITH_PAYWALL_KEY,
