@@ -1,29 +1,18 @@
 <script lang="ts">
-  import ChevronLeft from '~icons/heroicons/chevron-left-20-solid';
-  import ChevronRight from '~icons/heroicons/chevron-right-20-solid';
   import OpticSelector from '$lib/components/OpticSelector.svelte';
   import Searchbar from '$lib/components/Searchbar.svelte';
   import type { PageData } from './$types';
   import RegionSelect from '$lib/components/RegionSelect.svelte';
-  import type { DisplayedWebpage } from '$lib/api';
-  import { onMount } from 'svelte';
   import { searchQueryStore, useKeyboardShortcuts } from '$lib/stores';
-  import { Keys, Keybind, searchCb } from '$lib/keybind';
-  import { flip } from 'svelte/animate';
-  import Result from './Result.svelte';
-  import Sidebar from './Sidebar.svelte';
-  import Widget from './Widget.svelte';
-  import Discussions from './Discussions.svelte';
   import { page } from '$app/stores';
   import { updateQueryId } from '$lib/improvements';
   import { browser } from '$app/environment';
-  import Modal from './Modal.svelte';
+  import Serp from './Serp.svelte';
+  import { search } from '$lib/search';
 
   export let data: PageData;
   $: results = data.results;
-  $: query = data.query;
-
-  let modal: { top: number; left: number; site: DisplayedWebpage } | undefined;
+  $: query = data.params.query;
 
   const keybind = new Keybind([
     { key: Keys.J, callback: searchCb.focusNextResult },
@@ -49,153 +38,116 @@
     }
   };
 
-  onMount(() => {
-    const listener = () => {
-      modal = void 0;
-    };
-    document.addEventListener('click', listener);
-    return () => document.removeEventListener('click', listener);
-  });
-
-  const openSearchModal =
-    (site: DisplayedWebpage) =>
-    ({ detail: button }: CustomEvent<HTMLButtonElement>) => {
-      const rect = button.getBoundingClientRect();
-
-      if (modal?.site == site) {
-        modal = void 0;
-        return;
-      }
-
-      // NOTE: The point calculated is the middle of the right edge of the clicked
-      // element, like so:
-      //     +---+
-      //     |   x <--
-      //     +---+
-      modal = {
-        top: window.scrollY + rect.top + rect.height / 2,
-        left: window.scrollX + rect.right,
-        site,
-      };
-    };
-
-  // NOTE: save the search query to be used in the header
-  $: searchQueryStore?.set($page.url.search);
+  let prevPageSearchParams: URLSearchParams | null = null;
+  let nextPageSearchParams: URLSearchParams | null = null;
 
   $: {
-    results;
-    modal = void 0;
+    if (data.params.currentPage > 1) {
+      const newParams = new URLSearchParams($page.url.searchParams);
+      newParams.set('p', (data.params.currentPage - 1).toString());
+      prevPageSearchParams = newParams;
+    } else {
+      prevPageSearchParams = null;
+    }
+
+    if (results && results.type == 'websites' && results.hasMoreResults) {
+      const newParams = new URLSearchParams($page.url.searchParams);
+      newParams.set('p', (data.params.currentPage + 1).toString());
+      nextPageSearchParams = newParams;
+    } else {
+      nextPageSearchParams = null;
+    }
   }
 
+  const clientSearch = async () => {
+    if (!browser) return;
+
+    const res = await search(data.params, { fetch: fetch });
+
+    if (res.type == 'bang') {
+      window.location.replace(res.redirectTo);
+      return null;
+    }
+
+    results = res;
+
+    return res;
+  };
+
+  // NOTE: save the search query to be used in the navbar
+  $: searchQueryStore?.set($page.url.search);
+  let paramsForRedirect = new URLSearchParams($page.url.search);
+  let serverSearch = paramsForRedirect.get('ssr') === 'true';
+  paramsForRedirect.set('ssr', 'true');
+  let encodedQueryForRedirect = paramsForRedirect.toString();
+
   $: {
-    if (browser && results.type == 'websites') updateQueryId({ query, webpages: results.webpages });
+    if (browser && results && results.type == 'websites')
+      updateQueryId({ query, webpages: results.webpages });
   }
 </script>
 
-<svelte:window on:keydown={onKeyDown} />
-
-{#if modal}
-  <Modal {query} {modal} />
-{/if}
-
-{#if results.type == 'websites'}
-  <div
-    class="m-0 grid w-full grid-rows-[auto_1fr] gap-y-5 px-5 pt-4 md:grid-cols-[minmax(50ch,48rem)_1fr] md:gap-x-12 md:pl-20 lg:pl-28"
-    style="text-rendering:optimizeLegibility;font-smooth:always;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;"
-  >
-    <div class="flex max-w-2xl flex-col space-y-1">
-      <div class="w-full">
-        <Searchbar {query} />
-      </div>
-      <div class="mx-auto flex w-full justify-end sm:justify-between">
-        <div class="hidden h-full flex-col space-x-2 text-xs text-neutral sm:flex">
-          <p class="h-fit">
-            {#if results.numHits != null}
-              Found <span class="font-medium">{results.numHits.toLocaleString()}</span> results in
-              <span class="font-medium">{((results.searchDurationMs ?? 0) / 1000).toFixed(2)}s</span
-              >
-            {:else}
-              Search took <span class="font-medium"
-                >{((results.searchDurationMs ?? 0) / 1000).toFixed(2)}s</span
-              >
-            {/if}
-          </p>
-        </div>
-        <div class="flex space-x-2">
-          <div class="m-0 flex h-full flex-col justify-center p-0">
-            <OpticSelector searchOnChange={true} selected={data.optic} />
-          </div>
-          <div class="select-region flex h-full flex-col justify-center">
-            <RegionSelect searchOnChange={true} selected={data.selectedRegion} />
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-start-1 flex min-w-0 max-w-2xl flex-col space-y-5">
-      {#if results.spellCorrection}
-        <div>
-          <div>
-            Did you mean:{' '}
-            <a
-              id="misspell-link"
-              class="font-medium"
-              href="/search?q={encodeURIComponent(results.spellCorrection.raw)}"
-              >{#each results.spellCorrection.highlighted as frag}
-                {#if frag.kind == 'highlighted'}
-                  <b><i>{frag.text}</i></b>
-                {:else}
-                  {frag.text}
-                {/if}
-              {/each}</a
-            >
-          </div>
-        </div>
-      {/if}
-
-      {#if results.widget}
-        <Widget widget={results.widget} />
-      {/if}
-
-      {#if results.webpages}
-        <div class="grid w-full grid-cols-1 space-y-10 place-self-start">
-          {#each results.webpages as webpage, resultIndex (`${query}-${webpage.url}`)}
-            <div animate:flip={{ duration: 150 }}>
-              <Result {webpage} {resultIndex} on:modal={openSearchModal(webpage)} />
-            </div>
-          {/each}
-          {#if results.discussions}
-            <Discussions discussions={results.discussions} />
-          {/if}
-        </div>
-      {/if}
-
-      <div class="flex justify-center">
-        <div class="grid grid-cols-[repeat(3,auto)] items-center justify-center gap-2">
-          {#if data.prevPageSearchParams}
-            <a href="/search?{data.prevPageSearchParams}">
-              <ChevronLeft class="text-xl text-primary hover:text-primary-focus" />
-            </a>
-          {:else}
-            <ChevronLeft class="text-xl text-neutral" />
-          {/if}
-          <div>Page {data.currentPage}</div>
-          {#if data.nextPageSearchParams}
-            <a href="/search?{data.nextPageSearchParams}">
-              <ChevronRight class="text-xl text-primary hover:text-primary-focus" />
-            </a>
-          {:else}
-            <ChevronRight class="text-xl text-neutral" />
-          {/if}
-        </div>
-      </div>
-    </div>
-
-    {#if results.sidebar}
-      <div
-        class="row-start-2 mx-auto max-w-[90vw] justify-center md:col-start-2 md:row-span-2 md:row-start-1 md:max-w-[30vw] md:pt-5"
+{#if !serverSearch}
+  <noscript>
+    <meta http-equiv="refresh" content="0;url=/search?{encodedQueryForRedirect}" />
+    <div>
+      You are being redirected to <a href="/search?{encodedQueryForRedirect}" class="underline"
+        >a page that doesn't require javascript.</a
       >
-        <Sidebar sidebar={results.sidebar} />
-      </div>
-    {/if}
-  </div>
+    </div>
+  </noscript>
 {/if}
+
+<div
+  class="m-0 grid w-full grid-rows-[auto_1fr] gap-y-5 px-5 pt-4 md:grid-cols-[minmax(50ch,48rem)_1fr] md:gap-x-12 md:pl-20 lg:pl-28"
+  style="text-rendering:optimizeLegibility;font-smooth:always;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;"
+>
+  <div class="flex max-w-2xl flex-col space-y-1">
+    <div class="w-full">
+      <Searchbar {query} />
+    </div>
+    <div class="mx-auto flex w-full justify-end sm:justify-between">
+      <div class="hidden h-full flex-col space-x-2 text-xs text-neutral sm:flex">
+        <p class="h-fit">
+          {#if results && results.numHits != null}
+            Found <span class="font-medium">{results.numHits.toLocaleString()}</span> results in
+            <span class="font-medium">{((results.searchDurationMs ?? 0) / 1000).toFixed(2)}s</span>
+          {:else if results}
+            Search took <span class="font-medium"
+              >{((results.searchDurationMs ?? 0) / 1000).toFixed(2)}s</span
+            >
+          {/if}
+        </p>
+      </div>
+      <div class="flex space-x-2">
+        <div class="m-0 flex h-full flex-col justify-center p-0">
+          <OpticSelector searchOnChange={true} selected={data.params.optic} />
+        </div>
+        <div class="select-region flex h-full flex-col justify-center">
+          <RegionSelect searchOnChange={true} selected={data.params.selectedRegion} />
+        </div>
+      </div>
+    </div>
+  </div>
+  {#if results}
+    <Serp
+      {results}
+      {query}
+      {prevPageSearchParams}
+      {nextPageSearchParams}
+      currentPage={data.params.currentPage}
+    />
+  {:else}
+    {#await clientSearch() then results}
+      {#if results}
+        <Serp
+          {results}
+          {query}
+          {prevPageSearchParams}
+          {nextPageSearchParams}
+          currentPage={data.params.currentPage}
+        />
+      {/if}
+    {/await}
+  {/if}
+</div>

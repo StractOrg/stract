@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config,
     crawler::{self, planner::CrawlPlanner, CrawlCoordinator, Crawler},
-    distributed::sonic::{self, service::Message},
+    distributed::sonic::service::Message,
     kv::rocksdb_store::RocksDbStore,
     sonic_service,
     webgraph::WebgraphBuilder,
@@ -104,8 +104,8 @@ pub mod router {
     impl Message<RouterService> for NewJob {
         type Response = Option<Job>;
 
-        async fn handle(self, server: &RouterService) -> sonic::Result<Self::Response> {
-            Ok(server.router.sample_job().await?)
+        async fn handle(self, server: &RouterService) -> Self::Response {
+            server.router.sample_job().await.ok().flatten()
         }
     }
 }
@@ -127,9 +127,8 @@ pub mod coordinator {
     impl Message<CoordinatorService> for GetJob {
         type Response = Option<Job>;
 
-        async fn handle(self, server: &CoordinatorService) -> sonic::Result<Self::Response> {
-            let job = server.coordinator.sample_job()?;
-            Ok(job)
+        async fn handle(self, server: &CoordinatorService) -> Self::Response {
+            server.coordinator.sample_job().ok().flatten()
         }
     }
 }

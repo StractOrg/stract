@@ -91,7 +91,7 @@ impl LangSpellChecker {
                 continue;
             }
 
-            context[term_idx] = candidate.clone();
+            context[term_idx].clone_from(candidate);
 
             let log_prob = self.lm_logprob(term_idx, &context);
 

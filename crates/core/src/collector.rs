@@ -30,7 +30,7 @@ use crate::{
     inverted_index::{DocAddress, WebpagePointer},
     prehashed::Prehashed,
     ranking::initial::{InitialScoreTweaker, Score},
-    schema::FastField,
+    schema::{fast_field, FastFieldEnum},
     simhash,
 };
 
@@ -139,7 +139,7 @@ pub struct TopSegmentCollector {
 }
 
 impl TopSegmentCollector {
-    fn get_hash(&self, doc: DocId, field1: FastField, field2: FastField) -> Prehashed {
+    fn get_hash(&self, doc: DocId, field1: FastFieldEnum, field2: FastFieldEnum) -> Prehashed {
         let field_reader = self.fastfield_segment_reader.get_field_reader(doc);
 
         let hash = [
@@ -169,19 +169,31 @@ impl TopSegmentCollector {
         let simhash: Option<u64> = self
             .fastfield_segment_reader
             .get_field_reader(doc)
-            .get(FastField::SimHash)
+            .get(fast_field::SimHash.into())
             .unwrap()
             .into();
 
         self.bucket_collector.insert(SegmentDoc {
             hashes: Hashes {
-                site: self.get_hash(doc, FastField::SiteHash1, FastField::SiteHash2),
-                title: self.get_hash(doc, FastField::TitleHash1, FastField::TitleHash2),
-                url: self.get_hash(doc, FastField::UrlHash1, FastField::UrlHash2),
+                site: self.get_hash(
+                    doc,
+                    fast_field::SiteHash1.into(),
+                    fast_field::SiteHash2.into(),
+                ),
+                title: self.get_hash(
+                    doc,
+                    fast_field::TitleHash1.into(),
+                    fast_field::TitleHash2.into(),
+                ),
+                url: self.get_hash(
+                    doc,
+                    fast_field::UrlHash1.into(),
+                    fast_field::UrlHash2.into(),
+                ),
                 url_without_tld: self.get_hash(
                     doc,
-                    FastField::UrlWithoutTldHash1,
-                    FastField::UrlWithoutTldHash2,
+                    fast_field::UrlWithoutTldHash1.into(),
+                    fast_field::UrlWithoutTldHash2.into(),
                 ),
                 simhash: simhash.unwrap(),
             },

@@ -153,7 +153,10 @@ impl Index {
 
 #[cfg(test)]
 mod tests {
-    use crate::searcher::{LocalSearcher, SearchQuery};
+    use crate::{
+        ranking,
+        searcher::{LocalSearcher, SearchQuery},
+    };
 
     use super::*;
 
@@ -245,7 +248,7 @@ mod tests {
                 .ranking_signals
                 .as_ref()
                 .unwrap()
-                .get(&crate::ranking::Signal::Bm25Title)
+                .get(&crate::ranking::SignalEnum::from(ranking::signal::Bm25Title).into())
                 .unwrap())
             .all(|&v| v.value > 0.0));
     }

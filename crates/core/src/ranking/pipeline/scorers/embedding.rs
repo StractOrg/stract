@@ -21,8 +21,9 @@ use candle_core::Tensor;
 use crate::{
     models::dual_encoder::DualEncoder,
     ranking::{
+        self,
         pipeline::{stages::StoredEmbeddings, RankableWebpage, RecallRankingWebpage},
-        Signal, SignalCoefficient, SignalScore,
+        SignalCoefficient, SignalEnum, SignalScore,
     },
     searcher::{api::ScoredWebpagePointer, SearchQuery},
     Result,
@@ -100,7 +101,7 @@ impl<W, E: EmbeddingSignal<W>> EmbeddingScorer<W, E> {
         })
     }
 
-    fn query_emb_and_coefficient(&self, coeff_signal: Signal) -> Option<(Embedding, f64)> {
+    fn query_emb_and_coefficient(&self, coeff_signal: SignalEnum) -> Option<(Embedding, f64)> {
         self.query_emb().and_then(|query_emb| {
             self.signal_coefficients
                 .as_ref()
@@ -167,15 +168,15 @@ pub struct TitleEmbeddings;
 pub struct KeywordEmbeddings;
 
 pub trait EmbeddingSignal<W>: Send + Sync {
-    fn signal() -> Signal;
+    fn signal() -> SignalEnum;
     fn has_embedding(webpage: &W) -> bool;
     fn embedding(webpage: &W, hidden_size: usize) -> Option<Embedding>;
     fn insert_signal(webpage: &mut W, score: f64, coefficient: f64);
 }
 
 impl EmbeddingSignal<ScoredWebpagePointer> for TitleEmbeddings {
-    fn signal() -> Signal {
-        Signal::TitleEmbeddingSimilarity
+    fn signal() -> SignalEnum {
+        ranking::signal::TitleEmbeddingSimilarity.into()
     }
 
     fn has_embedding(webpage: &ScoredWebpagePointer) -> bool {
@@ -199,8 +200,8 @@ impl EmbeddingSignal<ScoredWebpagePointer> for TitleEmbeddings {
 }
 
 impl EmbeddingSignal<RecallRankingWebpage> for TitleEmbeddings {
-    fn signal() -> Signal {
-        Signal::TitleEmbeddingSimilarity
+    fn signal() -> SignalEnum {
+        ranking::signal::TitleEmbeddingSimilarity.into()
     }
 
     fn has_embedding(webpage: &RecallRankingWebpage) -> bool {
@@ -225,8 +226,8 @@ impl EmbeddingSignal<RecallRankingWebpage> for TitleEmbeddings {
 }
 
 impl EmbeddingSignal<ScoredWebpagePointer> for KeywordEmbeddings {
-    fn signal() -> Signal {
-        Signal::KeywordEmbeddingSimilarity
+    fn signal() -> SignalEnum {
+        ranking::signal::KeywordEmbeddingSimilarity.into()
     }
 
     fn has_embedding(webpage: &ScoredWebpagePointer) -> bool {
@@ -250,8 +251,8 @@ impl EmbeddingSignal<ScoredWebpagePointer> for KeywordEmbeddings {
 }
 
 impl EmbeddingSignal<RecallRankingWebpage> for KeywordEmbeddings {
-    fn signal() -> Signal {
-        Signal::KeywordEmbeddingSimilarity
+    fn signal() -> SignalEnum {
+        ranking::signal::KeywordEmbeddingSimilarity.into()
     }
 
     fn has_embedding(webpage: &RecallRankingWebpage) -> bool {

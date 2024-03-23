@@ -27,7 +27,7 @@ use utoipa::ToSchema;
 use crate::{
     highlighted::HighlightedFragment,
     inverted_index::RetrievedWebpage,
-    ranking::{Signal, SignalScore},
+    ranking::{SignalEnumDiscriminants, SignalScore},
     snippet::TextSnippet,
     web_spell::{self, CorrectionTerm},
     webpage::url_ext::UrlExt,
@@ -179,7 +179,7 @@ pub struct DisplayedWebpage {
     pub pretty_url: String,
     pub snippet: Snippet,
     pub rich_snippet: Option<RichSnippet>,
-    pub ranking_signals: Option<HashMap<Signal, SignalScore>>,
+    pub ranking_signals: Option<HashMap<SignalEnumDiscriminants, SignalScore>>,
     pub score: Option<f64>,
     pub likely_has_ads: bool,
     pub likely_has_paywall: bool,
@@ -233,7 +233,7 @@ pub enum DisplayedSidebar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{DateTime, Utc};
+    use chrono::DateTime;
 
     #[test]
     fn prettify_date_in_hours() {

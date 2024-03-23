@@ -21,10 +21,19 @@ use super::Result;
 use crate::distributed::{retry_strategy::ExponentialBackoff, sonic};
 use std::{net::SocketAddr, time::Duration};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RemoteClient<S: sonic::service::Service> {
     addr: SocketAddr,
     _phantom: std::marker::PhantomData<S>,
+}
+
+impl<S> Clone for RemoteClient<S>
+where
+    S: sonic::service::Service,
+{
+    fn clone(&self) -> Self {
+        Self::create(self.addr)
+    }
 }
 
 impl<S> RemoteClient<S>
@@ -32,6 +41,10 @@ where
     S: sonic::service::Service,
 {
     pub fn new(addr: SocketAddr) -> Self {
+        Self::create(addr)
+    }
+
+    pub fn create(addr: SocketAddr) -> Self {
         Self {
             addr,
             _phantom: std::marker::PhantomData,
@@ -43,12 +56,12 @@ impl<S> RemoteClient<S>
 where
     S: sonic::service::Service,
 {
-    async fn conn(&self) -> Result<sonic::service::ResilientConnection<S>> {
+    pub async fn conn(&self) -> Result<sonic::service::Connection<S>> {
         let retry = ExponentialBackoff::from_millis(30)
             .with_limit(Duration::from_millis(200))
             .take(5);
 
-        sonic::service::ResilientConnection::create_with_timeout(
+        sonic::service::Connection::create_with_timeout_retry(
             self.addr,
             Duration::from_secs(30),
             retry,
@@ -56,9 +69,43 @@ where
         .await
     }
 
-    async fn send<R: sonic::service::Wrapper<S>>(&self, req: &R) -> Result<R::Response> {
+    pub async fn send<R: sonic::service::Wrapper<S>>(&self, req: &R) -> Result<R::Response> {
+        self.send_with_timeout_retry(
+            req,
+            Duration::from_secs(60),
+            ExponentialBackoff::from_millis(500).with_limit(Duration::from_secs(3)),
+        )
+        .await
+    }
+
+    pub async fn send_with_timeout<R: sonic::service::Wrapper<S>>(
+        &self,
+        req: &R,
+        timeout: Duration,
+    ) -> Result<R::Response> {
         let conn = self.conn().await?;
-        conn.send_with_timeout(req, Duration::from_secs(60)).await
+        conn.send_with_timeout(req, timeout).await
+    }
+
+    pub async fn send_with_timeout_retry<R: sonic::service::Wrapper<S>>(
+        &self,
+        req: &R,
+        timeout: Duration,
+        retry: impl Iterator<Item = Duration>,
+    ) -> Result<R::Response> {
+        let mut er = None;
+        for backoff in retry {
+            match self.send_with_timeout(req, timeout).await {
+                Ok(r) => return Ok(r),
+                Err(e) => {
+                    tracing::error!("Failed to send request: {:?}", e);
+                    er = Some(e);
+                    tokio::time::sleep(backoff).await;
+                }
+            }
+        }
+
+        Err(er.unwrap())
     }
 }
 
@@ -101,10 +148,10 @@ where
         Self { clients }
     }
 
-    pub async fn send<Req, Rep>(&self, req: &Req, selector: &Rep) -> Result<Vec<Req::Response>>
+    pub async fn send<Req, Sel>(&self, req: &Req, selector: &Sel) -> Result<Vec<Req::Response>>
     where
         Req: sonic::service::Wrapper<S>,
-        Rep: ReplicaSelector<S>,
+        Sel: ReplicaSelector<S>,
     {
         let mut futures = Vec::new();
         for client in selector.select(&self.clients) {
@@ -196,15 +243,15 @@ where
         Self { shards }
     }
 
-    async fn send_single<Req, RSel>(
+    async fn send_single<Req, Sel>(
         &self,
         req: &Req,
         shard: &Shard<S, Id>,
-        replica_selector: &RSel,
+        replica_selector: &Sel,
     ) -> Result<(Id, Vec<Req::Response>)>
     where
         Req: sonic::service::Wrapper<S>,
-        RSel: ReplicaSelector<S>,
+        Sel: ReplicaSelector<S>,
     {
         Ok((
             shard.id.clone(),

@@ -12,13 +12,15 @@ use crate::Result;
 impl NodeRef {
     /// Return an iterator of references to this node and its ancestors.
     #[inline]
-    #[must_use] pub fn inclusive_ancestors(&self) -> Ancestors {
+    #[must_use]
+    pub fn inclusive_ancestors(&self) -> Ancestors {
         Ancestors(Some(self.clone()))
     }
 
     /// Return an iterator of references to this node’s ancestors.
     #[inline]
-    #[must_use] pub fn ancestors(&self) -> Ancestors {
+    #[must_use]
+    pub fn ancestors(&self) -> Ancestors {
         Ancestors(self.parent())
     }
 
@@ -63,7 +65,8 @@ impl NodeRef {
 
     /// Return an iterator of references to this node and the siblings after it.
     #[inline]
-    #[must_use] pub fn inclusive_following_siblings(&self) -> Siblings {
+    #[must_use]
+    pub fn inclusive_following_siblings(&self) -> Siblings {
         match self.parent() {
             Some(parent) => {
                 let last_sibling = parent.last_child().unwrap();
@@ -85,7 +88,8 @@ impl NodeRef {
 
     /// Return an iterator of references to this node’s siblings after it.
     #[inline]
-    #[must_use] pub fn following_siblings(&self) -> Siblings {
+    #[must_use]
+    pub fn following_siblings(&self) -> Siblings {
         match (self.parent(), self.next_sibling()) {
             (Some(parent), Some(next_sibling)) => {
                 let last_sibling = parent.last_child().unwrap();
@@ -100,7 +104,8 @@ impl NodeRef {
 
     /// Return an iterator of references to this node’s children.
     #[inline]
-    #[must_use] pub fn children(&self) -> Siblings {
+    #[must_use]
+    pub fn children(&self) -> Siblings {
         match (self.first_child(), self.last_child()) {
             (Some(first_child), Some(last_child)) => Siblings(Some(State {
                 next: first_child,
@@ -117,7 +122,8 @@ impl NodeRef {
     ///
     /// Note: this is the `NodeEdge::Start` items from `traverse()`.
     #[inline]
-    #[must_use] pub fn inclusive_descendants(&self) -> Descendants {
+    #[must_use]
+    pub fn inclusive_descendants(&self) -> Descendants {
         Descendants(self.traverse_inclusive())
     }
 
@@ -127,14 +133,16 @@ impl NodeRef {
     ///
     /// Note: this is the `NodeEdge::Start` items from `traverse()`.
     #[inline]
-    #[must_use] pub fn descendants(&self) -> Descendants {
+    #[must_use]
+    pub fn descendants(&self) -> Descendants {
         Descendants(self.traverse())
     }
 
     /// Return an iterator of the start and end edges of this node and its descendants,
     /// in tree order.
     #[inline]
-    #[must_use] pub fn traverse_inclusive(&self) -> Traverse {
+    #[must_use]
+    pub fn traverse_inclusive(&self) -> Traverse {
         Traverse(Some(State {
             next: NodeEdge::Start(self.clone()),
             next_back: NodeEdge::End(self.clone()),
@@ -144,7 +152,8 @@ impl NodeRef {
     /// Return an iterator of the start and end edges of this node’s descendants,
     /// in tree order.
     #[inline]
-    #[must_use] pub fn traverse(&self) -> Traverse {
+    #[must_use]
+    pub fn traverse(&self) -> Traverse {
         match (self.first_child(), self.last_child()) {
             (Some(first_child), Some(last_child)) => Traverse(Some(State {
                 next: NodeEdge::Start(first_child),
@@ -163,7 +172,8 @@ impl NodeRef {
 
     /// Return the first inclusive descendants element that match the given selector list.
     #[inline]
-    #[must_use] pub fn select_first(&self, selectors: &str) -> Option<NodeDataRef<ElementData>> {
+    #[must_use]
+    pub fn select_first(&self, selectors: &str) -> Option<NodeDataRef<ElementData>> {
         let mut elements = self.select(selectors).ok()?;
         elements.next()
     }

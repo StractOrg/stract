@@ -19,12 +19,12 @@ use std::io::BufReader;
 use std::{collections::HashMap, path::Path};
 
 use crate::enum_map::EnumMap;
-use crate::ranking::Signal;
+use crate::ranking::SignalEnum;
 use crate::Result;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct SerialziedLinearRegression {
-    weights: HashMap<Signal, f64>,
+    weights: HashMap<SignalEnum, f64>,
 }
 
 impl From<SerialziedLinearRegression> for LinearRegression {
@@ -41,7 +41,7 @@ impl From<SerialziedLinearRegression> for LinearRegression {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct LinearRegression {
-    pub weights: EnumMap<Signal, f64>,
+    pub weights: EnumMap<SignalEnum, f64>,
 }
 
 impl LinearRegression {

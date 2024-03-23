@@ -20,101 +20,106 @@ name = "stract"
 path = "src/main.rs"
 
 [dependencies]
-aes-gcm = {workspace = true}
-anyhow = {workspace = true}
-async-channel = {workspace = true}
-async-stream = {workspace = true}
-axum = {workspace = true}
-axum-extra = {workspace = true}
-axum-macros = {workspace = true}
-base64 = {workspace = true}
-bincode = {workspace = true}
-bitvec = {workspace = true}
-bytecount = {workspace = true}
-bytemuck = {workspace = true}
-byteorder = {workspace = true}
-bzip2 = {workspace = true}
-candle-core = {workspace = true}
-candle-nn = {workspace = true}
-candle-transformers = {workspace = true}
-chardetng = {workspace = true}
-chitchat = {workspace = true}
-chrono = {workspace = true}
-clap = {workspace = true}
-crossbeam-channel = {workspace = true}
-csv = {workspace = true}
-dashmap = {workspace = true}
-encoding_rs = {workspace = true}
-eventsource-stream = {workspace = true}
-fend-core = {workspace = true}
-flate2 = {workspace = true}
-fnv = {workspace = true}
-fst = {workspace = true}
-futures = {workspace = true}
-half = {workspace = true}
-hashbrown = {workspace = true}
-http = {workspace = true}
-image = {workspace = true}
-indicatif = {workspace = true}
-itertools = {workspace = true}
-kuchiki = {path = "../kuchiki"}
-libc = {workspace = true}
-log = {workspace = true}
-logos = {workspace = true}
-lz-str = {workspace = true}
-lz4_flex = {workspace = true}
-md5 = {workspace = true}
-memmap = {workspace = true}
-memmap2 = {workspace = true}
-mime = {workspace = true}
-min-max-heap = {workspace = true}
-num_cpus = {workspace = true}
-once_cell = {workspace = true}
-optics = {path = "../optics"}
-publicsuffix = {workspace = true}
-quick-xml = {workspace = true}
-rand = {workspace = true}
-rayon = {workspace = true}
-regex = {workspace = true}
-reqwest = {workspace = true}
-ring = {workspace = true}
-rio_api = {workspace = true}
-rio_turtle = {workspace = true}
-robotstxt-with-cache = {workspace = true}
-rocksdb = {workspace = true}
-rust-s3 = {workspace = true}
-rust-stemmers = {workspace = true}
-safetensors = {workspace = true}
-scylla = {workspace = true}
-serde = {workspace = true}
-serde_json = {workspace = true}
-serde_urlencoded = {workspace = true}
-tantivy = {workspace = true}
-thiserror = {workspace = true}
-tokenizers = {workspace = true}
-tokio = {workspace = true}
-tokio-stream = {workspace = true}
-toml = {workspace = true}
-tower-http = {workspace = true}
-tracing = {workspace = true}
-tracing-subscriber = {workspace = true}
-url = {workspace = true}
-urlencoding = {workspace = true}
-utoipa = {workspace = true}
-utoipa-swagger-ui = {workspace = true}
-uuid = {workspace = true}
-whatlang = {workspace = true}
-zimba = {path = "../zimba"}
+aes-gcm = { workspace = true }
+anyhow = { workspace = true }
+async-channel = { workspace = true }
+async-stream = { workspace = true }
+axum = { workspace = true }
+axum-extra = { workspace = true }
+axum-macros = { workspace = true }
+base64 = { workspace = true }
+bincode = { workspace = true }
+bitvec = { workspace = true }
+bytecount = { workspace = true }
+bytemuck = { workspace = true }
+byteorder = { workspace = true }
+bzip2 = { workspace = true }
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = { workspace = true }
+chardetng = { workspace = true }
+chitchat = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+crossbeam-channel = { workspace = true }
+csv = { workspace = true }
+dashmap = { workspace = true }
+encoding_rs = { workspace = true }
+enum_dispatch = { workspace = true }
+eventsource-stream = { workspace = true }
+fend-core = { workspace = true }
+flate2 = { workspace = true }
+fnv = { workspace = true }
+fst = { workspace = true }
+futures = { workspace = true }
+half = { workspace = true }
+hashbrown = { workspace = true }
+http = { workspace = true }
+image = { workspace = true }
+indicatif = { workspace = true }
+itertools = { workspace = true }
+kuchiki = { path = "../kuchiki" }
+libc = { workspace = true }
+log = { workspace = true }
+logos = { workspace = true }
+lz-str = { workspace = true }
+lz4_flex = { workspace = true }
+md5 = { workspace = true }
+memmap = { workspace = true }
+memmap2 = { workspace = true }
+mime = { workspace = true }
+min-max-heap = { workspace = true }
+nom = { workspace = true }
+num_cpus = { workspace = true }
+once_cell = { workspace = true }
+openraft = { workspace = true }
+optics = { path = "../optics" }
+publicsuffix = { workspace = true }
+quick-xml = { workspace = true }
+rand = { workspace = true }
+rayon = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+ring = { workspace = true }
+rio_api = { workspace = true }
+rio_turtle = { workspace = true }
+robotstxt-with-cache = { workspace = true }
+rocksdb = { workspace = true }
+rust-s3 = { workspace = true }
+rust-stemmers = { workspace = true }
+safetensors = { workspace = true }
+scylla = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_urlencoded = { workspace = true }
+strum = { workspace = true }
+tantivy = { workspace = true }
+thiserror = { workspace = true }
+tokenizers = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+toml = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true }
+urlencoding = { workspace = true }
+utoipa = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+uuid = { workspace = true }
+whatlang = { workspace = true }
+zimba = { path = "../zimba" }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = {workspace = true}
+tikv-jemallocator = { workspace = true }
 
 [dev-dependencies]
-criterion = {workspace = true}
-insta = {workspace = true}
-maplit = {workspace = true}
-proptest = {workspace = true}
-proptest-derive = {workspace = true}
+criterion = { workspace = true }
+insta = { workspace = true }
+maplit = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+tracing-test = { workspace = true }
 
 [[bench]]
 harness = false

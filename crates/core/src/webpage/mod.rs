@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    schema::{FastField, TextField},
+    schema::{fast_field::FastField, text_field::TextField, Field},
     webgraph::NodeID,
     Result,
 };
@@ -23,21 +23,19 @@ use candle_core::Tensor;
 use chrono::{DateTime, Utc};
 
 use std::collections::HashMap;
-use tantivy::{time::OffsetDateTime, TantivyDocument};
+use tantivy::TantivyDocument;
 use url::Url;
 
-use crate::schema::{Field, FLOAT_SCALING};
-
-use self::region::Region;
-
 mod adservers;
-mod html;
+pub mod html;
 mod just_text;
 pub mod region;
 pub mod safety_classifier;
 pub mod schema_org;
 pub mod url_ext;
 pub use self::html::Html;
+
+pub use region::Region;
 
 #[derive(Debug)]
 pub struct Webpage {
@@ -114,7 +112,7 @@ impl Webpage {
         })
     }
 
-    fn dmoz_description(&self) -> Option<String> {
+    pub fn dmoz_description(&self) -> Option<String> {
         self.dmoz_description.as_ref().and_then(|desc| {
             if !self.html.metadata().iter().any(|metadata| {
                 if let Some(content) = metadata.get(&"content".to_string()) {
@@ -131,171 +129,14 @@ impl Webpage {
     }
 
     pub fn as_tantivy(&self, schema: &tantivy::schema::Schema) -> Result<TantivyDocument> {
-        let region = Region::guess_from(self);
-
-        let dmoz_description = self.dmoz_description();
-
         let mut doc = self.html.as_tantivy(schema)?;
 
-        if let Ok(region) = region {
-            doc.add_u64(
-                schema
-                    .get_field(Field::Fast(FastField::Region).name())
-                    .expect("Failed to get region field"),
-                region.id(),
-            );
-        } else {
-            doc.add_u64(
-                schema
-                    .get_field(Field::Fast(FastField::Region).name())
-                    .expect("Failed to get region field"),
-                Region::All.id(),
-            );
-        }
-
-        let backlink_text: String =
-            itertools::intersperse(self.backlink_labels.clone(), "\n".to_string()).collect();
-
-        doc.add_text(
-            schema
-                .get_field(Field::Text(TextField::BacklinkText).name())
-                .expect("Failed to get backlink-text field"),
-            backlink_text,
-        );
-
-        doc.add_text(
-            schema
-                .get_field(Field::Text(TextField::Keywords).name())
-                .expect("Failed to get keywords field"),
-            self.keywords.join("\n"),
-        );
-
-        doc.add_date(
-            schema
-                .get_field(Field::Text(TextField::InsertionTimestamp).name())
-                .expect("Failed to get insertion-timestamp field"),
-            tantivy::DateTime::from_utc(OffsetDateTime::from_unix_timestamp(
-                self.inserted_at.timestamp(),
-            )?),
-        );
-
-        let safety = self
-            .safety_classification
-            .map(|label| label.to_string())
-            .unwrap_or_default();
-
-        doc.add_text(
-            schema
-                .get_field(Field::Text(TextField::SafetyClassification).name())
-                .expect("Failed to get safety_classification field"),
-            safety,
-        );
-
-        doc.add_u64(
-            schema
-                .get_field(Field::Fast(FastField::HostCentrality).name())
-                .expect("Failed to get host_centrality field"),
-            (self.host_centrality * FLOAT_SCALING as f64) as u64,
-        );
-
-        doc.add_u64(
-            schema
-                .get_field(Field::Fast(FastField::HostCentralityRank).name())
-                .expect("Failed to get host_centrality_rank field"),
-            self.host_centrality_rank,
-        );
-
-        doc.add_u64(
-            schema
-                .get_field(Field::Fast(FastField::PageCentrality).name())
-                .expect("Failed to get page_centrality field"),
-            (self.page_centrality * FLOAT_SCALING as f64) as u64,
-        );
-
-        doc.add_u64(
-            schema
-                .get_field(Field::Fast(FastField::PageCentralityRank).name())
-                .expect("Failed to get page_centrality_rank field"),
-            self.page_centrality_rank,
-        );
-
-        doc.add_u64(
-            schema
-                .get_field(Field::Fast(FastField::FetchTimeMs).name())
-                .expect("Failed to get fetch_time_ms field"),
-            self.fetch_time_ms,
-        );
-
-        doc.add_u64(
-            schema
-                .get_field(Field::Fast(FastField::PreComputedScore).name())
-                .expect("failed to get pre_computed_score field"),
-            (self.pre_computed_score * FLOAT_SCALING as f64) as u64,
-        );
-
-        if let Some(emb) = &self.title_embedding {
-            let mut serialized = Vec::new();
-            emb.write_bytes(&mut serialized)?;
-
-            doc.add_bytes(
-                schema
-                    .get_field(Field::Fast(FastField::TitleEmbeddings).name())
-                    .expect("Failed to get title_embeddings field"),
-                serialized,
-            );
-        } else {
-            doc.add_bytes(
-                schema
-                    .get_field(Field::Fast(FastField::TitleEmbeddings).name())
-                    .expect("Failed to get title_embeddings field"),
-                Vec::new(),
-            );
-        }
-
-        if let Some(emb) = &self.keyword_embedding {
-            let mut serialized = Vec::new();
-            emb.write_bytes(&mut serialized)?;
-
-            doc.add_bytes(
-                schema
-                    .get_field(Field::Fast(FastField::KeywordEmbeddings).name())
-                    .expect("Failed to get keyword_embeddings field"),
-                serialized,
-            );
-        } else {
-            doc.add_bytes(
-                schema
-                    .get_field(Field::Fast(FastField::KeywordEmbeddings).name())
-                    .expect("Failed to get keyword_embeddings field"),
-                Vec::new(),
-            );
-        }
-
-        match &self.node_id {
-            Some(node_id) => {
-                doc.add_u64(
-                    schema
-                        .get_field(Field::Fast(FastField::HostNodeID).name())
-                        .expect("Failed to get node_id field"),
-                    node_id.as_u64(),
-                );
-            }
-            None => {
-                doc.add_u64(
-                    schema
-                        .get_field(Field::Fast(FastField::HostNodeID).name())
-                        .expect("Failed to get node_id field"),
-                    u64::MAX,
-                );
+        for field in Field::all() {
+            match field {
+                Field::Fast(f) => f.add_webpage_tantivy(self, &mut doc, schema)?,
+                Field::Text(f) => f.add_webpage_tantivy(self, &mut doc, schema)?,
             }
         }
-
-        doc.add_text(
-            schema
-                .get_field(Field::Text(TextField::DmozDescription).name())
-                .expect("failed to get dmoz_description field"),
-            dmoz_description.unwrap_or_default(),
-        );
 
         Ok(doc)
     }

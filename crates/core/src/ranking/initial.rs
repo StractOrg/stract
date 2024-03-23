@@ -20,12 +20,12 @@ use serde::{Deserialize, Serialize};
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
 use tantivy::{DocId, SegmentReader};
 
-use super::SignalAggregator;
+use super::SignalComputer;
 
 pub struct InitialScoreTweaker {
     tv_searcher: tantivy::Searcher,
     fastfield_reader: FastFieldReader,
-    aggregator: SignalAggregator,
+    computer: SignalComputer,
 }
 
 /// SAFETY:
@@ -37,12 +37,12 @@ unsafe impl Send for InitialScoreTweaker {}
 impl InitialScoreTweaker {
     pub fn new(
         tv_searcher: tantivy::Searcher,
-        aggregator: SignalAggregator,
+        computer: SignalComputer,
         fastfield_reader: FastFieldReader,
     ) -> Self {
         Self {
             tv_searcher,
-            aggregator,
+            computer,
             fastfield_reader,
         }
     }
@@ -52,21 +52,21 @@ impl ScoreTweaker<Score> for InitialScoreTweaker {
     type Child = InitialSegmentScoreTweaker;
 
     fn segment_tweaker(&self, segment_reader: &SegmentReader) -> tantivy::Result<Self::Child> {
-        let mut aggregator = self.aggregator.clone();
+        let mut computer = self.computer.clone();
 
         let current_timestamp = Utc::now().timestamp() as usize;
-        aggregator.set_current_timestamp(current_timestamp);
+        computer.set_current_timestamp(current_timestamp);
 
-        aggregator
+        computer
             .register_segment(&self.tv_searcher, segment_reader, &self.fastfield_reader)
             .unwrap();
 
-        Ok(InitialSegmentScoreTweaker { aggregator })
+        Ok(InitialSegmentScoreTweaker { computer })
     }
 }
 
 pub struct InitialSegmentScoreTweaker {
-    aggregator: SignalAggregator,
+    computer: SignalComputer,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -77,13 +77,13 @@ pub struct Score {
 impl ScoreSegmentTweaker<Score> for InitialSegmentScoreTweaker {
     fn score(&mut self, doc: DocId, _score: tantivy::Score) -> Score {
         let mut total = self
-            .aggregator
+            .computer
             .compute_signals(doc)
             .flatten()
             .map(|computed| computed.score.coefficient * computed.score.value)
             .sum();
 
-        if let Some(boost) = self.aggregator.boosts(doc) {
+        if let Some(boost) = self.computer.boosts(doc) {
             total *= boost;
         }
 

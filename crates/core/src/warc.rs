@@ -670,10 +670,8 @@ impl Default for WarcWriter {
 mod tests {
     use super::*;
     use core::panic;
-    use flate2::write::GzEncoder;
-    use flate2::Compression;
+
     use proptest::prelude::*;
-    use std::io::Write;
 
     #[test]
     fn it_works() {

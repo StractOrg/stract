@@ -20,7 +20,6 @@ mod lexer;
 use ast::RankingCoeff;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 use std::fmt::Display;
 use thiserror::Error;
 use utoipa::ToSchema;
@@ -464,7 +463,8 @@ impl Display for HostRankings {
 }
 
 impl HostRankings {
-    #[must_use] pub fn rules(&self) -> Rule {
+    #[must_use]
+    pub fn rules(&self) -> Rule {
         let matches: Vec<_> = self
             .blocked
             .iter()
@@ -491,7 +491,8 @@ impl HostRankings {
         }
     }
 
-    #[must_use] pub fn into_optic(self) -> Optic {
+    #[must_use]
+    pub fn into_optic(self) -> Optic {
         Optic {
             host_rankings: self,
             ..Default::default()
@@ -507,7 +508,7 @@ impl HostRankings {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{RankingCoeff, RankingTarget};
+    use crate::ast::RankingTarget;
 
     use super::*;
     #[test]

@@ -83,7 +83,7 @@ impl CrawlPlanner {
 
         for host in hosts {
             let node = self.host_graph.id2node(host).unwrap();
-            if let Ok(url) = Url::parse(&format!("http://{}", node.name)) {
+            if let Ok(url) = Url::parse(&format!("http://{}", node.as_str())) {
                 let domain = Domain::from(url);
                 domains.entry(domain).or_default().push(*host);
             }
@@ -156,14 +156,14 @@ impl CrawlPlanner {
 
             total_wander_budget += wander_budget;
             total_schedule_budget += schedule_budget;
-            let host_name = self.host_graph.id2node(host).unwrap().name.clone();
+            let host_name = self.host_graph.id2node(host).unwrap().as_str().to_string();
 
             let before = urls.len();
             urls.extend(
                 pages
                     .into_iter()
                     .filter_map(|(id, score)| self.page_graph.id2node(&id).map(|n| (n, score)))
-                    .map(|(n, score)| (n.name, score))
+                    .map(|(n, score)| (n.as_str().to_string(), score))
                     .filter_map(|(n, score)| {
                         Url::parse(&format!("http://{n}")).ok().map(|u| (u, score))
                     })

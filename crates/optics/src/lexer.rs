@@ -359,7 +359,10 @@ mod tests {
 
         let lexer = LexerBridge::new(s);
 
-        let result: Vec<Token> = lexer.filter_map(std::result::Result::ok).map(|(_, t, _)| t).collect();
+        let result: Vec<Token> = lexer
+            .filter_map(std::result::Result::ok)
+            .map(|(_, t, _)| t)
+            .collect();
 
         let expected = vec![
             Token::Ranking,
@@ -405,7 +408,10 @@ mod tests {
 
         let lexer = LexerBridge::new(s);
 
-        let result: Vec<Token> = lexer.filter_map(std::result::Result::ok).map(|(_, t, _)| t).collect();
+        let result: Vec<Token> = lexer
+            .filter_map(std::result::Result::ok)
+            .map(|(_, t, _)| t)
+            .collect();
 
         let expected = vec![
             Token::Ranking,

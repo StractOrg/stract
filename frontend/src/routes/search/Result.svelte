@@ -29,7 +29,7 @@
     <div class="flex min-w-0 grow flex-col space-y-0.5">
       <div class="flex items-center text-sm">
         <ResultLink
-          _class="max-w-[calc(100%-100px)] truncate text-neutral-focus"
+          _class="url max-w-[calc(100%-100px)] truncate text-neutral-focus"
           href={webpage.url}
           {resultIndex}
         >
@@ -37,7 +37,7 @@
         </ResultLink>
       </div>
       <ResultLink
-        _class="result-main-link max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
+        _class="result-main-link title max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
         title={webpage.title}
         href={webpage.url}
         {resultIndex}

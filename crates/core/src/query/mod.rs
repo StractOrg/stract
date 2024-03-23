@@ -18,7 +18,7 @@ use crate::{
     inverted_index::InvertedIndex,
     query::parser::TermCompound,
     ranking::SignalCoefficient,
-    schema::{Field, TextField},
+    schema::{text_field, Field},
     search_ctx::Ctx,
     searcher::SearchQuery,
     webpage::{region::Region, safety_classifier},
@@ -38,14 +38,16 @@ pub mod union;
 
 use parser::Term;
 
-use self::{optic::AsMultipleTantivyQuery, parser::CompoundAwareTerm};
+use self::{
+    optic::AsMultipleTantivyQuery,
+    parser::{CompoundAwareTerm, SimpleOrPhrase},
+};
 
 const MAX_SIMILAR_TERMS: usize = 10;
 
 #[derive(Clone, Debug)]
 pub struct Query {
-    #[allow(clippy::vec_box)]
-    terms: Vec<Box<Term>>,
+    terms: Vec<Term>,
     simple_terms_text: Vec<String>,
     tantivy_query: Box<BooleanQuery>,
     host_rankings: HostRankings,
@@ -58,7 +60,7 @@ pub struct Query {
 
 impl Query {
     pub fn parse(ctx: &Ctx, query: &SearchQuery, index: &InvertedIndex) -> Result<Query> {
-        let parsed_terms = parser::parse(&query.query);
+        let parsed_terms = parser::parse(&query.query)?;
         let mut term_count = HashMap::new();
         let mut terms = Vec::new();
 
@@ -76,7 +78,7 @@ impl Query {
             .clone()
             .into_iter()
             .map(|term| CompoundAwareTerm {
-                term: *term,
+                term,
                 adjacent_terms: Vec::new(),
             })
             .collect();
@@ -87,7 +89,9 @@ impl Query {
             for window in term_ids.windows(window_size) {
                 let mut window_terms = Vec::new();
                 for i in window {
-                    if let Term::Simple(t) = &compound_terms[*i].term {
+                    if let Term::SimpleOrPhrase(SimpleOrPhrase::Simple(t)) =
+                        &compound_terms[*i].term
+                    {
                         window_terms.push(t.clone());
                     }
                 }
@@ -112,7 +116,7 @@ impl Query {
             .collect();
 
         if query.safe_search {
-            let field = Field::Text(TextField::SafetyClassification);
+            let field = Field::Text(text_field::SafetyClassification.into());
             let field = schema.get_field(field.name()).unwrap();
 
             queries.push((
@@ -180,7 +184,7 @@ impl Query {
         &self.simple_terms_text
     }
 
-    pub fn terms(&self) -> &[Box<Term>] {
+    pub fn terms(&self) -> &[Term] {
         &self.terms
     }
 
@@ -240,12 +244,7 @@ impl tantivy::query::Query for Query {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        index::Index,
-        rand_words,
-        searcher::{LocalSearcher, SearchQuery},
-        webpage::Webpage,
-    };
+    use crate::{index::Index, rand_words, searcher::LocalSearcher, webpage::Webpage};
 
     use super::*;
 

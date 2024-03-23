@@ -490,7 +490,8 @@ impl Cluster {
         })
     }
 
-    #[must_use] pub fn get_blob(&self, blob_number: usize) -> Option<&[u8]> {
+    #[must_use]
+    pub fn get_blob(&self, blob_number: usize) -> Option<&[u8]> {
         if self.blob_offsets.is_empty() {
             return None;
         }
@@ -574,19 +575,23 @@ impl ZimFile {
         Ok(Some(Cluster::from_bytes(&self.mmap[pointer..])?))
     }
 
-    #[must_use] pub fn mime_types(&self) -> &MimeTypes {
+    #[must_use]
+    pub fn mime_types(&self) -> &MimeTypes {
         &self.mime_types
     }
 
-    #[must_use] pub fn url_pointers(&self) -> &UrlPointerList {
+    #[must_use]
+    pub fn url_pointers(&self) -> &UrlPointerList {
         &self.url_pointers
     }
 
-    #[must_use] pub fn title_pointers(&self) -> &TitlePointerList {
+    #[must_use]
+    pub fn title_pointers(&self) -> &TitlePointerList {
         &self.title_pointers
     }
 
-    #[must_use] pub fn dir_entries(&self) -> DirEntryIterator<'_> {
+    #[must_use]
+    pub fn dir_entries(&self) -> DirEntryIterator<'_> {
         DirEntryIterator::new(&self.mmap, &self.url_pointers)
     }
 

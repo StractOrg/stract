@@ -76,12 +76,12 @@ impl WorkerThread {
         })
     }
 
-    async fn router_conn(&self) -> Result<sonic::service::ResilientConnection<RouterService>> {
+    async fn router_conn(&self) -> Result<sonic::service::Connection<RouterService>> {
         let retry = ExponentialBackoff::from_millis(1_000).with_limit(Duration::from_secs(10));
 
         let router = *self.router_hosts.choose(&mut rand::thread_rng()).unwrap();
 
-        Ok(sonic::service::ResilientConnection::create_with_timeout(
+        Ok(sonic::service::Connection::create_with_timeout_retry(
             router,
             Duration::from_secs(90),
             retry,

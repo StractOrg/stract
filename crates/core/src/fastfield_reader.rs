@@ -20,7 +20,7 @@ use tantivy::{columnar::ColumnValues, DocId, SegmentId};
 
 use crate::{
     enum_map::EnumMap,
-    schema::{DataType, FastField, Field},
+    schema::{fast_field::FastField, DataType, FastFieldEnum, Field},
 };
 
 #[derive(Default, Clone)]
@@ -53,7 +53,7 @@ impl FastFieldReader {
             let mut u64s = EnumMap::new();
             let mut bytes = EnumMap::new();
 
-            for field in Field::all().filter_map(Field::as_fast) {
+            for field in Field::all().filter_map(|f| f.as_fast()) {
                 match field.data_type() {
                     DataType::U64 => {
                         if let Ok(reader) = fastfield_readers.u64(field.name()) {
@@ -83,8 +83,8 @@ impl FastFieldReader {
 }
 
 struct AllReaders {
-    u64s: EnumMap<FastField, tantivy::columnar::Column<u64>>,
-    bytes: EnumMap<FastField, tantivy::columnar::BytesColumn>,
+    u64s: EnumMap<FastFieldEnum, tantivy::columnar::Column<u64>>,
+    bytes: EnumMap<FastFieldEnum, tantivy::columnar::BytesColumn>,
 }
 
 pub enum Value {
@@ -147,7 +147,7 @@ pub struct FieldReader<'a> {
 }
 
 impl<'a> FieldReader<'a> {
-    pub fn get(&self, field: FastField) -> Option<Value> {
+    pub fn get(&self, field: FastFieldEnum) -> Option<Value> {
         match field.data_type() {
             DataType::U64 => Some(
                 self.readers

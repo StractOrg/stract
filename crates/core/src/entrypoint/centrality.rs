@@ -40,7 +40,7 @@ fn store_csv<P: AsRef<Path>>(data: Vec<(Node, f64)>, output: P) {
     data.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
     let mut wtr = csv::Writer::from_writer(csv_file);
     for (node, centrality) in data {
-        wtr.write_record(&[node.name, centrality.to_string()])
+        wtr.write_record(&[node.as_str().to_string(), centrality.to_string()])
             .unwrap();
     }
     wtr.flush().unwrap();

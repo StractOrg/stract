@@ -19,6 +19,7 @@
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+pub mod dht;
 mod manager;
 mod worker;
 

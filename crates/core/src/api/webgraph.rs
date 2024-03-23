@@ -95,7 +95,7 @@ pub mod host {
             .with_limit(Duration::from_millis(200))
             .take(5);
 
-        let conn = sonic::service::ResilientConnection::create_with_timeout(
+        let conn = sonic::service::Connection::create_with_timeout_retry(
             host,
             Duration::from_secs(30),
             retry,
@@ -142,7 +142,7 @@ pub mod host {
             .with_limit(Duration::from_millis(200))
             .take(5);
 
-        let conn = sonic::service::ResilientConnection::create_with_timeout(
+        let conn = sonic::service::Connection::create_with_timeout_retry(
             host,
             Duration::from_secs(30),
             retry,
@@ -157,7 +157,9 @@ pub mod host {
             )
             .await
         {
-            Ok(Some(node)) => Ok(Json(KnowsHost::Known { host: node.name })),
+            Ok(Some(node)) => Ok(Json(KnowsHost::Known {
+                host: node.as_str().to_string(),
+            })),
             Err(err) => {
                 tracing::error!("Failed to send request to webgraph: {}", err);
                 Ok(Json(KnowsHost::Unknown))
@@ -286,12 +288,9 @@ async fn ingoing_links(
         .with_limit(Duration::from_millis(200))
         .take(5);
 
-    let conn = sonic::service::ResilientConnection::create_with_timeout(
-        host,
-        Duration::from_secs(30),
-        retry,
-    )
-    .await?;
+    let conn =
+        sonic::service::Connection::create_with_timeout_retry(host, Duration::from_secs(30), retry)
+            .await?;
 
     Ok(conn
         .send_with_timeout(
@@ -318,12 +317,9 @@ async fn outgoing_links(
         .with_limit(Duration::from_millis(200))
         .take(5);
 
-    let conn = sonic::service::ResilientConnection::create_with_timeout(
-        host,
-        Duration::from_secs(30),
-        retry,
-    )
-    .await?;
+    let conn =
+        sonic::service::Connection::create_with_timeout_retry(host, Duration::from_secs(30), retry)
+            .await?;
 
     Ok(conn
         .send_with_timeout(

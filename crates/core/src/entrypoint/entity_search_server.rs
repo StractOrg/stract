@@ -65,8 +65,8 @@ pub struct Search {
 
 impl sonic::service::Message<SearchService> for Search {
     type Response = Option<crate::entity_index::EntityMatch>;
-    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
-        Ok(server.index.search(&self.query))
+    async fn handle(self, server: &SearchService) -> Self::Response {
+        server.index.search(&self.query)
     }
 }
 
@@ -78,13 +78,13 @@ pub struct GetEntityImage {
 }
 impl sonic::service::Message<SearchService> for GetEntityImage {
     type Response = Option<Image>;
-    async fn handle(self, server: &SearchService) -> sonic::Result<Self::Response> {
-        Ok(server.index.retrieve_image(&self.image_id).map(|img| {
+    async fn handle(self, server: &SearchService) -> Self::Response {
+        server.index.retrieve_image(&self.image_id).map(|img| {
             let max_width = self.max_width.unwrap_or(u64::MAX) as u32;
             let max_height = self.max_height.unwrap_or(u64::MAX) as u32;
 
             img.resize_max(max_width, max_height)
-        }))
+        })
     }
 }
 

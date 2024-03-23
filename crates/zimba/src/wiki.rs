@@ -122,7 +122,7 @@ impl<'a> Iterator for ArticleIterator<'a> {
         let mut title = article_ref.title;
 
         if title.is_empty() {
-            title = article_ref.url.clone();
+            title.clone_from(&article_ref.url);
         }
 
         let article = Article {
@@ -210,7 +210,8 @@ pub struct Image {
     pub content: Vec<u8>,
 }
 impl Image {
-    #[must_use] pub fn bytes(&self) -> &[u8] {
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
         &self.content
     }
 }

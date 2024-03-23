@@ -17,8 +17,8 @@
 pub mod defaults;
 
 use super::Result;
+use crate::distributed::member::ShardId;
 use crate::feed::scheduler::SplitId;
-use crate::searcher::ShardId;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -82,7 +82,7 @@ impl WarcSource {
                 }
             }
             WarcSource::Local(config) => {
-                warc_paths = config.names.clone();
+                warc_paths.clone_from(&config.names);
             }
             WarcSource::S3(config) => {
                 let bucket = s3::Bucket::new(

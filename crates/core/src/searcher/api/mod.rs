@@ -32,7 +32,7 @@ use crate::inverted_index::RetrievedWebpage;
 use crate::models::dual_encoder::DualEncoder;
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
 use crate::ranking::pipeline::{PrecisionRankingWebpage, RankableWebpage, RecallRankingWebpage};
-use crate::ranking::ALL_SIGNALS;
+use crate::ranking::SignalEnum;
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::web_spell::SpellChecker;
 use crate::widgets::{Widget, Widgets};
@@ -145,11 +145,11 @@ pub fn combine_results(
 }
 pub fn add_ranking_signals(websites: &mut [DisplayedWebpage], pointers: &[ScoredWebpagePointer]) {
     for (website, pointer) in websites.iter_mut().zip(pointers.iter()) {
-        let mut signals = HashMap::with_capacity(ALL_SIGNALS.len());
+        let mut signals = HashMap::new();
 
-        for signal in ALL_SIGNALS {
+        for signal in SignalEnum::all() {
             if let Some(signal_value) = pointer.as_ranking().signals.get(signal) {
-                signals.insert(signal, *signal_value);
+                signals.insert(signal.into(), *signal_value);
             }
         }
 
@@ -210,16 +210,16 @@ where
     }
 
     async fn check_bangs(&self, query: &SearchQuery) -> Result<Option<BangHit>> {
-        let parsed_terms = query::parser::parse(&query.query);
+        let parsed_terms = query::parser::parse(&query.query)?;
 
-        if parsed_terms.iter().any(|term| match term.as_ref() {
+        if parsed_terms.iter().any(|term| match term {
             query::parser::Term::PossibleBang(t) => t.is_empty(),
             _ => false,
         }) {
             let q: String = intersperse(
                 parsed_terms
                     .iter()
-                    .filter(|term| !matches!(term.as_ref(), query::parser::Term::PossibleBang(_)))
+                    .filter(|term| !matches!(term, query::parser::Term::PossibleBang(_)))
                     .map(|term| term.to_string()),
                 " ".to_string(),
             )
@@ -258,13 +258,15 @@ where
     pub fn spell_check(&self, query: &str) -> Option<HighlightedSpellCorrection> {
         let query = query.to_lowercase();
 
-        let terms = query::parser::parse(&query);
+        let terms = query::parser::parse(&query).ok()?;
 
         let simple_query = terms
             .clone()
             .into_iter()
-            .filter_map(|term| match *term {
-                query::parser::Term::Simple(t) => Some(String::from(t)),
+            .filter_map(|term| match term {
+                query::parser::Term::SimpleOrPhrase(query::parser::SimpleOrPhrase::Simple(t)) => {
+                    Some(String::from(t))
+                }
                 _ => None,
             })
             .join(" ");
@@ -288,8 +290,8 @@ where
         let mut correction = crate::web_spell::Correction::empty(query);
 
         for term in terms {
-            match *term {
-                query::parser::Term::Simple(t) => {
+            match term {
+                query::parser::Term::SimpleOrPhrase(query::parser::SimpleOrPhrase::Simple(t)) => {
                     if let Some(term_correction) = correction_map.get(t.as_str()) {
                         correction.push(crate::web_spell::CorrectionTerm::Corrected {
                             orig: String::from(t),

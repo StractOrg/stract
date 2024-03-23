@@ -187,7 +187,7 @@ mod tests {
         enum_map::EnumMap,
         inverted_index::{DocAddress, WebpagePointer},
         prehashed::Prehashed,
-        ranking::{initial::Score, Signal},
+        ranking::{self, initial::Score},
     };
 
     use super::*;
@@ -197,7 +197,7 @@ mod tests {
             .map(|i| -> RecallRankingWebpage {
                 let mut signals = EnumMap::new();
                 signals.insert(
-                    Signal::HostCentrality,
+                    ranking::signal::HostCentrality.into(),
                     SignalScore {
                         coefficient: 1.0,
                         value: 1.0 / i as f64,

@@ -166,8 +166,7 @@ impl SecondTrainer {
                             .chain(vec![&term])
                             .map(|t| {
                                 let mut words = context.clone();
-                                words[1] = t.clone();
-
+                                words[1].clone_from(t);
                                 (self.lm_model.freq(&words), t)
                             })
                             .max_by(|(a, _), (b, _)| a.cmp(b))

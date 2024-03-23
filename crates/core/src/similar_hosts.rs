@@ -89,7 +89,7 @@ impl SimilarHostsFinder {
         let domains = nodes
             .iter()
             .filter_map(|node| {
-                Url::parse(&format!("http://{}", &node.name))
+                Url::parse(&format!("http://{}", &node.as_str()))
                     .ok()
                     .and_then(|url| url.root_domain().map(|d| d.to_string()))
             })
@@ -161,7 +161,7 @@ impl SimilarHostsFinder {
             })
             .filter_map(|ScoredNodeID { node_id, score }| {
                 let node = self.webgraph.id2node(&node_id).unwrap();
-                match Url::parse(&format!("http://{}", &node.name))
+                match Url::parse(&format!("http://{}", &node.as_str()))
                     .ok()
                     .and_then(|url| url.root_domain().map(|s| s.to_string()))
                 {

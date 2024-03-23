@@ -1,15 +1,18 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
-import { match } from 'ts-pattern';
-import { extractSearchParams } from '$lib/search';
+import { extractSearchParams, search, type SearchResults } from '$lib/search';
 import { globals } from '$lib/globals';
+import { browser } from '$app/environment';
 
 export const load: PageLoad = async (req) => {
-  const { url } = req;
+  const { url, fetch } = req;
+  const { clientAddress, form } = req.data;
+
+  const performSsr = url.searchParams.get('ssr') === 'true';
+
   let params = extractSearchParams(url.searchParams);
 
   if (!params.query.trim()) {
-    const form = req.data['form'];
     if (form) {
       params = form;
     } else {
@@ -21,32 +24,21 @@ export const load: PageLoad = async (req) => {
     redirect(301, '/');
   }
 
-  const results = req.data['results'];
+  let results: SearchResults | null = null;
 
-  if (results.type == 'bang') {
+  if (performSsr && !browser) {
+    results = await search(params, {
+      fetch,
+      headers: { 'X-Forwarded-For': clientAddress },
+    });
+  }
+
+  if (results && results.type == 'bang') {
     redirect(301, results.redirectTo);
   }
 
-  const prevPageSearchParams = match(params.currentPage > 1)
-    .with(true, () => {
-      const newParams = new URLSearchParams(url.searchParams);
-      newParams.set('p', (params.currentPage - 1).toString());
-      return newParams;
-    })
-    .otherwise(() => {});
-
-  const nextPageSearchParams = match(results.type == 'websites' && results.hasMoreResults)
-    .with(true, () => {
-      const newParams = new URLSearchParams(url.searchParams);
-      newParams.set('p', (params.currentPage + 1).toString());
-      return newParams;
-    })
-    .otherwise(() => {});
-
   return {
-    ...params,
-    prevPageSearchParams,
-    nextPageSearchParams,
+    params,
     results,
     globals: await globals({
       title: `${params.query} – Stract`,

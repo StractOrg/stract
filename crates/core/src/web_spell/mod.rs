@@ -34,6 +34,7 @@ pub use trainer::SecondTrainer;
 use fst::Streamer;
 use std::ops::Range;
 
+use crate::ceil_char_boundary;
 use crate::floor_char_boundary;
 use itertools::intersperse;
 use serde::{Deserialize, Serialize};
@@ -106,8 +107,12 @@ impl Correction {
 }
 
 pub fn sentence_ranges(text: &str) -> Vec<Range<usize>> {
+    let skip = ["mr.", "ms.", "dr."];
+
     let mut res = Vec::new();
     let mut last_start = 0;
+
+    let text = text.to_ascii_lowercase();
 
     // We should really do something more clever than this.
     // Tried using `SRX`[https://docs.rs/srx/latest/srx/] but it was a bit too slow.
@@ -115,9 +120,40 @@ pub fn sentence_ranges(text: &str) -> Vec<Range<usize>> {
         .char_indices()
         .filter(|(_, c)| matches!(c, '.' | '\n' | '?' | '!'))
     {
-        res.push(last_start..end + 1);
-        last_start = floor_char_boundary(text, end + 2);
+        let end = ceil_char_boundary(&text, end + 1);
+
+        if skip.iter().any(|p| text[last_start..end].ends_with(p)) {
+            continue;
+        }
+
+        // skip 'site.com', '...', '!!!' etc.
+        if !text[end..].starts_with(|c: char| c.is_ascii_whitespace()) {
+            continue;
+        }
+
+        let mut start = last_start;
+
+        while start < end && text[start..].starts_with(|c: char| c.is_whitespace()) {
+            start = ceil_char_boundary(&text, start + 1);
+        }
+
+        // just a precaution
+        if start > end {
+            continue;
+        }
+
+        res.push(start..end);
+
+        last_start = end;
     }
+
+    let mut start = last_start;
+
+    while start < text.len() && text[start..].starts_with(|c: char| c.is_whitespace()) {
+        start = floor_char_boundary(&text, start + 1);
+    }
+
+    res.push(start..text.len());
 
     res
 }
@@ -151,5 +187,43 @@ impl<'a> MergePointer<'a> {
             .is_none();
 
         !self.is_finished
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sentence_ranges() {
+        let text = "This is a sentence. This is another sentence. This is a third sentence.";
+        let ranges = sentence_ranges(text);
+        assert_eq!(ranges.len(), 3);
+
+        assert_eq!(&text[ranges[0].clone()], "This is a sentence.");
+        assert_eq!(&text[ranges[1].clone()], "This is another sentence.");
+        assert_eq!(&text[ranges[2].clone()], "This is a third sentence.");
+
+        let text = "This is a sentence. This is another sentence. This is a third sentence";
+        let ranges = sentence_ranges(text);
+        assert_eq!(ranges.len(), 3);
+
+        assert_eq!(&text[ranges[0].clone()], "This is a sentence.");
+        assert_eq!(&text[ranges[1].clone()], "This is another sentence.");
+        assert_eq!(&text[ranges[2].clone()], "This is a third sentence");
+
+        let text = "mr. roberts";
+
+        let ranges = sentence_ranges(text);
+
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(&text[ranges[0].clone()], "mr. roberts");
+
+        let text = "site.com is the best";
+
+        let ranges = sentence_ranges(text);
+
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(&text[ranges[0].clone()], "site.com is the best");
     }
 }

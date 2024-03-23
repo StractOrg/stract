@@ -163,7 +163,6 @@ impl BitVec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use itertools::Itertools;
     use std::iter::repeat;
 
     fn into_ranks(a: &[bool]) -> Vec<u64> {

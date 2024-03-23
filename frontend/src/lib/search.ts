@@ -1,12 +1,15 @@
-import type {
-  Region,
-  Widget,
-  DisplayedSidebar,
-  DisplayedWebpage,
-  WebsitesResult,
-  BangHit,
-  HighlightedSpellCorrection,
+import {
+  type Region,
+  type Widget,
+  type DisplayedSidebar,
+  type DisplayedWebpage,
+  type WebsitesResult,
+  type BangHit,
+  type HighlightedSpellCorrection,
+  type ApiOptions,
+  api,
 } from './api';
+import { fetchRemoteOptic } from './optics';
 import { decompressRanked, type RankedSites } from './rankings';
 
 export type SearchParams = {
@@ -55,7 +58,7 @@ export const extractSearchParams = (searchParams: URLSearchParams | FormData): S
   };
 };
 
-export const discussionsOptic: string = `DiscardNonMatching;
+const discussionsOptic: string = `DiscardNonMatching;
 
 Rule {
     Matches {
@@ -93,3 +96,80 @@ Rule {
         Site("|sh.itjust.works|")
     }
 };`;
+
+export const search = async (params: SearchParams, options: ApiOptions) => {
+  const { data: websitesReq } = api.search(
+    {
+      query: params.query,
+      page: params.currentPage - 1,
+      safeSearch: params.safeSearch,
+      optic: params.optic && (await fetchRemoteOptic({ opticUrl: params.optic, fetch })),
+      selectedRegion: params.selectedRegion,
+      hostRankings: params.host_rankings,
+      countResults: true,
+    },
+    options,
+  );
+
+  const { data: widgetReq } =
+    params.currentPage == 1
+      ? api.searchWidget(
+          {
+            query: params.query,
+          },
+          options,
+        )
+      : { data: undefined };
+
+  const { data: sidebarReq } =
+    params.currentPage == 1
+      ? api.searchSidebar(
+          {
+            query: params.query,
+          },
+          options,
+        )
+      : { data: undefined };
+
+  const { data: discussionsReq } =
+    params.currentPage == 1 && params.optic == undefined
+      ? api.search(
+          {
+            query: params.query,
+            optic: discussionsOptic,
+            numResults: 10,
+            safeSearch: params.safeSearch,
+            selectedRegion: params.selectedRegion,
+            hostRankings: params.host_rankings,
+            countResults: false,
+          },
+          options,
+        )
+      : { data: undefined };
+
+  const { data: spellcheckReq } = api.searchSpellcheck({ query: params.query }, options);
+
+  const [websites, widget, sidebar, discussionsRes, spellCorrection] = await Promise.all([
+    websitesReq,
+    widgetReq,
+    sidebarReq,
+    discussionsReq,
+    spellcheckReq,
+  ]);
+  const discussions = discussionsRes?.type == 'websites' ? discussionsRes.webpages : undefined;
+
+  const results: SearchResults =
+    websites.type == 'websites'
+      ? {
+          ...websites,
+          widget,
+          sidebar,
+          discussions,
+          spellCorrection,
+        }
+      : {
+          ...websites,
+        };
+
+  return results;
+};

@@ -28,9 +28,9 @@ use crate::{
     ranking::{
         models::lambdamart::LambdaMART,
         pipeline::{RankableWebpage, RankingPipeline, RankingStage, Recall, Scorer},
-        Signal, SignalAggregator, SignalScore,
+        SignalComputer, SignalEnum, SignalScore,
     },
-    schema::FastField,
+    schema::fast_field,
     searcher::SearchQuery,
 };
 
@@ -46,7 +46,7 @@ impl StoredEmbeddings {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RecallRankingWebpage {
     pub pointer: WebpagePointer,
-    pub signals: EnumMap<Signal, SignalScore>,
+    pub signals: EnumMap<SignalEnum, SignalScore>,
     pub optic_boost: Option<f64>,
     pub title_embedding: Option<StoredEmbeddings>,
     pub keyword_embedding: Option<StoredEmbeddings>,
@@ -57,16 +57,16 @@ impl RecallRankingWebpage {
     pub fn new(
         pointer: WebpagePointer,
         fastfield_reader: &fastfield_reader::SegmentReader,
-        aggregator: &mut SignalAggregator,
+        computer: &mut SignalComputer,
     ) -> Self {
         let fastfields = fastfield_reader.get_field_reader(pointer.address.doc_id);
 
         let title_embedding: Option<Vec<u8>> = fastfields
-            .get(FastField::TitleEmbeddings)
+            .get(fast_field::TitleEmbeddings.into())
             .and_then(|v| v.into());
 
         let keyword_embedding: Option<Vec<u8>> = fastfields
-            .get(FastField::KeywordEmbeddings)
+            .get(fast_field::KeywordEmbeddings.into())
             .and_then(|v| v.into());
 
         let mut res = RecallRankingWebpage {
@@ -78,12 +78,12 @@ impl RecallRankingWebpage {
             keyword_embedding: keyword_embedding.map(StoredEmbeddings),
         };
 
-        for computed_signal in aggregator.compute_signals(pointer.address.doc_id).flatten() {
+        for computed_signal in computer.compute_signals(pointer.address.doc_id).flatten() {
             res.signals
                 .insert(computed_signal.signal, computed_signal.score);
         }
 
-        if let Some(boost) = aggregator.boosts(pointer.address.doc_id) {
+        if let Some(boost) = computer.boosts(pointer.address.doc_id) {
             res.optic_boost = Some(boost);
         }
 

@@ -29,7 +29,7 @@ use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{PrecisionRankingWebpage, RankingPipeline, RecallRankingWebpage};
-use crate::ranking::{query_centrality, Ranker, Signal, SignalAggregator, ALL_SIGNALS};
+use crate::ranking::{self, query_centrality, Ranker, SignalComputer, SignalEnum};
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::DisplayedWebpage;
 use crate::webgraph::Node;
@@ -184,12 +184,13 @@ where
         ctx: &Ctx,
         guard: &G,
         de_rank_similar: bool,
-        aggregator: SignalAggregator,
+        computer: SignalComputer,
     ) -> Result<Ranker> {
-        let query_centrality_coeff = aggregator.coefficient(&Signal::QueryCentrality);
+        let query_centrality_coeff =
+            computer.coefficient(&ranking::signal::QueryCentrality.into());
 
         let mut ranker = Ranker::new(
-            aggregator,
+            computer,
             guard.inverted_index().fastfield_reader(),
             self.collector_config.clone(),
         );
@@ -244,7 +245,7 @@ where
             );
         let parsed_query = self.parse_query(ctx, guard, &query)?;
 
-        let mut aggregator = SignalAggregator::new(Some(&parsed_query));
+        let mut computer = SignalComputer::new(Some(&parsed_query));
 
         if let Some(inbound_sim) = &self.inbound_similarity {
             let liked_hosts: Vec<_> = parsed_query
@@ -264,10 +265,10 @@ where
                 .collect();
 
             let scorer = inbound_sim.scorer(&liked_hosts, &disliked_hosts, false);
-            aggregator.set_inbound_similarity(scorer);
+            computer.set_inbound_similarity(scorer);
         }
 
-        aggregator.set_region_count(
+        computer.set_region_count(
             guard
                 .search_index()
                 .region_count
@@ -277,10 +278,10 @@ where
         );
 
         if let Some(model) = self.linear_regression.as_ref() {
-            aggregator.set_linear_model(model.clone());
+            computer.set_linear_model(model.clone());
         }
 
-        let ranker = self.ranker(&parsed_query, ctx, guard, de_rank_similar, aggregator)?;
+        let ranker = self.ranker(&parsed_query, ctx, guard, de_rank_similar, computer)?;
 
         let res = guard.inverted_index().search_initial(
             &parsed_query,
@@ -293,7 +294,7 @@ where
         let ranking_websites = guard.inverted_index().retrieve_ranking_websites(
             ctx,
             res.top_websites,
-            ranker.aggregator(),
+            ranker.computer(),
             &fastfield_reader,
         )?;
 
@@ -409,9 +410,9 @@ where
         for (webpage, ranking) in webpages.iter_mut().zip(top_websites) {
             let mut ranking_signals = HashMap::new();
 
-            for signal in ALL_SIGNALS {
+            for signal in SignalEnum::all() {
                 if let Some(score) = ranking.ranking.signals.get(signal) {
-                    ranking_signals.insert(signal, *score);
+                    ranking_signals.insert(signal.into(), *score);
                 }
             }
 

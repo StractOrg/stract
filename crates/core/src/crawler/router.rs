@@ -15,10 +15,10 @@ struct RemoteCoordinator {
 }
 
 impl RemoteCoordinator {
-    async fn conn(&self) -> Result<sonic::service::ResilientConnection<CoordinatorService>> {
+    async fn conn(&self) -> Result<sonic::service::Connection<CoordinatorService>> {
         let retry = ExponentialBackoff::from_millis(1_000).with_limit(Duration::from_secs(10));
 
-        Ok(sonic::service::ResilientConnection::create_with_timeout(
+        Ok(sonic::service::Connection::create_with_timeout_retry(
             self.addr,
             Duration::from_secs(60),
             retry,

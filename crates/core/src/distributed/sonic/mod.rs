@@ -49,8 +49,11 @@ pub enum Error {
     #[error("The request could not be processed")]
     BadRequest,
 
-    #[error("Other")]
-    Other(#[from] anyhow::Error),
+    #[error("The body size ({body_size}) is larger than the maximum allowed ({max_size})")]
+    BodyTooLarge { body_size: usize, max_size: usize },
+
+    #[error("An application error occurred: {0}")]
+    Application(#[from] anyhow::Error),
 }
 
 pub struct Connection<Req, Res> {
@@ -83,6 +86,29 @@ where
         }
     }
 
+    pub async fn create_with_timeout_retry(
+        server: impl ToSocketAddrs + Clone,
+        timeout: Duration,
+        retry: impl Iterator<Item = Duration>,
+    ) -> Result<Self> {
+        let mut conn = Connection::create_with_timeout(server.clone(), timeout).await;
+        let mut retry = retry;
+
+        loop {
+            match conn {
+                Ok(conn) => return Ok(conn),
+                Err(_) => {
+                    if let Some(timeout) = retry.next() {
+                        tokio::time::sleep(timeout).await;
+                        conn = Connection::create_with_timeout(server.clone(), timeout).await;
+                    } else {
+                        return Err(Error::ConnectionTimeout);
+                    }
+                }
+            }
+        }
+    }
+
     async fn send_without_timeout(mut self, request: &Req) -> Result<Res> {
         let bytes = bincode::serialize(&request).unwrap();
 
@@ -104,11 +130,10 @@ where
         let header: Header = *bytemuck::from_bytes(&header_buf);
 
         if header.body_size > MAX_BODY_SIZE_BYTES {
-            return Err(Error::Other(anyhow::anyhow!(
-                "body size too large: {} (max: {})",
-                header.body_size,
-                MAX_BODY_SIZE_BYTES
-            )));
+            return Err(Error::BodyTooLarge {
+                body_size: header.body_size,
+                max_size: MAX_BODY_SIZE_BYTES,
+            });
         }
 
         let mut buf = vec![0; header.body_size];
@@ -140,7 +165,7 @@ struct Header {
 }
 
 pub struct Server<Req, Res> {
-    pub(super) listener: TcpListener,
+    listener: TcpListener,
     marker: PhantomData<(Req, Res)>,
 }
 
@@ -162,11 +187,10 @@ where
         let header: Header = *bytemuck::from_bytes(&header_buf);
 
         if header.body_size > MAX_BODY_SIZE_BYTES {
-            return Err(Error::Other(anyhow::anyhow!(
-                "body size too large: {} (max: {})",
-                header.body_size,
-                MAX_BODY_SIZE_BYTES
-            )));
+            return Err(Error::BodyTooLarge {
+                body_size: header.body_size,
+                max_size: MAX_BODY_SIZE_BYTES,
+            });
         }
 
         let mut buf = vec![0; header.body_size];
@@ -239,43 +263,6 @@ where
     }
 }
 
-pub struct ResilientConnection<Req, Res> {
-    conn: Connection<Req, Res>,
-}
-
-impl<Req, Res> ResilientConnection<Req, Res>
-where
-    Req: Serialize,
-    Res: DeserializeOwned,
-{
-    pub async fn create_with_timeout(
-        server: impl ToSocketAddrs + Clone,
-        timeout: Duration,
-        retry: impl Iterator<Item = Duration>,
-    ) -> Result<Self> {
-        let mut conn = Connection::create_with_timeout(server.clone(), timeout).await;
-        let mut retry = retry;
-
-        loop {
-            match conn {
-                Ok(conn) => return Ok(ResilientConnection { conn }),
-                Err(_) => {
-                    if let Some(timeout) = retry.next() {
-                        tokio::time::sleep(timeout).await;
-                        conn = Connection::create_with_timeout(server.clone(), timeout).await;
-                    } else {
-                        return Err(Error::ConnectionTimeout);
-                    }
-                }
-            }
-        }
-    }
-
-    pub async fn send_with_timeout(self, request: &Req, timeout: Duration) -> Result<Res> {
-        self.conn.send_with_timeout(request, timeout).await
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{collections::HashMap, future::Future};
@@ -283,6 +270,8 @@ mod tests {
     use proptest::prelude::*;
     use proptest_derive::Arbitrary;
     use serde::Deserialize;
+
+    use crate::free_socket_addr;
 
     use super::*;
 
@@ -302,8 +291,8 @@ mod tests {
             .build()
             .unwrap()
             .block_on(async move {
-                let server = Server::bind(("127.0.0.1", 0)).await.unwrap();
-                let addr = server.listener.local_addr().unwrap();
+                let addr = free_socket_addr();
+                let server = Server::bind(addr.clone()).await.unwrap();
                 let connection = Connection::create(addr).await.unwrap();
 
                 let svr_task = tokio::spawn(async move { svr_fn(server).await });

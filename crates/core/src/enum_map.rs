@@ -16,14 +16,22 @@
 
 use serde::{Deserialize, Serialize};
 
+pub trait InsertEnumMapKey: Sized {
+    fn into_usize(self) -> usize;
+}
+
+pub trait GetEnumMapKey: Sized {
+    fn from_usize(value: usize) -> Option<Self>;
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct EnumMap<K: Into<usize>, V> {
+pub struct EnumMap<K: InsertEnumMapKey, V> {
     inner: Vec<Option<V>>,
     len: usize,
     _phantom: std::marker::PhantomData<K>,
 }
 
-impl<K: Into<usize>, V> Default for EnumMap<K, V> {
+impl<K: InsertEnumMapKey, V> Default for EnumMap<K, V> {
     fn default() -> Self {
         Self::new()
     }
@@ -31,7 +39,7 @@ impl<K: Into<usize>, V> Default for EnumMap<K, V> {
 
 impl<K, V> EnumMap<K, V>
 where
-    K: Into<usize>,
+    K: InsertEnumMapKey,
 {
     pub fn new() -> Self {
         Self {
@@ -42,7 +50,7 @@ where
     }
 
     pub fn insert(&mut self, key: K, value: V) {
-        let key = key.into();
+        let key = key.into_usize();
 
         if key >= self.inner.len() {
             self.inner.resize_with(key + 1, || None);
@@ -60,7 +68,7 @@ where
     }
 
     pub fn get(&self, key: K) -> Option<&V> {
-        let key = key.into();
+        let key = key.into_usize();
         if key >= self.inner.len() {
             None
         } else {
@@ -81,7 +89,7 @@ where
     }
 
     pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
-        let key = key.into();
+        let key = key.into_usize();
         if key >= self.inner.len() {
             None
         } else {
@@ -92,19 +100,19 @@ where
 
 impl<K, V> EnumMap<K, V>
 where
-    K: TryFrom<usize> + Into<usize>,
+    K: GetEnumMapKey + InsertEnumMapKey,
 {
     pub fn keys(&self) -> impl Iterator<Item = K> + '_ {
         self.inner
             .iter()
             .enumerate()
-            .filter_map(|(key, value)| value.as_ref().and_then(|_| K::try_from(key).ok()))
+            .filter_map(|(key, value)| value.as_ref().and_then(|_| K::from_usize(key)))
     }
 }
 
 impl<K, V> FromIterator<(K, V)> for EnumMap<K, V>
 where
-    K: Into<usize>,
+    K: InsertEnumMapKey,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let mut map = Self::new();
@@ -118,17 +126,17 @@ where
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct EnumSet<K: Into<usize>> {
+pub struct EnumSet<K: InsertEnumMapKey> {
     map: EnumMap<K, ()>,
 }
 
-impl<K: Into<usize>> Default for EnumSet<K> {
+impl<K: InsertEnumMapKey> Default for EnumSet<K> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<K: Into<usize>> EnumSet<K> {
+impl<K: InsertEnumMapKey> EnumSet<K> {
     pub fn new() -> Self {
         Self {
             map: EnumMap::new(),
@@ -148,10 +156,7 @@ impl<K: Into<usize>> EnumSet<K> {
     }
 }
 
-impl<K> EnumSet<K>
-where
-    K: TryFrom<usize> + Into<usize>,
-{
+impl<K: InsertEnumMapKey + GetEnumMapKey> EnumSet<K> {
     pub fn iter(&self) -> impl Iterator<Item = K> + '_ {
         self.map.keys()
     }
@@ -168,9 +173,9 @@ mod tests {
         C,
     }
 
-    impl From<TestEnum> for usize {
-        fn from(val: TestEnum) -> Self {
-            val as usize
+    impl InsertEnumMapKey for TestEnum {
+        fn into_usize(self) -> usize {
+            self as usize
         }
     }
 

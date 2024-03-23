@@ -202,7 +202,6 @@ impl Display for PrometheusGroup {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
 

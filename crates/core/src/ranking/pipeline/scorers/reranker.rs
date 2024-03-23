@@ -18,8 +18,9 @@ use std::sync::Arc;
 
 use crate::{
     ranking::{
+        self,
         models::{cross_encoder::CrossEncoder, lambdamart::LambdaMART},
-        Signal, SignalCoefficient, SignalScore,
+        Signal, SignalCoefficient, SignalEnum, SignalScore,
     },
     searcher::SearchQuery,
 };
@@ -48,15 +49,19 @@ impl<M: CrossEncoder> ReRanker<M> {
     fn crossencoder_snippet_coeff(&self) -> f64 {
         self.signal_coefficients
             .as_ref()
-            .map(|coeff| coeff.get(&Signal::CrossEncoderSnippet))
-            .unwrap_or_else(|| Signal::CrossEncoderSnippet.default_coefficient())
+            .map(|coeff| coeff.get(&ranking::signal::CrossEncoderSnippet.into()))
+            .unwrap_or_else(|| {
+                SignalEnum::from(ranking::signal::CrossEncoderSnippet).default_coefficient()
+            })
     }
 
     fn crossencoder_title_coeff(&self) -> f64 {
         self.signal_coefficients
             .as_ref()
-            .map(|coeff| coeff.get(&Signal::CrossEncoderTitle))
-            .unwrap_or_else(|| Signal::CrossEncoderTitle.default_coefficient())
+            .map(|coeff| coeff.get(&ranking::signal::CrossEncoderTitle.into()))
+            .unwrap_or_else(|| {
+                SignalEnum::from(ranking::signal::CrossEncoderTitle).default_coefficient()
+            })
     }
 
     fn crossencoder_score_webpages(&self, webpage: &mut [PrecisionRankingWebpage]) {
@@ -75,7 +80,7 @@ impl<M: CrossEncoder> ReRanker<M> {
         for ((webpage, snippet), title) in webpage.iter_mut().zip(snippet_scores).zip(title_scores)
         {
             webpage.ranking.signals.insert(
-                Signal::CrossEncoderSnippet,
+                ranking::signal::CrossEncoderSnippet.into(),
                 SignalScore {
                     coefficient: self.crossencoder_snippet_coeff(),
                     value: snippet,
@@ -83,7 +88,7 @@ impl<M: CrossEncoder> ReRanker<M> {
             );
 
             webpage.ranking.signals.insert(
-                Signal::CrossEncoderTitle,
+                ranking::signal::CrossEncoderTitle.into(),
                 SignalScore {
                     coefficient: self.crossencoder_title_coeff(),
                     value: title,
