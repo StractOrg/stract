@@ -182,8 +182,9 @@ impl Model {
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let file = OpenOptions::new().read(true).open(path)?;
+        let reader = std::io::BufReader::new(file);
 
-        let model = bincode::deserialize_from(file)?;
+        let model = bincode::deserialize_from(reader)?;
 
         Ok(model)
     }

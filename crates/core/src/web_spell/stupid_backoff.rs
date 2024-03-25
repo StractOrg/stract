@@ -212,7 +212,9 @@ impl StupidBackoff {
             unsafe { memmap::Mmap::map(&File::open(path.as_ref().join("rotated_ngrams.bin"))?)? };
         let rotated_ngrams = fst::Map::new(mmap)?;
 
-        let n_counts = bincode::deserialize_from(File::open(path.as_ref().join("n_counts.bin"))?)?;
+        let file = File::open(path.as_ref().join("n_counts.bin"))?;
+        let reader = std::io::BufReader::new(file);
+        let n_counts = bincode::deserialize_from(reader)?;
 
         Ok(Self {
             ngrams,

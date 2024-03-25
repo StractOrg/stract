@@ -14,134 +14,236 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/license
 
-use std::path::Path;
+use std::{collections::BTreeMap, io::Write, path::Path};
 
 use super::{Node, NodeID};
+use crate::Result;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct StoredPtr {
+    file_offset: usize,
+    len: usize,
+}
+
+impl StoredPtr {
+    fn range(&self) -> std::ops::Range<usize> {
+        self.file_offset..self.file_offset + self.len
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Index {
+    map: BTreeMap<NodeID, StoredPtr>,
+}
+
+impl Index {
+    fn new() -> Self {
+        Self {
+            map: BTreeMap::new(),
+        }
+    }
+
+    fn open_or_new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        if path.as_ref().exists() {
+            let file = std::fs::File::open(path)?;
+            let reader = std::io::BufReader::new(file);
+
+            Ok(bincode::deserialize_from(reader)?)
+        } else {
+            Ok(Self::new())
+        }
+    }
+
+    fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let file = std::fs::File::create(path)?;
+        let writer = std::io::BufWriter::new(file);
+
+        bincode::serialize_into(writer, self)?;
+
+        Ok(())
+    }
+
+    fn insert(&mut self, id: NodeID, ptr: StoredPtr) {
+        self.map.insert(id, ptr);
+    }
+
+    fn get(&self, id: &NodeID) -> Option<&StoredPtr> {
+        self.map.get(id)
+    }
+
+    fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (&NodeID, &StoredPtr)> {
+        self.map.iter()
+    }
+
+    fn contains(&self, id: &NodeID) -> bool {
+        self.map.contains_key(id)
+    }
+}
+
+struct FileStore {
+    writer: std::io::BufWriter<std::fs::File>,
+    mmap: memmap2::MmapMut,
+    cur_offset: usize,
+}
+
+impl FileStore {
+    fn open_or_new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path.as_ref())?;
+        let cur_offset = file.metadata()?.len() as usize;
+
+        let mmap = unsafe { memmap2::MmapMut::map_mut(&file)? };
+
+        Ok(Self {
+            writer: std::io::BufWriter::new(file),
+            mmap,
+            cur_offset,
+        })
+    }
+
+    fn write(&mut self, node: &Node) -> Result<StoredPtr> {
+        let bytes = bincode::serialize(node)?;
+        self.writer.write_all(&bytes)?;
+
+        let file_offset = self.cur_offset;
+        self.cur_offset += bytes.len();
+
+        Ok(StoredPtr {
+            file_offset,
+            len: bytes.len(),
+        })
+    }
+
+    fn read(&self, ptr: &StoredPtr) -> Result<Option<Node>> {
+        let range = ptr.range();
+
+        if range.start > self.mmap.len() || range.end > self.mmap.len() {
+            return Ok(None);
+        }
+
+        let bytes = &self.mmap[range];
+        let node = bincode::deserialize(bytes)?;
+        Ok(Some(node))
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        self.writer.flush()?;
+
+        self.mmap = unsafe { memmap2::MmapMut::map_mut(self.writer.get_ref())? };
+
+        Ok(())
+    }
+}
 
 pub struct Id2NodeDb {
-    db: rocksdb::DB,
-    _cache: rocksdb::Cache, // needs to be kept alive for as long as the db is alive
+    path: std::path::PathBuf,
+    index: Index,
+    store: FileStore,
 }
 
 impl Id2NodeDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let mut opts = rocksdb::Options::default();
-        opts.create_if_missing(true);
-        opts.optimize_for_point_lookup(512);
+        if !path.as_ref().exists() {
+            std::fs::create_dir_all(&path).unwrap();
+        }
 
-        opts.set_allow_mmap_reads(true);
-        opts.set_allow_mmap_writes(true);
-        opts.set_write_buffer_size(128 * 1024 * 1024); // 128 MB
-        opts.set_target_file_size_base(512 * 1024 * 1024); // 512 MB
-        opts.set_target_file_size_multiplier(10);
-
-        opts.set_compression_type(rocksdb::DBCompressionType::None);
-
-        let mut block_opts = rocksdb::BlockBasedOptions::default();
-        let cache = rocksdb::Cache::new_lru_cache(1024 * 1024 * 1024); // 1 gb
-        block_opts.set_ribbon_filter(10.0);
-
-        // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
-        opts.set_level_compaction_dynamic_level_bytes(true);
-        opts.set_bytes_per_sync(1048576);
-
-        block_opts.set_block_size(32 * 1024); // 32 kb
-        block_opts.set_format_version(5);
-        block_opts.set_cache_index_and_filter_blocks(true);
-        block_opts.set_pin_l0_filter_and_index_blocks_in_cache(true);
-        block_opts.set_block_cache(&cache);
-
-        opts.set_block_based_table_factory(&block_opts);
-
-        let db = rocksdb::DB::open(&opts, path).unwrap();
-
-        Self { db, _cache: cache }
+        Self {
+            path: path.as_ref().to_path_buf(),
+            index: Index::open_or_new(path.as_ref().join("index.bin")).unwrap(),
+            store: FileStore::open_or_new(path.as_ref().join("store.bin")).unwrap(),
+        }
     }
 
     pub fn put(&mut self, id: &NodeID, node: &Node) {
-        let mut opts = rocksdb::WriteOptions::default();
-        opts.disable_wal(true);
+        if self.index.contains(id) {
+            return;
+        }
 
-        self.db
-            .put_opt(
-                id.as_u64().to_le_bytes(),
-                bincode::serialize(node).unwrap(),
-                &opts,
-            )
-            .unwrap();
+        let ptr = self.store.write(node).unwrap();
+        self.index.insert(*id, ptr);
     }
 
     pub fn get(&self, id: &NodeID) -> Option<Node> {
-        let mut opts = rocksdb::ReadOptions::default();
-        opts.set_verify_checksums(false);
-
-        self.db
-            .get_opt(id.as_u64().to_le_bytes(), &opts)
-            .unwrap()
-            .map(|bytes| bincode::deserialize(&bytes).unwrap())
+        match self.index.get(id) {
+            Some(ptr) => self.store.read(ptr).unwrap(),
+            None => None,
+        }
     }
 
     pub fn keys(&self) -> impl Iterator<Item = NodeID> + '_ {
-        let mut opts = rocksdb::ReadOptions::default();
-        opts.set_verify_checksums(false);
-        opts.set_async_io(true);
-
-        self.db
-            .iterator_opt(rocksdb::IteratorMode::Start, opts)
-            .filter_map(|r| {
-                let (key, _) = r.ok()?;
-                Some(NodeID::from(u64::from_le_bytes((*key).try_into().unwrap())))
-            })
+        self.index.iter().map(|(id, _)| *id)
     }
 
     pub fn estimate_num_keys(&self) -> usize {
-        self.db
-            .property_int_value("rocksdb.estimate-num-keys")
-            .ok()
-            .flatten()
-            .unwrap_or_default() as usize
+        self.index.len()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (NodeID, Node)> + '_ {
-        let mut opts = rocksdb::ReadOptions::default();
-        opts.set_verify_checksums(false);
-
-        self.db
-            .iterator_opt(rocksdb::IteratorMode::Start, opts)
-            .filter_map(|r| {
-                let (key, value) = r.ok()?;
-
-                Some((
-                    NodeID::from(u64::from_le_bytes((*key).try_into().unwrap())),
-                    bincode::deserialize(&value).unwrap(),
-                ))
-            })
+        self.index
+            .iter()
+            .filter_map(move |(id, ptr)| self.store.read(ptr).unwrap().map(|node| (*id, node)))
     }
 
     pub fn batch_put(&mut self, iter: impl Iterator<Item = (NodeID, Node)>) {
-        let mut batch = rocksdb::WriteBatch::default();
-        let mut count = 0;
+        let mut num_inserts = 0;
 
         for (id, node) in iter {
-            batch.put(
-                id.as_u64().to_le_bytes(),
-                bincode::serialize(&node).unwrap(),
-            );
-            count += 1;
+            self.put(&id, &node);
 
-            if count > 10_000 {
-                self.db.write(batch).unwrap();
-                batch = rocksdb::WriteBatch::default();
-                count = 0;
+            num_inserts += 1;
+            if num_inserts >= 1000 {
+                self.flush();
+                num_inserts = 0;
             }
         }
 
-        if count > 0 {
-            self.db.write(batch).unwrap();
+        if num_inserts > 0 {
+            self.flush();
         }
     }
 
-    pub fn flush(&self) {
-        self.db.flush().unwrap();
+    pub fn flush(&mut self) {
+        self.index
+            .save(self.path.as_path().join("index.bin"))
+            .unwrap();
+        self.store.flush().unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gen_temp_path;
+
+    #[test]
+    fn test_id2node_db() {
+        let mut db = Id2NodeDb::open(gen_temp_path());
+
+        let a_node = Node::from("a".to_string());
+        let a_id = NodeID::from(0 as u64);
+
+        db.put(&a_id, &a_node);
+        db.flush();
+
+        assert_eq!(db.get(&a_id), Some(a_node.clone()));
+
+        let b_node = Node::from("b".to_string());
+        let b_id = NodeID::from(1 as u64);
+
+        assert_eq!(db.get(&b_id), None);
+
+        db.put(&b_id, &b_node);
+        db.flush();
+
+        assert_eq!(db.get(&b_id), Some(b_node));
+        assert_eq!(db.get(&a_id), Some(a_node));
     }
 }
