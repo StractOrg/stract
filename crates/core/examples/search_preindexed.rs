@@ -3,8 +3,8 @@ use rand::seq::SliceRandom;
 use stract::{
     bangs::Bangs,
     config::{
-        ApiConfig, ApiThresholds, CollectorConfig, CorrectionConfig, LLMConfig, SnippetConfig,
-        WidgetsConfig,
+        defaults, ApiConfig, ApiThresholds, CollectorConfig, CorrectionConfig, LLMConfig,
+        SnippetConfig, WidgetsConfig,
     },
     distributed::member::ShardId,
     image_store::Image,
@@ -120,6 +120,7 @@ pub async fn main() {
             model: "data/mistral-7b-instruct-v0.2.Q4_K_M.gguf".to_string(),
             api_key: None,
         },
+        max_concurrent_searches: defaults::Api::max_concurrent_searches(),
     };
 
     let mut queries = stract::autosuggest::Autosuggest::load_csv(&config.queries_csv_path)

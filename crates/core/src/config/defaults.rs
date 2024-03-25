@@ -48,6 +48,10 @@ impl Api {
     pub fn entity_sidebar() -> f64 {
         10.0
     }
+
+    pub fn max_concurrent_searches() -> Option<usize> {
+        None
+    }
 }
 
 pub struct Snippet;

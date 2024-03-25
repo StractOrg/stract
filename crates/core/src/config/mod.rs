@@ -234,6 +234,9 @@ pub struct ApiConfig {
 
     #[serde(default)]
     pub correction_config: CorrectionConfig,
+
+    #[serde(default = "defaults::Api::max_concurrent_searches")]
+    pub max_concurrent_searches: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

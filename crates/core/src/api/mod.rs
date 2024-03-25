@@ -19,6 +19,7 @@
 
 use axum::{body::Body, extract, middleware, Router};
 use tokio::sync::Mutex;
+use tower::limit::ConcurrencyLimitLayer;
 use tower_http::compression::CompressionLayer;
 
 use crate::{
@@ -92,13 +93,17 @@ pub async fn favicon() -> impl IntoResponse {
 }
 
 fn build_router(state: Arc<State>) -> Router {
+    let mut search = Router::new()
+        .route("/beta/api/search", post(search::search))
+        .route_layer(middleware::from_fn_with_state(state.clone(), search_metric))
+        .layer(cors_layer());
+
+    if let Some(limit) = state.config.max_concurrent_searches {
+        search = search.layer(ConcurrencyLimitLayer::new(limit));
+    }
+
     Router::new()
-        .merge(
-            Router::new()
-                .route("/beta/api/search", post(search::search))
-                .route_layer(middleware::from_fn_with_state(state.clone(), search_metric))
-                .layer(cors_layer()),
-        )
+        .merge(search)
         .route("/favicon.ico", get(favicon))
         .merge(
             Router::new()
