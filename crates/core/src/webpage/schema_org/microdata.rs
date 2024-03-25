@@ -16,7 +16,7 @@
 
 //! Almost spec compliant microdata parser: https://html.spec.whatwg.org/multipage/microdata.htm
 
-use kuchiki::NodeRef;
+use kuchiki::{ElementData, NodeRef};
 use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
 
@@ -151,8 +151,63 @@ fn text_contents(node: NodeRef) -> Vec<RawProperty> {
     res
 }
 
+fn properties_for_prop(elem: &ElementData, current: NodeRef) -> Result<Vec<RawProperty>> {
+    if elem.attributes.borrow().contains("itemscope") {
+        Ok(vec![RawProperty::Item(parse_item(current)?)])
+    } else {
+        match elem.name.local.to_string().as_str() {
+            "meta" => Ok(vec![RawProperty::String(
+                elem.attributes
+                    .borrow()
+                    .get("content")
+                    .map(String::from)
+                    .unwrap_or_default(),
+            )]),
+            "audio" | "embed" | "iframe" | "img" | "source" | "track" | "video" => {
+                if let Some(url) = elem.attributes.borrow().get("src") {
+                    Ok(vec![RawProperty::String(url.to_string())])
+                } else {
+                    Ok(vec![RawProperty::String(String::new())])
+                }
+            }
+            "a" | "area" | "link" => {
+                if let Some(url) = elem.attributes.borrow().get("href") {
+                    Ok(vec![RawProperty::String(url.to_string())])
+                } else {
+                    Ok(vec![RawProperty::String(String::new())])
+                }
+            }
+            "object" => Ok(vec![RawProperty::String(
+                elem.attributes
+                    .borrow()
+                    .get("data")
+                    .map(String::from)
+                    .unwrap_or_default(),
+            )]),
+            "data" | "meter" => Ok(vec![RawProperty::String(
+                elem.attributes
+                    .borrow()
+                    .get("value")
+                    .map(String::from)
+                    .unwrap_or_default(),
+            )]),
+            "time" => {
+                let time = elem
+                    .attributes
+                    .borrow()
+                    .get("datetime")
+                    .map(String::from)
+                    .unwrap_or_else(|| current.text_contents());
+
+                Ok(vec![RawProperty::String(time)])
+            }
+            _ => Ok(text_contents(current.clone())),
+        }
+    }
+}
+
 /// implementation of https://html.spec.whatwg.org/multipage/microdata.html#associating-names-with-items
-/// TODO: handle itemrefs
+/// TODO: handle itemrefs (https://html.spec.whatwg.org/multipage/microdata.html#attr-itemref)
 fn parse_item(root: NodeRef) -> Result<RawItem> {
     if !root
         .as_element()
@@ -190,58 +245,7 @@ fn parse_item(root: NodeRef) -> Result<RawItem> {
             }
 
             if let Some(itemprop) = elem.attributes.borrow().get("itemprop") {
-                let properties_for_prop = if elem.attributes.borrow().contains("itemscope") {
-                    vec![RawProperty::Item(parse_item(current)?)]
-                } else {
-                    match elem.name.local.to_string().as_str() {
-                        "meta" => vec![RawProperty::String(
-                            elem.attributes
-                                .borrow()
-                                .get("content")
-                                .map(String::from)
-                                .unwrap_or_default(),
-                        )],
-                        "audio" | "embed" | "iframe" | "img" | "source" | "track" | "video" => {
-                            if let Some(url) = elem.attributes.borrow().get("src") {
-                                vec![RawProperty::String(url.to_string())]
-                            } else {
-                                vec![RawProperty::String(String::new())]
-                            }
-                        }
-                        "a" | "area" | "link" => {
-                            if let Some(url) = elem.attributes.borrow().get("href") {
-                                vec![RawProperty::String(url.to_string())]
-                            } else {
-                                vec![RawProperty::String(String::new())]
-                            }
-                        }
-                        "object" => vec![RawProperty::String(
-                            elem.attributes
-                                .borrow()
-                                .get("data")
-                                .map(String::from)
-                                .unwrap_or_default(),
-                        )],
-                        "data" | "meter" => vec![RawProperty::String(
-                            elem.attributes
-                                .borrow()
-                                .get("value")
-                                .map(String::from)
-                                .unwrap_or_default(),
-                        )],
-                        "time" => {
-                            let time = elem
-                                .attributes
-                                .borrow()
-                                .get("datetime")
-                                .map(String::from)
-                                .unwrap_or_else(|| current.text_contents());
-
-                            vec![RawProperty::String(time)]
-                        }
-                        _ => text_contents(current.clone()),
-                    }
-                };
+                let properties_for_prop = properties_for_prop(elem, current)?;
 
                 for itemprop in itemprop.split_ascii_whitespace() {
                     properties

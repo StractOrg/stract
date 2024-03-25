@@ -15,8 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::anyhow;
 use encoding_rs::{Encoding, UTF_8};
-use futures::{future::BoxFuture, FutureExt};
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashSet;
 use mime::Mime;
 use quick_xml::events::Event;
 use rand::seq::SliceRandom;
@@ -47,6 +46,12 @@ use super::{
 };
 
 const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
+
+const IGNORED_EXTENSIONS: [&str; 27] = [
+    ".pdf", ".jpg", ".zip", ".png", ".css", ".js", ".json", ".jsonp", ".woff2", ".woff", ".ttf",
+    ".svg", ".gif", ".jpeg", ".ico", ".mp4", ".mp3", ".avi", ".mov", ".mpeg", ".webm", ".wav",
+    ".flac", ".aac", ".ogg", ".m4a", ".m4v",
+];
 
 struct ProcessedUrl {
     new_urls: Vec<Url>,
@@ -238,7 +243,7 @@ impl<S: DatumStream> JobExecutor<S> {
 
                 if let Some(sitemap) = self.robotstxt.sitemap(retryable_url.url()).await {
                     self.sitemap_urls
-                        .extend(self.urls_from_sitemap(sitemap, 0, 5).await);
+                        .extend(self.urls_from_sitemap(sitemap, 5).await);
                 }
             }
 
@@ -276,92 +281,70 @@ impl<S: DatumStream> JobExecutor<S> {
         }
     }
 
+    fn increase_politeness(&mut self) {
+        self.politeness_factor *= 2.0;
+
+        if self.politeness_factor > self.config.max_politeness_factor {
+            self.politeness_factor = self.config.max_politeness_factor;
+        }
+
+        tracing::warn!("politeness factor increased to {}", self.politeness_factor);
+    }
+
+    fn new_urls(html: &Html) -> Vec<Url> {
+        html.all_links()
+            .into_iter()
+            .map(|link| link.destination)
+            .filter(|url| url.as_str().len() <= MAX_URL_LEN_BYTES)
+            .filter(|url| {
+                IGNORED_EXTENSIONS
+                    .iter()
+                    .all(|ext| !url.as_str().ends_with(ext))
+            })
+            .collect()
+    }
+
     async fn process_url(&mut self, url: Url) -> ProcessedUrl {
         let fetch = self.crawl_url(url.clone()).await;
 
         match fetch {
-            Ok(datum) => {
-                if matches!(datum.status_code, 200 | 301 | 302) {
-                    if datum.status_code == 200 {
-                        self.save_datum(datum.clone()).await;
+            Ok(datum) => match datum.status_code {
+                200 => {
+                    self.save_datum(datum.clone()).await;
 
-                        match Html::parse(&datum.body, datum.url.as_str()) {
-                            Ok(html) => {
-                                let new_urls = html
-                                    .all_links()
-                                    .into_iter()
-                                    .map(|link| link.destination)
-                                    .filter(|url| url.as_str().len() <= MAX_URL_LEN_BYTES)
-                                    .filter(|url| {
-                                        !url.path().ends_with(".pdf")
-                                            && !url.path().ends_with(".jpg")
-                                            && !url.path().ends_with(".zip")
-                                            && !url.path().ends_with(".png")
-                                            && !url.path().ends_with(".css")
-                                            && !url.path().ends_with(".js")
-                                            && !url.path().ends_with(".json")
-                                            && !url.path().ends_with(".jsonp")
-                                            && !url.path().ends_with(".woff2")
-                                            && !url.path().ends_with(".woff")
-                                            && !url.path().ends_with(".ttf")
-                                            && !url.path().ends_with(".svg")
-                                            && !url.path().ends_with(".gif")
-                                            && !url.path().ends_with(".jpeg")
-                                            && !url.path().ends_with(".ico")
-                                            && !url.path().ends_with(".mp4")
-                                            && !url.path().ends_with(".mp3")
-                                            && !url.path().ends_with(".avi")
-                                            && !url.path().ends_with(".mov")
-                                            && !url.path().ends_with(".mpeg")
-                                            && !url.path().ends_with(".webm")
-                                            && !url.path().ends_with(".wav")
-                                            && !url.path().ends_with(".flac")
-                                            && !url.path().ends_with(".aac")
-                                            && !url.path().ends_with(".ogg")
-                                            && !url.path().ends_with(".m4a")
-                                            && !url.path().ends_with(".m4v")
-                                    })
-                                    .collect();
-
-                                let url_res = UrlResponse::Success { url: datum.url };
-
-                                ProcessedUrl {
-                                    new_urls,
-                                    response: url_res,
-                                }
+                    match Html::parse(&datum.body, datum.url.as_str()) {
+                        Ok(html) => {
+                            let new_urls = Self::new_urls(&html);
+                            let url_res = UrlResponse::Success { url: datum.url };
+                            ProcessedUrl {
+                                new_urls,
+                                response: url_res,
                             }
-                            Err(_) => ProcessedUrl {
-                                new_urls: Vec::new(),
-                                response: UrlResponse::Failed {
-                                    url,
-                                    status_code: None,
-                                },
-                            },
                         }
-                    } else {
-                        let url_res = UrlResponse::Redirected {
-                            url,
-                            new_url: datum.url,
-                        };
-
-                        ProcessedUrl {
+                        Err(_) => ProcessedUrl {
                             new_urls: Vec::new(),
-                            response: url_res,
-                        }
+                            response: UrlResponse::Failed {
+                                url,
+                                status_code: None,
+                            },
+                        },
                     }
-                } else {
+                }
+                301 | 302 => {
+                    let url_res = UrlResponse::Redirected {
+                        url,
+                        new_url: datum.url,
+                    };
+
+                    ProcessedUrl {
+                        new_urls: Vec::new(),
+                        response: url_res,
+                    }
+                }
+
+                _ => {
                     if datum.status_code == 429 {
-                        self.politeness_factor *= 2.0;
-
-                        if self.politeness_factor > self.config.max_politeness_factor {
-                            self.politeness_factor = self.config.max_politeness_factor;
-                        }
-
-                        tracing::warn!(
-                            "politeness factor increased to {} for {}",
-                            self.politeness_factor,
-                            &url
-                        );
+                        self.increase_politeness();
                     }
 
                     tracing::debug!("failed to fetch url ({}): {}", &url, datum.status_code);
@@ -373,7 +356,7 @@ impl<S: DatumStream> JobExecutor<S> {
                         },
                     }
                 }
-            }
+            },
             Err(err) => {
                 tracing::debug!("failed to fetch url ({}): {}", &url, err);
 
@@ -409,10 +392,8 @@ impl<S: DatumStream> JobExecutor<S> {
             .map_err(|e| e.into())
     }
 
-    async fn crawl_url(&self, url: Url) -> Result<CrawlDatum> {
-        let start = Instant::now();
-
-        let res = if url.scheme() == "http" {
+    async fn fetch_with_https_priority(&self, url: Url) -> Result<reqwest::Response> {
+        if url.scheme() == "http" {
             let mut https = url.clone();
             https
                 .set_scheme("https")
@@ -427,10 +408,10 @@ impl<S: DatumStream> JobExecutor<S> {
             }
         } else {
             self.fetch(url.clone()).await
-        };
+        }
+    }
 
-        let fetch_time = start.elapsed();
-
+    async fn politeness_delay(&self, fetch_time: Duration) {
         let mut delay = fetch_time;
 
         if delay < Duration::from_millis(self.config.min_crawl_delay_ms) {
@@ -444,37 +425,41 @@ impl<S: DatumStream> JobExecutor<S> {
         }
 
         tokio::time::sleep(delay).await;
+    }
 
-        let res = res?;
-
-        let headers: HashMap<_, _> = res
-            .headers()
-            .iter()
-            .filter_map(|(k, v)| {
-                let k = k.to_string();
-                if let Ok(v) = v.to_str() {
-                    return Some((k, v.to_string()));
-                }
-
-                None
-            })
-            .collect();
-
+    fn check_headers(&self, res: &reqwest::Response) -> Result<warc::PayloadType> {
         // check if content length is too large
-        if let Some(content_length) = headers.get("content-length") {
-            if content_length.parse::<usize>().unwrap_or(0) > MAX_CONTENT_LENGTH {
+        if let Some(content_length) = res
+            .headers()
+            .get(reqwest::header::CONTENT_LENGTH)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<usize>().ok())
+        {
+            if content_length > MAX_CONTENT_LENGTH {
                 return Err(Error::ContentTooLarge.into());
             }
         }
 
         // check if content type is html
-        let payload_type = match headers.get("content-type") {
-            Some(ct) if ct.contains("text/html") => warc::PayloadType::Html,
-            Some(ct) if ct.contains("application/rss") => warc::PayloadType::Rss,
-            Some(ct) if ct.contains("application/atom") => warc::PayloadType::Atom,
-            ct => return Err(Error::InvalidContentType(format!("{ct:?}")).into()),
-        };
+        match res
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|val| val.to_str().ok())
+        {
+            Some(ct) if ct.contains("text/html") => Ok(warc::PayloadType::Html),
+            Some(ct) if ct.contains("application/rss") => Ok(warc::PayloadType::Rss),
+            Some(ct) if ct.contains("application/atom") => Ok(warc::PayloadType::Atom),
+            ct => Err(Error::InvalidContentType(format!("{ct:?}")).into()),
+        }
+    }
 
+    fn redirect_datum(
+        &self,
+        res: &reqwest::Response,
+        url: &Url,
+        payload_type: warc::PayloadType,
+        fetch_time: Duration,
+    ) -> Result<Option<CrawlDatum>> {
         let status_code = res.status().as_u16();
 
         if status_code == 301 || status_code == 302 {
@@ -489,17 +474,19 @@ impl<S: DatumStream> JobExecutor<S> {
                 .or_else(|_| url.join(location))
                 .map_err(|_| Error::InvalidRedirect)?;
 
-            return Ok(CrawlDatum {
+            Ok(Some(CrawlDatum {
                 url,
                 status_code,
                 payload_type,
                 body: String::new(),
                 fetch_time_ms: fetch_time.as_millis() as u64,
-            });
+            }))
+        } else {
+            Ok(None)
         }
+    }
 
-        let res_url = res.url().clone();
-
+    async fn encoded_body(&self, res: reqwest::Response) -> Result<String> {
         let content_type = res
             .headers()
             .get(reqwest::header::CONTENT_TYPE)
@@ -529,7 +516,28 @@ impl<S: DatumStream> JobExecutor<S> {
         }
 
         let (text, _, _) = encoding.decode(&bytes);
-        let body = text.to_string();
+        Ok(text.to_string())
+    }
+
+    async fn crawl_url(&self, url: Url) -> Result<CrawlDatum> {
+        let start = Instant::now();
+        let res = self.fetch_with_https_priority(url.clone()).await;
+        let fetch_time = start.elapsed();
+        self.politeness_delay(fetch_time).await;
+
+        // we want to delay before returning the error
+        let res = res?;
+
+        let payload_type = self.check_headers(&res)?;
+
+        if let Some(datum) = self.redirect_datum(&res, &url, payload_type, fetch_time)? {
+            return Ok(datum);
+        }
+
+        let status_code = res.status().as_u16();
+
+        let res_url = res.url().clone();
+        let body = self.encoded_body(res).await?;
 
         Ok(CrawlDatum {
             url: res_url,
@@ -540,41 +548,37 @@ impl<S: DatumStream> JobExecutor<S> {
         })
     }
 
-    fn urls_from_sitemap(
-        &self,
-        sitemap: Url,
-        depth: usize,
-        max_depth: usize,
-    ) -> BoxFuture<'_, Vec<Url>> {
-        async move {
-            if depth == max_depth {
-                return vec![];
+    async fn urls_from_sitemap(&self, sitemap: Url, max_depth: usize) -> Vec<Url> {
+        let mut stack = vec![(sitemap, 0)];
+        let mut urls = vec![];
+
+        while let Some((url, depth)) = stack.pop() {
+            if depth >= max_depth {
+                continue;
             }
 
-            // fetch url
-            let res = self.fetch(sitemap).await;
+            let res = self.fetch(url).await;
+            tokio::time::sleep(Duration::from_millis(self.config.min_crawl_delay_ms)).await;
 
             if res.is_err() {
-                return vec![];
+                continue;
             }
+
             let res = res.unwrap();
 
             if res.status() != reqwest::StatusCode::OK {
-                return vec![];
+                continue;
             }
 
             let body = res.text().await;
 
             if body.is_err() {
-                return vec![];
+                continue;
             }
 
             let body = body.unwrap();
 
-            // parse xml
             let entries = parse_sitemap(&body);
-
-            let mut urls = vec![];
 
             for entry in entries {
                 match entry {
@@ -582,16 +586,13 @@ impl<S: DatumStream> JobExecutor<S> {
                         urls.push(url);
                     }
                     SitemapEntry::Sitemap(url) => {
-                        tokio::time::sleep(Duration::from_millis(self.config.min_crawl_delay_ms))
-                            .await;
-                        urls.append(&mut self.urls_from_sitemap(url, depth + 1, max_depth).await);
+                        stack.push((url, depth + 1));
                     }
                 }
             }
-
-            urls
         }
-        .boxed()
+
+        urls
     }
 }
 

@@ -17,7 +17,7 @@
 //! Main library for Stract.
 
 #![doc(html_logo_url = "https://stract.com/images/biglogo.svg")]
-// #![warn(clippy::too_many_lines)]
+#![warn(clippy::too_many_lines)]
 // pedantic stuff
 // #![warn(clippy::pedantic)]
 // #![allow(clippy::unreadable_literal)]

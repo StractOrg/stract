@@ -234,7 +234,7 @@ impl Request {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub enum PayloadType {
     Html,

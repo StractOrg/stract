@@ -32,129 +32,130 @@ use crate::{
 
 const HYPERLOGLOG_COUNTERS: usize = 64;
 
-fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
+type Counter = BTreeMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>>;
+
+fn initialize(
+    graph: &Webgraph,
+    counters: &mut Counters,
+    centralities: &mut BTreeMap<NodeID, KahanSum>,
+) -> u64 {
     let mut num_nodes = 0;
-
-    let mut counters: BTreeMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>> = BTreeMap::new();
-
-    let mut centralities: BTreeMap<NodeID, KahanSum> = BTreeMap::new();
 
     for node in graph.nodes() {
         let mut counter = HyperLogLog::default();
         counter.add(node.as_u64());
 
-        counters.insert(node, counter);
+        counters.old.insert(node, counter);
         centralities.insert(node, KahanSum::default());
 
         num_nodes += 1;
     }
 
-    let mut changed_nodes = BloomFilter::new(num_nodes as u64, 0.05);
+    counters.new = counters.old.clone();
 
-    for node in graph.nodes() {
-        changed_nodes.insert(node.as_u64());
+    num_nodes
+}
+
+fn update_changed_counters(
+    graph: &Webgraph,
+    exact_changed_nodes: &mut BTreeSet<NodeID>,
+    counters: &mut Counters,
+    new_changed_nodes: &mut BloomFilter,
+) -> bool {
+    let mut new_exact_changed_nodes = BTreeSet::default();
+    let has_changes = AtomicBool::new(false);
+
+    exact_changed_nodes.iter().for_each(|changed_node| {
+        for edge in graph.raw_outgoing_edges(changed_node) {
+            if let (Some(counter_to), Some(counter_from)) =
+                (counters.new.get_mut(&edge.to), counters.old.get(&edge.from))
+            {
+                if counter_to
+                    .registers()
+                    .iter()
+                    .zip(counter_from.registers().iter())
+                    .any(|(to, from)| *from > *to)
+                {
+                    counter_to.merge(counter_from);
+                    new_changed_nodes.insert(edge.to.as_u64());
+
+                    new_exact_changed_nodes.insert(edge.to);
+
+                    has_changes.store(true, Ordering::Relaxed);
+                }
+            }
+        }
+    });
+
+    *exact_changed_nodes = new_exact_changed_nodes;
+
+    has_changes.load(Ordering::Relaxed)
+}
+
+fn update_all_counters(
+    graph: &Webgraph,
+    mut exact_changed_nodes: Option<&mut BTreeSet<NodeID>>,
+    counters: &mut Counters,
+    changed_nodes: &BloomFilter,
+    new_changed_nodes: &mut BloomFilter,
+) -> bool {
+    let has_changes = AtomicBool::new(false);
+
+    if let Some(exact_changed_nodes) = &mut exact_changed_nodes {
+        **exact_changed_nodes = BTreeSet::default();
     }
 
-    info!("Found {} nodes in the graph", num_nodes);
-    let exact_counting_threshold = (num_nodes as f64).sqrt().max(0.0).round() as u64;
-    let norm_factor = (num_nodes - 1) as f64;
+    graph.edges().for_each(|edge| {
+        if changed_nodes.contains(edge.from.as_u64()) {
+            if let (Some(counter_to), Some(counter_from)) =
+                (counters.new.get_mut(&edge.to), counters.old.get(&edge.from))
+            {
+                if counter_to
+                    .registers()
+                    .iter()
+                    .zip(counter_from.registers().iter())
+                    .any(|(to, from)| *from > *to)
+                {
+                    counter_to.merge(counter_from);
+                    new_changed_nodes.insert(edge.to.as_u64());
 
-    let mut exact_counting = false;
-    let has_changes = AtomicBool::new(true);
-    let mut t = 0;
-
-    let mut exact_changed_nodes: BTreeSet<NodeID> = BTreeSet::default();
-
-    loop {
-        if !has_changes.load(Ordering::Relaxed) {
-            break;
-        }
-
-        let mut new_counters = counters.clone();
-
-        has_changes.store(false, Ordering::Relaxed);
-        let mut new_changed_nodes = BloomFilter::new(num_nodes as u64, 0.05);
-
-        if !exact_changed_nodes.is_empty()
-            && exact_changed_nodes.len() as u64 <= exact_counting_threshold
-        {
-            let mut new_exact_changed_nodes = BTreeSet::default();
-
-            exact_changed_nodes.iter().for_each(|changed_node| {
-                for edge in graph.raw_outgoing_edges(changed_node) {
-                    if let (Some(counter_to), Some(counter_from)) =
-                        (new_counters.get_mut(&edge.to), counters.get(&edge.from))
-                    {
-                        if counter_to
-                            .registers()
-                            .iter()
-                            .zip(counter_from.registers().iter())
-                            .any(|(to, from)| *from > *to)
-                        {
-                            counter_to.merge(counter_from);
-                            new_changed_nodes.insert(edge.to.as_u64());
-
-                            new_exact_changed_nodes.insert(edge.to);
-
-                            has_changes.store(true, Ordering::Relaxed);
-                        }
+                    if let Some(exact_changed_nodes) = &mut exact_changed_nodes {
+                        exact_changed_nodes.insert(edge.to);
                     }
+
+                    has_changes.store(true, Ordering::Relaxed);
                 }
-            });
-
-            exact_changed_nodes = new_exact_changed_nodes;
-        } else {
-            exact_changed_nodes = BTreeSet::default();
-            graph.edges().for_each(|edge| {
-                if changed_nodes.contains(edge.from.as_u64()) {
-                    if let (Some(counter_to), Some(counter_from)) =
-                        (new_counters.get_mut(&edge.to), counters.get(&edge.from))
-                    {
-                        if counter_to
-                            .registers()
-                            .iter()
-                            .zip(counter_from.registers().iter())
-                            .any(|(to, from)| *from > *to)
-                        {
-                            counter_to.merge(counter_from);
-                            new_changed_nodes.insert(edge.to.as_u64());
-
-                            if exact_counting {
-                                exact_changed_nodes.insert(edge.to);
-                            }
-
-                            has_changes.store(true, Ordering::Relaxed);
-                        }
-                    }
-                }
-            })
+            }
         }
+    });
 
-        centralities.iter_mut().for_each(|(node, score)| {
-            *score += new_counters
-                .get(node)
-                .map(|counter| counter.size())
-                .unwrap_or_default()
-                .checked_sub(
-                    counters
-                        .get(node)
-                        .map(|counter| counter.size())
-                        .unwrap_or_default(),
-                )
-                .unwrap_or_default() as f64
-                / (t + 1) as f64;
-        });
+    has_changes.load(Ordering::Relaxed)
+}
 
-        counters = new_counters;
-        changed_nodes = new_changed_nodes;
-        t += 1;
+fn update_centralities(centralities: &mut BTreeMap<NodeID, KahanSum>, counters: &Counters, t: u64) {
+    centralities.iter_mut().for_each(|(node, score)| {
+        *score += counters
+            .new
+            .get(node)
+            .map(|counter| counter.size())
+            .unwrap_or_default()
+            .checked_sub(
+                counters
+                    .old
+                    .get(node)
+                    .map(|counter| counter.size())
+                    .unwrap_or_default(),
+            )
+            .unwrap_or_default() as f64
+            / (t + 1) as f64;
+    });
+}
 
-        if changed_nodes.estimate_card() <= exact_counting_threshold {
-            exact_counting = true;
-        }
-    }
-
-    let res = centralities
+fn normalize_centralities(
+    centralities: BTreeMap<NodeID, KahanSum>,
+    norm_factor: f64,
+) -> BTreeMap<NodeID, f64> {
+    centralities
         .into_iter()
         .map(|(node_id, sum)| (node_id, f64::from(sum)))
         .filter(|(_, centrality)| *centrality > 0.0)
@@ -166,7 +167,95 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
                 (node_id, centrality)
             }
         })
-        .collect();
+        .collect()
+}
+
+struct Counters {
+    old: Counter,
+    new: Counter,
+}
+
+impl Counters {
+    fn new() -> Self {
+        Self {
+            old: BTreeMap::default(),
+            new: BTreeMap::default(),
+        }
+    }
+
+    fn step(&mut self) {
+        self.old = self.new.clone();
+    }
+}
+
+fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
+    let mut counters = Counters::new();
+    let mut centralities: BTreeMap<NodeID, KahanSum> = BTreeMap::new();
+
+    let num_nodes = initialize(graph, &mut counters, &mut centralities);
+
+    let mut changed_nodes = BloomFilter::new(num_nodes, 0.05);
+
+    for node in graph.nodes() {
+        changed_nodes.insert(node.as_u64());
+    }
+
+    info!("Found {} nodes in the graph", num_nodes);
+    let exact_counting_threshold = (num_nodes as f64).sqrt().max(0.0).round() as u64;
+    let norm_factor = (num_nodes - 1) as f64;
+
+    let mut exact_counting = false;
+    let mut has_changes = true;
+    let mut t = 0;
+
+    let mut exact_changed_nodes: BTreeSet<NodeID> = BTreeSet::default();
+
+    loop {
+        if !has_changes {
+            break;
+        }
+
+        let mut new_changed_nodes = BloomFilter::new(num_nodes, 0.05);
+
+        if !exact_changed_nodes.is_empty()
+            && exact_changed_nodes.len() as u64 <= exact_counting_threshold
+        {
+            has_changes = update_changed_counters(
+                graph,
+                &mut exact_changed_nodes,
+                &mut counters,
+                &mut new_changed_nodes,
+            );
+        } else if exact_counting {
+            has_changes = update_all_counters(
+                graph,
+                Some(&mut exact_changed_nodes),
+                &mut counters,
+                &changed_nodes,
+                &mut new_changed_nodes,
+            );
+        } else {
+            has_changes = update_all_counters(
+                graph,
+                None,
+                &mut counters,
+                &changed_nodes,
+                &mut new_changed_nodes,
+            );
+        }
+
+        update_centralities(&mut centralities, &counters, t);
+
+        counters.step();
+        changed_nodes = new_changed_nodes;
+        t += 1;
+
+        if changed_nodes.estimate_card() <= exact_counting_threshold {
+            exact_counting = true;
+        }
+    }
+
+    let res = normalize_centralities(centralities, norm_factor);
 
     info!("Harmonic centrality calculated");
 

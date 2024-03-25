@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use hashbrown::HashSet;
-use kuchiki::{iter::NodeEdge, NodeRef};
+use kuchiki::{iter::NodeEdge, ElementData, NodeRef};
 use whatlang::Lang;
 
 use crate::stopwords;
@@ -190,6 +190,51 @@ struct ClassifiedParagraph {
     classification: Classification,
 }
 
+fn is_heading(elem: &ElementData) -> bool {
+    matches!(
+        elem.name.local.as_ref(),
+        "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
+    )
+}
+
+fn is_paragraph_breaking(elem: &ElementData) -> bool {
+    matches!(
+        elem.name.local.as_ref(),
+        "body"
+            | "blockquote"
+            | "caption"
+            | "center"
+            | "col"
+            | "colgroup"
+            | "dd"
+            | "div"
+            | "dl"
+            | "dt"
+            | "fieldset"
+            | "form"
+            | "legend"
+            | "optgroup"
+            | "option"
+            | "p"
+            | "pre"
+            | "table"
+            | "td"
+            | "textarea"
+            | "tfoot"
+            | "th"
+            | "thead"
+            | "tr"
+            | "ul"
+            | "li"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+    )
+}
+
 impl JustText {
     pub fn paragraphs(root: NodeRef) -> Vec<Paragraph> {
         let mut res = Vec::new();
@@ -212,49 +257,14 @@ impl JustText {
             match edge {
                 NodeEdge::Start(node) => {
                     if let Some(element) = node.as_element() {
-                        let name: &str = &element.name.local;
-
-                        if matches!(name, "h1" | "h2" | "h3" | "h4" | "h5" | "h6") {
+                        if is_heading(element) {
                             heading_count += 1;
                         }
 
-                        if matches!(
-                            name,
-                            "body"
-                                | "blockquote"
-                                | "caption"
-                                | "center"
-                                | "col"
-                                | "colgroup"
-                                | "dd"
-                                | "div"
-                                | "dl"
-                                | "dt"
-                                | "fieldset"
-                                | "form"
-                                | "legend"
-                                | "optgroup"
-                                | "option"
-                                | "p"
-                                | "pre"
-                                | "table"
-                                | "td"
-                                | "textarea"
-                                | "tfoot"
-                                | "th"
-                                | "thead"
-                                | "tr"
-                                | "ul"
-                                | "li"
-                                | "h1"
-                                | "h2"
-                                | "h3"
-                                | "h4"
-                                | "h5"
-                                | "h6"
-                        ) || (name == "br" && br)
+                        if is_paragraph_breaking(element)
+                            || (element.name.local.as_ref() == "br" && br)
                         {
-                            if name == "br" {
+                            if element.name.local.as_ref() == "br" {
                                 // the <br><br> is a paragraph separator and should
                                 // not be included in the number of tags within the
                                 // paragraph
@@ -271,10 +281,10 @@ impl JustText {
 
                             paragraph = Paragraph::new();
                         } else {
-                            br = name == "br";
+                            br = element.name.local.as_ref() == "br";
                             if br {
                                 paragraph.append_text(" ");
-                            } else if name == "a" {
+                            } else if element.name.local.as_ref() == "a" {
                                 link = true;
                             }
                             paragraph.tags_count += 1;
@@ -295,29 +305,21 @@ impl JustText {
                 }
                 NodeEdge::End(node) => {
                     if let Some(element) = node.as_element() {
-                        let name: &str = &element.name.local;
-                        if matches!(name, "h1" | "h2" | "h3" | "h4" | "h5" | "h6") {
+                        if is_heading(element) {
                             heading_count -= 1;
                         }
 
                         paragraph.append_text(" ");
 
-                        match name {
-                            "body" | "blockquote" | "caption" | "center" | "col" | "colgroup"
-                            | "dd" | "div" | "dl" | "dt" | "fieldset" | "form" | "legend"
-                            | "optgroup" | "option" | "p" | "pre" | "table" | "td" | "textarea"
-                            | "tfoot" | "th" | "thead" | "tr" | "ul" | "li" | "h1" | "h2"
-                            | "h3" | "h4" | "h5" | "h6" => {
-                                if paragraph.contains_text() {
-                                    res.push(paragraph);
-                                }
-
-                                paragraph = Paragraph::new();
+                        if is_paragraph_breaking(element) {
+                            if paragraph.contains_text() {
+                                res.push(paragraph);
                             }
-                            _ => {}
+
+                            paragraph = Paragraph::new();
                         }
 
-                        if name == "a" {
+                        if element.name.local.as_ref() == "a" {
                             link = false;
                         }
                     }
@@ -388,8 +390,48 @@ impl JustText {
         res
     }
 
-    fn contextual_classification(&self, paragraphs: &mut [ClassifiedParagraph]) {
-        // good headings
+    fn new_class(
+        prev_neighbour: &Classification,
+        next_neighbour: &Classification,
+        paragraphs: &[ClassifiedParagraph],
+        i: usize,
+    ) -> Classification {
+        if matches!(
+            prev_neighbour,
+            Classification::Intermediate(IntermediateClassification::Good)
+        ) && matches!(
+            next_neighbour,
+            Classification::Intermediate(IntermediateClassification::Good)
+        ) {
+            Classification::Intermediate(IntermediateClassification::Good)
+        } else if matches!(
+            prev_neighbour,
+            Classification::Intermediate(IntermediateClassification::Bad)
+        ) && matches!(
+            next_neighbour,
+            Classification::Intermediate(IntermediateClassification::Bad)
+        ) {
+            Classification::Intermediate(IntermediateClassification::Bad)
+        } else if (matches!(
+            prev_neighbour,
+            Classification::Intermediate(IntermediateClassification::Bad)
+        ) && matches!(
+            Self::get_prev_neighbour(paragraphs, i, false),
+            Classification::Intermediate(IntermediateClassification::NearGood)
+        )) || (matches!(
+            next_neighbour,
+            Classification::Intermediate(IntermediateClassification::Bad)
+        ) && matches!(
+            Self::get_next_neighbour(paragraphs, i, false),
+            Classification::Intermediate(IntermediateClassification::NearGood)
+        )) {
+            Classification::Intermediate(IntermediateClassification::Good)
+        } else {
+            Classification::Intermediate(IntermediateClassification::Bad)
+        }
+    }
+
+    fn update_good_headings(&self, paragraphs: &mut [ClassifiedParagraph]) {
         let num_paragraphs = paragraphs.len();
         for i in 0..num_paragraphs {
             let paragraph = &paragraphs[i];
@@ -412,14 +454,15 @@ impl JustText {
                 j += 1;
             }
         }
+    }
 
-        // classify short
+    fn classify_short(paragraphs: &mut [ClassifiedParagraph]) {
         let mut new_classes: Vec<_> = paragraphs
             .iter()
             .map(|par| par.classification.clone())
             .collect();
 
-        for i in 0..num_paragraphs {
+        for i in 0..paragraphs.len() {
             if !matches!(
                 paragraphs[i].classification,
                 Classification::Intermediate(IntermediateClassification::Short)
@@ -429,48 +472,16 @@ impl JustText {
 
             let prev_neighbour = Self::get_prev_neighbour(paragraphs, i, true);
             let next_neighbour = Self::get_next_neighbour(paragraphs, i, true);
-
-            if matches!(
-                prev_neighbour,
-                Classification::Intermediate(IntermediateClassification::Good)
-            ) && matches!(
-                next_neighbour,
-                Classification::Intermediate(IntermediateClassification::Good)
-            ) {
-                new_classes[i] = Classification::Intermediate(IntermediateClassification::Good);
-            } else if matches!(
-                prev_neighbour,
-                Classification::Intermediate(IntermediateClassification::Bad)
-            ) && matches!(
-                next_neighbour,
-                Classification::Intermediate(IntermediateClassification::Bad)
-            ) {
-                new_classes[i] = Classification::Intermediate(IntermediateClassification::Bad);
-            } else if (matches!(
-                prev_neighbour,
-                Classification::Intermediate(IntermediateClassification::Bad)
-            ) && matches!(
-                Self::get_prev_neighbour(paragraphs, i, false),
-                Classification::Intermediate(IntermediateClassification::NearGood)
-            )) || (matches!(
-                next_neighbour,
-                Classification::Intermediate(IntermediateClassification::Bad)
-            ) && matches!(
-                Self::get_next_neighbour(paragraphs, i, false),
-                Classification::Intermediate(IntermediateClassification::NearGood)
-            )) {
-                new_classes[i] = Classification::Intermediate(IntermediateClassification::Good);
-            } else {
-                new_classes[i] = Classification::Intermediate(IntermediateClassification::Bad);
-            }
+            new_classes[i] = Self::new_class(&prev_neighbour, &next_neighbour, paragraphs, i);
         }
 
         for (paragraph, classification) in paragraphs.iter_mut().zip(new_classes) {
             paragraph.classification = classification;
         }
+    }
 
-        // revise neargood
-        for i in 0..num_paragraphs {
+    fn revise_neargood(paragraphs: &mut [ClassifiedParagraph]) {
+        for i in 0..paragraphs.len() {
             if !matches!(
                 paragraphs[i].classification,
                 Classification::Intermediate(IntermediateClassification::NearGood)
@@ -511,6 +522,12 @@ impl JustText {
                 },
             };
         }
+    }
+
+    fn contextual_classification(&self, paragraphs: &mut [ClassifiedParagraph]) {
+        self.update_good_headings(paragraphs);
+        Self::classify_short(paragraphs);
+        Self::revise_neargood(paragraphs);
     }
 
     fn get_prev_neighbour(

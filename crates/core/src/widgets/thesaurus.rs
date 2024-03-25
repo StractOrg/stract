@@ -17,13 +17,21 @@
 use itertools::Itertools;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::BufReader, path::Path};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
 use utoipa::ToSchema;
 
 use anyhow::{anyhow, Result};
 use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleParser;
 use std::collections::HashMap;
+
+static VALUE_STR_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
+    regex::Regex::new(r#""(.*)"@"#).expect("Failed to compile regex")
+});
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", transparent)]
@@ -68,6 +76,103 @@ pub struct Info {
     hyponyms: Vec<Id>,
     hypernyms: Vec<Id>,
     pos: PartOfSpeech,
+}
+
+impl Info {
+    fn build_definition(concept: &NodeQuery<'_>) -> Definition {
+        let def = concept
+            .single_edge(|e| e.label.contains("#definition"))
+            .unwrap()
+            .to
+            .single_edge(|e| e.label.contains("#value"))
+            .unwrap()
+            .to
+            .node
+            .0
+            .clone();
+
+        let def = VALUE_STR_REGEX
+            .captures(&def)
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .as_str()
+            .to_string();
+
+        Definition(def)
+    }
+
+    fn build_examples(concept: &NodeQuery<'_>) -> Vec<Example> {
+        concept
+            .filtered_edges(|e| e.label.contains("#example"))
+            .into_iter()
+            .map(|e| {
+                e.to.single_edge(|e| e.label.contains("#value"))
+                    .unwrap()
+                    .to
+                    .node
+                    .0
+                    .clone()
+            })
+            .map(|e| {
+                VALUE_STR_REGEX
+                    .captures(&e)
+                    .unwrap()
+                    .get(1)
+                    .unwrap()
+                    .as_str()
+                    .to_string()
+            })
+            .map(Example)
+            .collect()
+    }
+
+    fn build_similar(concept: &NodeQuery<'_>) -> Vec<Id> {
+        concept
+            .filtered_edges(|e| e.label.contains("#similar"))
+            .into_iter()
+            .map(|e| Id(e.to.node.0.clone()))
+            .collect()
+    }
+
+    fn build_hyponyms(concept: &NodeQuery<'_>) -> Vec<Id> {
+        concept
+            .filtered_edges(|e| e.label.contains("#hyponym"))
+            .into_iter()
+            .map(|e| Id(e.to.node.0.clone()))
+            .collect()
+    }
+
+    fn build_hypernyms(concept: &NodeQuery<'_>) -> Vec<Id> {
+        concept
+            .filtered_edges(|e| e.label.contains("#hypernym"))
+            .into_iter()
+            .map(|e| Id(e.to.node.0.clone()))
+            .collect()
+    }
+
+    fn build_pos(concept: &NodeQuery<'_>) -> Result<PartOfSpeech> {
+        let pos = concept
+            .single_edge(|e| e.label.contains("#partOfSpeech"))
+            .unwrap()
+            .to
+            .node
+            .0
+            .split_once('#')
+            .unwrap()
+            .1
+            .to_string()
+            .replace('>', "");
+
+        match pos.as_str() {
+            "noun" => Ok(PartOfSpeech::Noun),
+            "adjective_satellite" => Ok(PartOfSpeech::AdjectiveSatellite),
+            "verb" => Ok(PartOfSpeech::Verb),
+            "adverb" => Ok(PartOfSpeech::Adverb),
+            "adjective" => Ok(PartOfSpeech::Adjective),
+            _ => Err(anyhow!("Unknown part of speech: {}", pos)),
+        }
+    }
 }
 
 pub struct Dictionary {
@@ -293,9 +398,38 @@ impl Dictionary {
         self.spellings.insert(normalized, lemma);
     }
 
-    pub fn build<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let reader = BufReader::new(File::open(path)?);
+    fn entry_info(entry: NodeQuery<'_>) -> Result<Vec<Info>> {
+        let mut res = Vec::new();
+        for sense in entry.filtered_edges(|e| e.label.contains("#sense")) {
+            let concept = sense
+                .to
+                .single_edge(|e| e.label.contains("#isLexicalizedSenseOf"))
+                .unwrap()
+                .to;
+            let id = Id(concept.node.0.clone());
 
+            let definition = Info::build_definition(&concept);
+            let examples = Info::build_examples(&concept);
+            let similar = Info::build_similar(&concept);
+            let hyponyms = Info::build_hyponyms(&concept);
+            let hypernyms = Info::build_hypernyms(&concept);
+            let pos = Info::build_pos(&concept)?;
+
+            res.push(Info {
+                id,
+                definition,
+                examples,
+                similar,
+                hyponyms,
+                hypernyms,
+                pos,
+            });
+        }
+
+        Ok(res)
+    }
+
+    fn build_graph<R: BufRead>(reader: R) -> Result<Graph> {
         let mut parser = TurtleParser::new(reader, None);
         let mut graph = Graph::new();
 
@@ -311,6 +445,10 @@ impl Dictionary {
             Ok::<_, anyhow::Error>(())
         })?;
 
+        Ok(graph)
+    }
+
+    fn build_lexical_entries(graph: &Graph) -> Vec<&'_ Node> {
         let mut lexical_entries = Vec::new();
 
         for (node, edges) in &graph.map {
@@ -321,8 +459,15 @@ impl Dictionary {
             }
         }
 
+        lexical_entries
+    }
+
+    pub fn build<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let reader = BufReader::new(File::open(path)?);
+        let graph = Self::build_graph(reader)?;
+        let lexical_entries = Self::build_lexical_entries(&graph);
+
         let mut dict = Self::empty()?;
-        let value_str_regex = regex::Regex::new(r#""(.*)"@"#).unwrap();
 
         for entry in lexical_entries {
             let entry = NodeQuery::new(entry, &graph);
@@ -338,7 +483,7 @@ impl Dictionary {
                 .0
                 .clone();
 
-            let written_rep = value_str_regex
+            let written_rep = VALUE_STR_REGEX
                 .captures(&written_rep)
                 .unwrap()
                 .get(1)
@@ -348,106 +493,7 @@ impl Dictionary {
 
             let lemma = Lemma(written_rep);
 
-            for sense in entry.filtered_edges(|e| e.label.contains("#sense")) {
-                let concept = sense
-                    .to
-                    .single_edge(|e| e.label.contains("#isLexicalizedSenseOf"))
-                    .unwrap()
-                    .to;
-                let id = Id(concept.node.0.clone());
-
-                let definition = concept
-                    .single_edge(|e| e.label.contains("#definition"))
-                    .unwrap()
-                    .to
-                    .single_edge(|e| e.label.contains("#value"))
-                    .unwrap()
-                    .to
-                    .node
-                    .0
-                    .clone();
-
-                let definition = value_str_regex
-                    .captures(&definition)
-                    .unwrap()
-                    .get(1)
-                    .unwrap()
-                    .as_str()
-                    .to_string();
-                let definition = Definition(definition);
-
-                let examples: Vec<_> = concept
-                    .filtered_edges(|e| e.label.contains("#example"))
-                    .into_iter()
-                    .map(|e| {
-                        e.to.single_edge(|e| e.label.contains("#value"))
-                            .unwrap()
-                            .to
-                            .node
-                            .0
-                            .clone()
-                    })
-                    .map(|e| {
-                        value_str_regex
-                            .captures(&e)
-                            .unwrap()
-                            .get(1)
-                            .unwrap()
-                            .as_str()
-                            .to_string()
-                    })
-                    .map(Example)
-                    .collect();
-
-                let similar: Vec<_> = concept
-                    .filtered_edges(|e| e.label.contains("#similar"))
-                    .into_iter()
-                    .map(|e| Id(e.to.node.0.clone()))
-                    .collect();
-
-                let hyponyms: Vec<_> = concept
-                    .filtered_edges(|e| e.label.contains("#hyponym"))
-                    .into_iter()
-                    .map(|e| Id(e.to.node.0.clone()))
-                    .collect();
-
-                let hypernyms: Vec<_> = concept
-                    .filtered_edges(|e| e.label.contains("#hypernym"))
-                    .into_iter()
-                    .map(|e| Id(e.to.node.0.clone()))
-                    .collect();
-
-                let pos = concept
-                    .single_edge(|e| e.label.contains("#partOfSpeech"))
-                    .unwrap()
-                    .to
-                    .node
-                    .0
-                    .split_once('#')
-                    .unwrap()
-                    .1
-                    .to_string()
-                    .replace('>', "");
-
-                let pos = match pos.as_str() {
-                    "noun" => PartOfSpeech::Noun,
-                    "adjective_satellite" => PartOfSpeech::AdjectiveSatellite,
-                    "verb" => PartOfSpeech::Verb,
-                    "adverb" => PartOfSpeech::Adverb,
-                    "adjective" => PartOfSpeech::Adjective,
-                    _ => return Err(anyhow!("Unknown part of speech: {}", pos)),
-                };
-
-                let info = Info {
-                    id,
-                    definition,
-                    examples,
-                    similar,
-                    hyponyms,
-                    hypernyms,
-                    pos,
-                };
-
+            for info in Self::entry_info(entry)? {
                 dict.insert(lemma.clone(), info);
             }
         }

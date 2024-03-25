@@ -122,6 +122,86 @@ impl SnippetBuilder {
 
         TextSnippet { fragments }
     }
+
+    fn trim_to_chars(&mut self, chars: usize) {
+        self.fragment = self.fragment.chars().take(chars).collect()
+    }
+
+    fn add_passage(&mut self, passage: &PassageCandidate) {
+        self.fragment.push(' ');
+        self.fragment.push_str(&passage.text);
+    }
+}
+
+fn passages(text: &str, mut tokenizer: Tokenizer, config: &SnippetConfig) -> Vec<PassageCandidate> {
+    sentence_ranges(text)
+        .into_iter()
+        .filter(|offset| offset.end - offset.start > config.min_passage_width)
+        .map(|offset| {
+            let sentence = text[offset].to_string();
+
+            let mut doc_terms = HashMap::new();
+
+            {
+                let mut stream =
+                    tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, &sentence);
+                while let Some(tok) = stream.next() {
+                    *doc_terms.entry(tok.text.clone()).or_insert(0) += 1;
+                }
+            }
+
+            PassageCandidate {
+                score: 0.0,
+                text: sentence,
+                doc_terms,
+            }
+        })
+        .collect()
+}
+
+fn calculate_idf(terms: &HashSet<String>, passages: &[PassageCandidate]) -> HashMap<String, f64> {
+    let mut n: HashMap<_, _> = terms.iter().map(|term| (term.to_string(), 0)).collect();
+
+    for term in terms.iter() {
+        for passage in passages.iter() {
+            if passage.doc_terms.contains_key(term) {
+                *n.entry(term.to_string()).or_insert(0) += 1;
+            }
+        }
+    }
+
+    n.into_iter()
+        .map(|(term, freq)| {
+            (
+                term,
+                (((passages.len() as f64) - (freq as f64) + 0.5) / ((freq as f64) + 0.5) + 1.0)
+                    .ln(),
+            )
+        })
+        .collect()
+}
+
+fn score_passages_with_bm25(
+    passages: &mut [PassageCandidate],
+    terms: &HashSet<String>,
+    idf: &HashMap<String, f64>,
+) {
+    let mut total_d_size = 0;
+
+    for passage in passages.iter() {
+        total_d_size += passage.doc_terms.len();
+    }
+
+    let avg_d_size = total_d_size / passages.len();
+    for passage in passages.iter_mut() {
+        for term in terms.iter() {
+            let f = *passage.doc_terms.get(term).unwrap_or(&0) as f64;
+            passage.score += idf[term]
+                * ((f * (K1 + 1.0))
+                    / (f + K1
+                        * (1.0 - B + B * (passage.doc_terms.len() as f64 / avg_d_size as f64))));
+        }
+    }
 }
 
 fn snippet_string_builder(
@@ -145,29 +225,7 @@ fn snippet_string_builder(
         })
         .collect();
 
-    let mut passages: Vec<_> = sentence_ranges(text)
-        .into_iter()
-        .filter(|offset| offset.end - offset.start > config.min_passage_width)
-        .map(|offset| {
-            let sentence = text[offset].to_string();
-
-            let mut doc_terms = HashMap::new();
-
-            {
-                let mut stream =
-                    tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, &sentence);
-                while let Some(tok) = stream.next() {
-                    *doc_terms.entry(tok.text.clone()).or_insert(0) += 1;
-                }
-            }
-
-            PassageCandidate {
-                score: 0.0,
-                text: sentence,
-                doc_terms,
-            }
-        })
-        .collect();
+    let mut passages = passages(text, tokenizer, &config);
 
     if passages.is_empty() {
         let mut snippet = SnippetBuilder {
@@ -180,44 +238,9 @@ fn snippet_string_builder(
         return snippet;
     }
 
-    let mut total_d_size = 0;
+    let idf = calculate_idf(&terms, &passages);
 
-    for passage in &passages {
-        total_d_size += passage.doc_terms.len();
-    }
-
-    let avg_d_size = total_d_size / passages.len();
-
-    let mut n: HashMap<_, _> = terms.iter().map(|term| (term.to_string(), 0)).collect();
-
-    for term in &terms {
-        for passage in &passages {
-            if passage.doc_terms.contains_key(term) {
-                *n.entry(term.to_string()).or_insert(0) += 1;
-            }
-        }
-    }
-
-    let idf: HashMap<_, _> = n
-        .into_iter()
-        .map(|(term, freq)| {
-            (
-                term,
-                (((passages.len() as f64) - (freq as f64) + 0.5) / ((freq as f64) + 0.5) + 1.0)
-                    .ln(),
-            )
-        })
-        .collect();
-
-    for passage in &mut passages {
-        for term in &terms {
-            let f = *passage.doc_terms.get(term).unwrap_or(&0) as f64;
-            passage.score += idf[term]
-                * ((f * (K1 + 1.0))
-                    / (f + K1
-                        * (1.0 - B + B * (passage.doc_terms.len() as f64 / avg_d_size as f64))));
-        }
-    }
+    score_passages_with_bm25(&mut passages, &terms, &idf);
 
     let best_idx = passages
         .iter()
@@ -233,28 +256,20 @@ fn snippet_string_builder(
     if snippet.fragment.len() > config.desired_num_chars + config.delta_num_chars {
         // TODO: find 'desired_num_chars' sized window that contains most highlights
         // instead of taking the prefix of the passage as a snippet
-        snippet.fragment = snippet
-            .fragment
-            .chars()
-            .take(config.desired_num_chars + config.delta_num_chars)
-            .collect();
+
+        snippet.trim_to_chars(config.desired_num_chars + config.delta_num_chars);
     } else {
         let mut next_passage_idx = best_idx + 1;
 
         while snippet.fragment.len() < config.desired_num_chars - config.delta_num_chars
             && next_passage_idx < passages.len()
         {
-            snippet.fragment += " ";
-            snippet.fragment += &passages[next_passage_idx].text;
+            snippet.add_passage(&passages[next_passage_idx]);
             next_passage_idx += 1;
         }
 
         if snippet.fragment.len() > config.desired_num_chars + config.delta_num_chars {
-            snippet.fragment = snippet
-                .fragment
-                .chars()
-                .take(config.desired_num_chars + config.delta_num_chars)
-                .collect();
+            snippet.trim_to_chars(config.desired_num_chars + config.delta_num_chars);
         }
     }
     snippet.highlight(&terms, lang);
