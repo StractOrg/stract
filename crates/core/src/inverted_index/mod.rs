@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -25,41 +25,38 @@
 //! tantivy is actually a FST (finite state transducer) and not a hash map.
 //! This allows us to perform more advanced queries than just term lookups,
 //! but the principle is the same.
+
+mod indexing;
+mod search;
+
+pub use indexing::merge_tantivy_segments;
+
 use chrono::NaiveDateTime;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tantivy::collector::Count;
+
 use tantivy::directory::MmapDirectory;
-use tantivy::merge_policy::NoMergePolicy;
+
 use tantivy::schema::{Schema, Value};
 use tantivy::tokenizer::TokenizerManager;
-use tantivy::{IndexReader, IndexWriter, SegmentMeta, TantivyDocument};
-use url::Url;
+use tantivy::{IndexReader, IndexWriter, TantivyDocument};
 
-use crate::collector::{Hashes, MainCollector};
+use crate::collector::Hashes;
 use crate::config::SnippetConfig;
 use crate::fastfield_reader::FastFieldReader;
-use crate::highlighted::HighlightedFragment;
-use crate::query::shortcircuit::ShortCircuitQuery;
-use crate::query::Query;
+
 use crate::ranking::initial::Score;
-use crate::ranking::pipeline::RecallRankingWebpage;
-use crate::ranking::SignalComputer;
+
 use crate::schema::text_field::TextField;
 use crate::schema::{fast_field, text_field, FastFieldEnum, Field, TextFieldEnum};
-use crate::search_ctx::Ctx;
-use crate::snippet;
 use crate::snippet::TextSnippet;
 use crate::tokenizer::{
     BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, TrigramTokenizer,
 };
-use crate::webgraph::NodeID;
 use crate::webpage::region::Region;
-use crate::webpage::url_ext::UrlExt;
-use crate::webpage::{schema_org, Webpage};
+
+use crate::webpage::schema_org;
 use crate::Result;
 use crate::{schema::create_schema, tokenizer::Tokenizer};
-use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -101,61 +98,27 @@ impl From<DocAddress> for tantivy::DocAddress {
     }
 }
 
-pub fn merge_tantivy_segments<P: AsRef<Path>>(
-    writer: &mut IndexWriter,
-    mut segments: Vec<SegmentMeta>,
-    base_path: P,
-    max_num_segments: u64,
-) -> Result<()> {
-    assert!(max_num_segments > 0);
+fn register_tokenizers(manager: &TokenizerManager) {
+    let tokenizer = Tokenizer::default();
+    manager.register(tokenizer.as_str(), tokenizer);
 
-    if segments.len() <= max_num_segments as usize {
-        return Ok(());
-    }
+    let tokenizer = Tokenizer::new_stemmed();
+    manager.register(tokenizer.as_str(), tokenizer);
 
-    let num_segments = (max_num_segments + 1) / 2; // ceil(num_segments/2)
+    let tokenizer = Tokenizer::Identity(Identity::default());
+    manager.register(tokenizer.as_str(), tokenizer);
 
-    let mut merge_segments = Vec::new();
+    let tokenizer = Tokenizer::Bigram(BigramTokenizer::default());
+    manager.register(tokenizer.as_str(), tokenizer);
 
-    for _ in 0..num_segments {
-        merge_segments.push(SegmentMergeCandidate {
-            num_docs: 0,
-            segments: Vec::new(),
-        });
-    }
+    let tokenizer = Tokenizer::Trigram(TrigramTokenizer::default());
+    manager.register(tokenizer.as_str(), tokenizer);
 
-    segments.sort_by_key(|b| std::cmp::Reverse(b.num_docs()));
+    let tokenizer = Tokenizer::SiteOperator(SiteOperatorUrlTokenizer);
+    manager.register(tokenizer.as_str(), tokenizer);
 
-    for segment in segments {
-        let best_candidate = merge_segments
-            .iter_mut()
-            .min_by(|a, b| a.num_docs.cmp(&b.num_docs))
-            .unwrap();
-
-        best_candidate.num_docs += segment.num_docs();
-        best_candidate.segments.push(segment);
-    }
-
-    for merge in merge_segments
-        .into_iter()
-        .filter(|merge| !merge.segments.is_empty())
-    {
-        let segment_ids: Vec<_> = merge.segments.iter().map(|segment| segment.id()).collect();
-        writer.merge(&segment_ids[..]).wait()?;
-
-        for segment in merge.segments {
-            for file in segment.list_files() {
-                std::fs::remove_file(base_path.as_ref().join(file)).ok();
-            }
-        }
-    }
-
-    Ok(())
-}
-
-struct SegmentMergeCandidate {
-    num_docs: u32,
-    segments: Vec<SegmentMeta>,
+    let tokenizer = Tokenizer::Json(JsonField);
+    manager.register(tokenizer.as_str(), tokenizer);
 }
 
 pub struct InvertedIndex {
@@ -191,40 +154,7 @@ impl InvertedIndex {
             tantivy::Index::create(mmap_directory, schema.clone(), index_settings)?
         };
 
-        let tokenizer = Tokenizer::default();
-        tantivy_index
-            .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
-
-        let tokenizer = Tokenizer::new_stemmed();
-        tantivy_index
-            .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
-
-        let tokenizer = Tokenizer::Identity(Identity::default());
-        tantivy_index
-            .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
-
-        let tokenizer = Tokenizer::Bigram(BigramTokenizer::default());
-        tantivy_index
-            .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
-
-        let tokenizer = Tokenizer::Trigram(TrigramTokenizer::default());
-        tantivy_index
-            .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
-
-        let tokenizer = Tokenizer::SiteOperator(SiteOperatorUrlTokenizer);
-        tantivy_index
-            .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
-
-        let tokenizer = Tokenizer::Json(JsonField);
-        tantivy_index
-            .tokenizers()
-            .register(tokenizer.as_str(), tokenizer);
+        register_tokenizers(tantivy_index.tokenizers());
 
         let reader: IndexReader = tantivy_index.reader_builder().try_into()?;
 
@@ -245,388 +175,12 @@ impl InvertedIndex {
         self.fastfield_reader.clone()
     }
 
-    pub fn prepare_writer(&mut self) -> Result<()> {
-        if self.writer.is_some() {
-            return Ok(());
-        }
-
-        let writer = self
-            .tantivy_index
-            .writer_with_num_threads(1, 1_000_000_000)?;
-
-        let merge_policy = NoMergePolicy;
-        writer.set_merge_policy(Box::new(merge_policy));
-
-        self.writer = Some(writer);
-
-        Ok(())
-    }
-
     pub fn set_snippet_config(&mut self, config: SnippetConfig) {
         self.snippet_config = config;
     }
 
-    pub fn set_auto_merge_policy(&mut self) {
-        let merge_policy = tantivy::merge_policy::LogMergePolicy::default();
-        self.writer
-            .as_mut()
-            .expect("writer has not been prepared")
-            .set_merge_policy(Box::new(merge_policy));
-    }
-
     pub fn tokenizers(&self) -> &TokenizerManager {
         self.tantivy_index.tokenizers()
-    }
-
-    #[cfg(test)]
-    pub fn temporary() -> Result<Self> {
-        let path = crate::gen_temp_path();
-        let mut s = Self::open(path)?;
-
-        s.prepare_writer()?;
-
-        Ok(s)
-    }
-
-    pub fn insert(&self, webpage: &Webpage) -> Result<()> {
-        self.writer
-            .as_ref()
-            .expect("writer has not been prepared")
-            .add_document(webpage.as_tantivy(&self.schema)?)?;
-        Ok(())
-    }
-
-    pub fn commit(&mut self) -> Result<()> {
-        self.prepare_writer()?;
-        self.writer
-            .as_mut()
-            .expect("writer has not been prepared")
-            .commit()?;
-        self.reader.reload()?;
-        self.fastfield_reader = FastFieldReader::new(&self.reader.searcher());
-
-        Ok(())
-    }
-
-    fn delete(&self, query: Box<dyn tantivy::query::Query>) -> Result<()> {
-        self.writer
-            .as_ref()
-            .expect("writer has not been prepared")
-            .delete_query(query)?;
-
-        Ok(())
-    }
-
-    pub fn delete_all_before(&self, timestamp: tantivy::DateTime) -> Result<()> {
-        let query = tantivy::query::RangeQuery::new_date_bounds(
-            text_field::InsertionTimestamp.name().to_string(),
-            std::ops::Bound::Unbounded,
-            std::ops::Bound::Excluded(timestamp),
-        );
-
-        self.delete(Box::new(query))
-    }
-
-    pub fn search_initial(
-        &self,
-        query: &Query,
-        ctx: &Ctx,
-        collector: MainCollector,
-    ) -> Result<InitialSearchResult> {
-        if !query.count_results() {
-            let mut query: Box<dyn tantivy::query::Query> = Box::new(query.clone());
-
-            if let Some(limit) = collector.top_docs().max_docs() {
-                let docs_per_segment = limit.total_docs / limit.segments;
-                query = Box::new(ShortCircuitQuery::new(query, docs_per_segment as u64));
-            }
-
-            let pointers = ctx.tv_searcher.search(&query, &collector)?;
-
-            return Ok(InitialSearchResult {
-                num_websites: None,
-                top_websites: pointers,
-            });
-        }
-
-        let collector = (Count, collector);
-        let (count, pointers) = ctx.tv_searcher.search(query, &collector)?;
-
-        Ok(InitialSearchResult {
-            num_websites: Some(count),
-            top_websites: pointers,
-        })
-    }
-
-    pub fn local_search_ctx(&self) -> Ctx {
-        let tv_searcher = self.tv_searcher();
-        Ctx {
-            fastfield_reader: self.fastfield_reader.clone(),
-            tv_searcher,
-        }
-    }
-
-    pub fn tv_searcher(&self) -> tantivy::Searcher {
-        self.reader.searcher()
-    }
-
-    pub fn retrieve_ranking_websites(
-        &self,
-        ctx: &Ctx,
-        pointers: Vec<WebpagePointer>,
-        mut computer: SignalComputer,
-        fastfield_reader: &FastFieldReader,
-    ) -> Result<Vec<RecallRankingWebpage>> {
-        let mut top_websites = Vec::new();
-
-        let mut pointers: Vec<_> = pointers.into_iter().enumerate().collect();
-        pointers.sort_by(|a, b| {
-            a.1.address
-                .segment
-                .cmp(&b.1.address.segment)
-                .then_with(|| a.1.address.doc_id.cmp(&b.1.address.doc_id))
-        });
-
-        let mut prev_segment = None;
-        for (orig_index, pointer) in pointers {
-            let update_segment = match prev_segment {
-                Some(prev_segment) if prev_segment != pointer.address.segment => true,
-                None => true,
-                _ => false,
-            };
-
-            let segment_reader = ctx.tv_searcher.segment_reader(pointer.address.segment);
-            if update_segment {
-                computer.register_segment(&ctx.tv_searcher, segment_reader, fastfield_reader)?;
-            }
-
-            prev_segment = Some(pointer.address.segment);
-
-            top_websites.push((
-                orig_index,
-                RecallRankingWebpage::new(
-                    pointer,
-                    fastfield_reader.borrow_segment(&segment_reader.segment_id()),
-                    &mut computer,
-                ),
-            ));
-        }
-
-        top_websites.sort_by(|a, b| a.0.cmp(&b.0));
-
-        Ok(top_websites
-            .into_iter()
-            .map(|(_, website)| website)
-            .collect())
-    }
-
-    pub fn website_host_node(&self, website: &WebpagePointer) -> Result<Option<NodeID>> {
-        let searcher = self.reader.searcher();
-        let doc: TantivyDocument = searcher.doc(website.address.into())?;
-
-        let field = self
-            .schema()
-            .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostNodeID)).name())
-            .unwrap();
-
-        let id = doc.get_first(field).unwrap().as_u64().unwrap();
-
-        if id == u64::MAX {
-            Ok(None)
-        } else {
-            Ok(Some(id.into()))
-        }
-    }
-
-    pub fn retrieve_websites(
-        &self,
-        websites: &[WebpagePointer],
-        query: &Query,
-    ) -> Result<Vec<RetrievedWebpage>> {
-        let tv_searcher = self.reader.searcher();
-        let mut webpages: Vec<RetrievedWebpage> = websites
-            .iter()
-            .map(|website| self.retrieve_doc(website.address, &tv_searcher))
-            .filter_map(|res| res.ok())
-            .collect();
-
-        for (url, page) in webpages.iter_mut().filter_map(|page| {
-            let url = Url::parse(&page.url).ok()?;
-            Some((url, page))
-        }) {
-            if query.simple_terms().is_empty() {
-                let snippet = if let Some(description) = page.description.as_deref() {
-                    let snip = description
-                        .split_whitespace()
-                        .take(self.snippet_config.empty_query_snippet_words)
-                        .join(" ");
-
-                    if snip.split_whitespace().count() < self.snippet_config.min_description_words {
-                        page.body
-                            .split_whitespace()
-                            .take(self.snippet_config.empty_query_snippet_words)
-                            .join(" ")
-                    } else {
-                        snip
-                    }
-                } else {
-                    page.body
-                        .split_whitespace()
-                        .take(self.snippet_config.empty_query_snippet_words)
-                        .join(" ")
-                };
-
-                page.snippet = TextSnippet {
-                    fragments: vec![HighlightedFragment::new_unhighlighted(snippet)],
-                };
-            } else {
-                let min_body_len = if url.is_homepage() {
-                    self.snippet_config.min_body_length_homepage
-                } else {
-                    self.snippet_config.min_body_length
-                };
-
-                if page.body.split_whitespace().count() < min_body_len
-                    && page
-                        .description
-                        .as_deref()
-                        .unwrap_or_default()
-                        .split_whitespace()
-                        .count()
-                        >= self.snippet_config.min_description_words
-                {
-                    page.snippet = snippet::generate(
-                        query,
-                        page.description.as_deref().unwrap_or_default(),
-                        &page.region,
-                        self.snippet_config.clone(),
-                    );
-                } else {
-                    page.snippet = snippet::generate(
-                        query,
-                        &page.body,
-                        &page.region,
-                        self.snippet_config.clone(),
-                    );
-                }
-            }
-        }
-
-        Ok(webpages)
-    }
-
-    #[allow(clippy::missing_panics_doc)] // cannot panic as writer is prepared
-    pub fn merge_into_max_segments(&mut self, max_num_segments: u64) -> Result<()> {
-        self.prepare_writer()?;
-        let base_path = Path::new(&self.path);
-        let segments: Vec<_> = self
-            .tantivy_index
-            .load_metas()?
-            .segments
-            .into_iter()
-            .collect();
-
-        merge_tantivy_segments(
-            self.writer.as_mut().expect("writer has not been prepared"),
-            segments,
-            base_path,
-            max_num_segments,
-        )?;
-
-        Ok(())
-    }
-
-    fn retrieve_doc(
-        &self,
-        doc_address: DocAddress,
-        searcher: &tantivy::Searcher,
-    ) -> Result<RetrievedWebpage> {
-        let doc: TantivyDocument = searcher.doc(doc_address.into())?;
-        Ok(RetrievedWebpage::from(doc))
-    }
-
-    #[must_use]
-    pub fn merge(mut self, mut other: InvertedIndex) -> Self {
-        self.prepare_writer().expect("failed to prepare writer");
-        other.prepare_writer().expect("failed to prepare writer");
-
-        let path = self.path.clone();
-
-        {
-            other.commit().expect("failed to commit index");
-            self.commit().expect("failed to commit index");
-
-            let other_meta = other
-                .tantivy_index
-                .load_metas()
-                .expect("failed to load tantivy metadata for index");
-
-            let mut meta = self
-                .tantivy_index
-                .load_metas()
-                .expect("failed to load tantivy metadata for index");
-
-            let other_path = other.path.clone();
-            let other_path = Path::new(other_path.as_str());
-            other
-                .writer
-                .take()
-                .expect("writer has not been prepared")
-                .wait_merging_threads()
-                .unwrap();
-
-            let path = self.path.clone();
-            let self_path = Path::new(path.as_str());
-            self.writer
-                .take()
-                .expect("writer has not been prepared")
-                .wait_merging_threads()
-                .unwrap();
-
-            let ids: HashSet<_> = meta.segments.iter().map(|segment| segment.id()).collect();
-
-            for segment in other_meta.segments {
-                if ids.contains(&segment.id()) {
-                    continue;
-                }
-
-                // TODO: handle case where current index has segment with same name
-                for file in segment.list_files() {
-                    let p = other_path.join(&file);
-                    if p.exists() {
-                        fs::rename(p, self_path.join(&file)).unwrap();
-                    }
-                }
-                meta.segments.push(segment);
-            }
-
-            meta.segments
-                .sort_by_key(|a| std::cmp::Reverse(a.max_doc()));
-
-            fs::remove_dir_all(other_path).ok();
-
-            let self_path = Path::new(&path);
-
-            std::fs::write(
-                self_path.join("meta.json"),
-                serde_json::to_string_pretty(&meta).unwrap(),
-            )
-            .unwrap();
-        }
-
-        let mut res = Self::open(path).expect("failed to open index");
-
-        res.prepare_writer().expect("failed to prepare writer");
-
-        res
-    }
-
-    pub fn stop(mut self) {
-        self.writer
-            .take()
-            .expect("writer has not been prepared")
-            .wait_merging_threads()
-            .unwrap()
     }
 
     pub fn schema(&self) -> Arc<Schema> {
@@ -637,47 +191,14 @@ impl InvertedIndex {
         self.tantivy_index.searchable_segments().unwrap().len()
     }
 
-    pub(crate) fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
-        let url = Url::parse(url).ok()?;
-        let tv_searcher = self.reader.searcher();
-        let field = tv_searcher
-            .schema()
-            .get_field(Field::Text(TextFieldEnum::from(text_field::UrlNoTokenizer)).name())
-            .unwrap();
+    #[cfg(test)]
+    pub fn temporary() -> Result<Self> {
+        let path = crate::gen_temp_path();
+        let mut s = Self::open(path)?;
 
-        let term = tantivy::Term::from_field_text(field, url.as_str());
+        s.prepare_writer()?;
 
-        let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
-
-        let mut res = tv_searcher
-            .search(&query, &tantivy::collector::TopDocs::with_limit(1))
-            .unwrap();
-
-        res.pop()
-            .map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).unwrap())
-    }
-
-    pub(crate) fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
-        let tv_searcher = self.reader.searcher();
-        let field = tv_searcher
-            .schema()
-            .get_field(
-                Field::Text(TextFieldEnum::from(text_field::SiteIfHomepageNoTokenizer)).name(),
-            )
-            .unwrap();
-
-        let host = url.normalized_host().unwrap_or_default();
-
-        let term = tantivy::Term::from_field_text(field, host);
-
-        let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
-
-        let mut res = tv_searcher
-            .search(&query, &tantivy::collector::TopDocs::with_limit(1))
-            .unwrap();
-
-        res.pop()
-            .map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).unwrap())
+        Ok(s)
     }
 }
 
@@ -795,8 +316,17 @@ impl From<TantivyDocument> for RetrievedWebpage {
 mod tests {
     use candle_core::Tensor;
     use maplit::hashmap;
+    use url::Url;
 
-    use crate::{config::CollectorConfig, ranking::Ranker, searcher::SearchQuery, webpage::Html};
+    use crate::{
+        collector::MainCollector,
+        config::CollectorConfig,
+        query::Query,
+        ranking::{Ranker, SignalComputer},
+        search_ctx::Ctx,
+        searcher::SearchQuery,
+        webpage::{Html, Webpage},
+    };
 
     use super::*;
 
@@ -1706,12 +1236,7 @@ mod tests {
         let fastfield_reader = index.fastfield_reader();
 
         let ranking_websites = index
-            .retrieve_ranking_websites(
-                &ctx,
-                res.top_websites,
-                ranker.computer(),
-                &fastfield_reader,
-            )
+            .retrieve_ranking_websites(&ctx, res.top_websites, ranker.computer(), &fastfield_reader)
             .unwrap();
 
         assert_eq!(ranking_websites.len(), 2);

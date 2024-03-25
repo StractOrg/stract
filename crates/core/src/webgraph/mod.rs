@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -13,403 +13,37 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-mod segment;
-
-use std::collections::{BTreeMap, BinaryHeap};
+use std::fs;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
-use std::{cmp, fs};
 
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
-use url::Url;
-use utoipa::ToSchema;
 
+use self::id_node_db::Id2NodeDb;
+use self::segment::Segment;
 use crate::executor::Executor;
-use crate::intmap;
-use crate::webpage::url_ext::UrlExt;
 
+pub use builder::WebgraphBuilder;
+pub use compression::Compression;
+pub use edge::*;
+pub use node::*;
+pub use shortest_path::ShortestPaths;
+pub use writer::WebgraphWriter;
+
+mod builder;
 pub mod centrality;
+mod compression;
+mod edge;
+mod id_node_db;
+mod node;
+mod segment;
+mod shortest_path;
 mod store;
-use self::segment::{Segment, SegmentWriter};
-
-pub const MAX_LABEL_LENGTH: usize = 1024;
-
-#[derive(
-    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
-pub struct NodeID(u64);
-
-impl NodeID {
-    pub fn as_u64(self) -> u64 {
-        self.0
-    }
-}
-
-impl From<u128> for NodeID {
-    fn from(val: u128) -> Self {
-        NodeID(val as u64)
-    }
-}
-
-impl From<u64> for NodeID {
-    fn from(val: u64) -> Self {
-        NodeID(val)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct FullNodeID {
-    pub prefix: NodeID,
-    pub id: NodeID,
-}
-
-impl From<Node> for FullNodeID {
-    fn from(value: Node) -> Self {
-        let id = value.id();
-        let prefix = value.into_host().id();
-
-        FullNodeID { prefix, id }
-    }
-}
-
-impl intmap::Key for NodeID {
-    const BIG_PRIME: Self = NodeID(11400714819323198549);
-
-    fn wrapping_mul(self, rhs: Self) -> Self {
-        NodeID(self.0.wrapping_mul(rhs.0))
-    }
-
-    fn modulus_usize(self, rhs: usize) -> usize {
-        (self.0 % (rhs as u64)) as usize
-    }
-}
-
-pub trait EdgeLabel
-where
-    Self: Send + Sync + Sized,
-{
-    fn to_bytes(&self) -> anyhow::Result<Vec<u8>>;
-    fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self>;
-}
-
-impl EdgeLabel for String {
-    fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        Ok(self.as_bytes().to_vec())
-    }
-
-    fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
-        Ok(String::from_utf8(bytes.to_vec())?)
-    }
-}
-
-impl EdgeLabel for () {
-    fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        Ok(Vec::new())
-    }
-
-    fn from_bytes(_bytes: &[u8]) -> anyhow::Result<Self> {
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Edge<L>
-where
-    L: EdgeLabel,
-{
-    pub from: NodeID,
-    pub to: NodeID,
-    pub label: L,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct InnerEdge<L>
-where
-    L: EdgeLabel,
-{
-    pub from: FullNodeID,
-    pub to: FullNodeID,
-    pub label: L,
-}
-
-impl<L> From<InnerEdge<L>> for Edge<L>
-where
-    L: EdgeLabel,
-{
-    fn from(edge: InnerEdge<L>) -> Self {
-        Edge {
-            from: edge.from.id,
-            to: edge.to.id,
-            label: edge.label,
-        }
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FullEdge {
-    pub from: Node,
-    pub to: Node,
-    pub label: String,
-}
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    ToSchema,
-)]
-#[serde(rename_all = "camelCase")]
-pub struct Node {
-    name: String,
-}
-
-impl Node {
-    pub fn into_host(self) -> Node {
-        let url = if self.name.contains("://") {
-            Url::parse(&self.name)
-        } else {
-            Url::parse(&("http://".to_string() + self.name.as_str()))
-        };
-
-        match url {
-            Ok(url) => {
-                let host = url.normalized_host().unwrap_or_default().to_string();
-                Node { name: host }
-            }
-            Err(_) => Node {
-                name: String::new(),
-            },
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        self.name.as_str()
-    }
-
-    pub fn id(&self) -> NodeID {
-        let digest = md5::compute(self.name.as_bytes());
-        u128::from_le_bytes(*digest).into()
-    }
-}
-
-impl From<String> for Node {
-    fn from(name: String) -> Self {
-        let url = if name.contains("://") {
-            Url::parse(&name).unwrap()
-        } else {
-            Url::parse(&("http://".to_string() + name.as_str())).unwrap()
-        };
-
-        Node::from(&url)
-    }
-}
-
-impl From<&Url> for Node {
-    fn from(url: &Url) -> Self {
-        let normalized = normalize_url(url);
-        Node { name: normalized }
-    }
-}
-
-impl From<&str> for Node {
-    fn from(name: &str) -> Self {
-        name.to_string().into()
-    }
-}
-
-impl From<Url> for Node {
-    fn from(url: Url) -> Self {
-        Self::from(&url)
-    }
-}
-
-pub fn normalize_url(url: &Url) -> String {
-    let mut url = url.clone();
-    url.normalize();
-
-    let scheme = url.scheme();
-    let mut normalized = url
-        .as_str()
-        .strip_prefix(scheme)
-        .unwrap_or_default()
-        .strip_prefix("://")
-        .unwrap_or_default()
-        .to_string();
-
-    if let Some(stripped) = normalized.strip_prefix("www.") {
-        normalized = stripped.to_string();
-    }
-
-    if let Some(prefix) = normalized.strip_suffix('/') {
-        normalized = prefix.to_string();
-    }
-
-    normalized
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-pub enum Compression {
-    None,
-    #[default]
-    Lz4,
-}
-
-impl Compression {
-    pub fn compress(&self, bytes: &[u8]) -> Vec<u8> {
-        match self {
-            Compression::None => bytes.to_vec(),
-            Compression::Lz4 => lz4_flex::compress_prepend_size(bytes),
-        }
-    }
-
-    pub fn decompress(&self, bytes: &[u8]) -> Vec<u8> {
-        match self {
-            Compression::None => bytes.to_vec(),
-            Compression::Lz4 => lz4_flex::decompress_size_prepended(bytes).unwrap(),
-        }
-    }
-}
-
-pub struct WebgraphBuilder {
-    path: Box<Path>,
-    executor: Executor,
-    compression: Compression,
-}
-
-impl WebgraphBuilder {
-    pub fn new<P: AsRef<Path>>(path: P) -> Self {
-        Self {
-            path: path.as_ref().into(),
-            executor: Executor::multi_thread("webgraph").unwrap(),
-            compression: Compression::default(),
-        }
-    }
-
-    pub fn single_threaded(mut self) -> Self {
-        self.executor = Executor::single_thread();
-        self
-    }
-
-    pub fn compression(mut self, compression: Compression) -> Self {
-        self.compression = compression;
-        self
-    }
-
-    pub fn open(self) -> Webgraph {
-        Webgraph::open(self.path, self.executor, self.compression)
-    }
-}
-
-pub trait ShortestPaths {
-    fn distances(&self, source: Node) -> BTreeMap<Node, u8>;
-    fn raw_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8>;
-    fn raw_distances_with_max(&self, source: NodeID, max_dist: u8) -> BTreeMap<NodeID, u8>;
-    fn raw_reversed_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8>;
-    fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8>;
-}
-
-fn dijkstra_multi<F1, F2, L>(
-    sources: &[NodeID],
-    node_edges: F1,
-    edge_node: F2,
-    max_dist: Option<u8>,
-) -> BTreeMap<NodeID, u8>
-where
-    L: EdgeLabel,
-    F1: Fn(NodeID) -> Vec<Edge<L>>,
-    F2: Fn(&Edge<L>) -> NodeID,
-{
-    let mut distances: BTreeMap<NodeID, u8> = BTreeMap::default();
-
-    let mut queue = BinaryHeap::new();
-
-    for source_id in sources.iter().copied() {
-        queue.push(cmp::Reverse((0, source_id)));
-        distances.insert(source_id, 0);
-    }
-
-    while let Some(state) = queue.pop() {
-        let (cost, v) = state.0;
-
-        let current_dist = distances.get(&v).unwrap_or(&u8::MAX);
-
-        if cost > *current_dist {
-            continue;
-        }
-
-        if let Some(max_dist) = max_dist {
-            if cost > max_dist {
-                return distances;
-            }
-        }
-
-        for edge in node_edges(v) {
-            if cost + 1 < *distances.get(&edge_node(&edge)).unwrap_or(&u8::MAX) {
-                let d = cost + 1;
-
-                let next = cmp::Reverse((d, edge_node(&edge)));
-                queue.push(next);
-                distances.insert(edge_node(&edge), d);
-            }
-        }
-    }
-
-    distances
-}
-
-impl ShortestPaths for Webgraph {
-    fn distances(&self, source: Node) -> BTreeMap<Node, u8> {
-        self.raw_distances(source.id())
-            .into_iter()
-            .filter_map(|(id, dist)| self.id2node(&id).map(|node| (node, dist)))
-            .collect()
-    }
-
-    fn raw_distances_with_max(&self, source: NodeID, max_dist: u8) -> BTreeMap<NodeID, u8> {
-        dijkstra_multi(
-            &[source],
-            |node| self.raw_outgoing_edges(&node),
-            |edge| edge.to,
-            Some(max_dist),
-        )
-    }
-
-    fn raw_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8> {
-        dijkstra_multi(
-            &[source],
-            |node| self.raw_outgoing_edges(&node),
-            |edge| edge.to,
-            None,
-        )
-    }
-
-    fn raw_reversed_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8> {
-        dijkstra_multi(
-            &[source],
-            |node| self.raw_ingoing_edges(&node),
-            |edge| edge.from,
-            None,
-        )
-    }
-
-    fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8> {
-        self.raw_reversed_distances(source.id())
-            .into_iter()
-            .filter_map(|(id, dist)| self.id2node(&id).map(|node| (node, dist)))
-            .collect()
-    }
-}
+mod writer;
 
 type SegmentID = String;
 
@@ -447,238 +81,6 @@ impl Meta {
 
         let json = serde_json::to_string_pretty(&self).unwrap();
         writer.write_all(json.as_bytes()).unwrap();
-    }
-}
-
-struct Id2NodeDb {
-    db: rocksdb::DB,
-    _cache: rocksdb::Cache, // needs to be kept alive for as long as the db is alive
-}
-
-impl Id2NodeDb {
-    fn open<P: AsRef<Path>>(path: P) -> Self {
-        let mut opts = rocksdb::Options::default();
-        opts.create_if_missing(true);
-        opts.optimize_for_point_lookup(512);
-
-        opts.set_allow_mmap_reads(true);
-        opts.set_allow_mmap_writes(true);
-        opts.set_write_buffer_size(128 * 1024 * 1024); // 128 MB
-        opts.set_target_file_size_base(512 * 1024 * 1024); // 512 MB
-        opts.set_target_file_size_multiplier(10);
-
-        opts.set_compression_type(rocksdb::DBCompressionType::None);
-
-        let mut block_opts = rocksdb::BlockBasedOptions::default();
-        let cache = rocksdb::Cache::new_lru_cache(1024 * 1024 * 1024); // 1 gb
-        block_opts.set_ribbon_filter(10.0);
-
-        // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
-        opts.set_level_compaction_dynamic_level_bytes(true);
-        opts.set_bytes_per_sync(1048576);
-
-        block_opts.set_block_size(32 * 1024); // 32 kb
-        block_opts.set_format_version(5);
-        block_opts.set_cache_index_and_filter_blocks(true);
-        block_opts.set_pin_l0_filter_and_index_blocks_in_cache(true);
-        block_opts.set_block_cache(&cache);
-
-        opts.set_block_based_table_factory(&block_opts);
-
-        let db = rocksdb::DB::open(&opts, path).unwrap();
-
-        Self { db, _cache: cache }
-    }
-
-    fn put(&mut self, id: &NodeID, node: &Node) {
-        let mut opts = rocksdb::WriteOptions::default();
-        opts.disable_wal(true);
-
-        self.db
-            .put_opt(
-                id.as_u64().to_le_bytes(),
-                bincode::serialize(node).unwrap(),
-                &opts,
-            )
-            .unwrap();
-    }
-
-    fn get(&self, id: &NodeID) -> Option<Node> {
-        let mut opts = rocksdb::ReadOptions::default();
-        opts.set_verify_checksums(false);
-
-        self.db
-            .get_opt(id.as_u64().to_le_bytes(), &opts)
-            .unwrap()
-            .map(|bytes| bincode::deserialize(&bytes).unwrap())
-    }
-
-    fn keys(&self) -> impl Iterator<Item = NodeID> + '_ {
-        let mut opts = rocksdb::ReadOptions::default();
-        opts.set_verify_checksums(false);
-        opts.set_async_io(true);
-
-        self.db
-            .iterator_opt(rocksdb::IteratorMode::Start, opts)
-            .filter_map(|r| {
-                let (key, _) = r.ok()?;
-                Some(NodeID(u64::from_le_bytes((*key).try_into().unwrap())))
-            })
-    }
-
-    fn estimate_num_keys(&self) -> usize {
-        self.db
-            .property_int_value("rocksdb.estimate-num-keys")
-            .ok()
-            .flatten()
-            .unwrap_or_default() as usize
-    }
-
-    fn iter(&self) -> impl Iterator<Item = (NodeID, Node)> + '_ {
-        let mut opts = rocksdb::ReadOptions::default();
-        opts.set_verify_checksums(false);
-
-        self.db
-            .iterator_opt(rocksdb::IteratorMode::Start, opts)
-            .filter_map(|r| {
-                let (key, value) = r.ok()?;
-
-                Some((
-                    NodeID(u64::from_le_bytes((*key).try_into().unwrap())),
-                    bincode::deserialize(&value).unwrap(),
-                ))
-            })
-    }
-
-    fn batch_put(&mut self, iter: impl Iterator<Item = (NodeID, Node)>) {
-        let mut batch = rocksdb::WriteBatch::default();
-        let mut count = 0;
-
-        for (id, node) in iter {
-            batch.put(
-                id.as_u64().to_le_bytes(),
-                bincode::serialize(&node).unwrap(),
-            );
-            count += 1;
-
-            if count > 10_000 {
-                self.db.write(batch).unwrap();
-                batch = rocksdb::WriteBatch::default();
-                count = 0;
-            }
-        }
-
-        if count > 0 {
-            self.db.write(batch).unwrap();
-        }
-    }
-
-    fn flush(&self) {
-        self.db.flush().unwrap();
-    }
-}
-
-pub struct WebgraphWriter {
-    pub path: String,
-    segment: SegmentWriter,
-    insert_batch: Vec<InnerEdge<String>>,
-    id2node: Id2NodeDb,
-    executor: Executor,
-    meta: Meta,
-    compression: Compression,
-}
-
-impl WebgraphWriter {
-    fn meta<P: AsRef<Path>>(path: P) -> Meta {
-        let meta_path = path.as_ref().join("metadata.json");
-        Meta::open(meta_path)
-    }
-
-    fn save_metadata(&mut self) {
-        let path = Path::new(&self.path).join("metadata.json");
-        self.meta.save(path);
-    }
-
-    pub fn new<P: AsRef<Path>>(path: P, executor: Executor, compression: Compression) -> Self {
-        fs::create_dir_all(&path).unwrap();
-        let mut meta = Self::meta(&path);
-        meta.comitted_segments.clear();
-
-        fs::create_dir_all(path.as_ref().join("segments")).unwrap();
-
-        let id = uuid::Uuid::new_v4().to_string();
-        let segment = SegmentWriter::open(path.as_ref().join("segments"), id.clone(), compression);
-
-        meta.comitted_segments.push(id);
-
-        Self {
-            path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
-            segment,
-            id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
-            insert_batch: Vec::with_capacity(store::MAX_BATCH_SIZE),
-            executor,
-            meta,
-            compression,
-        }
-    }
-
-    pub fn id2node(&self, id: &NodeID) -> Option<Node> {
-        self.id2node.get(id)
-    }
-
-    fn id_or_assign(&mut self, node: Node) -> FullNodeID {
-        let id = FullNodeID::from(node.clone());
-
-        self.id2node.put(&id.id, &node);
-
-        id
-    }
-
-    pub fn insert(&mut self, from: Node, to: Node, label: String) {
-        if from == to {
-            return;
-        }
-
-        let (from_id, to_id) = (
-            self.id_or_assign(from.clone()),
-            self.id_or_assign(to.clone()),
-        );
-
-        let edge = InnerEdge {
-            from: from_id,
-            to: to_id,
-            label: label.chars().take(MAX_LABEL_LENGTH).collect(),
-        };
-
-        self.insert_batch.push(edge);
-
-        if self.insert_batch.len() >= store::MAX_BATCH_SIZE {
-            self.commit();
-        }
-    }
-
-    pub fn commit(&mut self) {
-        if !self.insert_batch.is_empty() {
-            self.segment.insert(&self.insert_batch);
-            self.segment.flush();
-            self.insert_batch.clear();
-        }
-
-        self.save_metadata();
-        self.id2node.flush();
-    }
-
-    pub fn finalize(mut self) -> Webgraph {
-        self.commit();
-
-        Webgraph {
-            path: self.path,
-            segments: vec![self.segment.finalize()],
-            executor: self.executor.into(),
-            id2node: self.id2node,
-            meta: self.meta,
-            compression: self.compression,
-        }
     }
 }
 
@@ -1043,20 +445,20 @@ mod test {
     #[test]
     fn node_lowercase_name() {
         let n = Node::from("TEST".to_string());
-        assert_eq!(&n.name, "test");
+        assert_eq!(n.as_str(), "test");
     }
 
     #[test]
     fn host_node_cleanup() {
         let n = Node::from("https://www.example.com?test").into_host();
-        assert_eq!(&n.name, "example.com");
+        assert_eq!(n.as_str(), "example.com");
     }
 
     #[test]
     fn remove_protocol() {
         let n = Node::from("https://www.example.com/?test");
 
-        assert_eq!(&n.name, "example.com/?test=");
+        assert_eq!(n.as_str(), "example.com/?test=");
     }
 
     #[test]

@@ -146,11 +146,11 @@ impl EdgeStoreWriter {
                 Some(InnerEdge {
                     from: FullNodeID {
                         prefix: val.from_prefix,
-                        id: NodeID(from),
+                        id: NodeID::from(from),
                     },
                     to: FullNodeID {
                         prefix: val.to_prefix,
-                        id: NodeID(to),
+                        id: NodeID::from(to),
                     },
                     label: L::from_bytes(&val.label).unwrap(),
                 })
@@ -619,7 +619,7 @@ impl EdgeStore {
                 let (key, val) = res.unwrap();
 
                 let node = u64::from_le_bytes((*key).try_into().unwrap());
-                let node = NodeID(node);
+                let node = NodeID::from(node);
 
                 let node_range = bincode::deserialize::<Range<usize>>(&val).unwrap();
                 let edge_nodes = &self.edge_nodes[node_range];
@@ -659,12 +659,12 @@ mod tests {
 
         let e = InnerEdge {
             from: FullNodeID {
-                id: NodeID(0),
-                prefix: NodeID(0),
+                id: NodeID::from(0 as u64),
+                prefix: NodeID::from(0 as u64),
             },
             to: FullNodeID {
-                id: NodeID(1),
-                prefix: NodeID(0),
+                id: NodeID::from(1 as u64),
+                prefix: NodeID::from(0 as u64),
             },
             label: "test".to_string(),
         };
@@ -673,12 +673,12 @@ mod tests {
 
         let store = kv.finalize();
 
-        let edges: Vec<_> = store.get_with_label(&NodeID(0));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64));
 
         assert_eq!(edges.len(), 1);
         assert_eq!(&edges[0], &Edge::from(e.clone()));
 
-        let edges: Vec<_> = store.get_with_label(&NodeID(1));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64));
 
         assert_eq!(edges.len(), 0);
     }
@@ -693,12 +693,12 @@ mod tests {
 
         let e = InnerEdge {
             from: FullNodeID {
-                id: NodeID(0),
-                prefix: NodeID(0),
+                id: NodeID::from(0 as u64),
+                prefix: NodeID::from(0 as u64),
             },
             to: FullNodeID {
-                id: NodeID(1),
-                prefix: NodeID(0),
+                id: NodeID::from(1 as u64),
+                prefix: NodeID::from(0 as u64),
             },
             label: "test".to_string(),
         };
@@ -707,10 +707,10 @@ mod tests {
 
         let store = kv.finalize();
 
-        let edges: Vec<_> = store.get_with_label(&NodeID(0));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64));
         assert_eq!(edges.len(), 0);
 
-        let edges: Vec<_> = store.get_with_label(&NodeID(1));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64));
         assert_eq!(edges.len(), 1);
         assert_eq!(&edges[0], &Edge::from(e.clone()));
     }

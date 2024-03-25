@@ -181,11 +181,8 @@ fn calculate_idf(terms: &HashSet<String>, passages: &[PassageCandidate]) -> Hash
         .collect()
 }
 
-fn score_passages_with_bm25(
-    passages: &mut [PassageCandidate],
-    terms: &HashSet<String>,
-    idf: &HashMap<String, f64>,
-) {
+fn score_passages_with_bm25(passages: &mut [PassageCandidate], terms: &HashSet<String>) {
+    let idf = calculate_idf(terms, passages);
     let mut total_d_size = 0;
 
     for passage in passages.iter() {
@@ -238,9 +235,7 @@ fn snippet_string_builder(
         return snippet;
     }
 
-    let idf = calculate_idf(&terms, &passages);
-
-    score_passages_with_bm25(&mut passages, &terms, &idf);
+    score_passages_with_bm25(&mut passages, &terms);
 
     let best_idx = passages
         .iter()

@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -182,16 +182,16 @@ mod test {
         let mut edges = Vec::new();
 
         let a = FullNodeID {
-            id: NodeID(0),
-            prefix: NodeID(0),
+            id: NodeID::from(0 as u64),
+            prefix: NodeID::from(0 as u64),
         };
         let b = FullNodeID {
-            id: NodeID(1),
-            prefix: NodeID(0),
+            id: NodeID::from(1 as u64),
+            prefix: NodeID::from(0 as u64),
         };
         let c = FullNodeID {
-            id: NodeID(2),
-            prefix: NodeID(0),
+            id: NodeID::from(2 as u64),
+            prefix: NodeID::from(0 as u64),
         };
 
         edges.push(InnerEdge {
