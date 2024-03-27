@@ -13,6 +13,9 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#![allow(clippy::type_complexity)]
+#![allow(dead_code)]
+#![allow(unused_variables)]
 
 use std::{net::ToSocketAddrs, sync::Arc};
 
@@ -174,7 +177,7 @@ enum Resp<J, R> {
     User(R),
 }
 
-struct Server<W>
+pub struct Server<W>
 where
     W: Worker,
 {
