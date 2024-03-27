@@ -35,11 +35,109 @@ use serde::Deserialize;
 use serde::Serialize;
 use tokio::sync::RwLock;
 
-use crate::mapreduce::dht::network::api;
+use crate::ampc::dht::network::api;
 
 use super::NodeId;
 use super::TypeConfig;
 use super::{Request, Response};
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct Table(String);
+
+impl Table {
+    pub fn as_std(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<String> for Table {
+    fn from(v: String) -> Self {
+        Self(v)
+    }
+}
+
+impl From<&str> for Table {
+    fn from(v: &str) -> Self {
+        Self(v.to_string())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct Key(Vec<u8>);
+
+impl Key {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl From<Vec<u8>> for Key {
+    fn from(v: Vec<u8>) -> Self {
+        Self(v)
+    }
+}
+
+impl From<&[u8]> for Key {
+    fn from(v: &[u8]) -> Self {
+        Self(v.to_vec())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct Value(Vec<u8>);
+
+impl Value {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl From<Vec<u8>> for Value {
+    fn from(v: Vec<u8>) -> Self {
+        Self(v)
+    }
+}
+
+impl From<&[u8]> for Value {
+    fn from(v: &[u8]) -> Self {
+        Self(v.to_vec())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct Db {
+    data: BTreeMap<Table, BTreeMap<Key, Value>>,
+}
+
+impl Db {
+    pub fn drop_table(&mut self, table: &Table) {
+        self.data.remove(table);
+    }
+
+    pub fn get(&self, table: &Table, key: &Key) -> Option<Value> {
+        self.data.get(table).and_then(|m| m.get(key).cloned())
+    }
+
+    pub fn set(&mut self, table: Table, key: Key, value: Value) {
+        self.data.entry(table).or_default().insert(key, value);
+    }
+
+    pub fn new_table_from(&mut self, table: &Table, new_table: Table) {
+        let data = self.data.get(table).cloned().unwrap_or_default();
+        self.data.insert(new_table, data);
+    }
+
+    pub fn new_table(&mut self, table: Table) {
+        self.data.insert(table, BTreeMap::new());
+    }
+
+    pub fn tables(&self) -> Vec<Table> {
+        self.data.keys().cloned().collect()
+    }
+}
 
 #[derive(Debug)]
 pub struct StoredSnapshot {
@@ -55,7 +153,7 @@ pub struct StateMachineData {
     pub last_membership: StoredMembership<NodeId, BasicNode>,
 
     /// Application data.
-    pub data: BTreeMap<Vec<u8>, Vec<u8>>,
+    pub db: Db,
 }
 
 #[derive(Debug, Default)]
@@ -156,13 +254,23 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
             match entry.payload {
                 EntryPayload::Blank => res.push(Response::Empty),
                 EntryPayload::Normal(ref req) => match req {
-                    Request::Set(api::Set { key, value }) => {
-                        sm.data.insert(key.clone(), value.clone());
+                    Request::Set(api::Set { table, key, value }) => {
+                        sm.db.set(table.clone(), key.clone(), value.clone());
                         res.push(Response::Set(Ok(())))
                     }
-
-                    Request::Get(api::Get { key: _ }) => {
+                    Request::Get(api::Get { table: _, key: _ }) => {
                         unreachable!("Get requests should not be replicated")
+                    }
+                    Request::CreateTable(api::CreateTable { table }) => {
+                        sm.db.new_table(table.clone());
+                        res.push(Response::CreateTable(Ok(())))
+                    }
+                    Request::DropTable(api::DropTable { table }) => {
+                        sm.db.data.remove(table);
+                        res.push(Response::DropTable(Ok(())))
+                    }
+                    Request::AllTables(api::AllTables) => {
+                        res.push(Response::AllTables(Ok(sm.db.tables())))
                     }
                 },
                 EntryPayload::Membership(ref mem) => {
@@ -199,13 +307,12 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
 
         // Update the state machine.
         {
-            let data: BTreeMap<Vec<u8>, Vec<u8>> = bincode::deserialize(&new_snapshot.data)
-                .map_err(|e| {
-                    StorageIOError::read_snapshot(Some(new_snapshot.meta.signature()), &e)
-                })?;
+            let data: Db = bincode::deserialize(&new_snapshot.data).map_err(|e| {
+                StorageIOError::read_snapshot(Some(new_snapshot.meta.signature()), &e)
+            })?;
 
             let mut state_machine = self.state_machine.write().await;
-            state_machine.data = data;
+            state_machine.db = data;
             state_machine.last_applied_log = meta.last_log_id;
             state_machine.last_membership = meta.last_membership.clone();
         }
@@ -241,7 +348,7 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
 mod tests {
     use openraft::testing::{StoreBuilder, Suite};
 
-    type LogStore = crate::mapreduce::dht::log_store::LogStore<TypeConfig>;
+    type LogStore = crate::ampc::dht::log_store::LogStore<TypeConfig>;
 
     use super::*;
 

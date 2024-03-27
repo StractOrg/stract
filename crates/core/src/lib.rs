@@ -35,7 +35,7 @@ use thiserror::Error;
 pub mod entrypoint;
 pub mod inverted_index;
 
-pub mod mapreduce;
+pub mod ampc;
 
 mod api;
 pub mod autosuggest;

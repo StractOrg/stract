@@ -26,7 +26,6 @@ use whatlang::Lang;
 use crate::{
     config::{self, WebSpellConfig},
     entrypoint::download_all_warc_files,
-    mapreduce::Worker,
     web_spell::{FirstTrainer, FirstTrainerResult, SecondTrainer},
     webpage::Html,
 };
@@ -123,8 +122,6 @@ pub struct Job {
     pub source_config: config::WarcSource,
     pub warc_path: String,
 }
-
-impl Worker for SpellWorker {}
 
 pub fn run(config: WebSpellConfig) -> Result<()> {
     let warc_paths = config.warc_source.paths()?;

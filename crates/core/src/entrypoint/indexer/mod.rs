@@ -30,7 +30,6 @@ pub use crate::entrypoint::indexer::worker::IndexingWorker;
 
 use crate::config::{self, WarcSource};
 use crate::index::Index;
-use crate::mapreduce::{Map, Reduce, Worker};
 use crate::Result;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,28 +38,6 @@ pub struct IndexPointer(String);
 impl From<String> for IndexPointer {
     fn from(path: String) -> Self {
         IndexPointer(path)
-    }
-}
-
-impl Worker for IndexingWorker {}
-
-impl Map<IndexingWorker, IndexPointer> for Job {
-    fn map(&self, worker: &IndexingWorker) -> IndexPointer {
-        let index = self.process(worker);
-        IndexPointer(index.path)
-    }
-}
-
-impl Reduce<Index> for Index {
-    fn reduce(self, element: Index) -> Self {
-        let other = element;
-        let other_path = other.path.clone();
-
-        let res = self.merge(other);
-
-        std::fs::remove_dir_all(other_path).unwrap();
-
-        res
     }
 }
 
@@ -85,10 +62,7 @@ pub fn run(config: &config::IndexingLocalConfig) -> Result<()> {
                 batch_size: config.batch_size,
             },
         })
-        .map(|job| {
-            let pointer: IndexPointer = job.map(&worker);
-            pointer
-        })
+        .map(|job| IndexPointer(job.process(&worker).path))
         .collect();
 
     merge(indexes)?;

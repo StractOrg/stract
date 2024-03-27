@@ -31,7 +31,7 @@ pub mod log_store;
 mod network;
 pub mod store;
 
-use network::api::{Get, Set};
+use network::api::{AllTables, CreateTable, DropTable, Get, Set};
 
 use std::fmt::Debug;
 use std::io::Cursor;
@@ -79,18 +79,6 @@ macro_rules! raft_sonic_request_response {
         }
 
         $(
-        impl TryFrom<Response> for <$req as $crate::distributed::sonic::service::Message<$service>>::Response {
-            type Error = $crate::distributed::sonic::Error;
-            fn try_from(res: Response) -> Result<Self, Self::Error> {
-                match res {
-                    Response::$req(res) => Ok(res),
-                    _ => Err($crate::distributed::sonic::Error::Application(anyhow::anyhow!("Invalid response for request from Raft"))),
-                }
-            }
-        }
-        )*
-
-        $(
         impl From<$req> for Request {
             fn from(req: $req) -> Self {
                 Request::$req(req)
@@ -100,12 +88,12 @@ macro_rules! raft_sonic_request_response {
     };
 }
 
-raft_sonic_request_response!(Server, [Get, Set]);
+raft_sonic_request_response!(Server, [Get, Set, CreateTable, DropTable, AllTables]);
 
 #[cfg(test)]
 mod tests {
     use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
-    use tests::network::api::RemoteClient;
+    use tests::{network::api::RemoteClient, store::Table};
     use tokio::sync::Mutex;
     use tracing_test::traced_test;
 
@@ -196,20 +184,30 @@ mod tests {
         let c1 = RemoteClient::new(addr1);
         let c2 = RemoteClient::new(addr2);
 
-        c1.set("hello".as_bytes().to_vec(), "world".as_bytes().to_vec())
-            .await?;
+        let table = Table::from("test");
 
-        let res = c1.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        c1.set(
+            table.clone(),
+            "hello".as_bytes().to_vec().into(),
+            "world".as_bytes().to_vec().into(),
+        )
+        .await?;
 
-        let res = c2.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
 
-        c2.set("hello".as_bytes().to_vec(), "world2".as_bytes().to_vec())
-            .await?;
+        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
 
-        let res = c1.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world2".as_bytes().to_vec()));
+        c2.set(
+            table.clone(),
+            "hello".as_bytes().into(),
+            "world2".as_bytes().into(),
+        )
+        .await?;
+
+        let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world2".as_bytes().into()));
 
         Ok(())
     }
@@ -259,12 +257,18 @@ mod tests {
         let c1 = RemoteClient::new(addr1);
         let c2 = RemoteClient::new(addr2);
 
-        c1.set("hello".as_bytes().to_vec(), "world".as_bytes().to_vec())
-            .await?;
+        let table = Table::from("test");
 
-        let res = c2.get("hello".as_bytes().to_vec()).await?;
+        c1.set(
+            table.clone(),
+            "hello".as_bytes().into(),
+            "world".as_bytes().into(),
+        )
+        .await?;
 
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
+
+        assert_eq!(res, Some("world".as_bytes().into()));
 
         let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2), (3, addr3)]
             .into_iter()
@@ -276,8 +280,8 @@ mod tests {
         rc1.join(3, addr3, members.clone()).await?;
 
         let c3 = RemoteClient::new(addr3);
-        let res = c3.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        let res = c3.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
 
         Ok(())
     }
@@ -340,14 +344,20 @@ mod tests {
 
         let rc1 = network::raft::RemoteClient::new(1, BasicNode::new(addr1));
 
-        c1.set("hello".as_bytes().to_vec(), "world".as_bytes().to_vec())
-            .await?;
+        let table = Table::from("test");
 
-        let res = c1.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        c1.set(
+            table.clone(),
+            "hello".as_bytes().into(),
+            "world".as_bytes().into(),
+        )
+        .await?;
 
-        let res = c2.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
+
+        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
 
         // crash node 2
         handles[1].abort();
@@ -364,15 +374,19 @@ mod tests {
 
         let c2 = RemoteClient::new(addr2);
 
-        let res = c2.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
 
         // crash node 2 again
         handles[1].abort();
         drop(raft2);
 
-        c1.set("hello".as_bytes().to_vec(), "world2".as_bytes().to_vec())
-            .await?;
+        c1.set(
+            table.clone(),
+            "hello".as_bytes().into(),
+            "world2".as_bytes().into(),
+        )
+        .await?;
 
         let (raft2, server2, addr2) = server(2).await?;
         handles[1] = tokio::spawn(async move {
@@ -385,8 +399,8 @@ mod tests {
 
         let c2 = RemoteClient::new(addr2);
 
-        let res = c2.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world2".as_bytes().to_vec()));
+        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world2".as_bytes().into()));
 
         Ok(())
     }
@@ -457,34 +471,35 @@ mod tests {
                     let clients = Arc::new(vec![c1, c2]);
 
                     let shared_actions = Arc::new(actions.clone());
+                    let table = Table::from("test");
 
                     for (i, action) in actions.into_iter().enumerate() {
                         match action {
                             Action::Set { key, value } => {
                                 let client = clients.choose(&mut rand::thread_rng()).unwrap();
 
-                                client.set(key.clone(), value.clone()).await.unwrap();
+                                client.set(table.clone(), key.clone().into(), value.clone().into()).await.unwrap();
                                 ground_truth.lock().await.insert(key.clone(), value.clone());
                             }
                             Action::Get { prev_key } => {
                                 let client = clients.choose(&mut rand::thread_rng()).unwrap();
-                                client.set(b"ensure-linearized-read".to_vec(), vec![]).await.unwrap();
+                                client.set(table.clone(), b"ensure-linearized-read".to_vec().into(), vec![].into()).await.unwrap();
 
                                 let key = if i == 0 {
                                     b"non-existent-key".to_vec()
                                 } else {
-                                    match shared_actions[dbg!(prev_key % dbg!(i))] {
+                                    match shared_actions[prev_key % i] {
                                         Action::Set { ref key, .. } => {
-                                            dbg!(key.clone())
+                                            key.clone()
                                         },
                                         Action::Get { .. } => b"non-existent-key".to_vec(),
                                     }
                                 };
 
-                                let res = client.get(key.clone()).await.unwrap();
+                                let res = client.get(table.clone(), key.clone().into()).await.unwrap();
                                 let expected = ground_truth.lock().await.get(&key).cloned();
 
-                                assert_eq!(res, expected);
+                                assert_eq!(res.map(|v| v.as_bytes().to_vec()), expected);
                             }
                         }
                     }

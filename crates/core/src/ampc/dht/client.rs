@@ -25,7 +25,10 @@ use crate::{
     Result,
 };
 
-use super::network::api;
+use super::{
+    network::api,
+    store::{Key, Table, Value},
+};
 
 struct Node {
     api: api::RemoteClient,
@@ -38,12 +41,12 @@ impl Node {
         Self { api }
     }
 
-    async fn get(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>> {
-        self.api.get(key).await
+    async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {
+        self.api.get(table, key).await
     }
 
-    async fn set(&self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-        self.api.set(key, value).await
+    async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
+        self.api.set(table, key, value).await
     }
 }
 
@@ -64,16 +67,17 @@ impl Shard {
         self.nodes.choose(&mut rand::thread_rng()).unwrap()
     }
 
-    async fn get(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>> {
-        self.node().get(key).await
+    async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {
+        self.node().get(table, key).await
     }
 
-    async fn set(&self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-        self.node().set(key, value).await
+    async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
+        self.node().set(table, key, value).await
     }
 }
 
 pub struct Client {
+    ids: Vec<ShardId>,
     shards: BTreeMap<ShardId, Shard>,
 }
 
@@ -101,7 +105,9 @@ impl Client {
                 .add_node(host);
         }
 
-        Self { shards }
+        let ids = shards.keys().cloned().collect();
+
+        Self { shards, ids }
     }
 
     pub fn add_node(&mut self, shard_id: ShardId, addr: SocketAddr) {
@@ -109,27 +115,64 @@ impl Client {
             .entry(shard_id)
             .or_insert_with(Shard::new)
             .add_node(addr);
+
+        self.ids = self.shards.keys().cloned().collect();
     }
 
     fn shard_for_key(&self, key: &[u8]) -> Result<&Shard> {
-        let ids = self.shards.keys().collect::<Vec<_>>();
-
-        if ids.is_empty() {
+        if self.ids.is_empty() {
             return Err(anyhow::anyhow!("No shards"));
         }
 
         let hash = md5::compute(key);
         let hash = u64::from_le_bytes((&hash.0[..(u64::BITS / 8) as usize]).try_into().unwrap());
 
-        let shard_id = ids[hash as usize % ids.len()];
+        let shard_id = &self.ids[hash as usize % self.ids.len()];
         Ok(self.shards.get(shard_id).unwrap())
     }
 
-    pub async fn get(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>> {
-        self.shard_for_key(&key)?.get(key).await
+    pub async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {
+        self.shard_for_key(key.as_bytes())?.get(table, key).await
     }
 
-    pub async fn set(&self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-        self.shard_for_key(&key)?.set(key, value).await
+    pub async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
+        self.shard_for_key(key.as_bytes())?
+            .set(table, key, value)
+            .await
+    }
+
+    pub async fn drop_table(&self, table: Table) -> Result<()> {
+        for shard in self.shards.values() {
+            for node in &shard.nodes {
+                node.api.drop_table(table.clone()).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn create_table(&self, table: Table) -> Result<()> {
+        for shard in self.shards.values() {
+            for node in &shard.nodes {
+                node.api.create_table(table.clone()).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn all_tables(&self) -> Result<Vec<Table>> {
+        let mut tables = Vec::new();
+
+        for shard in self.shards.values() {
+            for node in &shard.nodes {
+                tables.extend(node.api.all_tables().await?);
+            }
+        }
+
+        tables.sort();
+        tables.dedup();
+
+        Ok(tables)
     }
 }

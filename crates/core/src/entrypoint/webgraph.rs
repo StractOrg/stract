@@ -17,7 +17,6 @@ use crate::{
     config::WarcSource,
     config::{self, WebgraphConstructConfig},
     entrypoint::download_all_warc_files,
-    mapreduce::Worker,
     webgraph::{self, Node, WebgraphWriter},
     webpage::{url_ext::UrlExt, Html},
     Result,
@@ -147,8 +146,6 @@ impl WebgraphWorker {
         info!("{} done", name);
     }
 }
-
-impl Worker for WebgraphWorker {}
 
 pub struct Webgraph {}
 

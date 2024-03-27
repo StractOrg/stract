@@ -28,11 +28,11 @@ use openraft::{
 use tokio::sync::RwLock;
 
 use crate::{
+    ampc::dht::{NodeId, TypeConfig},
     distributed::{
         retry_strategy::ExponentialBackoff,
         sonic::{self, service::Connection},
     },
-    mapreduce::dht::{NodeId, TypeConfig},
     Result,
 };
 
