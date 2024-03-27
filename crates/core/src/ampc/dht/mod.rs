@@ -31,7 +31,7 @@ pub mod log_store;
 mod network;
 pub mod store;
 
-use network::api::{AllTables, CreateTable, DropTable, Get, Set};
+use network::api::{AllTables, CloneTable, CreateTable, DropTable, Get, Set};
 
 use std::fmt::Debug;
 use std::io::Cursor;
@@ -45,6 +45,7 @@ pub use network::api::RemoteClient as ApiClient;
 pub use network::raft::RemoteClient as RaftClient;
 
 pub use client::Client;
+pub use store::Table;
 
 pub type NodeId = u64;
 
@@ -88,12 +89,15 @@ macro_rules! raft_sonic_request_response {
     };
 }
 
-raft_sonic_request_response!(Server, [Get, Set, CreateTable, DropTable, AllTables]);
+raft_sonic_request_response!(
+    Server,
+    [Get, Set, CreateTable, DropTable, AllTables, CloneTable]
+);
 
 #[cfg(test)]
 mod tests {
     use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
-    use tests::{network::api::RemoteClient, store::Table};
+    use tests::network::api::RemoteClient;
     use tokio::sync::Mutex;
     use tracing_test::traced_test;
 

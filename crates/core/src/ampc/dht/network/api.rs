@@ -58,6 +58,12 @@ pub struct CreateTable {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AllTables;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CloneTable {
+    pub from: Table,
+    pub to: Table,
+}
+
 impl sonic::service::Message<Server> for Set {
     type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
 
@@ -121,17 +127,34 @@ impl sonic::service::Message<Server> for AllTables {
     }
 }
 
+impl sonic::service::Message<Server> for CloneTable {
+    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+
+    async fn handle(self, server: &Server) -> Self::Response {
+        match server.raft.client_write(self.into()).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct RemoteClient {
     self_remote: sonic::replication::RemoteClient<Server>,
-    likely_leader: RwLock<sonic::replication::RemoteClient<Server>>,
+    #[serde(skip)]
+    likely_leader: RwLock<Option<sonic::replication::RemoteClient<Server>>>,
 }
 
 impl RemoteClient {
     pub fn new(addr: SocketAddr) -> Self {
         Self {
             self_remote: sonic::replication::RemoteClient::new(addr),
-            likely_leader: RwLock::new(sonic::replication::RemoteClient::new(addr)),
+            likely_leader: RwLock::new(None),
         }
+    }
+
+    pub fn addr(&self) -> SocketAddr {
+        self.self_remote.addr()
     }
 
     fn retry_strat() -> impl Iterator<Item = std::time::Duration> {
@@ -147,6 +170,8 @@ impl RemoteClient {
                 .likely_leader
                 .read()
                 .await
+                .as_ref()
+                .unwrap_or(&self.self_remote)
                 .send_with_timeout(
                     &Set {
                         table: table.clone(),
@@ -169,12 +194,12 @@ impl RemoteClient {
                         }) => match leader_node {
                             Some(leader_node) => {
                                 let mut likely_leader = self.likely_leader.write().await;
-                                *likely_leader = sonic::replication::RemoteClient::new(
+                                *likely_leader = Some(sonic::replication::RemoteClient::new(
                                     leader_node
                                         .addr
                                         .parse()
                                         .expect("node addr should always be valid addr"),
-                                );
+                                ));
                             }
                             None => {
                                 tokio::time::sleep(backoff).await;
@@ -248,6 +273,8 @@ impl RemoteClient {
                 .likely_leader
                 .read()
                 .await
+                .as_ref()
+                .unwrap_or(&self.self_remote)
                 .send_with_timeout(
                     &DropTable {
                         table: table.clone(),
@@ -266,12 +293,12 @@ impl RemoteClient {
                         }) => match leader_node {
                             Some(leader_node) => {
                                 let mut likely_leader = self.likely_leader.write().await;
-                                *likely_leader = sonic::replication::RemoteClient::new(
+                                *likely_leader = Some(sonic::replication::RemoteClient::new(
                                     leader_node
                                         .addr
                                         .parse()
                                         .expect("node addr should always be valid addr"),
-                                );
+                                ));
                             }
                             None => {
                                 tokio::time::sleep(backoff).await;
@@ -301,7 +328,7 @@ impl RemoteClient {
             }
         }
 
-        Err(anyhow!("failed to set key"))
+        Err(anyhow!("failed to drop table"))
     }
 
     pub async fn create_table(&self, table: Table) -> Result<()> {
@@ -310,6 +337,8 @@ impl RemoteClient {
                 .likely_leader
                 .read()
                 .await
+                .as_ref()
+                .unwrap_or(&self.self_remote)
                 .send_with_timeout(
                     &CreateTable {
                         table: table.clone(),
@@ -328,12 +357,12 @@ impl RemoteClient {
                         }) => match leader_node {
                             Some(leader_node) => {
                                 let mut likely_leader = self.likely_leader.write().await;
-                                *likely_leader = sonic::replication::RemoteClient::new(
+                                *likely_leader = Some(sonic::replication::RemoteClient::new(
                                     leader_node
                                         .addr
                                         .parse()
                                         .expect("node addr should always be valid addr"),
-                                );
+                                ));
                             }
                             None => {
                                 tokio::time::sleep(backoff).await;
@@ -363,7 +392,7 @@ impl RemoteClient {
             }
         }
 
-        Err(anyhow!("failed to set key"))
+        Err(anyhow!("failed to create table"))
     }
 
     pub async fn all_tables(&self) -> Result<Vec<Table>> {
@@ -372,6 +401,8 @@ impl RemoteClient {
                 .likely_leader
                 .read()
                 .await
+                .as_ref()
+                .unwrap_or(&self.self_remote)
                 .send_with_timeout(&AllTables, Duration::from_secs(5))
                 .await;
 
@@ -385,12 +416,12 @@ impl RemoteClient {
                         }) => match leader_node {
                             Some(leader_node) => {
                                 let mut likely_leader = self.likely_leader.write().await;
-                                *likely_leader = sonic::replication::RemoteClient::new(
+                                *likely_leader = Some(sonic::replication::RemoteClient::new(
                                     leader_node
                                         .addr
                                         .parse()
                                         .expect("node addr should always be valid addr"),
-                                );
+                                ));
                             }
                             None => {
                                 tokio::time::sleep(backoff).await;
@@ -420,6 +451,71 @@ impl RemoteClient {
             }
         }
 
-        Err(anyhow!("failed to set key"))
+        Err(anyhow!("failed to get tables"))
+    }
+
+    pub async fn clone_table(&self, from: Table, to: Table) -> Result<()> {
+        for backoff in Self::retry_strat() {
+            let res = self
+                .likely_leader
+                .read()
+                .await
+                .as_ref()
+                .unwrap_or(&self.self_remote)
+                .send_with_timeout(
+                    &CloneTable {
+                        from: from.clone(),
+                        to: to.clone(),
+                    },
+                    Duration::from_secs(5),
+                )
+                .await;
+
+            match res {
+                Ok(res) => match res {
+                    Ok(res) => return Ok(res),
+                    Err(RaftError::APIError(e)) => match e {
+                        ClientWriteError::ForwardToLeader(ForwardToLeader {
+                            leader_id: _,
+                            leader_node,
+                        }) => match leader_node {
+                            Some(leader_node) => {
+                                let mut likely_leader = self.likely_leader.write().await;
+                                *likely_leader = Some(sonic::replication::RemoteClient::new(
+                                    leader_node
+                                        .addr
+                                        .parse()
+                                        .expect("node addr should always be valid addr"),
+                                ));
+                            }
+                            None => {
+                                tokio::time::sleep(backoff).await;
+                            }
+                        },
+                        ClientWriteError::ChangeMembershipError(_) => {
+                            unreachable!(".clone_table() should not change membership")
+                        }
+                    },
+                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                },
+                Err(e) => match e {
+                    sonic::Error::IO(_)
+                    | sonic::Error::Serialization(_)
+                    | sonic::Error::ConnectionTimeout
+                    | sonic::Error::RequestTimeout
+                    | sonic::Error::PoolCreation => {
+                        tokio::time::sleep(backoff).await;
+                    }
+                    sonic::Error::BadRequest
+                    | sonic::Error::BodyTooLarge {
+                        body_size: _,
+                        max_size: _,
+                    }
+                    | sonic::Error::Application(_) => return Err(e.into()),
+                },
+            }
+        }
+
+        Err(anyhow!("failed to clone table"))
     }
 }

@@ -46,7 +46,7 @@ use super::{Request, Response};
 pub struct Table(String);
 
 impl Table {
-    pub fn as_std(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         &self.0
     }
 }
@@ -125,9 +125,9 @@ impl Db {
         self.data.entry(table).or_default().insert(key, value);
     }
 
-    pub fn new_table_from(&mut self, table: &Table, new_table: Table) {
-        let data = self.data.get(table).cloned().unwrap_or_default();
-        self.data.insert(new_table, data);
+    pub fn clone_table(&mut self, from: &Table, to: Table) {
+        let data = self.data.get(from).cloned().unwrap_or_default();
+        self.data.insert(to, data);
     }
 
     pub fn new_table(&mut self, table: Table) {
@@ -266,11 +266,15 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
                         res.push(Response::CreateTable(Ok(())))
                     }
                     Request::DropTable(api::DropTable { table }) => {
-                        sm.db.data.remove(table);
+                        sm.db.drop_table(table);
                         res.push(Response::DropTable(Ok(())))
                     }
                     Request::AllTables(api::AllTables) => {
                         res.push(Response::AllTables(Ok(sm.db.tables())))
+                    }
+                    Request::CloneTable(api::CloneTable { from, to }) => {
+                        sm.db.clone_table(from, to.clone());
+                        res.push(Response::CloneTable(Ok(())))
                     }
                 },
                 EntryPayload::Membership(ref mem) => {

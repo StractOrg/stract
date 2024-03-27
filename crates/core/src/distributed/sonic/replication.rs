@@ -21,8 +21,8 @@ use super::Result;
 use crate::distributed::{retry_strategy::ExponentialBackoff, sonic};
 use std::{net::SocketAddr, time::Duration};
 
-#[derive(Debug)]
-pub struct RemoteClient<S: sonic::service::Service> {
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct RemoteClient<S> {
     addr: SocketAddr,
     _phantom: std::marker::PhantomData<S>,
 }
@@ -49,6 +49,10 @@ where
             addr,
             _phantom: std::marker::PhantomData,
         }
+    }
+
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
     }
 }
 

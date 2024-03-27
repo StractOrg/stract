@@ -30,8 +30,17 @@ use super::{
     store::{Key, Table, Value},
 };
 
+#[derive(serde::Serialize, serde::Deserialize)]
 struct Node {
     api: api::RemoteClient,
+}
+
+impl Clone for Node {
+    fn clone(&self) -> Self {
+        Self {
+            api: api::RemoteClient::new(self.api.addr()),
+        }
+    }
 }
 
 impl Node {
@@ -50,6 +59,7 @@ impl Node {
     }
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct Shard {
     nodes: Vec<Node>,
 }
@@ -76,6 +86,7 @@ impl Shard {
     }
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Client {
     ids: Vec<ShardId>,
     shards: BTreeMap<ShardId, Shard>,
@@ -174,5 +185,15 @@ impl Client {
         tables.dedup();
 
         Ok(tables)
+    }
+
+    pub async fn clone_table(&self, from: Table, to: Table) -> Result<()> {
+        for shard in self.shards.values() {
+            for node in &shard.nodes {
+                node.api.clone_table(from.clone(), to.clone()).await?;
+            }
+        }
+
+        Ok(())
     }
 }

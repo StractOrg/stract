@@ -16,29 +16,69 @@
 #![allow(clippy::type_complexity)]
 #![allow(dead_code)]
 #![allow(unused_variables)]
+#![allow(unused_mut)]
+#![allow(unused_assignments)]
+#![allow(unreachable_code)]
 
 use std::{net::ToSocketAddrs, sync::Arc};
 
-use crate::{distributed::sonic, webgraph::Webgraph, Result};
+use futures::executor::block_on;
+
+use crate::{
+    distributed::{cluster::Cluster, sonic},
+    webgraph::Webgraph,
+    Result,
+};
 
 pub mod dht;
 
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+struct Table {
+    prefix: String,
+    round: u64,
+}
+
+impl Table {
+    fn new(prefix: String) -> Self {
+        Self { prefix, round: 0 }
+    }
+
+    fn dht_table(&self) -> dht::Table {
+        format!("{}-{}", self.prefix, self.round).into()
+    }
+
+    fn next(&self) -> Self {
+        Self {
+            prefix: self.prefix.clone(),
+            round: self.round + 1,
+        }
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct DhtTableConn<K, V> {
+    table: Table,
+    client: dht::Client,
     _maker: std::marker::PhantomData<(K, V)>,
 }
 
 impl<K, V> Clone for DhtTableConn<K, V> {
     fn clone(&self) -> Self {
         Self {
+            table: self.table.clone(),
+            client: self.client.clone(),
             _maker: std::marker::PhantomData,
         }
     }
 }
 
 impl<K, V> DhtTableConn<K, V> {
-    fn new() -> Self {
-        todo!()
+    async fn new(cluster: &Cluster, prefix: String) -> Self {
+        Self {
+            table: Table::new(prefix),
+            client: dht::Client::new(cluster).await,
+            _maker: std::marker::PhantomData,
+        }
     }
 
     fn get(&self, key: K) -> Option<V> {
@@ -48,12 +88,52 @@ impl<K, V> DhtTableConn<K, V> {
     fn put(&self, key: K, value: V) {
         todo!()
     }
+
+    fn next(&self) -> DhtTableConn<K, V> {
+        Self {
+            table: self.table.next(),
+            client: self.client.clone(),
+            _maker: std::marker::PhantomData,
+        }
+    }
+
+    fn init_from(&self, prev: &DhtTableConn<K, V>) {
+        block_on(
+            self.client
+                .clone_table(prev.table.dht_table(), self.table.dht_table()),
+        )
+        .unwrap();
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct DhtConn<K, V> {
     prev: DhtTableConn<K, V>,
     new: DhtTableConn<K, V>,
+}
+
+impl<K, V> DhtConn<K, V> {
+    fn new(cluster: &Cluster, prefix: String) -> Self {
+        let prev = block_on(DhtTableConn::new(cluster, prefix));
+        let new = prev.next();
+        Self { prev, new }
+    }
+
+    fn drop_prev_tables(&self) {
+        let tables = block_on(self.prev.client.all_tables()).unwrap();
+
+        for table in tables {
+            if table.as_str().starts_with(&self.prev.table.prefix) {
+                block_on(self.prev.client.drop_table(table)).unwrap();
+            }
+        }
+    }
+
+    fn next_round(&mut self) {
+        self.prev = self.new.clone();
+        self.new = self.prev.next();
+        self.new.init_from(&self.prev)
+    }
 }
 
 impl<K, V> Clone for DhtConn<K, V> {
@@ -96,7 +176,8 @@ pub trait Mapper: serde::Serialize + serde::de::DeserializeOwned + Send + Sync +
 pub trait Finisher {
     type Job: Job;
 
-    fn is_done(
+    fn is_finished(
+        &self,
         dht: &DhtConn<
             <<Self as Finisher>::Job as Job>::DhtKey,
             <<Self as Finisher>::Job as Job>::DhtValue,
@@ -201,7 +282,7 @@ where
     W: Worker + 'static,
 {
     fn handle(&mut self) -> Result<()> {
-        let req = futures::executor::block_on(self.conn.accept())?;
+        let req = block_on(self.conn.accept())?;
 
         match req.body().clone() {
             Req::Coordinator(coord_req) => {
@@ -232,14 +313,14 @@ where
                     }
                 };
 
-                futures::executor::block_on(req.respond(res))?;
+                block_on(req.respond(res))?;
             }
             Req::User(user_req) => {
                 let worker = Arc::clone(&self.worker);
 
                 std::thread::spawn(move || {
                     let res = Resp::User(worker.handle(user_req.clone()));
-                    futures::executor::block_on(req.respond(res)).unwrap();
+                    block_on(req.respond(res)).unwrap();
                 });
             }
         };
@@ -300,7 +381,24 @@ where
     where
         F: Finisher<Job = J>,
     {
-        todo!()
+        let mut dht = self.setup.init_dht();
+        dht.drop_prev_tables();
+
+        let mut is_first = true;
+
+        while !finisher.is_finished(&dht) {
+            if is_first {
+                self.setup.setup_first_round(&dht);
+            } else {
+                self.setup.setup_round(&dht);
+            }
+
+            is_first = false;
+
+            todo!();
+
+            dht.next_round();
+        }
     }
 }
 
@@ -336,14 +434,23 @@ impl Job for CentralityJob {
     }
 }
 
-struct CentralitySetup {}
+struct CentralitySetup {
+    dht: DhtConn<Key, Value>,
+}
+
+impl CentralitySetup {
+    pub async fn new(cluster: &Cluster, prefix: String) -> Self {
+        let dht = DhtConn::new(cluster, prefix);
+        Self { dht }
+    }
+}
 
 impl Setup for CentralitySetup {
     type DhtKey = Key;
     type DhtValue = Value;
 
     fn init_dht(&self) -> DhtConn<Key, Value> {
-        todo!()
+        self.dht.clone()
     }
 
     fn setup_round(&self, _dht: &DhtConn<Key, Value>) {
