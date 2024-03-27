@@ -46,6 +46,18 @@ pub struct Get {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BatchGet {
+    pub table: Table,
+    pub keys: Vec<Key>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BatchSet {
+    pub table: Table,
+    pub values: Vec<(Key, Value)>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DropTable {
     pub table: Table,
 }
@@ -77,6 +89,19 @@ impl sonic::service::Message<Server> for Set {
     }
 }
 
+impl sonic::service::Message<Server> for BatchSet {
+    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+
+    async fn handle(self, server: &Server) -> Self::Response {
+        tracing::debug!("received batch set request: {:?}", self);
+
+        match server.raft.client_write(self.into()).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 impl sonic::service::Message<Server> for Get {
     type Response = Option<Value>;
 
@@ -88,6 +113,20 @@ impl sonic::service::Message<Server> for Get {
             .await
             .db
             .get(&self.table, &self.key)
+    }
+}
+
+impl sonic::service::Message<Server> for BatchGet {
+    type Response = Vec<(Key, Value)>;
+
+    async fn handle(self, server: &Server) -> Self::Response {
+        server
+            .state_machine_store
+            .state_machine
+            .read()
+            .await
+            .db
+            .batch_get(&self.table, &self.keys)
     }
 }
 
@@ -232,6 +271,73 @@ impl RemoteClient {
         Err(anyhow!("failed to set key"))
     }
 
+    pub async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
+        for backoff in Self::retry_strat() {
+            let res = self
+                .likely_leader
+                .read()
+                .await
+                .as_ref()
+                .unwrap_or(&self.self_remote)
+                .send_with_timeout(
+                    &BatchSet {
+                        table: table.clone(),
+                        values: values.clone(),
+                    },
+                    Duration::from_secs(5),
+                )
+                .await;
+
+            tracing::debug!(".batch_set() got response: {res:?}");
+
+            match res {
+                Ok(res) => match res {
+                    Ok(_) => return Ok(()),
+                    Err(RaftError::APIError(e)) => match e {
+                        ClientWriteError::ForwardToLeader(ForwardToLeader {
+                            leader_id: _,
+                            leader_node,
+                        }) => match leader_node {
+                            Some(leader_node) => {
+                                let mut likely_leader = self.likely_leader.write().await;
+                                *likely_leader = Some(sonic::replication::RemoteClient::new(
+                                    leader_node
+                                        .addr
+                                        .parse()
+                                        .expect("node addr should always be valid addr"),
+                                ));
+                            }
+                            None => {
+                                tokio::time::sleep(backoff).await;
+                            }
+                        },
+                        ClientWriteError::ChangeMembershipError(_) => {
+                            unreachable!(".batch_set() should not change membership")
+                        }
+                    },
+                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                },
+                Err(e) => match e {
+                    sonic::Error::IO(_)
+                    | sonic::Error::Serialization(_)
+                    | sonic::Error::ConnectionTimeout
+                    | sonic::Error::RequestTimeout
+                    | sonic::Error::PoolCreation => {
+                        tokio::time::sleep(backoff).await;
+                    }
+                    sonic::Error::BadRequest
+                    | sonic::Error::BodyTooLarge {
+                        body_size: _,
+                        max_size: _,
+                    }
+                    | sonic::Error::Application(_) => return Err(e.into()),
+                },
+            }
+        }
+
+        Err(anyhow!("failed to batch set values"))
+    }
+
     pub async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {
         for backoff in Self::retry_strat() {
             match self
@@ -265,6 +371,41 @@ impl RemoteClient {
         }
 
         Err(anyhow!("failed to get key"))
+    }
+
+    pub async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
+        for backoff in Self::retry_strat() {
+            match self
+                .self_remote
+                .send_with_timeout(
+                    &BatchGet {
+                        table: table.clone(),
+                        keys: keys.clone(),
+                    },
+                    Duration::from_secs(5),
+                )
+                .await
+            {
+                Ok(res) => return Ok(res),
+                Err(e) => match e {
+                    sonic::Error::IO(_)
+                    | sonic::Error::Serialization(_)
+                    | sonic::Error::ConnectionTimeout
+                    | sonic::Error::RequestTimeout
+                    | sonic::Error::PoolCreation => {
+                        tokio::time::sleep(backoff).await;
+                    }
+                    sonic::Error::BadRequest
+                    | sonic::Error::BodyTooLarge {
+                        body_size: _,
+                        max_size: _,
+                    }
+                    | sonic::Error::Application(_) => return Err(e.into()),
+                },
+            }
+        }
+
+        Err(anyhow!("failed to batch get keys"))
     }
 
     pub async fn drop_table(&self, table: Table) -> Result<()> {

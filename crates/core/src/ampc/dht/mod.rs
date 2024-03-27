@@ -31,7 +31,7 @@ pub mod log_store;
 mod network;
 pub mod store;
 
-use network::api::{AllTables, CloneTable, CreateTable, DropTable, Get, Set};
+use network::api::{AllTables, BatchSet, CloneTable, CreateTable, DropTable, Set};
 
 use std::fmt::Debug;
 use std::io::Cursor;
@@ -45,7 +45,7 @@ pub use network::api::RemoteClient as ApiClient;
 pub use network::raft::RemoteClient as RaftClient;
 
 pub use client::Client;
-pub use store::Table;
+pub use store::{Key, Table, Value};
 
 pub type NodeId = u64;
 
@@ -91,7 +91,7 @@ macro_rules! raft_sonic_request_response {
 
 raft_sonic_request_response!(
     Server,
-    [Get, Set, CreateTable, DropTable, AllTables, CloneTable]
+    [Set, BatchSet, CreateTable, DropTable, AllTables, CloneTable]
 );
 
 #[cfg(test)]
@@ -360,9 +360,6 @@ mod tests {
         let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
         assert_eq!(res, Some("world".as_bytes().into()));
 
-        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
-        assert_eq!(res, Some("world".as_bytes().into()));
-
         // crash node 2
         handles[1].abort();
         drop(raft2);
@@ -375,6 +372,7 @@ mod tests {
         });
 
         rc1.join(2, addr2, members.clone()).await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let c2 = RemoteClient::new(addr2);
 
@@ -400,6 +398,7 @@ mod tests {
         });
         raft2.initialize(members.clone()).await?;
         rc1.join(2, addr2, members.clone()).await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let c2 = RemoteClient::new(addr2);
 

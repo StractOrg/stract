@@ -43,7 +43,7 @@ impl Table {
         Self { prefix, round: 0 }
     }
 
-    fn dht_table(&self) -> dht::Table {
+    fn dht(&self) -> dht::Table {
         format!("{}-{}", self.prefix, self.round).into()
     }
 
@@ -72,8 +72,12 @@ impl<K, V> Clone for DhtTableConn<K, V> {
     }
 }
 
-impl<K, V> DhtTableConn<K, V> {
-    async fn new(cluster: &Cluster, prefix: String) -> Self {
+impl<K, V> DhtTableConn<K, V>
+where
+    K: serde::Serialize + serde::de::DeserializeOwned,
+    V: serde::Serialize + serde::de::DeserializeOwned,
+{
+    pub async fn new(cluster: &Cluster, prefix: String) -> Self {
         Self {
             table: Table::new(prefix),
             client: dht::Client::new(cluster).await,
@@ -81,28 +85,71 @@ impl<K, V> DhtTableConn<K, V> {
         }
     }
 
-    fn get(&self, key: K) -> Option<V> {
-        todo!()
+    pub fn get(&self, key: K) -> Option<V> {
+        let key = bincode::serialize(&key).unwrap();
+
+        block_on(self.client.get(self.table.dht(), key.into()))
+            .unwrap()
+            .map(|v| bincode::deserialize(v.as_bytes()).unwrap())
     }
 
-    fn put(&self, key: K, value: V) {
-        todo!()
+    pub fn batch_get(&self, keys: Vec<K>) -> Vec<(K, V)> {
+        let keys: Vec<dht::Key> = keys
+            .into_iter()
+            .map(|k| bincode::serialize(&k).unwrap().into())
+            .collect::<Vec<_>>();
+        let values = block_on(self.client.batch_get(self.table.dht(), keys)).unwrap();
+
+        values
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    bincode::deserialize(k.as_bytes()).unwrap(),
+                    bincode::deserialize(v.as_bytes()).unwrap(),
+                )
+            })
+            .collect()
+    }
+
+    pub fn set(&self, key: K, value: V) {
+        let key = bincode::serialize(&key).unwrap();
+        let value = bincode::serialize(&value).unwrap();
+
+        block_on(self.client.set(self.table.dht(), key.into(), value.into())).unwrap();
+    }
+
+    pub fn batch_set(&self, pairs: Vec<(K, V)>) {
+        let pairs: Vec<(dht::Key, dht::Value)> = pairs
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    bincode::serialize(&k).unwrap().into(),
+                    bincode::serialize(&v).unwrap().into(),
+                )
+            })
+            .collect();
+
+        block_on(self.client.batch_set(self.table.dht(), pairs)).unwrap();
     }
 
     fn next(&self) -> DhtTableConn<K, V> {
-        Self {
+        let new = Self {
             table: self.table.next(),
             client: self.client.clone(),
             _maker: std::marker::PhantomData,
-        }
+        };
+
+        new.init_from(self);
+
+        new
     }
 
     fn init_from(&self, prev: &DhtTableConn<K, V>) {
-        block_on(
-            self.client
-                .clone_table(prev.table.dht_table(), self.table.dht_table()),
-        )
-        .unwrap();
+        block_on(self.client.clone_table(prev.table.dht(), self.table.dht())).unwrap();
+    }
+
+    pub fn drop_table(&self) {
+        block_on(self.client.drop_table(self.table.dht())).unwrap();
     }
 }
 
@@ -112,7 +159,11 @@ pub struct DhtConn<K, V> {
     new: DhtTableConn<K, V>,
 }
 
-impl<K, V> DhtConn<K, V> {
+impl<K, V> DhtConn<K, V>
+where
+    K: serde::Serialize + serde::de::DeserializeOwned,
+    V: serde::Serialize + serde::de::DeserializeOwned,
+{
     fn new(cluster: &Cluster, prefix: String) -> Self {
         let prev = block_on(DhtTableConn::new(cluster, prefix));
         let new = prev.next();
@@ -130,9 +181,10 @@ impl<K, V> DhtConn<K, V> {
     }
 
     fn next_round(&mut self) {
+        self.prev.drop_table();
         self.prev = self.new.clone();
+
         self.new = self.prev.next();
-        self.new.init_from(&self.prev)
     }
 }
 

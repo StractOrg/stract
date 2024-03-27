@@ -125,6 +125,10 @@ impl Db {
         self.data.entry(table).or_default().insert(key, value);
     }
 
+    pub fn batch_set(&mut self, table: Table, values: Vec<(Key, Value)>) {
+        self.data.entry(table).or_default().extend(values);
+    }
+
     pub fn clone_table(&mut self, from: &Table, to: Table) {
         let data = self.data.get(from).cloned().unwrap_or_default();
         self.data.insert(to, data);
@@ -136,6 +140,16 @@ impl Db {
 
     pub fn tables(&self) -> Vec<Table> {
         self.data.keys().cloned().collect()
+    }
+
+    pub fn batch_get(&self, table: &Table, keys: &[Key]) -> Vec<(Key, Value)> {
+        match self.data.get(table) {
+            None => Vec::new(),
+            Some(table) => keys
+                .iter()
+                .filter_map(|key| table.get(key).map(|value| (key.clone(), value.clone())))
+                .collect(),
+        }
     }
 }
 
@@ -258,8 +272,9 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
                         sm.db.set(table.clone(), key.clone(), value.clone());
                         res.push(Response::Set(Ok(())))
                     }
-                    Request::Get(api::Get { table: _, key: _ }) => {
-                        unreachable!("Get requests should not be replicated")
+                    Request::BatchSet(api::BatchSet { table, values }) => {
+                        sm.db.batch_set(table.clone(), values.clone());
+                        res.push(Response::Set(Ok(())))
                     }
                     Request::CreateTable(api::CreateTable { table }) => {
                         sm.db.new_table(table.clone());

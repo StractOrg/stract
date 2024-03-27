@@ -54,8 +54,16 @@ impl Node {
         self.api.get(table, key).await
     }
 
+    async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
+        self.api.batch_get(table, keys).await
+    }
+
     async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
         self.api.set(table, key, value).await
+    }
+
+    async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
+        self.api.batch_set(table, values).await
     }
 }
 
@@ -81,8 +89,16 @@ impl Shard {
         self.node().get(table, key).await
     }
 
+    async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
+        self.node().batch_get(table, keys).await
+    }
+
     async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
         self.node().set(table, key, value).await
+    }
+
+    async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
+        self.node().batch_set(table, values).await
     }
 }
 
@@ -130,7 +146,7 @@ impl Client {
         self.ids = self.shards.keys().cloned().collect();
     }
 
-    fn shard_for_key(&self, key: &[u8]) -> Result<&Shard> {
+    fn shard_id_for_key(&self, key: &[u8]) -> Result<&ShardId> {
         if self.ids.is_empty() {
             return Err(anyhow::anyhow!("No shards"));
         }
@@ -138,7 +154,11 @@ impl Client {
         let hash = md5::compute(key);
         let hash = u64::from_le_bytes((&hash.0[..(u64::BITS / 8) as usize]).try_into().unwrap());
 
-        let shard_id = &self.ids[hash as usize % self.ids.len()];
+        Ok(&self.ids[hash as usize % self.ids.len()])
+    }
+
+    fn shard_for_key(&self, key: &[u8]) -> Result<&Shard> {
+        let shard_id = self.shard_id_for_key(key)?;
         Ok(self.shards.get(shard_id).unwrap())
     }
 
@@ -146,10 +166,54 @@ impl Client {
         self.shard_for_key(key.as_bytes())?.get(table, key).await
     }
 
+    pub async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
+        let mut shard_keys: BTreeMap<ShardId, Vec<Key>> = BTreeMap::new();
+
+        for key in keys {
+            let shard = self.shard_id_for_key(key.as_bytes())?;
+            shard_keys.entry(*shard).or_default().push(key);
+        }
+
+        let mut futures = Vec::with_capacity(shard_keys.len());
+
+        for (shard_id, keys) in shard_keys {
+            futures.push(self.shards[&shard_id].batch_get(table.clone(), keys));
+        }
+
+        let mut results: Vec<_> = futures::future::try_join_all(futures)
+            .await?
+            .into_iter()
+            .flatten()
+            .collect();
+        results.sort_by(|(a, _), (b, _)| a.cmp(b));
+        results.dedup_by(|(a, _), (b, _)| a == b);
+
+        Ok(results)
+    }
+
     pub async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
         self.shard_for_key(key.as_bytes())?
             .set(table, key, value)
             .await
+    }
+
+    pub async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
+        let mut shard_values: BTreeMap<ShardId, Vec<(Key, Value)>> = BTreeMap::new();
+
+        for (key, value) in values {
+            let shard = self.shard_id_for_key(key.as_bytes())?;
+            shard_values.entry(*shard).or_default().push((key, value));
+        }
+
+        let mut futures = Vec::with_capacity(shard_values.len());
+
+        for (shard_id, values) in shard_values {
+            futures.push(self.shards[&shard_id].batch_set(table.clone(), values));
+        }
+
+        futures::future::try_join_all(futures).await?;
+
+        Ok(())
     }
 
     pub async fn drop_table(&self, table: Table) -> Result<()> {
