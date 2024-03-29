@@ -1,29 +1,33 @@
-/**
- * Enum to represent the key strings provided by {@link KeyboardEvent}
- */
-export enum Keys {
-  J = 'j',
-  D = 'd',
-  K = 'k',
-  H = 'h',
-  V = 'v',
-  T = 't',
-  M = 'm',
-  L = 'l',
-  O = 'o',
-  S = 's',
-  SINGLE_QUOTE = "'",
-  FORWARD_SLASH = '/',
-  CTRL = 'Control',
-  ENTER = 'Enter',
-  ARROW_UP = 'ArrowUp',
-  ARROW_DOWN = 'ArrowDown',
-}
+import { match } from 'ts-pattern';
+import Result from '../routes/search/Result.svelte';
+import type Searchbar from './components/Searchbar.svelte';
+import type SpellCorrection from '../routes/search/SpellCorrection.svelte';
+
+export const Keys = [
+  'j',
+  'd',
+  'k',
+  'h',
+  'v',
+  't',
+  'm',
+  'l',
+  'o',
+  's',
+  "'",
+  '/',
+  'Control',
+  'Enter',
+  'ArrowUp',
+  'ArrowDown',
+];
+export type Key = (typeof Keys)[number];
 
 // The type used to declare the key downs that will trigger the callback
 export interface KeybindCallback {
-  key: Keys;
-  callback: (e: KeyboardEvent) => void;
+  key: Key;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  callback: (e: KeyboardEvent, context: any) => void;
   shift?: boolean;
   ctrl?: boolean;
   alt?: boolean;
@@ -32,10 +36,10 @@ export interface KeybindCallback {
 /**
  * Used to create and interface with key bindings
  */
-export class Keybind {
+export class Keybind<T> {
   // All of the keybindings to their callbacks
-  private bindings: KeybindCallback[];
-  private bindingEntries: Keys[];
+  public bindings: KeybindCallback[];
+  private bindingEntries: Key[];
 
   /**
    * Constructor
@@ -53,8 +57,8 @@ export class Keybind {
    * @param str - The string to attempt to convert
    * @returns undefined if unable to convert, otherwise {@link Keys}
    */
-  private keyEnumFromString(str: string): Keys | undefined {
-    for (const [_, key] of Object.entries(Keys)) {
+  private keyEnumFromString(str: string): Key | undefined {
+    for (const key of Keys) {
       if (key == str) return key;
     }
 
@@ -73,7 +77,7 @@ export class Keybind {
    * @param e - The `keydown` event of `KeyboardEvent` type
    * @param useKeyboardShortcuts - A boolean of the user's `useKeyboardShortcuts` preference
    */
-  onKeyDown(e: KeyboardEvent, useKeyboardShortcuts: boolean) {
+  onKeyDown(e: KeyboardEvent, useKeyboardShortcuts: boolean, context?: T) {
     if (!useKeyboardShortcuts || e.repeat) return;
 
     const enum_key = this.keyEnumFromString(e.key);
@@ -88,7 +92,7 @@ export class Keybind {
     const binding = this.bindings.find((binding) => binding.key === enum_key);
     if (binding && binding.alt == alt && binding.shift == shift && binding.ctrl == ctrl) {
       e.preventDefault();
-      binding.callback(e);
+      binding.callback(e, context);
     }
   }
 }
@@ -97,10 +101,13 @@ export class Keybind {
 Search callbacks
 */
 
-/**
- * Used to indicate what direction {@link navigateResults} should go (up/down)
- */
-type Direction = 1 | -1;
+export type Refs = {
+  results: Result[];
+  searchbar: Searchbar;
+  spellCorrection?: SpellCorrection;
+};
+
+type Direction = 'up' | 'down';
 
 /**
  * Utilized to bring the next/previous result into focus
@@ -112,55 +119,39 @@ type Direction = 1 | -1;
  *
  * @param direction - How to maneuver through the result list (up/down), indicated by {@link Direction}
  */
-const navigateResults = (direction: Direction) => {
+const navigateResults = (direction: Direction, context: Refs) => {
   const currentActive = document.activeElement;
+  const results = context.results;
 
-  const results = [...document.getElementsByClassName('result')] as HTMLElement[];
-  let currentResultIndex: number | null = null;
   let newIndex = 0;
+  const currentResultIndex = results.findIndex((el) => el.getMainDiv().contains(currentActive));
 
-  results.forEach((el, index) => {
-    if (el.contains(currentActive)) currentResultIndex = index;
-  });
+  if (currentResultIndex > -1) {
+    newIndex =
+      currentResultIndex +
+      match(direction)
+        .with('up', () => -1)
+        .with('down', () => 1)
+        .exhaustive();
 
-  if (currentResultIndex != null) {
-    newIndex = currentResultIndex + direction;
-    if (0 > newIndex || newIndex >= results.length) {
+    if (newIndex < 0 || newIndex >= results.length) {
       newIndex = currentResultIndex;
     }
   }
 
-  const nextResult = results[newIndex];
-
-  // Get the anchor element and focus it
-  (nextResult.getElementsByClassName('result-main-link')[0] as HTMLElement)?.focus();
+  results[newIndex].getMainResultLink().focus();
 };
 
-/**
- * Wrapper for {@link navigateResults} that will focus on the next result
- */
-const focusNextResult = () => navigateResults(1);
+const focusNextResult = (_e: KeyboardEvent, context: Refs) => navigateResults('down', context);
 
-/**
- * Wrapper for {@link navigateResults} that will focus on the previous result
- */
-const focusPrevResult = () => navigateResults(-1);
+const focusPrevResult = (_e: KeyboardEvent, context: Refs) => navigateResults('up', context);
 
-/**
- * Focus the first result (if any)
- */
-const focusMainResult = () => {
-  const results = document.getElementsByClassName('result-main-link');
-  if (results.length > 0) {
-    (results[0] as HTMLElement).focus();
-  }
+const focusMainResult = (_e: KeyboardEvent, context: Refs) => {
+  if (context.results[0]) context.results[0].getMainResultLink().focus();
 };
 
-/**
- * Focus the search bar
- */
-const focusSearchBar = () => {
-  (document.getElementById('searchbar') as HTMLInputElement)?.select();
+const selectSearchBar = (_e: KeyboardEvent, context: Refs) => {
+  context.searchbar.select();
 };
 
 /**
@@ -176,17 +167,15 @@ const scrollToTop = () => {
 /**
  * Redirect to the currently focused result
  *
- * @param e - The triggering {@link KeyboardEvent}
+ * @param _e - The triggering {@link KeyboardEvent}
  */
-const openResult = (e: KeyboardEvent) => {
-  if ((e.target as HTMLElement).className.includes('result-main-link')) {
-    const resultLink = e.target as HTMLAnchorElement;
-    window.location.href = resultLink.href;
-  } else {
-    const results = document.getElementsByClassName('result-main-link');
-    if (results.length > 0) {
-      window.location.href = (results[0] as HTMLAnchorElement).href;
-    }
+const openResult = (e: KeyboardEvent, context: Refs) => {
+  if (e.target && e.target instanceof HTMLElement) {
+    const activeElement = e.target as HTMLElement;
+    const currentResultIndex = context.results.findIndex((el) =>
+      el.getMainDiv().contains(activeElement),
+    );
+    if (currentResultIndex > -1) context.results[currentResultIndex].getMainResultLink().open();
   }
 };
 
@@ -198,11 +187,14 @@ const openResult = (e: KeyboardEvent) => {
  *
  * @param e - The triggering {@link KeyboardEvent}
  */
-const openResultInNewTab = (e: KeyboardEvent) => {
-  // Ensure target event is a result url
-  if ((e.target as HTMLElement).className.includes('result-main-link')) {
-    const resultLink = e.target as HTMLAnchorElement;
-    window.open(resultLink.href, '_blank', 'noopener');
+const openResultInNewTab = (e: KeyboardEvent, context: Refs) => {
+  if (e.target && e.target instanceof HTMLElement) {
+    const activeElement = e.target as HTMLElement;
+    const currentResultIndex = context.results.findIndex((el) =>
+      el.getMainDiv().contains(activeElement),
+    );
+    if (currentResultIndex > -1)
+      context.results[currentResultIndex].getMainResultLink().openInNewTab();
   }
 };
 
@@ -211,25 +203,26 @@ const openResultInNewTab = (e: KeyboardEvent) => {
  *
  * @param e - The triggering {@link KeyboardEvent}
  */
-const domainSearch = (e: KeyboardEvent) => {
-  // Ensure target event is a result url
-  if ((e.target as HTMLElement).className.includes('result-main-link')) {
-    const searchBar = document.getElementById('searchbar') as HTMLInputElement;
-    if (searchBar) {
-      // Parse the result url, pull out the hostname then resubmit search
-      const resultLink = new URL((e.target as HTMLAnchorElement)?.href);
-      searchBar.value += ` site:${resultLink.hostname}`;
-      searchBar.form?.submit();
+const domainSearch = (e: KeyboardEvent, context: Refs) => {
+  if (e.target && e.target instanceof HTMLElement) {
+    const activeElement = e.target as HTMLElement;
+    const currentResultIndex = context.results.findIndex((el) =>
+      el.getMainDiv().contains(activeElement),
+    );
+    if (currentResultIndex > -1) {
+      const focusedResult = context.results[currentResultIndex];
+      const query = context.searchbar.userQuery();
+      const domain = focusedResult.getMainResultLink().getUrl().hostname;
+      const domainQuery = `site:${domain}`;
+
+      // Only run the domain query if it isn't already in the query
+      if (!query.includes(domainQuery)) context.searchbar.search(`${query} ${domainQuery}`);
     }
   }
 };
 
-/**
- * Redirect to the `Did you mean:` link (if exists)
- */
-const goToMisspellLink = () => {
-  const msLink = document.getElementById('misspell-link');
-  if (msLink) window.location.href = (msLink as HTMLAnchorElement).href;
+const openSpellCorrection = (_e: KeyboardEvent, context: Refs) => {
+  if (context.spellCorrection) context.spellCorrection.open();
 };
 
 // Packaged callbacks to keep imports clean
@@ -237,10 +230,10 @@ export const searchCb = {
   focusNextResult,
   focusPrevResult,
   focusMainResult,
-  focusSearchBar,
+  selectSearchBar,
   scrollToTop,
   openResult,
   openResultInNewTab,
   domainSearch,
-  goToMisspellLink,
+  openSpellCorrection,
 };

@@ -12,12 +12,15 @@
   import ChevronLeft from '~icons/heroicons/chevron-left-20-solid';
   import ChevronRight from '~icons/heroicons/chevron-right-20-solid';
   import { flip } from 'svelte/animate';
+  import SpellCorrection from './SpellCorrection.svelte';
 
   export let results: SearchResults;
   export let query: string;
   export let nextPageSearchParams: URLSearchParams | null;
   export let prevPageSearchParams: URLSearchParams | null;
   export let currentPage: number;
+  export let spellCorrectElem: SpellCorrection;
+  export let resultElems: Result[];
 
   let modal: { top: number; left: number; site: DisplayedWebpage } | undefined;
 
@@ -64,20 +67,7 @@
 {#if results.type == 'websites'}
   <div class="col-start-1 flex min-w-0 max-w-2xl flex-col space-y-5">
     {#if results.spellCorrection}
-      <div>
-        <div>
-          Did you mean:{' '}
-          <a class="font-medium" href="/search?q={encodeURIComponent(results.spellCorrection.raw)}"
-            >{#each results.spellCorrection.highlighted as frag}
-              {#if frag.kind == 'highlighted'}
-                <b><i>{frag.text}</i></b>
-              {:else}
-                {frag.text}
-              {/if}
-            {/each}</a
-          >
-        </div>
-      </div>
+      <SpellCorrection spellCorrection={results.spellCorrection} bind:this={spellCorrectElem} />
     {/if}
 
     {#if results.widget}
@@ -88,7 +78,12 @@
       <div class="grid w-full grid-cols-1 space-y-10 place-self-start">
         {#each results.webpages as webpage, resultIndex (`${query}-${webpage.url}`)}
           <div animate:flip={{ duration: 150 }}>
-            <Result {webpage} {resultIndex} on:modal={openSearchModal(webpage)} />
+            <Result
+              bind:this={resultElems[resultIndex]}
+              {webpage}
+              {resultIndex}
+              on:modal={openSearchModal(webpage)}
+            />
           </div>
         {/each}
         {#if results.discussions}

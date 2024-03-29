@@ -8,35 +8,14 @@
   import { updateQueryId } from '$lib/improvements';
   import { browser } from '$app/environment';
   import Serp from './Serp.svelte';
+  import Result from './Result.svelte';
   import { search } from '$lib/search';
+  import { Keybind, searchCb, type Refs } from '$lib/keybind';
+  import SpellCorrection from './SpellCorrection.svelte';
 
   export let data: PageData;
   $: results = data.results;
   $: query = data.params.query;
-
-  const keybind = new Keybind([
-    { key: Keys.J, callback: searchCb.focusNextResult },
-    { key: Keys.ARROW_DOWN, callback: searchCb.focusNextResult },
-    { key: Keys.K, callback: searchCb.focusPrevResult },
-    { key: Keys.ARROW_UP, callback: searchCb.focusPrevResult },
-    { key: Keys.H, callback: searchCb.focusSearchBar },
-    { key: Keys.FORWARD_SLASH, callback: searchCb.focusSearchBar },
-    { key: Keys.V, callback: searchCb.openResultInNewTab },
-    { key: Keys.SINGLE_QUOTE, callback: searchCb.openResultInNewTab },
-    { key: Keys.T, callback: searchCb.scrollToTop },
-    { key: Keys.D, callback: searchCb.domainSearch },
-    { key: Keys.L, callback: searchCb.openResult },
-    { key: Keys.O, callback: searchCb.openResult },
-    { key: Keys.M, callback: searchCb.focusMainResult },
-    { key: Keys.S, callback: searchCb.goToMisspellLink },
-  ]);
-
-  const onKeyDown = (event: KeyboardEvent) => {
-    // Only call onKeyDown if the target is not an input element (ie. search bar)
-    if (!((event.target as HTMLElement).nodeName === 'INPUT')) {
-      keybind.onKeyDown(event, $useKeyboardShortcuts);
-    }
-  };
 
   let prevPageSearchParams: URLSearchParams | null = null;
   let nextPageSearchParams: URLSearchParams | null = null;
@@ -85,7 +64,48 @@
     if (browser && results && results.type == 'websites')
       updateQueryId({ query, webpages: results.webpages });
   }
+
+  let resultElems: Result[] = [];
+  let spellCorrectElem: SpellCorrection;
+  let searchbarElem: Searchbar;
+
+  let context: Refs;
+  $: context = {
+    results: resultElems,
+    searchbar: searchbarElem,
+    spellCorrection: spellCorrectElem,
+  };
+
+  let keybind = new Keybind([
+    { key: 'j', callback: searchCb.focusNextResult },
+    { key: 'ArrowDown', callback: searchCb.focusNextResult },
+    { key: 'k', callback: searchCb.focusPrevResult },
+    { key: 'ArrowUp', callback: searchCb.focusPrevResult },
+    { key: 'h', callback: searchCb.selectSearchBar },
+    { key: '/', callback: searchCb.selectSearchBar },
+    { key: 'v', callback: searchCb.openResultInNewTab },
+    { key: "'", callback: searchCb.openResultInNewTab },
+    { key: 't', callback: searchCb.scrollToTop },
+    { key: 'd', callback: searchCb.domainSearch },
+    { key: 'l', callback: searchCb.openResult },
+    { key: 'o', callback: searchCb.openResult },
+    { key: 'm', callback: searchCb.focusMainResult },
+    { key: 's', callback: searchCb.openSpellCorrection },
+  ]);
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    // Only call onKeyDown if the target is not an input element (ie. search bar)
+    if (
+      context &&
+      searchbarElem &&
+      !(event.target instanceof HTMLElement && searchbarElem.getForm().contains(event.target))
+    ) {
+      keybind.onKeyDown(event, $useKeyboardShortcuts, context);
+    }
+  };
 </script>
+
+<svelte:window on:keydown={onKeyDown} />
 
 {#if !serverSearch}
   <noscript>
@@ -104,7 +124,7 @@
 >
   <div class="flex max-w-2xl flex-col space-y-1">
     <div class="w-full">
-      <Searchbar {query} />
+      <Searchbar {query} bind:this={searchbarElem} />
     </div>
     <div class="mx-auto flex w-full justify-end sm:justify-between">
       <div class="hidden h-full flex-col space-x-2 text-xs text-neutral sm:flex">
@@ -136,6 +156,8 @@
       {prevPageSearchParams}
       {nextPageSearchParams}
       currentPage={data.params.currentPage}
+      {resultElems}
+      {spellCorrectElem}
     />
   {:else}
     {#await clientSearch() then results}
@@ -146,6 +168,8 @@
           {prevPageSearchParams}
           {nextPageSearchParams}
           currentPage={data.params.currentPage}
+          {resultElems}
+          {spellCorrectElem}
         />
       {/if}
     {/await}

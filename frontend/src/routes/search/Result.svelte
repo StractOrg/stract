@@ -22,9 +22,15 @@
   let button: HTMLButtonElement;
 
   const dispatch = createEventDispatcher<{ modal: HTMLButtonElement }>();
+
+  let mainDiv: HTMLElement;
+  export const getMainDiv = () => mainDiv;
+
+  let mainResultLink: ResultLink;
+  export const getMainResultLink = () => mainResultLink;
 </script>
 
-<div class="result flex min-w-0 grow flex-col space-y-0.5">
+<div class="flex min-w-0 grow flex-col space-y-0.5" bind:this={mainDiv}>
   <div class="flex min-w-0">
     <div class="flex min-w-0 grow flex-col space-y-0.5">
       <div class="flex items-center text-sm">
@@ -37,10 +43,11 @@
         </ResultLink>
       </div>
       <ResultLink
-        _class="result-main-link title max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
+        _class="title max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
         title={webpage.title}
         href={webpage.url}
         {resultIndex}
+        bind:this={mainResultLink}
       >
         {webpage.title}
       </ResultLink>

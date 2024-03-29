@@ -2,12 +2,18 @@
   import MagnifyingGlass from '~icons/heroicons/magnifying-glass';
   import Button from '$lib/components/Button.svelte';
   import { api, type HighlightedFragment } from '$lib/api';
-  import { safeSearchStore, hostRankingsStore, postSearchStore } from '$lib/stores';
+  import {
+    safeSearchStore,
+    hostRankingsStore,
+    postSearchStore,
+    useKeyboardShortcuts,
+  } from '$lib/stores';
   import { browser } from '$app/environment';
   import { derived } from 'svelte/store';
   import { compressRanked, rankingsToRanked } from '$lib/rankings';
   import { twJoin } from 'tailwind-merge';
   import { P, match } from 'ts-pattern';
+  import { Keybind } from '$lib/keybind';
 
   export let autofocus = false;
 
@@ -57,26 +63,34 @@
     didChangeInput = false;
   };
 
-  const onKeydown = (ev: KeyboardEvent) => {
-    match(ev.key)
-      .with('ArrowUp', () => {
-        ev.preventDefault();
-        moveSelection(-1);
-      })
-      .with('ArrowDown', () => {
-        ev.preventDefault();
-        moveSelection(1);
-      })
-      .with('Enter', () => {
-        hasFocus = false;
-      })
-      .otherwise(() => {
-        didChangeInput = true;
-      });
+  let keybind = new Keybind([
+    { key: 'ArrowDown', callback: () => moveSelection(1) },
+    { key: 'ArrowUp', callback: () => moveSelection(-1) },
+    { key: 'Enter', callback: () => (hasFocus = true) },
+  ]);
+
+  const onKeydown = (e: KeyboardEvent) => {
+    if (keybind.bindings.find((binding) => binding.key === e.key)) {
+      keybind.onKeyDown(e, $useKeyboardShortcuts);
+    } else {
+      didChangeInput = true;
+    }
   };
 
   let suggestionsDiv: HTMLDivElement | undefined;
   let hasFocus = autofocus;
+
+  let formElem: HTMLFormElement;
+  let inputElem: HTMLInputElement;
+  export const getForm = () => formElem;
+  export const select = () => inputElem.select();
+  export const userQuery = () => lastRealQuery;
+  export const search = (q: string) => {
+    if (formElem && inputElem) {
+      inputElem.value = q;
+      formElem.submit();
+    }
+  };
 </script>
 
 <form
@@ -84,6 +98,7 @@
   class="flex w-full justify-center"
   id="searchbar-form"
   method={$postSearchStore ? 'POST' : 'GET'}
+  bind:this={formElem}
 >
   <input type="hidden" value={$safeSearchStore ? 'true' : 'false'} name="ss" />
   <input type="hidden" value={$compressedRanked} name="sr" id="host_rankingsUuid" />
@@ -124,6 +139,7 @@
       }}
       bind:value={query}
       on:keydown={onKeydown}
+      bind:this={inputElem}
     />
     <div class="h-full py-0.5 pr-0.5">
       <Button _class="py-0 h-full" type="submit">search</Button>

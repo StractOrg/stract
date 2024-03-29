@@ -8,6 +8,24 @@
   export let _class: string = '';
   export let title: string | null = null;
   export let resultIndex: number | null = null;
+
+  let link: HTMLAnchorElement;
+  export const focus = () => {
+    link.focus();
+  };
+  export const open = () => {
+    link.click();
+  };
+  export const openInCurrentTab = () => {
+    window.location.href = link.href;
+  };
+  export const openInNewTab = () => {
+    window.open(link.href, '_blank', 'noopener');
+  };
+
+  export const hasFocus = () => document.activeElement == link;
+
+  export const getUrl = () => new URL(link.href);
 </script>
 
 {#if resultIndex != null}
@@ -18,6 +36,7 @@
     use:improvements={resultIndex}
     target={$resultsInNewTab ? '_blank' : null}
     rel={$resultsInNewTab ? 'noopener' : null}
+    bind:this={link}
   >
     <slot />
   </a>
@@ -28,6 +47,7 @@
     {title}
     target={$resultsInNewTab ? '_blank' : null}
     rel={$resultsInNewTab ? 'noopener' : null}
+    bind:this={link}
   >
     <slot />
   </a>
