@@ -1,3 +1,5 @@
+<svelte:options accessors />
+
 <script lang="ts">
   import MagnifyingGlass from '~icons/heroicons/magnifying-glass';
   import Button from '$lib/components/Button.svelte';
@@ -77,6 +79,19 @@
 
   let suggestionsDiv: HTMLDivElement | undefined;
   let hasFocus = autofocus;
+
+  let formElem: HTMLFormElement;
+  let inputElem: HTMLInputElement;
+  export const getInputElem = () => inputElem;
+  export const getForm = () => formElem;
+  export const select = () => inputElem.select();
+  export const userQuery = () => lastRealQuery;
+  export const search = (q: string) => {
+    if (formElem && inputElem) {
+      inputElem.value = q;
+      formElem.submit();
+    }
+  };
 </script>
 
 <form
@@ -84,6 +99,7 @@
   class="flex w-full justify-center"
   id="searchbar-form"
   method={$postSearchStore ? 'POST' : 'GET'}
+  bind:this={formElem}
 >
   <input type="hidden" value={$safeSearchStore ? 'true' : 'false'} name="ss" />
   <input type="hidden" value={$compressedRanked} name="sr" id="host_rankingsUuid" />
@@ -124,6 +140,7 @@
       }}
       bind:value={query}
       on:keydown={onKeydown}
+      bind:this={inputElem}
     />
     <div class="h-full py-0.5 pr-0.5">
       <Button _class="py-0 h-full" type="submit">search</Button>

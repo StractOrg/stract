@@ -5,6 +5,7 @@
   import MarkPagesWithAdsSelect from './MarkPagesWithAdsSelect.svelte';
   import MarkPagesWithPaywallSelect from './MarkPagesWithPaywallSelect.svelte';
   import ResultsInNewTabs from './ResultsInNewTabs.svelte';
+  import UseKeyboardShortcuts from './UseKeyboardShortcuts.svelte';
 
   const settings = [
     {
@@ -38,6 +39,11 @@
       description: 'Keep the search results window open and have links open in new tabs',
       type: 'results-in-new-tabs',
     },
+    {
+      title: 'Keyboard shortcuts',
+      description: 'Enables the use of keyboard shortcuts on the site',
+      type: 'use-keeb-shortcuts',
+    },
   ] as const;
 </script>
 
@@ -65,6 +71,8 @@
                 <MarkPagesWithPaywallSelect />
               {:else if setting.type == 'results-in-new-tabs'}
                 <ResultsInNewTabs />
+              {:else if setting.type == 'use-keeb-shortcuts'}
+                <UseKeyboardShortcuts />
               {/if}
             </div>
           </div>
