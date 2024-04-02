@@ -38,6 +38,8 @@
     }
   }
 
+  let serp: Serp | undefined = undefined;
+
   const clientSearch = async () => {
     if (!browser) return;
 
@@ -66,14 +68,14 @@
   }
 
   let resultElems: Result[] = [];
-  let spellCorrectElem: SpellCorrection;
-  let searchbarElem: Searchbar;
+  let spellCorrectElem: SpellCorrection | undefined = undefined;
+  let searchbarElem: Searchbar | undefined = undefined;
 
   let context: Refs;
   $: context = {
-    results: resultElems,
+    results: serp?.resultElems,
     searchbar: searchbarElem,
-    spellCorrection: spellCorrectElem,
+    spellCorrection: serp?.spellCorrectElem,
   };
 
   let keybind = new Keybind([
@@ -91,15 +93,11 @@
     { key: 'o', callback: searchCb.openResult },
     { key: 'm', callback: searchCb.focusMainResult },
     { key: 's', callback: searchCb.openSpellCorrection },
+    { key: 'Escape', callback: searchCb.clearFocus },
   ]);
 
   const onKeyDown = (event: KeyboardEvent) => {
-    // Only call onKeyDown if the target is not an input element (ie. search bar)
-    if (
-      context &&
-      searchbarElem &&
-      !(event.target instanceof HTMLElement && searchbarElem.getForm().contains(event.target))
-    ) {
+    if (event.target != searchbarElem?.getInputElem()) {
       keybind.onKeyDown(event, $useKeyboardShortcuts, context);
     }
   };
@@ -158,6 +156,7 @@
       currentPage={data.params.currentPage}
       {resultElems}
       {spellCorrectElem}
+      bind:this={serp}
     />
   {:else}
     {#await clientSearch() then results}
@@ -170,6 +169,7 @@
           currentPage={data.params.currentPage}
           {resultElems}
           {spellCorrectElem}
+          bind:this={serp}
         />
       {/if}
     {/await}

@@ -20,13 +20,14 @@ export const Keys = [
   'Enter',
   'ArrowUp',
   'ArrowDown',
+  'Escape',
 ];
 export type Key = (typeof Keys)[number];
 
 // The type used to declare the key downs that will trigger the callback
 export interface KeybindCallback {
   key: Key;
-  callback: (e: KeyboardEvent, context: Refs) => void;
+  callback: (context: Refs) => void;
   shift?: boolean;
   ctrl?: boolean;
   alt?: boolean;
@@ -51,17 +52,13 @@ export class Keybind {
   }
 
   /**
-   * Attempt to convert a string to {@link Keys} enum
+   * Attempt to convert a string to a {@link Key}
    *
    * @param str - The string to attempt to convert
-   * @returns undefined if unable to convert, otherwise {@link Keys}
+   * @returns undefined if unable to convert, otherwise corresponding {@link Key}
    */
-  private keyEnumFromString(str: string): Key | undefined {
-    for (const key of Keys) {
-      if (key == str) return key;
-    }
-
-    return undefined;
+  private keyFromString(str: string): Key | undefined {
+    return Keys.find((key) => key === str);
   }
 
   /**
@@ -77,21 +74,21 @@ export class Keybind {
    * @param useKeyboardShortcuts - A boolean of the user's `useKeyboardShortcuts` preference
    */
   onKeyDown(e: KeyboardEvent, useKeyboardShortcuts: boolean, context: Refs) {
-    if (!useKeyboardShortcuts || e.repeat) return;
+    if (!useKeyboardShortcuts) return;
 
-    const enum_key = this.keyEnumFromString(e.key);
+    const key = this.keyFromString(e.key);
 
-    if (!(enum_key && this.bindingEntries.includes(enum_key))) return;
+    if (!(key && this.bindingEntries.includes(key))) return;
 
     // Conditionals to be able to later compare to a potentially undefined binding.shift/.al/.ctrl
     const shift = e.shiftKey ? true : undefined;
     const ctrl = e.ctrlKey ? true : undefined;
     const alt = e.altKey ? true : undefined;
 
-    const binding = this.bindings.find((binding) => binding.key === enum_key);
+    const binding = this.bindings.find((binding) => binding.key === key);
     if (binding && binding.alt == alt && binding.shift == shift && binding.ctrl == ctrl) {
       e.preventDefault();
-      binding.callback(e, context);
+      binding.callback(context);
     }
   }
 }
@@ -101,8 +98,8 @@ Search callbacks
 */
 
 export type Refs = {
-  results: Result[];
-  searchbar: Searchbar;
+  results?: Result[];
+  searchbar?: Searchbar;
   spellCorrection?: SpellCorrection;
 };
 
@@ -119,11 +116,12 @@ type Direction = 'up' | 'down';
  * @param direction - How to maneuver through the result list (up/down), indicated by {@link Direction}
  */
 const navigateResults = (direction: Direction, context: Refs) => {
-  const currentActive = document.activeElement;
+  if (!context.results || context.results.length === 0) return;
   const results = context.results;
+  console.log(results);
 
   let newIndex = 0;
-  const currentResultIndex = results.findIndex((el) => el.getMainDiv().contains(currentActive));
+  const currentResultIndex = results.findIndex((result) => result?.hasFocus());
 
   if (currentResultIndex > -1) {
     newIndex =
@@ -138,44 +136,46 @@ const navigateResults = (direction: Direction, context: Refs) => {
     }
   }
 
-  results[newIndex].getMainResultLink().focus();
+  if (newIndex < results.length && results[newIndex]) {
+    results[newIndex].getMainResultLink()?.focus();
+  }
 };
 
-const focusNextResult = (_e: KeyboardEvent, context: Refs) => navigateResults('down', context);
-
-const focusPrevResult = (_e: KeyboardEvent, context: Refs) => navigateResults('up', context);
-
-const focusMainResult = (_e: KeyboardEvent, context: Refs) => {
-  if (context.results[0]) context.results[0].getMainResultLink().focus();
+const focusNextResult = (context: Refs) => navigateResults('down', context);
+const focusPrevResult = (context: Refs) => navigateResults('up', context);
+const focusMainResult = (context: Refs) => {
+  if (!context.results || context.results.length == 0) return;
+  if (context.results[0]) context.results[0].getMainResultLink()?.focus();
 };
 
-const selectSearchBar = (_e: KeyboardEvent, context: Refs) => {
-  context.searchbar.select();
+const selectSearchBar = (context: Refs) => {
+  scrollToTop(context);
+
+  if (context.searchbar) {
+    context.searchbar.select();
+  }
 };
 
 /**
  * Scroll to the top of the window and reset focus
  */
-const scrollToTop = () => {
+const scrollToTop = (context: Refs) => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur(); // reset focus
-  }
+
+  if (!context.results) return;
+
+  const focusedResult: Result | undefined = context.results.find((result) => result.hasFocus());
+  focusedResult?.clearFocus();
 };
 
 /**
  * Redirect to the currently focused result
- *
- * @param _e - The triggering {@link KeyboardEvent}
  */
-const openResult = (e: KeyboardEvent, context: Refs) => {
-  if (e.target && e.target instanceof HTMLElement) {
-    const activeElement = e.target as HTMLElement;
-    const currentResultIndex = context.results.findIndex((el) =>
-      el.getMainDiv().contains(activeElement),
-    );
-    if (currentResultIndex > -1) context.results[currentResultIndex].getMainResultLink().open();
-  }
+const openResult = (context: Refs) => {
+  if (!context.results) return;
+
+  const focusedResult: Result | undefined = context.results.find((result) => result.hasFocus());
+  focusedResult?.getMainResultLink()?.open();
 };
 
 /**
@@ -183,45 +183,37 @@ const openResult = (e: KeyboardEvent, context: Refs) => {
  *
  * @remarks
  * Requires pop-ups to be allowed for the window
- *
- * @param e - The triggering {@link KeyboardEvent}
  */
-const openResultInNewTab = (e: KeyboardEvent, context: Refs) => {
-  if (e.target && e.target instanceof HTMLElement) {
-    const activeElement = e.target as HTMLElement;
-    const currentResultIndex = context.results.findIndex((el) =>
-      el.getMainDiv().contains(activeElement),
-    );
-    if (currentResultIndex > -1)
-      context.results[currentResultIndex].getMainResultLink().openInNewTab();
-  }
+const openResultInNewTab = (context: Refs) => {
+  if (!context.results) return;
+  const focusedResult: Result | undefined = context.results.find((result) => result.hasFocus());
+  focusedResult?.getMainResultLink()?.openInNewTab();
 };
 
 /**
  * Do a domain search using the domain of the currently focused result
- *
- * @param e - The triggering {@link KeyboardEvent}
  */
-const domainSearch = (e: KeyboardEvent, context: Refs) => {
-  if (e.target && e.target instanceof HTMLElement) {
-    const activeElement = e.target as HTMLElement;
-    const currentResultIndex = context.results.findIndex((el) =>
-      el.getMainDiv().contains(activeElement),
-    );
-    if (currentResultIndex > -1) {
-      const focusedResult = context.results[currentResultIndex];
-      const query = context.searchbar.userQuery();
-      const domain = focusedResult.getMainResultLink().getUrl().hostname;
-      const domainQuery = `site:${domain}`;
+const domainSearch = (context: Refs) => {
+  if (!context.results || !context.searchbar) return;
 
-      // Only run the domain query if it isn't already in the query
-      if (!query.includes(domainQuery)) context.searchbar.search(`${query} ${domainQuery}`);
-    }
-  }
+  const focusedResult: Result | undefined = context.results.find((result) => result.hasFocus());
+  if (!focusedResult) return;
+
+  const query = context.searchbar.userQuery();
+  const domain = focusedResult.getMainResultLink()?.getUrl().hostname;
+  const domainQuery = `site:${domain}`;
+
+  // Only run the domain query if it isn't already in the query
+  if (!query.includes(domainQuery)) context.searchbar.search(`${query} ${domainQuery}`);
 };
 
-const openSpellCorrection = (_e: KeyboardEvent, context: Refs) => {
+const openSpellCorrection = (context: Refs) => {
   if (context.spellCorrection) context.spellCorrection.open();
+};
+
+const clearFocus = (context: Refs) => {
+  const focusedResult: Result | undefined = context.results?.find((result) => result.hasFocus());
+  focusedResult?.clearFocus();
 };
 
 // Packaged callbacks to keep imports clean
@@ -235,4 +227,5 @@ export const searchCb = {
   openResultInNewTab,
   domainSearch,
   openSpellCorrection,
+  clearFocus,
 };

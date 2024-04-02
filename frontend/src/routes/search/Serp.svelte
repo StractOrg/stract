@@ -1,3 +1,5 @@
+<svelte:options accessors />
+
 <script lang="ts">
   import { type DisplayedWebpage } from '$lib/api';
   import type { SearchResults } from '$lib/search';
@@ -19,7 +21,7 @@
   export let nextPageSearchParams: URLSearchParams | null;
   export let prevPageSearchParams: URLSearchParams | null;
   export let currentPage: number;
-  export let spellCorrectElem: SpellCorrection;
+  export let spellCorrectElem: SpellCorrection | undefined;
   export let resultElems: Result[];
 
   let modal: { top: number; left: number; site: DisplayedWebpage } | undefined;

@@ -13,6 +13,9 @@
   export const focus = () => {
     link.focus();
   };
+  export const clearFocus = () => {
+    link.blur();
+  };
   export const open = () => {
     link.click();
   };

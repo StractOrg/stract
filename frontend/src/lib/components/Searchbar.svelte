@@ -1,3 +1,5 @@
+<svelte:options accessors />
+
 <script lang="ts">
   import MagnifyingGlass from '~icons/heroicons/magnifying-glass';
   import Button from '$lib/components/Button.svelte';
@@ -80,6 +82,7 @@
 
   let formElem: HTMLFormElement;
   let inputElem: HTMLInputElement;
+  export const getInputElem = () => inputElem;
   export const getForm = () => formElem;
   export const select = () => inputElem.select();
   export const userQuery = () => lastRealQuery;
