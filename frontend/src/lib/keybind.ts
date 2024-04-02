@@ -118,7 +118,6 @@ type Direction = 'up' | 'down';
 const navigateResults = (direction: Direction, context: Refs) => {
   if (!context.results || context.results.length === 0) return;
   const results = context.results;
-  console.log(results);
 
   let newIndex = 0;
   const currentResultIndex = results.findIndex((result) => result?.hasFocus());
