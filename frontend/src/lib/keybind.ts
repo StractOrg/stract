@@ -26,8 +26,7 @@ export type Key = (typeof Keys)[number];
 // The type used to declare the key downs that will trigger the callback
 export interface KeybindCallback {
   key: Key;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  callback: (e: KeyboardEvent, context: any) => void;
+  callback: (e: KeyboardEvent, context: Refs) => void;
   shift?: boolean;
   ctrl?: boolean;
   alt?: boolean;
@@ -36,7 +35,7 @@ export interface KeybindCallback {
 /**
  * Used to create and interface with key bindings
  */
-export class Keybind<T> {
+export class Keybind {
   // All of the keybindings to their callbacks
   public bindings: KeybindCallback[];
   private bindingEntries: Key[];
@@ -77,7 +76,7 @@ export class Keybind<T> {
    * @param e - The `keydown` event of `KeyboardEvent` type
    * @param useKeyboardShortcuts - A boolean of the user's `useKeyboardShortcuts` preference
    */
-  onKeyDown(e: KeyboardEvent, useKeyboardShortcuts: boolean, context?: T) {
+  onKeyDown(e: KeyboardEvent, useKeyboardShortcuts: boolean, context: Refs) {
     if (!useKeyboardShortcuts || e.repeat) return;
 
     const enum_key = this.keyEnumFromString(e.key);
