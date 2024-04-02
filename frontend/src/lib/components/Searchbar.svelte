@@ -2,18 +2,12 @@
   import MagnifyingGlass from '~icons/heroicons/magnifying-glass';
   import Button from '$lib/components/Button.svelte';
   import { api, type HighlightedFragment } from '$lib/api';
-  import {
-    safeSearchStore,
-    hostRankingsStore,
-    postSearchStore,
-    useKeyboardShortcuts,
-  } from '$lib/stores';
+  import { safeSearchStore, hostRankingsStore, postSearchStore } from '$lib/stores';
   import { browser } from '$app/environment';
   import { derived } from 'svelte/store';
   import { compressRanked, rankingsToRanked } from '$lib/rankings';
   import { twJoin } from 'tailwind-merge';
   import { P, match } from 'ts-pattern';
-  import { Keybind } from '$lib/keybind';
 
   export let autofocus = false;
 
@@ -63,18 +57,22 @@
     didChangeInput = false;
   };
 
-  let keybind = new Keybind([
-    { key: 'ArrowDown', callback: () => moveSelection(1) },
-    { key: 'ArrowUp', callback: () => moveSelection(-1) },
-    { key: 'Enter', callback: () => (hasFocus = true) },
-  ]);
-
-  const onKeydown = (e: KeyboardEvent) => {
-    if (keybind.bindings.find((binding) => binding.key === e.key)) {
-      keybind.onKeyDown(e, $useKeyboardShortcuts);
-    } else {
-      didChangeInput = true;
-    }
+  const onKeydown = (ev: KeyboardEvent) => {
+    match(ev.key)
+      .with('ArrowUp', () => {
+        ev.preventDefault();
+        moveSelection(-1);
+      })
+      .with('ArrowDown', () => {
+        ev.preventDefault();
+        moveSelection(1);
+      })
+      .with('Enter', () => {
+        hasFocus = false;
+      })
+      .otherwise(() => {
+        didChangeInput = true;
+      });
   };
 
   let suggestionsDiv: HTMLDivElement | undefined;
