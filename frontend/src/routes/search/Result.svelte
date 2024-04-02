@@ -1,3 +1,5 @@
+<svelte:options accessors />
+
 <script lang="ts">
   import AdjustVertical from '~icons/heroicons/adjustments-vertical';
   import type { DisplayedWebpage } from '$lib/api';
@@ -22,9 +24,18 @@
   let button: HTMLButtonElement;
 
   const dispatch = createEventDispatcher<{ modal: HTMLButtonElement }>();
+
+  let mainDiv: HTMLElement | undefined = undefined;
+  export const getMainDiv = () => mainDiv;
+
+  let mainResultLink: ResultLink | undefined = undefined;
+  export const getMainResultLink = () => mainResultLink;
+
+  export const hasFocus = () => mainResultLink?.hasFocus();
+  export const clearFocus = () => mainResultLink?.clearFocus();
 </script>
 
-<div class="result flex min-w-0 grow flex-col space-y-0.5">
+<div class="flex min-w-0 grow flex-col space-y-0.5" bind:this={mainDiv}>
   <div class="flex min-w-0">
     <div class="flex min-w-0 grow flex-col space-y-0.5">
       <div class="flex items-center text-sm">
@@ -41,6 +52,7 @@
         title={webpage.title}
         href={webpage.url}
         {resultIndex}
+        bind:this={mainResultLink}
       >
         {webpage.title}
       </ResultLink>

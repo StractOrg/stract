@@ -3,12 +3,15 @@
   import Searchbar from '$lib/components/Searchbar.svelte';
   import type { PageData } from './$types';
   import RegionSelect from '$lib/components/RegionSelect.svelte';
-  import { searchQueryStore } from '$lib/stores';
+  import { searchQueryStore, useKeyboardShortcuts } from '$lib/stores';
   import { page } from '$app/stores';
   import { updateQueryId } from '$lib/improvements';
   import { browser } from '$app/environment';
   import Serp from './Serp.svelte';
+  import Result from './Result.svelte';
   import { search } from '$lib/search';
+  import { Keybind, searchCb, type Refs } from '$lib/keybind';
+  import SpellCorrection from './SpellCorrection.svelte';
 
   export let data: PageData;
   $: results = data.results;
@@ -34,6 +37,8 @@
       nextPageSearchParams = null;
     }
   }
+
+  let serp: Serp | undefined = undefined;
 
   const clientSearch = async () => {
     if (!browser) return;
@@ -61,7 +66,44 @@
     if (browser && results && results.type == 'websites')
       updateQueryId({ query, webpages: results.webpages });
   }
+
+  let resultElems: Result[] = [];
+  let spellCorrectElem: SpellCorrection | undefined = undefined;
+  let searchbarElem: Searchbar | undefined = undefined;
+
+  let context: Refs;
+  $: context = {
+    results: serp?.resultElems,
+    searchbar: searchbarElem,
+    spellCorrection: serp?.spellCorrectElem,
+  };
+
+  let keybind = new Keybind([
+    { key: 'j', callback: searchCb.focusNextResult },
+    { key: 'ArrowDown', callback: searchCb.focusNextResult },
+    { key: 'k', callback: searchCb.focusPrevResult },
+    { key: 'ArrowUp', callback: searchCb.focusPrevResult },
+    { key: 'h', callback: searchCb.selectSearchBar },
+    { key: '/', callback: searchCb.selectSearchBar },
+    { key: 'v', callback: searchCb.openResultInNewTab },
+    { key: "'", callback: searchCb.openResultInNewTab },
+    { key: 't', callback: searchCb.scrollToTop },
+    { key: 'd', callback: searchCb.domainSearch },
+    { key: 'l', callback: searchCb.openResult },
+    { key: 'o', callback: searchCb.openResult },
+    { key: 'm', callback: searchCb.focusMainResult },
+    { key: 's', callback: searchCb.openSpellCorrection },
+    { key: 'Escape', callback: searchCb.clearFocus },
+  ]);
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.target != searchbarElem?.getInputElem()) {
+      keybind.onKeyDown(event, $useKeyboardShortcuts, context);
+    }
+  };
 </script>
+
+<svelte:window on:keydown={onKeyDown} />
 
 {#if !serverSearch}
   <noscript>
@@ -80,7 +122,7 @@
 >
   <div class="flex max-w-2xl flex-col space-y-1">
     <div class="w-full">
-      <Searchbar {query} />
+      <Searchbar {query} bind:this={searchbarElem} />
     </div>
     <div class="mx-auto flex w-full justify-end sm:justify-between">
       <div class="hidden h-full flex-col space-x-2 text-xs text-neutral sm:flex">
@@ -112,6 +154,9 @@
       {prevPageSearchParams}
       {nextPageSearchParams}
       currentPage={data.params.currentPage}
+      {resultElems}
+      {spellCorrectElem}
+      bind:this={serp}
     />
   {:else}
     {#await clientSearch() then results}
@@ -122,6 +167,9 @@
           {prevPageSearchParams}
           {nextPageSearchParams}
           currentPage={data.params.currentPage}
+          {resultElems}
+          {spellCorrectElem}
+          bind:this={serp}
         />
       {/if}
     {/await}
