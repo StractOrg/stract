@@ -13,14 +13,20 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#![allow(clippy::type_complexity)]
 #![allow(dead_code)]
 #![allow(unused_variables)]
-#![allow(unused_mut)]
 #![allow(unused_assignments)]
 #![allow(unreachable_code)]
 
-use std::{net::ToSocketAddrs, sync::Arc};
+use anyhow::anyhow;
+use rayon::prelude::*;
+use std::{
+    collections::{BTreeMap, VecDeque},
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
+use tokio::net::ToSocketAddrs;
 
 use futures::executor::block_on;
 
@@ -203,7 +209,7 @@ where
 {
     type DhtKey: Send + Sync + serde::Serialize + serde::de::DeserializeOwned;
     type DhtValue: Send + Sync + serde::Serialize + serde::de::DeserializeOwned;
-    type Worker: Worker;
+    type Worker: Worker<Job = Self>;
     type Mapper: Mapper<Job = Self>;
 
     fn is_schedulable(&self, _worker: &<<Self as Job>::Worker as Worker>::Remote) -> bool {
@@ -254,7 +260,7 @@ pub trait Message<W: Worker>: std::fmt::Debug + Clone {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-enum CoordReq<J, M, K, V> {
+pub enum CoordReq<J, M, K, V> {
     CurrentJob,
     ScheduleJob { job: J, mappers: Vec<M> },
     Setup { dht: DhtConn<K, V> },
@@ -278,17 +284,27 @@ where
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-enum CoordResp<J> {
+pub enum CoordResp<J> {
     CurrentJob(Option<J>),
     ScheduleJob(()),
     Setup(()),
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-enum Req<J, M, R, K, V> {
+pub enum Req<J, M, R, K, V> {
     Coordinator(CoordReq<J, M, K, V>),
     User(R),
 }
+
+type JobReq<J> = Req<
+    J,
+    <J as Job>::Mapper,
+    <<J as Job>::Worker as Worker>::Request,
+    <J as Job>::DhtKey,
+    <J as Job>::DhtValue,
+>;
+
+type JobResp<J> = Resp<J, <<J as Job>::Worker as Worker>::Response>;
 
 impl<J, M, R, K, V> Clone for Req<J, M, R, K, V>
 where
@@ -305,28 +321,21 @@ where
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-enum Resp<J, R> {
+pub enum Resp<J, R> {
     Coordinator(CoordResp<J>),
     User(R),
 }
+
+type JobDht<J> = DhtConn<<J as Job>::DhtKey, <J as Job>::DhtValue>;
 
 pub struct Server<W>
 where
     W: Worker,
 {
-    dht: Option<Arc<DhtConn<<W::Job as Job>::DhtKey, <W::Job as Job>::DhtValue>>>,
+    dht: Option<Arc<JobDht<W::Job>>>,
     worker: Arc<W>,
     current_job: Option<W::Job>,
-    conn: sonic::Server<
-        Req<
-            W::Job,
-            <W::Job as Job>::Mapper,
-            W::Request,
-            <W::Job as Job>::DhtKey,
-            <W::Job as Job>::DhtValue,
-        >,
-        Resp<W::Job, W::Response>,
-    >,
+    conn: sonic::Server<JobReq<W::Job>, JobResp<W::Job>>,
 }
 
 impl<W> Server<W>
@@ -379,10 +388,28 @@ where
 
         Ok(())
     }
+
+    fn bind(addr: impl ToSocketAddrs, worker: W) -> Result<Server<W>> {
+        let worker = Arc::new(worker);
+        let conn = block_on(sonic::Server::bind(addr))?;
+
+        Ok(Server {
+            dht: None,
+            worker,
+            current_job: None,
+            conn,
+        })
+    }
+
+    fn run(&mut self) -> Result<()> {
+        loop {
+            self.handle()?;
+        }
+    }
 }
 
 pub trait Worker: Send + Sync {
-    type Remote;
+    type Remote: RemoteWorker<Job = Self::Job>;
 
     type Request: serde::Serialize + serde::de::DeserializeOwned + Clone + Send + Sync;
     type Response: serde::Serialize + serde::de::DeserializeOwned + Send + Sync;
@@ -390,21 +417,82 @@ pub trait Worker: Send + Sync {
 
     fn handle(&self, req: Self::Request) -> Self::Response;
 
-    fn bind(self, addr: impl ToSocketAddrs) -> Server<Self>
+    fn bind(self, addr: impl ToSocketAddrs) -> Result<Server<Self>>
     where
-        Self: Sized,
+        Self: Sized + 'static,
     {
-        todo!()
+        Server::bind(addr, self)
+    }
+
+    fn run(self, addr: impl ToSocketAddrs) -> Result<()>
+    where
+        Self: Sized + 'static,
+    {
+        self.bind(addr)?.run()
     }
 }
 
-pub trait RemoteWorker {}
+type JobConn<J> = sonic::Connection<JobReq<J>, JobResp<J>>;
+
+pub trait RemoteWorker
+where
+    Self: Send + Sync,
+{
+    type Job: Job;
+    fn remote_addr(&self) -> SocketAddr;
+
+    fn schedule_job(
+        &self,
+        job: &Self::Job,
+        mappers: Vec<<Self::Job as Job>::Mapper>,
+    ) -> Result<()> {
+        self.send(&JobReq::Coordinator(CoordReq::ScheduleJob {
+            job: job.clone(),
+            mappers,
+        }))?;
+
+        Ok(())
+    }
+
+    fn send_dht(
+        &self,
+        dht: &DhtConn<<Self::Job as Job>::DhtKey, <Self::Job as Job>::DhtValue>,
+    ) -> Result<()> {
+        self.send(&JobReq::Coordinator(CoordReq::Setup { dht: dht.clone() }))?;
+
+        Ok(())
+    }
+
+    fn current_job(&self) -> Result<Option<Self::Job>> {
+        let req = JobReq::Coordinator(CoordReq::CurrentJob);
+        let res = self.send(&req)?;
+
+        match res {
+            Resp::Coordinator(CoordResp::CurrentJob(job)) => Ok(job),
+            _ => Err(anyhow!("unexpected response")),
+        }
+    }
+
+    fn conn(&self) -> Result<JobConn<Self::Job>> {
+        let conn = block_on(JobConn::connect(self.remote_addr()))?;
+        Ok(conn)
+    }
+
+    fn send(&self, req: &JobReq<Self::Job>) -> Result<JobResp<Self::Job>> {
+        let conn = self.conn()?;
+        let res = block_on(conn.send(req))?;
+        Ok(res)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+struct WorkerRef(usize);
 
 struct Coordinator<J>
 where
     J: Job,
 {
-    workers: Vec<<<J as Job>::Worker as Worker>::Remote>,
+    workers: BTreeMap<WorkerRef, <<J as Job>::Worker as Worker>::Remote>,
     setup: Box<dyn Setup<DhtKey = J::DhtKey, DhtValue = J::DhtValue>>,
     mappers: Vec<J::Mapper>,
 }
@@ -420,7 +508,11 @@ where
         Self {
             setup: Box::new(setup),
             mappers: Vec::new(),
-            workers,
+            workers: workers
+                .into_iter()
+                .enumerate()
+                .map(|(i, w)| (WorkerRef(i), w))
+                .collect(),
         }
     }
 
@@ -429,7 +521,16 @@ where
         self
     }
 
-    fn run<F>(self, jobs: Vec<J>, finisher: F)
+    fn send_dht_to_workers(&self, dht: &DhtConn<J::DhtKey, J::DhtValue>) -> Result<()> {
+        self.workers
+            .par_iter()
+            .map(|(_, worker)| worker.send_dht(dht))
+            .collect::<Result<()>>()?;
+
+        Ok(())
+    }
+
+    fn run<F>(self, jobs: Vec<J>, finisher: F) -> Result<()>
     where
         F: Finisher<Job = J>,
     {
@@ -446,11 +547,99 @@ where
             }
 
             is_first = false;
+            self.send_dht_to_workers(&dht)?;
 
-            todo!();
+            // run round
+            let mut sleeper =
+                ExponentialBackoff::new(Duration::from_millis(100), Duration::from_secs(10), 2.0);
+
+            let mut remaining_jobs: VecDeque<_> = jobs.clone().into_iter().collect();
+            let mut scheduled_jobs = BTreeMap::new();
+
+            while let Some(job) = remaining_jobs.pop_front() {
+                // get current status from workers
+                let worker_jobs = self
+                    .workers
+                    .iter()
+                    .map(|(r, w)| (*r, w.current_job()))
+                    .collect::<BTreeMap<_, _>>();
+
+                // handle failed workers
+                for r in worker_jobs
+                    .iter()
+                    .filter_map(|(r, j)| j.as_ref().err().map(|_| r))
+                {
+                    if let Some(job) = scheduled_jobs.remove(r) {
+                        remaining_jobs.push_front(job);
+                    }
+                }
+
+                let potential_workers = worker_jobs
+                    .iter()
+                    .filter_map(|(r, j)| j.as_ref().ok().map(|_| *r))
+                    .filter(|r| job.is_schedulable(&self.workers[r]))
+                    .collect::<Vec<_>>();
+
+                if potential_workers.is_empty() {
+                    return Err(anyhow!(
+                        "Failed to schedule job: no potential workers are responding."
+                    ));
+                }
+
+                // schedule remaining jobs to idle workers (if any)
+                match potential_workers.iter().find(|r| {
+                    worker_jobs[r]
+                        .as_ref()
+                        .expect("references in `possible_workers` should only point to non-failed workers")
+                        .is_none()
+                }) {
+                    Some(free_worker) => {
+                        self.workers[free_worker].schedule_job(&job, self.mappers.clone())?;
+                        scheduled_jobs.insert(*free_worker, job);
+                        sleeper.success();
+                    },
+                    None => {
+                        remaining_jobs.push_front(job);
+                        let sleep_duration = sleeper.next();
+                        std::thread::sleep(sleep_duration);
+                    }
+                }
+            }
 
             dht.next_round();
         }
+
+        Ok(())
+    }
+}
+
+struct ExponentialBackoff {
+    min: Duration,
+    max: Duration,
+    factor: f64,
+    attempts: usize,
+}
+
+impl ExponentialBackoff {
+    fn new(min: Duration, max: Duration, factor: f64) -> Self {
+        Self {
+            min,
+            max,
+            factor,
+            attempts: 0,
+        }
+    }
+}
+
+impl ExponentialBackoff {
+    fn next(&mut self) -> Duration {
+        let duration = self.min.mul_f64(self.factor.powi(self.attempts as i32));
+        self.attempts += 1;
+        duration.min(self.max)
+    }
+
+    fn success(&mut self) {
+        self.attempts = 0;
     }
 }
 
@@ -565,12 +754,20 @@ macro_rules! impl_worker {
 impl_worker!(CentralityJob, RemoteCentralityWorker => CentralityWorker, [GetShard,]);
 
 struct RemoteCentralityWorker {
-    addr: String,
+    addr: SocketAddr,
 }
 
 impl RemoteCentralityWorker {
     fn shard(&self) -> u64 {
         todo!()
+    }
+}
+
+impl RemoteWorker for RemoteCentralityWorker {
+    type Job = CentralityJob;
+
+    fn remote_addr(&self) -> SocketAddr {
+        self.addr
     }
 }
 

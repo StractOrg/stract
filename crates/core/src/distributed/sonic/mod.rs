@@ -20,6 +20,7 @@ pub mod service;
 use std::{marker::PhantomData, time::Duration};
 
 use serde::{de::DeserializeOwned, Serialize};
+
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, ToSocketAddrs},
@@ -66,6 +67,10 @@ where
     Req: Serialize,
     Res: DeserializeOwned,
 {
+    pub async fn connect(server: impl ToSocketAddrs) -> Result<Self> {
+        Self::create(server).await
+    }
+
     pub async fn create(server: impl ToSocketAddrs) -> Result<Self> {
         Self::create_with_timeout(server, Duration::from_secs(30)).await
     }
