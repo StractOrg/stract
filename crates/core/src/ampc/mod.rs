@@ -248,8 +248,8 @@ pub trait Setup {
     type DhtValue;
 
     fn init_dht(&self) -> DhtConn<Self::DhtKey, Self::DhtValue>;
-    fn setup_round(&self, dht: &DhtConn<Self::DhtKey, Self::DhtValue>);
-    fn setup_first_round(&self, dht: &DhtConn<Self::DhtKey, Self::DhtValue>) {
+    fn setup_round(&self, dht: &DhtTableConn<Self::DhtKey, Self::DhtValue>) {}
+    fn setup_first_round(&self, dht: &DhtTableConn<Self::DhtKey, Self::DhtValue>) {
         self.setup_round(dht);
     }
 }
@@ -541,10 +541,11 @@ where
 
         while !finisher.is_finished(&dht) {
             if is_first {
-                self.setup.setup_first_round(&dht);
+                self.setup.setup_first_round(&dht.new);
             } else {
-                self.setup.setup_round(&dht);
+                self.setup.setup_round(&dht.new);
             }
+            dht.next_round();
 
             is_first = false;
             self.send_dht_to_workers(&dht)?;
@@ -605,8 +606,6 @@ where
                     }
                 }
             }
-
-            dht.next_round();
         }
 
         Ok(())
@@ -693,10 +692,6 @@ impl Setup for CentralitySetup {
     fn init_dht(&self) -> DhtConn<Key, Value> {
         self.dht.clone()
     }
-
-    fn setup_round(&self, _dht: &DhtConn<Key, Value>) {
-        todo!()
-    }
 }
 
 struct CentralityWorker {
@@ -754,12 +749,13 @@ macro_rules! impl_worker {
 impl_worker!(CentralityJob, RemoteCentralityWorker => CentralityWorker, [GetShard,]);
 
 struct RemoteCentralityWorker {
+    shard: u64,
     addr: SocketAddr,
 }
 
 impl RemoteCentralityWorker {
     fn shard(&self) -> u64 {
-        todo!()
+        self.shard
     }
 }
 

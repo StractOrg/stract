@@ -17,7 +17,10 @@
 use std::{net::SocketAddr, time::Duration};
 
 use crate::{
-    ampc::dht::store::{Key, Table, Value},
+    ampc::dht::{
+        store::{Key, Table, Value},
+        upsert::UpsertEnum,
+    },
     distributed::retry_strategy::RandomBackoff,
     Result,
 };
@@ -40,6 +43,27 @@ pub struct Set {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BatchSet {
+    pub table: Table,
+    pub values: Vec<(Key, Value)>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Upsert {
+    pub table: Table,
+    pub key: Key,
+    pub value: Value,
+    pub upsert_fn: UpsertEnum,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BatchUpsert {
+    pub table: Table,
+    pub values: Vec<(Key, Value)>,
+    pub upsert_fn: UpsertEnum,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Get {
     pub table: Table,
     pub key: Key,
@@ -49,12 +73,6 @@ pub struct Get {
 pub struct BatchGet {
     pub table: Table,
     pub keys: Vec<Key>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BatchSet {
-    pub table: Table,
-    pub values: Vec<(Key, Value)>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -94,6 +112,32 @@ impl sonic::service::Message<Server> for BatchSet {
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received batch set request: {:?}", self);
+
+        match server.raft.client_write(self.into()).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl sonic::service::Message<Server> for Upsert {
+    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+
+    async fn handle(self, server: &Server) -> Self::Response {
+        tracing::debug!("received upsert request: {:?}", self);
+
+        match server.raft.client_write(self.into()).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl sonic::service::Message<Server> for BatchUpsert {
+    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+
+    async fn handle(self, server: &Server) -> Self::Response {
+        tracing::debug!("received batch upsert request: {:?}", self);
 
         match server.raft.client_write(self.into()).await {
             Ok(_) => Ok(()),

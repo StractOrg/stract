@@ -30,8 +30,11 @@ mod client;
 pub mod log_store;
 mod network;
 pub mod store;
+pub mod upsert;
 
-use network::api::{AllTables, BatchSet, CloneTable, CreateTable, DropTable, Set};
+use network::api::{
+    AllTables, BatchSet, BatchUpsert, CloneTable, CreateTable, DropTable, Set, Upsert,
+};
 
 use std::fmt::Debug;
 use std::io::Cursor;
@@ -91,7 +94,16 @@ macro_rules! raft_sonic_request_response {
 
 raft_sonic_request_response!(
     Server,
-    [Set, BatchSet, CreateTable, DropTable, AllTables, CloneTable]
+    [
+        Set,
+        BatchSet,
+        Upsert,
+        BatchUpsert,
+        CreateTable,
+        DropTable,
+        AllTables,
+        CloneTable
+    ]
 );
 
 #[cfg(test)]

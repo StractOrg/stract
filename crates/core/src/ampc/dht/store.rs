@@ -37,6 +37,8 @@ use tokio::sync::RwLock;
 
 use crate::ampc::dht::network::api;
 
+use super::upsert::UpsertEnum;
+use super::upsert::UpsertFn;
 use super::NodeId;
 use super::TypeConfig;
 use super::{Request, Response};
@@ -127,6 +129,39 @@ impl Db {
 
     pub fn batch_set(&mut self, table: Table, values: Vec<(Key, Value)>) {
         self.data.entry(table).or_default().extend(values);
+    }
+
+    pub fn upsert(&mut self, table: Table, upsert_fn: &UpsertEnum, key: Key, value: Value) {
+        let table = self.data.entry(table).or_default();
+
+        match table.get(&key).cloned() {
+            Some(old) => {
+                let merged = upsert_fn.upsert(old, value);
+                table.insert(key, merged)
+            }
+            None => table.insert(key, value),
+        };
+    }
+
+    pub fn batch_upsert(
+        &mut self,
+        table: Table,
+        upsert_fn: &UpsertEnum,
+        values: Vec<(Key, Value)>,
+    ) {
+        let table = self.data.entry(table).or_default();
+
+        for (key, value) in values {
+            match table.get(&key).cloned() {
+                Some(old) => {
+                    let merged = upsert_fn.upsert(old, value);
+                    table.insert(key, merged);
+                }
+                None => {
+                    table.insert(key, value);
+                }
+            }
+        }
     }
 
     pub fn clone_table(&mut self, from: &Table, to: Table) {
@@ -275,6 +310,24 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
                     Request::BatchSet(api::BatchSet { table, values }) => {
                         sm.db.batch_set(table.clone(), values.clone());
                         res.push(Response::Set(Ok(())))
+                    }
+                    Request::Upsert(api::Upsert {
+                        table,
+                        key,
+                        value,
+                        upsert_fn,
+                    }) => {
+                        sm.db
+                            .upsert(table.clone(), upsert_fn, key.clone(), value.clone());
+                        res.push(Response::Upsert(Ok(())))
+                    }
+                    Request::BatchUpsert(api::BatchUpsert {
+                        table,
+                        upsert_fn,
+                        values,
+                    }) => {
+                        sm.db.batch_upsert(table.clone(), upsert_fn, values.clone());
+                        res.push(Response::Upsert(Ok(())))
                     }
                     Request::CreateTable(api::CreateTable { table }) => {
                         sm.db.new_table(table.clone());
