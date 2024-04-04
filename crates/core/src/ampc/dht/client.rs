@@ -28,6 +28,7 @@ use crate::{
 use super::{
     network::api,
     store::{Key, Table, Value},
+    upsert::UpsertEnum,
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -65,6 +66,25 @@ impl Node {
     async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
         self.api.batch_set(table, values).await
     }
+
+    async fn upsert<F: Into<UpsertEnum>>(
+        &self,
+        table: Table,
+        upsert: F,
+        key: Key,
+        value: Value,
+    ) -> Result<bool> {
+        self.api.upsert(table, upsert, key, value).await
+    }
+
+    async fn batch_upsert<F: Into<UpsertEnum>>(
+        &self,
+        table: Table,
+        upsert: F,
+        values: Vec<(Key, Value)>,
+    ) -> Result<Vec<(Key, bool)>> {
+        self.api.batch_upsert(table, upsert, values).await
+    }
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -99,6 +119,25 @@ impl Shard {
 
     async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
         self.node().batch_set(table, values).await
+    }
+
+    async fn upsert<F: Into<UpsertEnum>>(
+        &self,
+        table: Table,
+        upsert: F,
+        key: Key,
+        value: Value,
+    ) -> Result<bool> {
+        self.node().upsert(table, upsert, key, value).await
+    }
+
+    async fn batch_upsert<F: Into<UpsertEnum>>(
+        &self,
+        table: Table,
+        upsert: F,
+        values: Vec<(Key, Value)>,
+    ) -> Result<Vec<(Key, bool)>> {
+        self.node().batch_upsert(table, upsert, values).await
     }
 }
 
@@ -214,6 +253,48 @@ impl Client {
         futures::future::try_join_all(futures).await?;
 
         Ok(())
+    }
+
+    pub async fn upsert<F: Into<UpsertEnum>>(
+        &self,
+        table: Table,
+        upsert: F,
+        key: Key,
+        value: Value,
+    ) -> Result<bool> {
+        self.shard_for_key(key.as_bytes())?
+            .upsert(table, upsert, key, value)
+            .await
+    }
+
+    pub async fn batch_upsert<F: Into<UpsertEnum> + Clone>(
+        &self,
+        table: Table,
+        upsert: F,
+        values: Vec<(Key, Value)>,
+    ) -> Result<Vec<(Key, bool)>> {
+        let mut shard_values: BTreeMap<ShardId, Vec<(Key, Value)>> = BTreeMap::new();
+
+        for (key, value) in values {
+            let shard = self.shard_id_for_key(key.as_bytes())?;
+            shard_values.entry(*shard).or_default().push((key, value));
+        }
+
+        let mut futures = Vec::with_capacity(shard_values.len());
+
+        for (shard_id, values) in shard_values {
+            futures.push(self.shards[&shard_id].batch_upsert(
+                table.clone(),
+                upsert.clone(),
+                values,
+            ));
+        }
+
+        Ok(futures::future::try_join_all(futures)
+            .await?
+            .into_iter()
+            .flatten()
+            .collect())
     }
 
     pub async fn drop_table(&self, table: Table) -> Result<()> {

@@ -131,16 +131,24 @@ impl Db {
         self.data.entry(table).or_default().extend(values);
     }
 
-    pub fn upsert(&mut self, table: Table, upsert_fn: &UpsertEnum, key: Key, value: Value) {
+    pub fn upsert(&mut self, table: Table, upsert_fn: &UpsertEnum, key: Key, value: Value) -> bool {
         let table = self.data.entry(table).or_default();
 
         match table.get(&key).cloned() {
             Some(old) => {
-                let merged = upsert_fn.upsert(old, value);
-                table.insert(key, merged)
+                let merged = upsert_fn.upsert(old.clone(), value);
+
+                let has_changed = merged != old;
+
+                table.insert(key, merged);
+
+                has_changed
             }
-            None => table.insert(key, value),
-        };
+            None => {
+                table.insert(key, value);
+                true
+            }
+        }
     }
 
     pub fn batch_upsert(
@@ -148,20 +156,29 @@ impl Db {
         table: Table,
         upsert_fn: &UpsertEnum,
         values: Vec<(Key, Value)>,
-    ) {
+    ) -> Vec<(Key, bool)> {
         let table = self.data.entry(table).or_default();
+        let mut res = Vec::with_capacity(values.len());
 
         for (key, value) in values {
             match table.get(&key).cloned() {
                 Some(old) => {
-                    let merged = upsert_fn.upsert(old, value);
-                    table.insert(key, merged);
+                    let merged = upsert_fn.upsert(old.clone(), value);
+
+                    let has_changed = merged != old;
+
+                    table.insert(key.clone(), merged);
+
+                    res.push((key, has_changed));
                 }
                 None => {
-                    table.insert(key, value);
+                    table.insert(key.clone(), value);
+                    res.push((key, true));
                 }
             }
         }
+
+        res
     }
 
     pub fn clone_table(&mut self, from: &Table, to: Table) {
@@ -316,19 +333,21 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
                         key,
                         value,
                         upsert_fn,
-                    }) => {
-                        sm.db
-                            .upsert(table.clone(), upsert_fn, key.clone(), value.clone());
-                        res.push(Response::Upsert(Ok(())))
-                    }
+                    }) => res.push(Response::Upsert(Ok(sm.db.upsert(
+                        table.clone(),
+                        upsert_fn,
+                        key.clone(),
+                        value.clone(),
+                    )))),
                     Request::BatchUpsert(api::BatchUpsert {
                         table,
                         upsert_fn,
                         values,
-                    }) => {
-                        sm.db.batch_upsert(table.clone(), upsert_fn, values.clone());
-                        res.push(Response::Upsert(Ok(())))
-                    }
+                    }) => res.push(Response::BatchUpsert(Ok(sm.db.batch_upsert(
+                        table.clone(),
+                        upsert_fn,
+                        values.clone(),
+                    )))),
                     Request::CreateTable(api::CreateTable { table }) => {
                         sm.db.new_table(table.clone());
                         res.push(Response::CreateTable(Ok(())))

@@ -23,7 +23,7 @@ use rayon::prelude::*;
 use std::{
     collections::{BTreeMap, VecDeque},
     net::SocketAddr,
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::Duration,
 };
 use tokio::net::ToSocketAddrs;
@@ -31,10 +31,15 @@ use tokio::net::ToSocketAddrs;
 use futures::executor::block_on;
 
 use crate::{
+    ampc::dht::upsert::HyperLogLogUpsert64,
+    bloom::BloomFilter,
     distributed::{cluster::Cluster, sonic},
-    webgraph::Webgraph,
+    hyperloglog::HyperLogLog,
+    webgraph::{self, Edge, Webgraph},
     Result,
 };
+
+use self::dht::upsert::UpsertEnum;
 
 pub mod dht;
 
@@ -138,6 +143,39 @@ where
         block_on(self.client.batch_set(self.table.dht(), pairs)).unwrap();
     }
 
+    pub fn upsert<F: Into<UpsertEnum>>(&self, upsert: F, key: K, value: V) -> bool {
+        let key = bincode::serialize(&key).unwrap();
+        let value = bincode::serialize(&value).unwrap();
+
+        block_on(
+            self.client
+                .upsert(self.table.dht(), upsert, key.into(), value.into()),
+        )
+        .unwrap()
+    }
+
+    pub fn batch_upsert<F: Into<UpsertEnum> + Clone>(
+        &self,
+        upsert: F,
+        pairs: Vec<(K, V)>,
+    ) -> Vec<(K, bool)> {
+        let pairs: Vec<(dht::Key, dht::Value)> = pairs
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    bincode::serialize(&k).unwrap().into(),
+                    bincode::serialize(&v).unwrap().into(),
+                )
+            })
+            .collect();
+
+        block_on(self.client.batch_upsert(self.table.dht(), upsert, pairs))
+            .unwrap()
+            .into_iter()
+            .map(|(k, did_upsert)| (bincode::deserialize(k.as_bytes()).unwrap(), did_upsert))
+            .collect()
+    }
+
     fn next(&self) -> DhtTableConn<K, V> {
         let new = Self {
             table: self.table.next(),
@@ -162,7 +200,7 @@ where
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct DhtConn<K, V> {
     prev: DhtTableConn<K, V>,
-    new: DhtTableConn<K, V>,
+    next: DhtTableConn<K, V>,
 }
 
 impl<K, V> DhtConn<K, V>
@@ -172,8 +210,8 @@ where
 {
     fn new(cluster: &Cluster, prefix: String) -> Self {
         let prev = block_on(DhtTableConn::new(cluster, prefix));
-        let new = prev.next();
-        Self { prev, new }
+        let next = prev.next();
+        Self { prev, next }
     }
 
     fn drop_prev_tables(&self) {
@@ -188,9 +226,17 @@ where
 
     fn next_round(&mut self) {
         self.prev.drop_table();
-        self.prev = self.new.clone();
+        self.prev = self.next.clone();
 
-        self.new = self.prev.next();
+        self.next = self.prev.next();
+    }
+
+    pub fn prev(&self) -> &DhtTableConn<K, V> {
+        &self.prev
+    }
+
+    pub fn next(&self) -> &DhtTableConn<K, V> {
+        &self.next
     }
 }
 
@@ -198,7 +244,7 @@ impl<K, V> Clone for DhtConn<K, V> {
     fn clone(&self) -> Self {
         Self {
             prev: self.prev.clone(),
-            new: self.new.clone(),
+            next: self.next.clone(),
         }
     }
 }
@@ -236,7 +282,7 @@ pub trait Finisher {
 
     fn is_finished(
         &self,
-        dht: &DhtConn<
+        dht: &DhtTableConn<
             <<Self as Finisher>::Job as Job>::DhtKey,
             <<Self as Finisher>::Job as Job>::DhtValue,
         >,
@@ -537,17 +583,10 @@ where
         let mut dht = self.setup.init_dht();
         dht.drop_prev_tables();
 
-        let mut is_first = true;
+        self.setup.setup_first_round(&dht.next);
+        dht.next_round();
 
-        while !finisher.is_finished(&dht) {
-            if is_first {
-                self.setup.setup_first_round(&dht.new);
-            } else {
-                self.setup.setup_round(&dht.new);
-            }
-            dht.next_round();
-
-            is_first = false;
+        while !finisher.is_finished(&dht.prev) {
             self.send_dht_to_workers(&dht)?;
 
             // run round
@@ -606,6 +645,9 @@ where
                     }
                 }
             }
+
+            self.setup.setup_round(&dht.next);
+            dht.next_round();
         }
 
         Ok(())
@@ -639,74 +681,6 @@ impl ExponentialBackoff {
 
     fn success(&mut self) {
         self.attempts = 0;
-    }
-}
-
-/*
-
-repeat vec![
-    Box::new(Mapper1::new()) as Box<dyn Mapper<D, W>>,
-    Box::new(Mapper2::new()) as Box<dyn Mapper<D, W>>,
-]
-
-until Algorithm::is_finished(dht).
-
-Before each round, call Algorithm::setup_round(dht). first rounde call Algorithm::setup_first_round(dht) instead.
-
-*/
-
-type Key = ();
-type Value = ();
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct CentralityJob {
-    shard: u64,
-}
-
-impl Job for CentralityJob {
-    type DhtKey = Key;
-    type DhtValue = Value;
-    type Worker = CentralityWorker;
-    type Mapper = CentralityMapper;
-
-    fn is_schedulable(&self, worker: &RemoteCentralityWorker) -> bool {
-        self.shard == worker.shard()
-    }
-}
-
-struct CentralitySetup {
-    dht: DhtConn<Key, Value>,
-}
-
-impl CentralitySetup {
-    pub async fn new(cluster: &Cluster, prefix: String) -> Self {
-        let dht = DhtConn::new(cluster, prefix);
-        Self { dht }
-    }
-}
-
-impl Setup for CentralitySetup {
-    type DhtKey = Key;
-    type DhtValue = Value;
-
-    fn init_dht(&self) -> DhtConn<Key, Value> {
-        self.dht.clone()
-    }
-}
-
-struct CentralityWorker {
-    shard: u64,
-    graph: Webgraph,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct GetShard;
-
-impl Message<CentralityWorker> for GetShard {
-    type Response = u64;
-
-    fn handle(self, worker: &CentralityWorker) -> Self::Response {
-        worker.shard
     }
 }
 
@@ -746,6 +720,110 @@ macro_rules! impl_worker {
     };
 }
 
+/*
+
+repeat vec![
+    Box::new(Mapper1::new()) as Box<dyn Mapper<D, W>>,
+    Box::new(Mapper2::new()) as Box<dyn Mapper<D, W>>,
+]
+
+until Algorithm::is_finished(dht).
+
+Before each round, call Algorithm::setup_round(dht). first rounde call Algorithm::setup_first_round(dht) instead.
+
+*/
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+enum Key {
+    Node(webgraph::NodeID),
+    Meta,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+enum Value {
+    Counter(HyperLogLog<64>),
+    Meta { round_had_changes: bool },
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct CentralityJob {
+    shard: u64,
+}
+
+impl Job for CentralityJob {
+    type DhtKey = Key;
+    type DhtValue = Value;
+    type Worker = CentralityWorker;
+    type Mapper = CentralityMapper;
+
+    fn is_schedulable(&self, worker: &RemoteCentralityWorker) -> bool {
+        self.shard == worker.shard()
+    }
+}
+
+struct CentralitySetup {
+    dht: DhtConn<Key, Value>,
+}
+
+impl CentralitySetup {
+    pub async fn new(cluster: &Cluster, prefix: String) -> Self {
+        let dht = DhtConn::new(cluster, prefix);
+        Self { dht }
+    }
+}
+
+impl Setup for CentralitySetup {
+    type DhtKey = Key;
+    type DhtValue = Value;
+
+    fn init_dht(&self) -> DhtConn<Key, Value> {
+        self.dht.clone()
+    }
+
+    fn setup_round(&self, dht: &DhtTableConn<Self::DhtKey, Self::DhtValue>) {
+        dht.set(
+            Key::Meta,
+            Value::Meta {
+                round_had_changes: false,
+            },
+        );
+    }
+}
+
+struct CentralityWorker {
+    shard: u64,
+    graph: Webgraph,
+    changed_nodes: Arc<Mutex<BloomFilter>>,
+}
+
+impl CentralityWorker {
+    fn new(shard: u64, graph: Webgraph) -> Self {
+        let num_nodes = graph.estimate_num_nodes() as u64;
+        let mut changed_nodes = BloomFilter::new(num_nodes, 0.05);
+
+        for node in graph.nodes() {
+            changed_nodes.insert(node.as_u64());
+        }
+
+        Self {
+            shard,
+            graph,
+            changed_nodes: Arc::new(Mutex::new(changed_nodes)),
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct GetShard;
+
+impl Message<CentralityWorker> for GetShard {
+    type Response = u64;
+
+    fn handle(self, worker: &CentralityWorker) -> Self::Response {
+        worker.shard
+    }
+}
+
 impl_worker!(CentralityJob, RemoteCentralityWorker => CentralityWorker, [GetShard,]);
 
 struct RemoteCentralityWorker {
@@ -770,10 +848,131 @@ impl RemoteWorker for RemoteCentralityWorker {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 struct CentralityMapper {}
 
+impl CentralityMapper {
+    fn update_dht(
+        &self,
+        batch: &[Edge<()>],
+        changed_nodes: &Mutex<BloomFilter>,
+        new_changed_nodes: &Mutex<BloomFilter>,
+        dht: &DhtConn<Key, Value>,
+    ) {
+        // get old values from prev dht using edge.from where edge.from in changed_nodes
+
+        let mut old_counters: BTreeMap<_, _> = {
+            let changed_nodes = changed_nodes.lock().unwrap();
+
+            dht.prev()
+                .batch_get(
+                    batch
+                        .iter()
+                        .filter_map(|edge| {
+                            if changed_nodes.contains(edge.from.as_u64()) {
+                                Some(edge.from)
+                            } else {
+                                None
+                            }
+                        })
+                        .map(Key::Node)
+                        .collect(),
+                )
+                .into_iter()
+                .filter_map(|(key, val)| match (key, val) {
+                    (Key::Node(node), Value::Counter(counter)) => Some((node, counter)),
+                    _ => None,
+                })
+                .collect()
+        };
+
+        let changes = {
+            let changed_nodes = changed_nodes.lock().unwrap();
+
+            // upsert edge.to hyperloglogs in dht.next
+            dht.next().batch_upsert(
+                HyperLogLogUpsert64,
+                batch
+                    .iter()
+                    .filter(|edge| changed_nodes.contains(edge.from.as_u64()))
+                    .map(|edge| {
+                        let mut counter = old_counters
+                            .remove(&edge.from)
+                            .unwrap_or_else(HyperLogLog::default);
+                        counter.add(edge.from.as_u64());
+                        (Key::Node(edge.to), Value::Counter(counter))
+                    })
+                    .collect(),
+            )
+        };
+
+        // update new bloom filter with the nodes that changed
+        {
+            let mut new_changed_nodes = new_changed_nodes.lock().unwrap();
+
+            for (node, did_upsert) in &changes {
+                if *did_upsert {
+                    if let Key::Node(node) = node {
+                        new_changed_nodes.insert(node.as_u64());
+                    }
+                }
+            }
+        }
+
+        // if any nodes changed, indicate in dht that we aren't finished yet
+        {
+            if changes.iter().any(|(_, did_upsert)| *did_upsert) {
+                dht.next().set(
+                    Key::Meta,
+                    Value::Meta {
+                        round_had_changes: true,
+                    },
+                )
+            }
+        }
+    }
+}
+
 impl Mapper for CentralityMapper {
     type Job = CentralityJob;
 
     fn map(&self, _: Self::Job, worker: &CentralityWorker, dht: &DhtConn<Key, Value>) {
-        todo!("iterate edges in graph and update dht")
+        let new_changed_nodes = Arc::new(Mutex::new(BloomFilter::empty_from(
+            &worker.changed_nodes.lock().unwrap(),
+        )));
+
+        let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
+
+        pool.scope(|s| {
+            const BATCH_SIZE: usize = 16_384;
+            let mut batch = Vec::with_capacity(BATCH_SIZE);
+
+            for edge in worker.graph.edges() {
+                batch.push(edge);
+                if batch.len() >= BATCH_SIZE {
+                    let changed_nodes = Arc::clone(&worker.changed_nodes);
+                    let new_changed_nodes = Arc::clone(&new_changed_nodes);
+                    let update_batch = batch.clone();
+
+                    s.spawn(move |_| {
+                        self.update_dht(&update_batch, &changed_nodes, &new_changed_nodes, dht)
+                    });
+
+                    batch.clear();
+                }
+            }
+        });
+
+        *worker.changed_nodes.lock().unwrap() = new_changed_nodes.lock().unwrap().clone();
+    }
+}
+
+struct CentralityFinish {}
+
+impl Finisher for CentralityFinish {
+    type Job = CentralityJob;
+
+    fn is_finished(&self, dht: &DhtTableConn<Key, Value>) -> bool {
+        match dht.get(Key::Meta).unwrap() {
+            Value::Meta { round_had_changes } => round_had_changes,
+            _ => unreachable!("unexpected value in dht for key: {:?}", Key::Meta),
+        }
     }
 }

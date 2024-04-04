@@ -17,7 +17,10 @@
 pub mod api;
 pub mod raft;
 
-use api::{AllTables, BatchGet, BatchSet, CloneTable, CreateTable, DropTable, Get, Set};
+use api::{
+    AllTables, BatchGet, BatchSet, BatchUpsert, CloneTable, CreateTable, DropTable, Get, Set,
+    Upsert,
+};
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 
 use openraft::{BasicNode, Raft, RaftNetworkFactory};
@@ -71,6 +74,8 @@ sonic_service!(
         BatchGet,
         Set,
         BatchSet,
+        Upsert,
+        BatchUpsert,
         DropTable,
         CreateTable,
         AllTables,

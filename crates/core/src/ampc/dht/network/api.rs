@@ -121,26 +121,33 @@ impl sonic::service::Message<Server> for BatchSet {
 }
 
 impl sonic::service::Message<Server> for Upsert {
-    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<bool, RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received upsert request: {:?}", self);
 
         match server.raft.client_write(self.into()).await {
-            Ok(_) => Ok(()),
+            Ok(res) => match res.data {
+                crate::ampc::dht::Response::Upsert(res) => res,
+                _ => panic!("unexpected response from raft"),
+            },
             Err(e) => Err(e),
         }
     }
 }
 
 impl sonic::service::Message<Server> for BatchUpsert {
-    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response =
+        Result<Vec<(Key, bool)>, RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received batch upsert request: {:?}", self);
 
         match server.raft.client_write(self.into()).await {
-            Ok(_) => Ok(()),
+            Ok(res) => match res.data {
+                crate::ampc::dht::Response::BatchUpsert(res) => res,
+                _ => panic!("unexpected response from raft"),
+            },
             Err(e) => Err(e),
         }
     }
@@ -702,5 +709,157 @@ impl RemoteClient {
         }
 
         Err(anyhow!("failed to clone table"))
+    }
+
+    pub async fn upsert<F: Into<UpsertEnum>>(
+        &self,
+        table: Table,
+        upsert: F,
+        key: Key,
+        value: Value,
+    ) -> Result<bool> {
+        let upsert = upsert.into();
+
+        for backoff in Self::retry_strat() {
+            let res = self
+                .likely_leader
+                .read()
+                .await
+                .as_ref()
+                .unwrap_or(&self.self_remote)
+                .send_with_timeout(
+                    &Upsert {
+                        table: table.clone(),
+                        key: key.clone(),
+                        value: value.clone(),
+                        upsert_fn: upsert.clone(),
+                    },
+                    Duration::from_secs(5),
+                )
+                .await;
+
+            tracing::debug!(".upsert() got response: {res:?}");
+
+            match res {
+                Ok(res) => match res {
+                    Ok(res) => return Ok(res),
+                    Err(RaftError::APIError(e)) => match e {
+                        ClientWriteError::ForwardToLeader(ForwardToLeader {
+                            leader_id: _,
+                            leader_node,
+                        }) => match leader_node {
+                            Some(leader_node) => {
+                                let mut likely_leader = self.likely_leader.write().await;
+                                *likely_leader = Some(sonic::replication::RemoteClient::new(
+                                    leader_node
+                                        .addr
+                                        .parse()
+                                        .expect("node addr should always be valid addr"),
+                                ));
+                            }
+                            None => {
+                                tokio::time::sleep(backoff).await;
+                            }
+                        },
+                        ClientWriteError::ChangeMembershipError(_) => {
+                            unreachable!(".upert() should not change membership")
+                        }
+                    },
+                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                },
+                Err(e) => match e {
+                    sonic::Error::IO(_)
+                    | sonic::Error::Serialization(_)
+                    | sonic::Error::ConnectionTimeout
+                    | sonic::Error::RequestTimeout
+                    | sonic::Error::PoolCreation => {
+                        tokio::time::sleep(backoff).await;
+                    }
+                    sonic::Error::BadRequest
+                    | sonic::Error::BodyTooLarge {
+                        body_size: _,
+                        max_size: _,
+                    }
+                    | sonic::Error::Application(_) => return Err(e.into()),
+                },
+            }
+        }
+
+        Err(anyhow!("failed to perform upsert"))
+    }
+
+    pub async fn batch_upsert<F: Into<UpsertEnum>>(
+        &self,
+        table: Table,
+        upsert: F,
+        values: Vec<(Key, Value)>,
+    ) -> Result<Vec<(Key, bool)>> {
+        let upsert = upsert.into();
+
+        for backoff in Self::retry_strat() {
+            let res = self
+                .likely_leader
+                .read()
+                .await
+                .as_ref()
+                .unwrap_or(&self.self_remote)
+                .send_with_timeout(
+                    &BatchUpsert {
+                        table: table.clone(),
+                        upsert_fn: upsert.clone(),
+                        values: values.clone(),
+                    },
+                    Duration::from_secs(5),
+                )
+                .await;
+
+            tracing::debug!(".batch_upsert() got response: {res:?}");
+
+            match res {
+                Ok(res) => match res {
+                    Ok(res) => return Ok(res),
+                    Err(RaftError::APIError(e)) => match e {
+                        ClientWriteError::ForwardToLeader(ForwardToLeader {
+                            leader_id: _,
+                            leader_node,
+                        }) => match leader_node {
+                            Some(leader_node) => {
+                                let mut likely_leader = self.likely_leader.write().await;
+                                *likely_leader = Some(sonic::replication::RemoteClient::new(
+                                    leader_node
+                                        .addr
+                                        .parse()
+                                        .expect("node addr should always be valid addr"),
+                                ));
+                            }
+                            None => {
+                                tokio::time::sleep(backoff).await;
+                            }
+                        },
+                        ClientWriteError::ChangeMembershipError(_) => {
+                            unreachable!(".batch_upsert() should not change membership")
+                        }
+                    },
+                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                },
+                Err(e) => match e {
+                    sonic::Error::IO(_)
+                    | sonic::Error::Serialization(_)
+                    | sonic::Error::ConnectionTimeout
+                    | sonic::Error::RequestTimeout
+                    | sonic::Error::PoolCreation => {
+                        tokio::time::sleep(backoff).await;
+                    }
+                    sonic::Error::BadRequest
+                    | sonic::Error::BodyTooLarge {
+                        body_size: _,
+                        max_size: _,
+                    }
+                    | sonic::Error::Application(_) => return Err(e.into()),
+                },
+            }
+        }
+
+        Err(anyhow!("failed to batch upsert values"))
     }
 }

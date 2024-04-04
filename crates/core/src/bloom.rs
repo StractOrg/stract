@@ -31,6 +31,13 @@ impl BloomFilter {
         }
     }
 
+    pub fn empty_from(other: &Self) -> Self {
+        Self {
+            bit_vec: BitVec::repeat(false, other.num_bits as usize),
+            num_bits: other.num_bits,
+        }
+    }
+
     fn num_bits(estimated_items: u64, fp: f64) -> u64 {
         ((estimated_items as f64) * fp.ln() / (-8.0 * 2.0_f64.ln().powi(2))).ceil() as u64
     }
