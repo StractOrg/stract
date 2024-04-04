@@ -109,6 +109,13 @@ impl From<&[u8]> for Value {
     }
 }
 
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub enum UpsertAction {
+    Merged,
+    NoChange,
+    Inserted,
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Db {
     data: BTreeMap<Table, BTreeMap<Key, Value>>,
@@ -131,7 +138,13 @@ impl Db {
         self.data.entry(table).or_default().extend(values);
     }
 
-    pub fn upsert(&mut self, table: Table, upsert_fn: &UpsertEnum, key: Key, value: Value) -> bool {
+    pub fn upsert(
+        &mut self,
+        table: Table,
+        upsert_fn: &UpsertEnum,
+        key: Key,
+        value: Value,
+    ) -> UpsertAction {
         let table = self.data.entry(table).or_default();
 
         match table.get(&key).cloned() {
@@ -142,11 +155,15 @@ impl Db {
 
                 table.insert(key, merged);
 
-                has_changed
+                if has_changed {
+                    UpsertAction::Merged
+                } else {
+                    UpsertAction::NoChange
+                }
             }
             None => {
                 table.insert(key, value);
-                true
+                UpsertAction::Inserted
             }
         }
     }
@@ -156,7 +173,7 @@ impl Db {
         table: Table,
         upsert_fn: &UpsertEnum,
         values: Vec<(Key, Value)>,
-    ) -> Vec<(Key, bool)> {
+    ) -> Vec<(Key, UpsertAction)> {
         let table = self.data.entry(table).or_default();
         let mut res = Vec::with_capacity(values.len());
 
@@ -169,11 +186,15 @@ impl Db {
 
                     table.insert(key.clone(), merged);
 
-                    res.push((key, has_changed));
+                    if has_changed {
+                        res.push((key, UpsertAction::Merged));
+                    } else {
+                        res.push((key, UpsertAction::NoChange));
+                    }
                 }
                 None => {
                     table.insert(key.clone(), value);
-                    res.push((key, true));
+                    res.push((key, UpsertAction::Inserted));
                 }
             }
         }

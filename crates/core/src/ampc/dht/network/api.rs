@@ -18,7 +18,7 @@ use std::{net::SocketAddr, time::Duration};
 
 use crate::{
     ampc::dht::{
-        store::{Key, Table, Value},
+        store::{Key, Table, UpsertAction, Value},
         upsert::UpsertEnum,
     },
     distributed::retry_strategy::RandomBackoff,
@@ -121,7 +121,7 @@ impl sonic::service::Message<Server> for BatchSet {
 }
 
 impl sonic::service::Message<Server> for Upsert {
-    type Response = Result<bool, RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<UpsertAction, RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received upsert request: {:?}", self);
@@ -138,7 +138,7 @@ impl sonic::service::Message<Server> for Upsert {
 
 impl sonic::service::Message<Server> for BatchUpsert {
     type Response =
-        Result<Vec<(Key, bool)>, RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+        Result<Vec<(Key, UpsertAction)>, RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received batch upsert request: {:?}", self);
@@ -717,7 +717,7 @@ impl RemoteClient {
         upsert: F,
         key: Key,
         value: Value,
-    ) -> Result<bool> {
+    ) -> Result<UpsertAction> {
         let upsert = upsert.into();
 
         for backoff in Self::retry_strat() {
@@ -793,7 +793,7 @@ impl RemoteClient {
         table: Table,
         upsert: F,
         values: Vec<(Key, Value)>,
-    ) -> Result<Vec<(Key, bool)>> {
+    ) -> Result<Vec<(Key, UpsertAction)>> {
         let upsert = upsert.into();
 
         for backoff in Self::retry_strat() {

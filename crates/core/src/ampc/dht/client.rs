@@ -27,7 +27,7 @@ use crate::{
 
 use super::{
     network::api,
-    store::{Key, Table, Value},
+    store::{Key, Table, UpsertAction, Value},
     upsert::UpsertEnum,
 };
 
@@ -73,7 +73,7 @@ impl Node {
         upsert: F,
         key: Key,
         value: Value,
-    ) -> Result<bool> {
+    ) -> Result<UpsertAction> {
         self.api.upsert(table, upsert, key, value).await
     }
 
@@ -82,8 +82,15 @@ impl Node {
         table: Table,
         upsert: F,
         values: Vec<(Key, Value)>,
-    ) -> Result<Vec<(Key, bool)>> {
-        self.api.batch_upsert(table, upsert, values).await
+    ) -> Result<Vec<(Key, UpsertAction)>> {
+        let res = self.api.batch_upsert(table, upsert, values.clone()).await?;
+
+        debug_assert_eq!(res.len(), values.len());
+        debug_assert!(res
+            .iter()
+            .all(|(k, _)| values.iter().any(|(key, _)| key == k)));
+
+        Ok(res)
     }
 }
 
@@ -127,7 +134,7 @@ impl Shard {
         upsert: F,
         key: Key,
         value: Value,
-    ) -> Result<bool> {
+    ) -> Result<UpsertAction> {
         self.node().upsert(table, upsert, key, value).await
     }
 
@@ -136,7 +143,7 @@ impl Shard {
         table: Table,
         upsert: F,
         values: Vec<(Key, Value)>,
-    ) -> Result<Vec<(Key, bool)>> {
+    ) -> Result<Vec<(Key, UpsertAction)>> {
         self.node().batch_upsert(table, upsert, values).await
     }
 }
@@ -261,7 +268,7 @@ impl Client {
         upsert: F,
         key: Key,
         value: Value,
-    ) -> Result<bool> {
+    ) -> Result<UpsertAction> {
         self.shard_for_key(key.as_bytes())?
             .upsert(table, upsert, key, value)
             .await
@@ -272,7 +279,7 @@ impl Client {
         table: Table,
         upsert: F,
         values: Vec<(Key, Value)>,
-    ) -> Result<Vec<(Key, bool)>> {
+    ) -> Result<Vec<(Key, UpsertAction)>> {
         let mut shard_values: BTreeMap<ShardId, Vec<(Key, Value)>> = BTreeMap::new();
 
         for (key, value) in values {

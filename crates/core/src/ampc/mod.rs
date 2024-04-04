@@ -39,7 +39,7 @@ use crate::{
     Result,
 };
 
-use self::dht::upsert::UpsertEnum;
+use self::dht::{store::UpsertAction, upsert::UpsertEnum};
 
 pub mod dht;
 
@@ -143,7 +143,7 @@ where
         block_on(self.client.batch_set(self.table.dht(), pairs)).unwrap();
     }
 
-    pub fn upsert<F: Into<UpsertEnum>>(&self, upsert: F, key: K, value: V) -> bool {
+    pub fn upsert<F: Into<UpsertEnum>>(&self, upsert: F, key: K, value: V) -> UpsertAction {
         let key = bincode::serialize(&key).unwrap();
         let value = bincode::serialize(&value).unwrap();
 
@@ -158,7 +158,7 @@ where
         &self,
         upsert: F,
         pairs: Vec<(K, V)>,
-    ) -> Vec<(K, bool)> {
+    ) -> Vec<(K, UpsertAction)> {
         let pairs: Vec<(dht::Key, dht::Value)> = pairs
             .into_iter()
             .map(|(k, v)| {
@@ -907,10 +907,12 @@ impl CentralityMapper {
         {
             let mut new_changed_nodes = new_changed_nodes.lock().unwrap();
 
-            for (node, did_upsert) in &changes {
-                if *did_upsert {
+            for (node, upsert_res) in &changes {
+                if let UpsertAction::Merged = upsert_res {
                     if let Key::Node(node) = node {
                         new_changed_nodes.insert(node.as_u64());
+                    } else {
+                        unreachable!("expected Key::Node in changes");
                     }
                 }
             }
@@ -918,7 +920,9 @@ impl CentralityMapper {
 
         // if any nodes changed, indicate in dht that we aren't finished yet
         {
-            if changes.iter().any(|(_, did_upsert)| *did_upsert) {
+            if changes.iter().any(|(_, upsert_res)| {
+                matches!(upsert_res, UpsertAction::Merged | UpsertAction::Inserted)
+            }) {
                 dht.next().set(
                     Key::Meta,
                     Value::Meta {
