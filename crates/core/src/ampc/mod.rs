@@ -19,7 +19,10 @@ use rayon::prelude::*;
 use std::{
     collections::{BTreeMap, VecDeque},
     net::SocketAddr,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
     time::Duration,
 };
 use tokio::net::ToSocketAddrs;
@@ -35,7 +38,10 @@ use crate::{
     Result,
 };
 
-use self::dht::{store::UpsertAction, upsert::UpsertEnum};
+use self::dht::{
+    store::UpsertAction,
+    upsert::{F64Add, UpsertEnum},
+};
 
 pub mod dht;
 
@@ -338,7 +344,7 @@ pub trait Message<W: Worker>: std::fmt::Debug + Clone {
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub enum CoordReq<J, M, T> {
     CurrentJob,
-    ScheduleJob { job: J, mappers: Vec<M> },
+    ScheduleJob { job: J, mapper: M },
     Setup { dht: DhtConn<T> },
 }
 
@@ -391,19 +397,13 @@ where
                     CoordReq::CurrentJob => {
                         Resp::Coordinator(CoordResp::CurrentJob(self.current_job.clone()))
                     }
-                    CoordReq::ScheduleJob { job, mappers } => {
+                    CoordReq::ScheduleJob { job, mapper } => {
                         self.current_job = Some(job.clone());
                         let worker = Arc::clone(&self.worker);
                         let dht = self.dht.clone();
 
                         std::thread::spawn(move || {
-                            for mapper in mappers {
-                                mapper.map(
-                                    job.clone(),
-                                    &worker,
-                                    dht.as_ref().expect("DHT not set"),
-                                );
-                            }
+                            mapper.map(job.clone(), &worker, dht.as_ref().expect("DHT not set"));
                         });
 
                         Resp::Coordinator(CoordResp::ScheduleJob(()))
@@ -481,14 +481,10 @@ where
     type Job: Job;
     fn remote_addr(&self) -> SocketAddr;
 
-    fn schedule_job(
-        &self,
-        job: &Self::Job,
-        mappers: Vec<<Self::Job as Job>::Mapper>,
-    ) -> Result<()> {
+    fn schedule_job(&self, job: &Self::Job, mapper: <Self::Job as Job>::Mapper) -> Result<()> {
         self.send(&JobReq::Coordinator(CoordReq::ScheduleJob {
             job: job.clone(),
-            mappers,
+            mapper,
         }))?;
 
         Ok(())
@@ -524,6 +520,12 @@ where
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
 struct WorkerRef(usize);
+
+#[must_use = "this `JobScheduled` may not have scheduled the job on any worker"]
+enum JobScheduled {
+    Success(WorkerRef),
+    NoAvailableWorkers,
+}
 
 struct Coordinator<J>
 where
@@ -567,6 +569,39 @@ where
         Ok(())
     }
 
+    fn schedule_job(
+        &self,
+        job: J,
+        mapper: J::Mapper,
+        worker_jobs: &BTreeMap<WorkerRef, Result<Option<J>>>,
+    ) -> Result<JobScheduled> {
+        let potential_workers = worker_jobs
+            .iter()
+            .filter_map(|(r, j)| j.as_ref().ok().map(|_| *r))
+            .filter(|r| job.is_schedulable(&self.workers[r]))
+            .collect::<Vec<_>>();
+
+        if potential_workers.is_empty() {
+            return Err(anyhow!(
+                "Failed to schedule job: no potential workers are responding."
+            ));
+        }
+
+        // schedule remaining jobs to idle workers (if any)
+        match potential_workers.iter().find(|r| {
+            worker_jobs[r]
+                .as_ref()
+                .expect("references in `potential_workers` should only point to non-failed workers")
+                .is_none()
+        }) {
+            Some(free_worker) => {
+                self.workers[free_worker].schedule_job(&job, mapper)?;
+                Ok(JobScheduled::Success(*free_worker))
+            }
+            None => Ok(JobScheduled::NoAvailableWorkers),
+        }
+    }
+
     fn run<F>(self, jobs: Vec<J>, finisher: F) -> Result<()>
     where
         F: Finisher<Job = J>,
@@ -580,60 +615,92 @@ where
         while !finisher.is_finished(&dht.prev) {
             self.send_dht_to_workers(&dht)?;
 
-            // run round
-            let mut sleeper =
-                ExponentialBackoff::new(Duration::from_millis(100), Duration::from_secs(10), 2.0);
+            for mapper in &self.mappers {
+                // run round
+                let mut remaining_jobs: VecDeque<_> = jobs.clone().into_iter().collect();
+                let mut sleeper = ExponentialBackoff::new(
+                    Duration::from_millis(100),
+                    Duration::from_secs(10),
+                    2.0,
+                );
 
-            let mut remaining_jobs: VecDeque<_> = jobs.clone().into_iter().collect();
-            let mut scheduled_jobs = BTreeMap::new();
+                let mut scheduled_jobs: BTreeMap<WorkerRef, J> = BTreeMap::new();
 
-            while let Some(job) = remaining_jobs.pop_front() {
-                // get current status from workers
-                let worker_jobs = self
-                    .workers
-                    .iter()
-                    .map(|(r, w)| (*r, w.current_job()))
-                    .collect::<BTreeMap<_, _>>();
+                while let Some(job) = remaining_jobs.pop_front() {
+                    // get current status from workers
+                    let worker_jobs = self
+                        .workers
+                        .iter()
+                        .map(|(r, w)| (*r, w.current_job()))
+                        .collect::<BTreeMap<_, _>>();
 
-                // handle failed workers
-                for r in worker_jobs
-                    .iter()
-                    .filter_map(|(r, j)| j.as_ref().err().map(|_| r))
-                {
-                    if let Some(job) = scheduled_jobs.remove(r) {
-                        remaining_jobs.push_front(job);
+                    // handle failed workers
+                    for r in worker_jobs
+                        .iter()
+                        .filter_map(|(r, j)| j.as_ref().err().map(|_| r))
+                    {
+                        if let Some(job) = scheduled_jobs.remove(r) {
+                            remaining_jobs.push_front(job);
+                        }
+                    }
+
+                    match self.schedule_job(job.clone(), mapper.clone(), &worker_jobs)? {
+                        JobScheduled::Success(worker) => {
+                            scheduled_jobs.insert(worker, job);
+                            sleeper.success();
+                        }
+                        JobScheduled::NoAvailableWorkers => {
+                            remaining_jobs.push_front(job);
+                            let sleep_duration = sleeper.next();
+                            std::thread::sleep(sleep_duration);
+                        }
                     }
                 }
 
-                let potential_workers = worker_jobs
-                    .iter()
-                    .filter_map(|(r, j)| j.as_ref().ok().map(|_| *r))
-                    .filter(|r| job.is_schedulable(&self.workers[r]))
-                    .collect::<Vec<_>>();
+                // await all scheduled jobs
+                let mut sleeper = ExponentialBackoff::new(
+                    Duration::from_millis(100),
+                    Duration::from_secs(10),
+                    2.0,
+                );
+                loop {
+                    let worker_jobs = self
+                        .workers
+                        .iter()
+                        .map(|(r, w)| (*r, w.current_job()))
+                        .collect::<BTreeMap<_, _>>();
 
-                if potential_workers.is_empty() {
-                    return Err(anyhow!(
-                        "Failed to schedule job: no potential workers are responding."
-                    ));
-                }
-
-                // schedule remaining jobs to idle workers (if any)
-                match potential_workers.iter().find(|r| {
-                    worker_jobs[r]
-                        .as_ref()
-                        .expect("references in `possible_workers` should only point to non-failed workers")
-                        .is_none()
-                }) {
-                    Some(free_worker) => {
-                        self.workers[free_worker].schedule_job(&job, self.mappers.clone())?;
-                        scheduled_jobs.insert(*free_worker, job);
-                        sleeper.success();
-                    },
-                    None => {
-                        remaining_jobs.push_front(job);
-                        let sleep_duration = sleeper.next();
-                        std::thread::sleep(sleep_duration);
+                    let mut finished_workers = 0;
+                    for (r, j) in worker_jobs.iter() {
+                        match j {
+                            Ok(Some(_)) => break,
+                            Ok(None) => finished_workers += 1,
+                            Err(_) => {
+                                if let Some(job) = &scheduled_jobs.remove(r) {
+                                    match self.schedule_job(
+                                        job.clone(),
+                                        mapper.clone(),
+                                        &worker_jobs,
+                                    )? {
+                                        JobScheduled::Success(r) => {
+                                            scheduled_jobs.insert(r, job.clone());
+                                            break; // need to break to avoid double scheduling to same worker
+                                        }
+                                        JobScheduled::NoAvailableWorkers => {
+                                            // retry scheduling.
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
+
+                    if finished_workers == self.workers.len() {
+                        break;
+                    }
+
+                    std::thread::sleep(sleeper.next());
                 }
             }
 
@@ -762,9 +829,10 @@ struct Meta {
 struct CentralityTables {
     counters: DefaultDhtTableConn<webgraph::NodeID, HyperLogLog<64>>,
     meta: DefaultDhtTableConn<(), Meta>,
+    centrality: DefaultDhtTableConn<webgraph::NodeID, f64>,
 }
 
-impl_dht_tables!(CentralityTables, [counters, meta]);
+impl_dht_tables!(CentralityTables, [counters, meta, centrality]);
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 struct CentralityJob {
@@ -790,6 +858,7 @@ impl CentralitySetup {
         let initial = CentralityTables {
             counters: DefaultDhtTableConn::new(cluster, "counters").await,
             meta: DefaultDhtTableConn::new(cluster, "meta").await,
+            centrality: DefaultDhtTableConn::new(cluster, "centrality").await,
         };
 
         let dht = DhtConn::new(initial);
@@ -819,6 +888,7 @@ struct CentralityWorker {
     shard: u64,
     graph: Webgraph,
     changed_nodes: Arc<Mutex<BloomFilter>>,
+    round: AtomicU64,
 }
 
 impl CentralityWorker {
@@ -834,6 +904,7 @@ impl CentralityWorker {
             shard,
             graph,
             changed_nodes: Arc::new(Mutex::new(changed_nodes)),
+            round: AtomicU64::new(0),
         }
     }
 }
@@ -871,7 +942,10 @@ impl RemoteWorker for RemoteCentralityWorker {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct CentralityMapper {}
+enum CentralityMapper {
+    Cardinalities,
+    Centralities,
+}
 
 impl CentralityMapper {
     fn update_dht(
@@ -951,12 +1025,42 @@ impl CentralityMapper {
             }
         }
     }
-}
 
-impl Mapper for CentralityMapper {
-    type Job = CentralityJob;
+    fn update_centralities(
+        &self,
+        nodes: &[webgraph::NodeID],
+        round: u64,
+        dht: &DhtConn<CentralityTables>,
+    ) {
+        let old_counters: BTreeMap<_, _> = dht
+            .prev()
+            .counters
+            .batch_get(nodes.to_vec())
+            .into_iter()
+            .collect();
+        let new_counters: BTreeMap<_, _> = dht
+            .next()
+            .counters
+            .batch_get(nodes.to_vec())
+            .into_iter()
+            .collect();
 
-    fn map(&self, _: Self::Job, worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+        let mut delta = Vec::with_capacity(nodes.len());
+
+        for node in nodes {
+            let old_size = old_counters.get(node).map(|s| s.size() as u64).unwrap_or(0);
+            let new_size = new_counters.get(node).map(|s| s.size() as u64).unwrap_or(0);
+
+            if let Some(d) = new_size.checked_sub(old_size) {
+                delta.push((*node, d as f64 / (round + 1) as f64));
+            }
+        }
+
+        dht.next().centrality.batch_upsert(F64Add, delta);
+    }
+
+    fn map_cardinalities(&self, worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+        const BATCH_SIZE: usize = 16_384;
         let new_changed_nodes = Arc::new(Mutex::new(BloomFilter::empty_from(
             &worker.changed_nodes.lock().unwrap(),
         )));
@@ -964,7 +1068,6 @@ impl Mapper for CentralityMapper {
         let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
 
         pool.scope(|s| {
-            const BATCH_SIZE: usize = 16_384;
             let mut batch = Vec::with_capacity(BATCH_SIZE);
 
             for edge in worker.graph.edges() {
@@ -981,11 +1084,59 @@ impl Mapper for CentralityMapper {
                     batch.clear();
                 }
             }
+
+            if !batch.is_empty() {
+                let changed_nodes = Arc::clone(&worker.changed_nodes);
+                let new_changed_nodes = Arc::clone(&new_changed_nodes);
+                let update_batch = batch.clone();
+
+                s.spawn(move |_| {
+                    self.update_dht(&update_batch, &changed_nodes, &new_changed_nodes, dht)
+                });
+            }
         });
-
         *worker.changed_nodes.lock().unwrap() = new_changed_nodes.lock().unwrap().clone();
+    }
 
-        todo!("count cardinality of hyperloglogs in dht.next and update count after all mappers are done")
+    fn map_centralities(&self, worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+        const BATCH_SIZE: usize = 16_384;
+        let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
+
+        let round = worker.round.fetch_add(1, Ordering::Relaxed);
+
+        // count cardinality of hyperloglogs in dht.next and update count after all mappers are done
+        pool.scope(|s| {
+            let mut batch = Vec::with_capacity(BATCH_SIZE);
+            let changed_nodes = worker.changed_nodes.lock().unwrap();
+            for node in worker
+                .graph
+                .nodes()
+                .filter(|node| changed_nodes.contains(node.as_u64()))
+            {
+                batch.push(node);
+                if batch.len() >= BATCH_SIZE {
+                    let update_batch = batch.clone();
+                    s.spawn(move |_| self.update_centralities(&update_batch, round, dht));
+
+                    batch.clear();
+                }
+            }
+
+            if !batch.is_empty() {
+                s.spawn(move |_| self.update_centralities(&batch, round, dht));
+            }
+        });
+    }
+}
+
+impl Mapper for CentralityMapper {
+    type Job = CentralityJob;
+
+    fn map(&self, _: Self::Job, worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+        match self {
+            CentralityMapper::Cardinalities => self.map_cardinalities(worker, dht),
+            CentralityMapper::Centralities => self.map_centralities(worker, dht),
+        }
     }
 }
 
