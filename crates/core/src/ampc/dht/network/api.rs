@@ -228,6 +228,14 @@ impl sonic::service::Message<Server> for CloneTable {
     }
 }
 
+impl std::fmt::Debug for RemoteClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RemoteClient")
+            .field("self_remote", &self.self_remote.addr())
+            .finish()
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct RemoteClient {
     self_remote: sonic::replication::RemoteClient<Server>,

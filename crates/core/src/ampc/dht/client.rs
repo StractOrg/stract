@@ -31,7 +31,7 @@ use super::{
     upsert::UpsertEnum,
 };
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct Node {
     api: api::RemoteClient,
 }
@@ -94,7 +94,7 @@ impl Node {
     }
 }
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct Shard {
     nodes: Vec<Node>,
 }
@@ -148,7 +148,7 @@ impl Shard {
     }
 }
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
 pub struct Client {
     ids: Vec<ShardId>,
     shards: BTreeMap<ShardId, Shard>,

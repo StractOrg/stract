@@ -513,3 +513,6 @@ impl Default for CorrectionConfig {
         }
     }
 }
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct DhtConfig {}

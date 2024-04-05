@@ -125,6 +125,18 @@ enum Commands {
     WebSpell {
         config_path: String,
     },
+
+    // Commands to compute distributed graph algorithms.
+    Ampc {
+        #[clap(subcommand)]
+        options: AmpcOptions,
+    },
+}
+
+#[derive(Subcommand)]
+enum AmpcOptions {
+    /// Start a node for the distributed hash table (DHT).
+    Dht { config_path: String },
 }
 
 #[derive(Subcommand)]
@@ -400,6 +412,16 @@ fn main() -> Result<()> {
             let config: config::WebSpellConfig = load_toml_config(config_path);
             entrypoint::web_spell::run(config)?;
         }
+        Commands::Ampc { options } => match options {
+            AmpcOptions::Dht { config_path } => {
+                let config: config::DhtConfig = load_toml_config(config_path);
+
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::ampc::dht::run(config))?;
+            }
+        },
     }
 
     Ok(())

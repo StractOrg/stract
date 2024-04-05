@@ -13,10 +13,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#![allow(dead_code)]
-#![allow(unused_variables)]
-#![allow(unused_assignments)]
-#![allow(unreachable_code)]
 
 use anyhow::anyhow;
 use rayon::prelude::*;
@@ -43,15 +39,22 @@ use self::dht::{store::UpsertAction, upsert::UpsertEnum};
 
 pub mod dht;
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 struct Table {
     prefix: String,
     round: u64,
 }
 
 impl Table {
-    fn new(prefix: String) -> Self {
-        Self { prefix, round: 0 }
+    fn new<S: AsRef<str>>(prefix: S) -> Self {
+        Self {
+            prefix: prefix.as_ref().to_string(),
+            round: 0,
+        }
+    }
+
+    pub fn prefix(&self) -> &str {
+        &self.prefix
     }
 
     fn dht(&self) -> dht::Table {
@@ -66,14 +69,14 @@ impl Table {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct DhtTableConn<K, V> {
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct DefaultDhtTableConn<K, V> {
     table: Table,
     client: dht::Client,
     _maker: std::marker::PhantomData<(K, V)>,
 }
 
-impl<K, V> Clone for DhtTableConn<K, V> {
+impl<K, V> Clone for DefaultDhtTableConn<K, V> {
     fn clone(&self) -> Self {
         Self {
             table: self.table.clone(),
@@ -82,34 +85,42 @@ impl<K, V> Clone for DhtTableConn<K, V> {
         }
     }
 }
-
-impl<K, V> DhtTableConn<K, V>
+impl<K, V> DefaultDhtTableConn<K, V>
 where
     K: serde::Serialize + serde::de::DeserializeOwned,
     V: serde::Serialize + serde::de::DeserializeOwned,
 {
-    pub async fn new(cluster: &Cluster, prefix: String) -> Self {
+    pub async fn new<S: AsRef<str>>(cluster: &Cluster, prefix: S) -> Self {
         Self {
             table: Table::new(prefix),
             client: dht::Client::new(cluster).await,
             _maker: std::marker::PhantomData,
         }
     }
+}
 
-    pub fn get(&self, key: K) -> Option<V> {
+trait DhtTableConn: Clone + serde::Serialize + serde::de::DeserializeOwned {
+    type Key: serde::Serialize + serde::de::DeserializeOwned;
+    type Value: serde::Serialize + serde::de::DeserializeOwned;
+
+    fn client(&self) -> &dht::Client;
+    fn table(&self) -> &Table;
+    fn next(&self) -> Self;
+
+    fn get(&self, key: Self::Key) -> Option<Self::Value> {
         let key = bincode::serialize(&key).unwrap();
 
-        block_on(self.client.get(self.table.dht(), key.into()))
+        block_on(self.client().get(self.table().dht(), key.into()))
             .unwrap()
             .map(|v| bincode::deserialize(v.as_bytes()).unwrap())
     }
 
-    pub fn batch_get(&self, keys: Vec<K>) -> Vec<(K, V)> {
+    fn batch_get(&self, keys: Vec<Self::Key>) -> Vec<(Self::Key, Self::Value)> {
         let keys: Vec<dht::Key> = keys
             .into_iter()
             .map(|k| bincode::serialize(&k).unwrap().into())
             .collect::<Vec<_>>();
-        let values = block_on(self.client.batch_get(self.table.dht(), keys)).unwrap();
+        let values = block_on(self.client().batch_get(self.table().dht(), keys)).unwrap();
 
         values
             .into_iter()
@@ -122,43 +133,18 @@ where
             .collect()
     }
 
-    pub fn set(&self, key: K, value: V) {
-        let key = bincode::serialize(&key).unwrap();
-        let value = bincode::serialize(&value).unwrap();
-
-        block_on(self.client.set(self.table.dht(), key.into(), value.into())).unwrap();
-    }
-
-    pub fn batch_set(&self, pairs: Vec<(K, V)>) {
-        let pairs: Vec<(dht::Key, dht::Value)> = pairs
-            .into_iter()
-            .map(|(k, v)| {
-                (
-                    bincode::serialize(&k).unwrap().into(),
-                    bincode::serialize(&v).unwrap().into(),
-                )
-            })
-            .collect();
-
-        block_on(self.client.batch_set(self.table.dht(), pairs)).unwrap();
-    }
-
-    pub fn upsert<F: Into<UpsertEnum>>(&self, upsert: F, key: K, value: V) -> UpsertAction {
+    fn set(&self, key: Self::Key, value: Self::Value) {
         let key = bincode::serialize(&key).unwrap();
         let value = bincode::serialize(&value).unwrap();
 
         block_on(
-            self.client
-                .upsert(self.table.dht(), upsert, key.into(), value.into()),
+            self.client()
+                .set(self.table().dht(), key.into(), value.into()),
         )
-        .unwrap()
+        .unwrap();
     }
 
-    pub fn batch_upsert<F: Into<UpsertEnum> + Clone>(
-        &self,
-        upsert: F,
-        pairs: Vec<(K, V)>,
-    ) -> Vec<(K, UpsertAction)> {
+    fn batch_set(&self, pairs: Vec<(Self::Key, Self::Value)>) {
         let pairs: Vec<(dht::Key, dht::Value)> = pairs
             .into_iter()
             .map(|(k, v)| {
@@ -169,17 +155,83 @@ where
             })
             .collect();
 
-        block_on(self.client.batch_upsert(self.table.dht(), upsert, pairs))
-            .unwrap()
-            .into_iter()
-            .map(|(k, did_upsert)| (bincode::deserialize(k.as_bytes()).unwrap(), did_upsert))
-            .collect()
+        block_on(self.client().batch_set(self.table().dht(), pairs)).unwrap();
     }
 
-    fn next(&self) -> DhtTableConn<K, V> {
+    fn upsert<F: Into<UpsertEnum>>(
+        &self,
+        upsert: F,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> UpsertAction {
+        let key = bincode::serialize(&key).unwrap();
+        let value = bincode::serialize(&value).unwrap();
+
+        block_on(
+            self.client()
+                .upsert(self.table().dht(), upsert, key.into(), value.into()),
+        )
+        .unwrap()
+    }
+
+    fn batch_upsert<F: Into<UpsertEnum> + Clone>(
+        &self,
+        upsert: F,
+        pairs: Vec<(Self::Key, Self::Value)>,
+    ) -> Vec<(Self::Key, UpsertAction)> {
+        let pairs: Vec<(dht::Key, dht::Value)> = pairs
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    bincode::serialize(&k).unwrap().into(),
+                    bincode::serialize(&v).unwrap().into(),
+                )
+            })
+            .collect();
+
+        block_on(
+            self.client()
+                .batch_upsert(self.table().dht(), upsert, pairs),
+        )
+        .unwrap()
+        .into_iter()
+        .map(|(k, did_upsert)| (bincode::deserialize(k.as_bytes()).unwrap(), did_upsert))
+        .collect()
+    }
+
+    fn init_from(&self, prev: &DefaultDhtTableConn<Self::Key, Self::Value>) {
+        block_on(
+            self.client()
+                .clone_table(prev.table().dht(), self.table().dht()),
+        )
+        .unwrap();
+    }
+
+    fn drop_table(&self) {
+        block_on(self.client().drop_table(self.table().dht())).unwrap();
+    }
+}
+
+impl<K, V> DhtTableConn for DefaultDhtTableConn<K, V>
+where
+    K: serde::Serialize + serde::de::DeserializeOwned,
+    V: serde::Serialize + serde::de::DeserializeOwned,
+{
+    type Key = K;
+    type Value = V;
+
+    fn client(&self) -> &dht::Client {
+        &self.client
+    }
+
+    fn table(&self) -> &Table {
+        &self.table
+    }
+
+    fn next(&self) -> DefaultDhtTableConn<Self::Key, Self::Value> {
         let new = Self {
-            table: self.table.next(),
-            client: self.client.clone(),
+            table: self.table().next(),
+            client: self.client().clone(),
             _maker: std::marker::PhantomData,
         };
 
@@ -187,65 +239,53 @@ where
 
         new
     }
-
-    fn init_from(&self, prev: &DhtTableConn<K, V>) {
-        block_on(self.client.clone_table(prev.table.dht(), self.table.dht())).unwrap();
-    }
-
-    pub fn drop_table(&self) {
-        block_on(self.client.drop_table(self.table.dht())).unwrap();
-    }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct DhtConn<K, V> {
-    prev: DhtTableConn<K, V>,
-    next: DhtTableConn<K, V>,
-}
-
-impl<K, V> DhtConn<K, V>
+pub trait DhtTables
 where
-    K: serde::Serialize + serde::de::DeserializeOwned,
-    V: serde::Serialize + serde::de::DeserializeOwned,
+    Self: Clone + serde::Serialize + serde::de::DeserializeOwned + Send + Sync,
 {
-    fn new(cluster: &Cluster, prefix: String) -> Self {
-        let prev = block_on(DhtTableConn::new(cluster, prefix));
-        let next = prev.next();
-        Self { prev, next }
-    }
+    fn drop_tables(&self);
+    fn next(&self) -> Self;
+    fn cleanup_prev_tables(&self);
+}
 
-    fn drop_prev_tables(&self) {
-        let tables = block_on(self.prev.client.all_tables()).unwrap();
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct DhtConn<T> {
+    prev: T,
+    next: T,
+}
 
-        for table in tables {
-            if table.as_str().starts_with(&self.prev.table.prefix) {
-                block_on(self.prev.client.drop_table(table)).unwrap();
-            }
+impl<T> DhtConn<T>
+where
+    T: DhtTables,
+{
+    fn new(initial: T) -> Self {
+        let next = initial.next();
+
+        Self {
+            prev: initial,
+            next,
         }
     }
 
+    fn cleanup_prev_tables(&self) {
+        self.prev.cleanup_prev_tables();
+    }
+
     fn next_round(&mut self) {
-        self.prev.drop_table();
+        self.prev.drop_tables();
         self.prev = self.next.clone();
 
         self.next = self.prev.next();
     }
 
-    pub fn prev(&self) -> &DhtTableConn<K, V> {
+    pub fn prev(&self) -> &T {
         &self.prev
     }
 
-    pub fn next(&self) -> &DhtTableConn<K, V> {
+    pub fn next(&self) -> &T {
         &self.next
-    }
-}
-
-impl<K, V> Clone for DhtConn<K, V> {
-    fn clone(&self) -> Self {
-        Self {
-            prev: self.prev.clone(),
-            next: self.next.clone(),
-        }
     }
 }
 
@@ -253,8 +293,7 @@ pub trait Job
 where
     Self: serde::Serialize + serde::de::DeserializeOwned + std::fmt::Debug + Clone + Send + Sync,
 {
-    type DhtKey: Send + Sync + serde::Serialize + serde::de::DeserializeOwned;
-    type DhtValue: Send + Sync + serde::Serialize + serde::de::DeserializeOwned;
+    type DhtTables: DhtTables;
     type Worker: Worker<Job = Self>;
     type Mapper: Mapper<Job = Self>;
 
@@ -270,32 +309,23 @@ pub trait Mapper: serde::Serialize + serde::de::DeserializeOwned + Send + Sync +
         &self,
         job: Self::Job,
         worker: &<<Self as Mapper>::Job as Job>::Worker,
-        dht: &DhtConn<
-            <<Self as Mapper>::Job as Job>::DhtKey,
-            <<Self as Mapper>::Job as Job>::DhtValue,
-        >,
+        dht: &DhtConn<<<Self as Mapper>::Job as Job>::DhtTables>,
     );
 }
 
 pub trait Finisher {
     type Job: Job;
 
-    fn is_finished(
-        &self,
-        dht: &DhtTableConn<
-            <<Self as Finisher>::Job as Job>::DhtKey,
-            <<Self as Finisher>::Job as Job>::DhtValue,
-        >,
-    ) -> bool;
+    fn is_finished(&self, dht: &<<Self as Finisher>::Job as Job>::DhtTables) -> bool;
 }
 
 pub trait Setup {
-    type DhtKey;
-    type DhtValue;
+    type DhtTables;
 
-    fn init_dht(&self) -> DhtConn<Self::DhtKey, Self::DhtValue>;
-    fn setup_round(&self, dht: &DhtTableConn<Self::DhtKey, Self::DhtValue>) {}
-    fn setup_first_round(&self, dht: &DhtTableConn<Self::DhtKey, Self::DhtValue>) {
+    fn init_dht(&self) -> DhtConn<Self::DhtTables>;
+    #[allow(unused_variables)] // reason = "dht might be used by implementors"
+    fn setup_round(&self, dht: &Self::DhtTables) {}
+    fn setup_first_round(&self, dht: &Self::DhtTables) {
         self.setup_round(dht);
     }
 }
@@ -305,28 +335,11 @@ pub trait Message<W: Worker>: std::fmt::Debug + Clone {
     fn handle(self, worker: &W) -> Self::Response;
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub enum CoordReq<J, M, K, V> {
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub enum CoordReq<J, M, T> {
     CurrentJob,
     ScheduleJob { job: J, mappers: Vec<M> },
-    Setup { dht: DhtConn<K, V> },
-}
-
-impl<J, M, K, V> Clone for CoordReq<J, M, K, V>
-where
-    J: Clone,
-    M: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            Self::CurrentJob => Self::CurrentJob,
-            Self::ScheduleJob { job, mappers } => Self::ScheduleJob {
-                job: job.clone(),
-                mappers: mappers.clone(),
-            },
-            Self::Setup { dht } => Self::Setup { dht: dht.clone() },
-        }
-    }
+    Setup { dht: DhtConn<T> },
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -336,35 +349,16 @@ pub enum CoordResp<J> {
     Setup(()),
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub enum Req<J, M, R, K, V> {
-    Coordinator(CoordReq<J, M, K, V>),
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub enum Req<J, M, R, T> {
+    Coordinator(CoordReq<J, M, T>),
     User(R),
 }
 
-type JobReq<J> = Req<
-    J,
-    <J as Job>::Mapper,
-    <<J as Job>::Worker as Worker>::Request,
-    <J as Job>::DhtKey,
-    <J as Job>::DhtValue,
->;
+type JobReq<J> =
+    Req<J, <J as Job>::Mapper, <<J as Job>::Worker as Worker>::Request, <J as Job>::DhtTables>;
 
 type JobResp<J> = Resp<J, <<J as Job>::Worker as Worker>::Response>;
-
-impl<J, M, R, K, V> Clone for Req<J, M, R, K, V>
-where
-    J: Clone,
-    M: Clone,
-    R: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            Self::Coordinator(req) => Self::Coordinator(req.clone()),
-            Self::User(req) => Self::User(req.clone()),
-        }
-    }
-}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum Resp<J, R> {
@@ -372,7 +366,7 @@ pub enum Resp<J, R> {
     User(R),
 }
 
-type JobDht<J> = DhtConn<<J as Job>::DhtKey, <J as Job>::DhtValue>;
+type JobDht<J> = DhtConn<<J as Job>::DhtTables>;
 
 pub struct Server<W>
 where
@@ -500,10 +494,7 @@ where
         Ok(())
     }
 
-    fn send_dht(
-        &self,
-        dht: &DhtConn<<Self::Job as Job>::DhtKey, <Self::Job as Job>::DhtValue>,
-    ) -> Result<()> {
+    fn send_dht(&self, dht: &DhtConn<<Self::Job as Job>::DhtTables>) -> Result<()> {
         self.send(&JobReq::Coordinator(CoordReq::Setup { dht: dht.clone() }))?;
 
         Ok(())
@@ -539,7 +530,7 @@ where
     J: Job,
 {
     workers: BTreeMap<WorkerRef, <<J as Job>::Worker as Worker>::Remote>,
-    setup: Box<dyn Setup<DhtKey = J::DhtKey, DhtValue = J::DhtValue>>,
+    setup: Box<dyn Setup<DhtTables = J::DhtTables>>,
     mappers: Vec<J::Mapper>,
 }
 
@@ -549,7 +540,7 @@ where
 {
     fn new<S>(setup: S, workers: Vec<<<J as Job>::Worker as Worker>::Remote>) -> Self
     where
-        S: Setup<DhtKey = J::DhtKey, DhtValue = J::DhtValue> + 'static,
+        S: Setup<DhtTables = J::DhtTables> + 'static,
     {
         Self {
             setup: Box::new(setup),
@@ -562,12 +553,12 @@ where
         }
     }
 
-    fn add(&mut self, mapper: J::Mapper) -> &mut Self {
+    pub fn with_mapper(&mut self, mapper: J::Mapper) -> &mut Self {
         self.mappers.push(mapper);
         self
     }
 
-    fn send_dht_to_workers(&self, dht: &DhtConn<J::DhtKey, J::DhtValue>) -> Result<()> {
+    fn send_dht_to_workers(&self, dht: &DhtConn<J::DhtTables>) -> Result<()> {
         self.workers
             .par_iter()
             .map(|(_, worker)| worker.send_dht(dht))
@@ -581,7 +572,7 @@ where
         F: Finisher<Job = J>,
     {
         let mut dht = self.setup.init_dht();
-        dht.drop_prev_tables();
+        dht.cleanup_prev_tables();
 
         self.setup.setup_first_round(&dht.next);
         dht.next_round();
@@ -684,6 +675,35 @@ impl ExponentialBackoff {
     }
 }
 
+// TODO: this could be a proc macro instead
+macro_rules! impl_dht_tables {
+    ($struct:ty, [$($field:ident),*$(,)?]) => {
+        impl DhtTables for $struct {
+            fn drop_tables(&self) {
+                $(self.$field.drop_table();)*
+            }
+
+            fn next(&self) -> Self {
+                Self {
+                    $($field: self.$field.next(),)*
+                }
+            }
+
+            fn cleanup_prev_tables(&self) {
+                $(
+                    let tables = block_on(self.$field.client().all_tables()).unwrap();
+
+                    for table in tables {
+                        if table.as_str().starts_with(&self.$field.table().prefix()) {
+                            block_on(self.$field.client().drop_table(table)).unwrap();
+                        }
+                    }
+                )*
+            }
+        }
+    };
+}
+
 macro_rules! impl_worker {
     ($job:ident , $remote:ident => $worker:ident, [$($req:ident),*$(,)?]) => {
         mod worker_impl__ {
@@ -733,17 +753,18 @@ Before each round, call Algorithm::setup_round(dht). first rounde call Algorithm
 
 */
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-enum Key {
-    Node(webgraph::NodeID),
-    Meta,
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct Meta {
+    round_had_changes: bool,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-enum Value {
-    Counter(HyperLogLog<64>),
-    Meta { round_had_changes: bool },
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct CentralityTables {
+    counters: DefaultDhtTableConn<webgraph::NodeID, HyperLogLog<64>>,
+    meta: DefaultDhtTableConn<(), Meta>,
 }
+
+impl_dht_tables!(CentralityTables, [counters, meta]);
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 struct CentralityJob {
@@ -751,8 +772,7 @@ struct CentralityJob {
 }
 
 impl Job for CentralityJob {
-    type DhtKey = Key;
-    type DhtValue = Value;
+    type DhtTables = CentralityTables;
     type Worker = CentralityWorker;
     type Mapper = CentralityMapper;
 
@@ -762,28 +782,33 @@ impl Job for CentralityJob {
 }
 
 struct CentralitySetup {
-    dht: DhtConn<Key, Value>,
+    dht: DhtConn<CentralityTables>,
 }
 
 impl CentralitySetup {
-    pub async fn new(cluster: &Cluster, prefix: String) -> Self {
-        let dht = DhtConn::new(cluster, prefix);
+    pub async fn new(cluster: &Cluster) -> Self {
+        let initial = CentralityTables {
+            counters: DefaultDhtTableConn::new(cluster, "counters").await,
+            meta: DefaultDhtTableConn::new(cluster, "meta").await,
+        };
+
+        let dht = DhtConn::new(initial);
+
         Self { dht }
     }
 }
 
 impl Setup for CentralitySetup {
-    type DhtKey = Key;
-    type DhtValue = Value;
+    type DhtTables = CentralityTables;
 
-    fn init_dht(&self) -> DhtConn<Key, Value> {
+    fn init_dht(&self) -> DhtConn<Self::DhtTables> {
         self.dht.clone()
     }
 
-    fn setup_round(&self, dht: &DhtTableConn<Self::DhtKey, Self::DhtValue>) {
-        dht.set(
-            Key::Meta,
-            Value::Meta {
+    fn setup_round(&self, dht: &Self::DhtTables) {
+        dht.meta.set(
+            (),
+            Meta {
                 round_had_changes: false,
             },
         );
@@ -854,7 +879,7 @@ impl CentralityMapper {
         batch: &[Edge<()>],
         changed_nodes: &Mutex<BloomFilter>,
         new_changed_nodes: &Mutex<BloomFilter>,
-        dht: &DhtConn<Key, Value>,
+        dht: &DhtConn<CentralityTables>,
     ) {
         // get old values from prev dht using edge.from where edge.from in changed_nodes
 
@@ -862,6 +887,7 @@ impl CentralityMapper {
             let changed_nodes = changed_nodes.lock().unwrap();
 
             dht.prev()
+                .counters
                 .batch_get(
                     batch
                         .iter()
@@ -872,14 +898,9 @@ impl CentralityMapper {
                                 None
                             }
                         })
-                        .map(Key::Node)
                         .collect(),
                 )
                 .into_iter()
-                .filter_map(|(key, val)| match (key, val) {
-                    (Key::Node(node), Value::Counter(counter)) => Some((node, counter)),
-                    _ => None,
-                })
                 .collect()
         };
 
@@ -887,7 +908,7 @@ impl CentralityMapper {
             let changed_nodes = changed_nodes.lock().unwrap();
 
             // upsert edge.to hyperloglogs in dht.next
-            dht.next().batch_upsert(
+            dht.next().counters.batch_upsert(
                 HyperLogLogUpsert64,
                 batch
                     .iter()
@@ -897,7 +918,7 @@ impl CentralityMapper {
                             .remove(&edge.from)
                             .unwrap_or_else(HyperLogLog::default);
                         counter.add(edge.from.as_u64());
-                        (Key::Node(edge.to), Value::Counter(counter))
+                        (edge.to, counter)
                     })
                     .collect(),
             )
@@ -909,23 +930,21 @@ impl CentralityMapper {
 
             for (node, upsert_res) in &changes {
                 if let UpsertAction::Merged = upsert_res {
-                    if let Key::Node(node) = node {
-                        new_changed_nodes.insert(node.as_u64());
-                    } else {
-                        unreachable!("expected Key::Node in changes");
-                    }
+                    new_changed_nodes.insert(node.as_u64());
                 }
             }
         }
 
         // if any nodes changed, indicate in dht that we aren't finished yet
         {
-            if changes.iter().any(|(_, upsert_res)| {
-                matches!(upsert_res, UpsertAction::Merged | UpsertAction::Inserted)
+            if changes.iter().any(|(_, upsert_res)| match upsert_res {
+                UpsertAction::Merged => true,
+                UpsertAction::NoChange => false,
+                UpsertAction::Inserted => true,
             }) {
-                dht.next().set(
-                    Key::Meta,
-                    Value::Meta {
+                dht.next().meta.set(
+                    (),
+                    Meta {
                         round_had_changes: true,
                     },
                 )
@@ -937,7 +956,7 @@ impl CentralityMapper {
 impl Mapper for CentralityMapper {
     type Job = CentralityJob;
 
-    fn map(&self, _: Self::Job, worker: &CentralityWorker, dht: &DhtConn<Key, Value>) {
+    fn map(&self, _: Self::Job, worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
         let new_changed_nodes = Arc::new(Mutex::new(BloomFilter::empty_from(
             &worker.changed_nodes.lock().unwrap(),
         )));
@@ -965,6 +984,8 @@ impl Mapper for CentralityMapper {
         });
 
         *worker.changed_nodes.lock().unwrap() = new_changed_nodes.lock().unwrap().clone();
+
+        todo!("count cardinality of hyperloglogs in dht.next and update count after all mappers are done")
     }
 }
 
@@ -973,10 +994,7 @@ struct CentralityFinish {}
 impl Finisher for CentralityFinish {
     type Job = CentralityJob;
 
-    fn is_finished(&self, dht: &DhtTableConn<Key, Value>) -> bool {
-        match dht.get(Key::Meta).unwrap() {
-            Value::Meta { round_had_changes } => round_had_changes,
-            _ => unreachable!("unexpected value in dht for key: {:?}", Key::Meta),
-        }
+    fn is_finished(&self, dht: &CentralityTables) -> bool {
+        dht.meta.get(()).unwrap().round_had_changes
     }
 }
