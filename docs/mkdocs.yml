@@ -8,6 +8,7 @@ nav:
   - Webgraph: webgraph.md
   - Search Index: search_index.md
   - Optics: optics.md
+  - Add To Browser: add_to_browser.md
 
 theme:
   name: material
