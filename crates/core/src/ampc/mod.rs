@@ -602,6 +602,53 @@ where
         }
     }
 
+    fn await_scheduled_jobs(
+        &self,
+        mut scheduled_jobs: BTreeMap<WorkerRef, J>,
+        mapper: J::Mapper,
+    ) -> Result<()> {
+        let mut sleeper =
+            ExponentialBackoff::new(Duration::from_millis(100), Duration::from_secs(10), 2.0);
+
+        loop {
+            let worker_jobs = self
+                .workers
+                .iter()
+                .map(|(r, w)| (*r, w.current_job()))
+                .collect::<BTreeMap<_, _>>();
+
+            let mut finished_workers = 0;
+            for (r, j) in worker_jobs.iter() {
+                match j {
+                    Ok(Some(_)) => break,
+                    Ok(None) => finished_workers += 1,
+                    Err(_) => {
+                        if let Some(job) = &scheduled_jobs.remove(r) {
+                            match self.schedule_job(job.clone(), mapper.clone(), &worker_jobs)? {
+                                JobScheduled::Success(r) => {
+                                    scheduled_jobs.insert(r, job.clone());
+                                    break; // need to break to avoid double scheduling to same worker
+                                }
+                                JobScheduled::NoAvailableWorkers => {
+                                    // retry scheduling.
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if finished_workers == self.workers.len() {
+                break;
+            }
+
+            std::thread::sleep(sleeper.next());
+        }
+
+        Ok(())
+    }
+
     fn run<F>(self, jobs: Vec<J>, finisher: F) -> Result<()>
     where
         F: Finisher<Job = J>,
@@ -657,51 +704,7 @@ where
                     }
                 }
 
-                // await all scheduled jobs
-                let mut sleeper = ExponentialBackoff::new(
-                    Duration::from_millis(100),
-                    Duration::from_secs(10),
-                    2.0,
-                );
-                loop {
-                    let worker_jobs = self
-                        .workers
-                        .iter()
-                        .map(|(r, w)| (*r, w.current_job()))
-                        .collect::<BTreeMap<_, _>>();
-
-                    let mut finished_workers = 0;
-                    for (r, j) in worker_jobs.iter() {
-                        match j {
-                            Ok(Some(_)) => break,
-                            Ok(None) => finished_workers += 1,
-                            Err(_) => {
-                                if let Some(job) = &scheduled_jobs.remove(r) {
-                                    match self.schedule_job(
-                                        job.clone(),
-                                        mapper.clone(),
-                                        &worker_jobs,
-                                    )? {
-                                        JobScheduled::Success(r) => {
-                                            scheduled_jobs.insert(r, job.clone());
-                                            break; // need to break to avoid double scheduling to same worker
-                                        }
-                                        JobScheduled::NoAvailableWorkers => {
-                                            // retry scheduling.
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if finished_workers == self.workers.len() {
-                        break;
-                    }
-
-                    std::thread::sleep(sleeper.next());
-                }
+                self.await_scheduled_jobs(scheduled_jobs, mapper.clone())?;
             }
 
             self.setup.setup_round(&dht.next);
@@ -948,86 +951,100 @@ enum CentralityMapper {
 }
 
 impl CentralityMapper {
+    /// get old values from prev dht using edge.from where edge.from in changed_nodes
+    fn get_old_counters(
+        batch: &[Edge<()>],
+        changed_nodes: &Mutex<BloomFilter>,
+        dht: &DhtConn<CentralityTables>,
+    ) -> BTreeMap<webgraph::NodeID, HyperLogLog<64>> {
+        let changed_nodes = changed_nodes.lock().unwrap();
+
+        dht.prev()
+            .counters
+            .batch_get(
+                batch
+                    .iter()
+                    .filter_map(|edge| {
+                        if changed_nodes.contains(edge.from.as_u64()) {
+                            Some(edge.from)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+            )
+            .into_iter()
+            .collect()
+    }
+
+    /// upsert old edge.from `old_counters` into edge.to in dht.next,
+    /// thereby updating their hyperloglog counters
+    fn update_counters(
+        batch: &[Edge<()>],
+        changed_nodes: &Mutex<BloomFilter>,
+        old_counters: BTreeMap<webgraph::NodeID, HyperLogLog<64>>,
+        dht: &DhtConn<CentralityTables>,
+    ) -> Vec<(webgraph::NodeID, UpsertAction)> {
+        let mut old_counters = old_counters;
+        let changed_nodes = changed_nodes.lock().unwrap();
+
+        dht.next().counters.batch_upsert(
+            HyperLogLogUpsert64,
+            batch
+                .iter()
+                .filter(|edge| changed_nodes.contains(edge.from.as_u64()))
+                .map(|edge| {
+                    let mut counter = old_counters
+                        .remove(&edge.from)
+                        .unwrap_or_else(HyperLogLog::default);
+                    counter.add(edge.from.as_u64());
+                    (edge.to, counter)
+                })
+                .collect(),
+        )
+    }
+
+    /// update new bloom filter with the nodes that changed
+    fn update_changed_nodes(
+        changes: &[(webgraph::NodeID, UpsertAction)],
+        new_changed_nodes: &Mutex<BloomFilter>,
+    ) {
+        let mut new_changed_nodes = new_changed_nodes.lock().unwrap();
+
+        for (node, upsert_res) in changes {
+            if let UpsertAction::Merged = upsert_res {
+                new_changed_nodes.insert(node.as_u64());
+            }
+        }
+    }
+
     fn update_dht(
-        &self,
         batch: &[Edge<()>],
         changed_nodes: &Mutex<BloomFilter>,
         new_changed_nodes: &Mutex<BloomFilter>,
         dht: &DhtConn<CentralityTables>,
     ) {
-        // get old values from prev dht using edge.from where edge.from in changed_nodes
+        let old_counters = Self::get_old_counters(batch, changed_nodes, dht);
+        let changes = Self::update_counters(batch, changed_nodes, old_counters, dht);
 
-        let mut old_counters: BTreeMap<_, _> = {
-            let changed_nodes = changed_nodes.lock().unwrap();
-
-            dht.prev()
-                .counters
-                .batch_get(
-                    batch
-                        .iter()
-                        .filter_map(|edge| {
-                            if changed_nodes.contains(edge.from.as_u64()) {
-                                Some(edge.from)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect(),
-                )
-                .into_iter()
-                .collect()
-        };
-
-        let changes = {
-            let changed_nodes = changed_nodes.lock().unwrap();
-
-            // upsert edge.to hyperloglogs in dht.next
-            dht.next().counters.batch_upsert(
-                HyperLogLogUpsert64,
-                batch
-                    .iter()
-                    .filter(|edge| changed_nodes.contains(edge.from.as_u64()))
-                    .map(|edge| {
-                        let mut counter = old_counters
-                            .remove(&edge.from)
-                            .unwrap_or_else(HyperLogLog::default);
-                        counter.add(edge.from.as_u64());
-                        (edge.to, counter)
-                    })
-                    .collect(),
-            )
-        };
-
-        // update new bloom filter with the nodes that changed
-        {
-            let mut new_changed_nodes = new_changed_nodes.lock().unwrap();
-
-            for (node, upsert_res) in &changes {
-                if let UpsertAction::Merged = upsert_res {
-                    new_changed_nodes.insert(node.as_u64());
-                }
-            }
-        }
+        Self::update_changed_nodes(&changes, new_changed_nodes);
 
         // if any nodes changed, indicate in dht that we aren't finished yet
-        {
-            if changes.iter().any(|(_, upsert_res)| match upsert_res {
-                UpsertAction::Merged => true,
-                UpsertAction::NoChange => false,
-                UpsertAction::Inserted => true,
-            }) {
-                dht.next().meta.set(
-                    (),
-                    Meta {
-                        round_had_changes: true,
-                    },
-                )
-            }
+        if changes.iter().any(|(_, upsert_res)| match upsert_res {
+            UpsertAction::Merged => true,
+            UpsertAction::NoChange => false,
+            UpsertAction::Inserted => true,
+        }) {
+            dht.next().meta.set(
+                (),
+                Meta {
+                    round_had_changes: true,
+                },
+            )
         }
     }
 
     fn update_centralities(
-        &self,
         nodes: &[webgraph::NodeID],
         round: u64,
         dht: &DhtConn<CentralityTables>,
@@ -1059,7 +1076,7 @@ impl CentralityMapper {
         dht.next().centrality.batch_upsert(F64Add, delta);
     }
 
-    fn map_cardinalities(&self, worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+    fn map_cardinalities(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
         const BATCH_SIZE: usize = 16_384;
         let new_changed_nodes = Arc::new(Mutex::new(BloomFilter::empty_from(
             &worker.changed_nodes.lock().unwrap(),
@@ -1078,7 +1095,7 @@ impl CentralityMapper {
                     let update_batch = batch.clone();
 
                     s.spawn(move |_| {
-                        self.update_dht(&update_batch, &changed_nodes, &new_changed_nodes, dht)
+                        Self::update_dht(&update_batch, &changed_nodes, &new_changed_nodes, dht)
                     });
 
                     batch.clear();
@@ -1091,14 +1108,14 @@ impl CentralityMapper {
                 let update_batch = batch.clone();
 
                 s.spawn(move |_| {
-                    self.update_dht(&update_batch, &changed_nodes, &new_changed_nodes, dht)
+                    Self::update_dht(&update_batch, &changed_nodes, &new_changed_nodes, dht)
                 });
             }
         });
         *worker.changed_nodes.lock().unwrap() = new_changed_nodes.lock().unwrap().clone();
     }
 
-    fn map_centralities(&self, worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+    fn map_centralities(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
         const BATCH_SIZE: usize = 16_384;
         let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
 
@@ -1116,14 +1133,14 @@ impl CentralityMapper {
                 batch.push(node);
                 if batch.len() >= BATCH_SIZE {
                     let update_batch = batch.clone();
-                    s.spawn(move |_| self.update_centralities(&update_batch, round, dht));
+                    s.spawn(move |_| Self::update_centralities(&update_batch, round, dht));
 
                     batch.clear();
                 }
             }
 
             if !batch.is_empty() {
-                s.spawn(move |_| self.update_centralities(&batch, round, dht));
+                s.spawn(move |_| Self::update_centralities(&batch, round, dht));
             }
         });
     }
@@ -1134,8 +1151,8 @@ impl Mapper for CentralityMapper {
 
     fn map(&self, _: Self::Job, worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
         match self {
-            CentralityMapper::Cardinalities => self.map_cardinalities(worker, dht),
-            CentralityMapper::Centralities => self.map_centralities(worker, dht),
+            CentralityMapper::Cardinalities => Self::map_cardinalities(worker, dht),
+            CentralityMapper::Centralities => Self::map_centralities(worker, dht),
         }
     }
 }
