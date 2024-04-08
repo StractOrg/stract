@@ -47,8 +47,11 @@ use self::network::Server;
 pub use network::api::RemoteClient as ApiClient;
 pub use network::raft::RemoteClient as RaftClient;
 
+pub use crate::distributed::member::ShardId;
 pub use client::Client;
+pub use store::UpsertAction;
 pub use store::{Key, Table, Value};
+pub use upsert::*;
 
 pub type NodeId = u64;
 
@@ -64,7 +67,6 @@ openraft::declare_raft_types!(
         AsyncRuntime = TokioRuntime,
 );
 
-#[macro_export]
 macro_rules! raft_sonic_request_response {
     ($service:ident, [$($req:ident),*$(,)?]) => {
         #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -107,7 +109,7 @@ raft_sonic_request_response!(
 );
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
     use tests::network::api::RemoteClient;
     use tokio::sync::Mutex;
@@ -123,7 +125,7 @@ mod tests {
 
     use super::*;
 
-    async fn server(
+    pub async fn server(
         id: u64,
     ) -> anyhow::Result<(
         openraft::Raft<TypeConfig>,
@@ -356,7 +358,6 @@ mod tests {
         };
 
         let c1 = RemoteClient::new(addr1);
-        let c2 = RemoteClient::new(addr2);
 
         let rc1 = network::raft::RemoteClient::new(1, BasicNode::new(addr1));
 

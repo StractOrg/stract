@@ -18,6 +18,7 @@ use std::{path::Path, sync::Arc};
 
 use crate::{
     config::{LiveIndexConfig, LiveIndexSchedulerConfig},
+    distributed::sonic::service::sonic_service,
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
@@ -29,7 +30,6 @@ use crate::{
     live_index::{Index, IndexManager},
     ranking::inbound_similarity::InboundSimilarity,
     searcher::{InitialWebsiteResult, LocalSearcher},
-    sonic_service,
     webgraph::WebgraphBuilder,
 };
 use anyhow::Result;

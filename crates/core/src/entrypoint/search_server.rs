@@ -22,6 +22,7 @@ use url::Url;
 
 use crate::{
     config,
+    distributed::sonic::service::sonic_service,
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
@@ -35,7 +36,7 @@ use crate::{
         models::{lambdamart::LambdaMART, linear::LinearRegression},
     },
     searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
-    sonic_service, Result,
+    Result,
 };
 
 sonic_service!(

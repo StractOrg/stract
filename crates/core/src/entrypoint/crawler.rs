@@ -21,9 +21,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config,
     crawler::{self, planner::CrawlPlanner, CrawlCoordinator, Crawler},
+    distributed::sonic::service::sonic_service,
     distributed::sonic::service::Message,
     kv::rocksdb_store::RocksDbStore,
-    sonic_service,
     webgraph::WebgraphBuilder,
     Result,
 };

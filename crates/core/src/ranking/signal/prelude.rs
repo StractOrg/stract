@@ -1,3 +1,4 @@
+use crate::enum_dispatch_from_discriminant;
 // Stract is an open source web search engine.
 // Copyright (C) 2024 Stract ApS
 //
@@ -15,7 +16,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 use crate::enum_map::InsertEnumMapKey;
 
-use crate::enum_dispatch_from_discriminant;
 use crate::schema::Field;
 use crate::{
     schema::{FastFieldEnum, TextFieldEnum},

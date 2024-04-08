@@ -12,7 +12,12 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/licensepub trait Finisher {
 
-pub mod dht;
-pub mod harmonic_centrality;
+use super::prelude::Job;
+
+pub trait Finisher {
+    type Job: Job;
+
+    fn is_finished(&self, dht: &<<Self as Finisher>::Job as Job>::DhtTables) -> bool;
+}

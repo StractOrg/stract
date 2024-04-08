@@ -17,13 +17,7 @@
 use rand::seq::SliceRandom;
 use std::{collections::BTreeMap, net::SocketAddr};
 
-use crate::{
-    distributed::{
-        cluster::Cluster,
-        member::{Service, ShardId},
-    },
-    Result,
-};
+use crate::{distributed::member::ShardId, Result};
 
 use super::{
     network::api,
@@ -155,27 +149,14 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn new(cluster: &Cluster) -> Self {
-        let dht_members = cluster
-            .members()
-            .await
-            .into_iter()
-            .filter_map(|member| {
-                if let Service::Dht { shard, host } = member.service {
-                    Some((shard, host))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
+    pub fn new(members: &[(ShardId, SocketAddr)]) -> Self {
         let mut shards = BTreeMap::new();
 
-        for (shard, host) in dht_members {
+        for (shard, host) in members {
             shards
-                .entry(shard)
+                .entry(*shard)
                 .or_insert_with(Shard::new)
-                .add_node(host);
+                .add_node(*host);
         }
 
         let ids = shards.keys().cloned().collect();

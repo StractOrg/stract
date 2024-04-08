@@ -28,15 +28,15 @@ pub trait UpsertFn {
 #[enum_dispatch(UpsertFn)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum UpsertEnum {
-    HyperLogLogUpsert64,
+    HyperLogLog64Upsert,
     U64Add,
     F64Add,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct HyperLogLogUpsert64;
+pub struct HyperLogLog64Upsert;
 
-impl UpsertFn for HyperLogLogUpsert64 {
+impl UpsertFn for HyperLogLog64Upsert {
     fn upsert(&self, old: Value, new: Value) -> Value {
         let mut old: HyperLogLog<64> = bincode::deserialize(old.as_bytes()).unwrap();
         let new: HyperLogLog<64> = bincode::deserialize(new.as_bytes()).unwrap();

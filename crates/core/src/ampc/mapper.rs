@@ -12,7 +12,17 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/license
 
-pub mod dht;
-pub mod harmonic_centrality;
+use super::{prelude::Job, DhtConn};
+
+pub trait Mapper: serde::Serialize + serde::de::DeserializeOwned + Send + Sync + Clone {
+    type Job: Job<Mapper = Self>;
+
+    fn map(
+        &self,
+        job: Self::Job,
+        worker: &<<Self as Mapper>::Job as Job>::Worker,
+        dht: &DhtConn<<<Self as Mapper>::Job as Job>::DhtTables>,
+    );
+}

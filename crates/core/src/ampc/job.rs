@@ -12,7 +12,20 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/licenses
 
-pub mod dht;
-pub mod harmonic_centrality;
+use super::{DhtTables, Mapper, Worker};
+
+pub trait Job
+where
+    Self: serde::Serialize + serde::de::DeserializeOwned + std::fmt::Debug + Clone + Send + Sync,
+{
+    type DhtTables: DhtTables;
+    type Worker: Worker<Job = Self>;
+    type Mapper: Mapper<Job = Self>;
+
+    #[allow(unused_variables)] // reason="`worker` might be used by implementors"
+    fn is_schedulable(&self, worker: &<<Self as Job>::Worker as Worker>::Remote) -> bool {
+        true
+    }
+}

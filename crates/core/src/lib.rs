@@ -255,7 +255,6 @@ mod tests {
     }
 }
 
-#[macro_export]
 macro_rules! enum_dispatch_from_discriminant {
     ($discenum:ident => $enum:ident, [$($disc:ident),*$(,)?]) => {
         impl From<$discenum> for $enum {
@@ -269,3 +268,5 @@ macro_rules! enum_dispatch_from_discriminant {
         }
     };
 }
+
+pub(crate) use enum_dispatch_from_discriminant;

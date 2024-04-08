@@ -12,7 +12,14 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/licenses/
 
-pub mod dht;
-pub mod harmonic_centrality;
+pub(crate) use super::dht_conn::impl_dht_tables;
+pub(crate) use super::worker::impl_worker;
+
+pub use super::finisher::Finisher;
+pub use super::job::Job;
+pub use super::mapper::Mapper;
+pub use super::setup::Setup;
+pub use super::worker::RemoteWorker;
+pub use super::worker::{Message, Worker};

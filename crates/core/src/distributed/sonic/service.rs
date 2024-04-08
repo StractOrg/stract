@@ -128,7 +128,6 @@ impl<'a, S: Service> Connection<'a, S> {
     }
 }
 
-#[macro_export]
 macro_rules! sonic_service {
     ($service:ident, [$($req:ident),*$(,)?]) => {
         mod service_impl__ {
@@ -192,6 +191,8 @@ macro_rules! sonic_service {
         }
     };
 }
+
+pub(crate) use sonic_service;
 
 #[cfg(test)]
 mod tests {

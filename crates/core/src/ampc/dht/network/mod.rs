@@ -25,9 +25,8 @@ use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 
 use openraft::{BasicNode, Raft, RaftNetworkFactory};
 
-use crate::sonic_service;
-
 use self::raft::RemoteClient;
+use crate::distributed::sonic::service::sonic_service;
 
 use super::{store::StateMachineStore, NodeId, TypeConfig};
 

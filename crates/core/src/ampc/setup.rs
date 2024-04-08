@@ -12,7 +12,17 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/license
 
-pub mod dht;
-pub mod harmonic_centrality;
+use super::DhtConn;
+
+pub trait Setup {
+    type DhtTables;
+
+    fn init_dht(&self) -> DhtConn<Self::DhtTables>;
+    #[allow(unused_variables)] // reason = "dht might be used by implementors"
+    fn setup_round(&self, dht: &Self::DhtTables) {}
+    fn setup_first_round(&self, dht: &Self::DhtTables) {
+        self.setup_round(dht);
+    }
+}

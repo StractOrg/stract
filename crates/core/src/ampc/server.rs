@@ -1,0 +1,98 @@
+// Stract is an open source web search engine.
+// Copyright (C) 2024 Stract ApS
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>
+
+use std::sync::Arc;
+
+use tokio::net::ToSocketAddrs;
+
+use crate::distributed::sonic;
+use crate::Result;
+
+use super::{block_on, CoordReq, CoordResp, JobDht, JobReq, JobResp, Mapper, Req, Resp, Worker};
+
+pub struct Server<W>
+where
+    W: Worker,
+{
+    dht: Option<Arc<JobDht<W::Job>>>,
+    worker: Arc<W>,
+    current_job: Option<W::Job>,
+    conn: sonic::Server<JobReq<W::Job>, JobResp<W::Job>>,
+}
+
+impl<W> Server<W>
+where
+    W: Worker + 'static,
+{
+    fn handle(&mut self) -> Result<()> {
+        let req = block_on(self.conn.accept())?;
+
+        match req.body().clone() {
+            Req::Coordinator(coord_req) => {
+                let res = match coord_req {
+                    CoordReq::CurrentJob => {
+                        Resp::Coordinator(CoordResp::CurrentJob(self.current_job.clone()))
+                    }
+                    CoordReq::ScheduleJob { job, mapper } => {
+                        self.current_job = Some(job.clone());
+                        let worker = Arc::clone(&self.worker);
+                        let dht = self.dht.clone();
+
+                        std::thread::spawn(move || {
+                            mapper.map(job.clone(), &worker, dht.as_ref().expect("DHT not set"));
+                        });
+
+                        Resp::Coordinator(CoordResp::ScheduleJob(()))
+                    }
+                    CoordReq::Setup { dht } => {
+                        self.dht = Some(Arc::new(dht));
+                        Resp::Coordinator(CoordResp::Setup(()))
+                    }
+                };
+
+                block_on(req.respond(res))?;
+            }
+            Req::User(user_req) => {
+                let worker = Arc::clone(&self.worker);
+
+                std::thread::spawn(move || {
+                    let res = Resp::User(worker.handle(user_req.clone()));
+                    block_on(req.respond(res)).unwrap();
+                });
+            }
+        };
+
+        Ok(())
+    }
+
+    pub fn bind(addr: impl ToSocketAddrs, worker: W) -> Result<Server<W>> {
+        let worker = Arc::new(worker);
+        let conn = block_on(sonic::Server::bind(addr))?;
+
+        Ok(Server {
+            dht: None,
+            worker,
+            current_job: None,
+            conn,
+        })
+    }
+
+    pub fn run(&mut self) -> Result<()> {
+        loop {
+            self.handle()?;
+        }
+    }
+}

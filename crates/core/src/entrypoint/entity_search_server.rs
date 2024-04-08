@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config,
+    distributed::sonic::service::sonic_service,
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
@@ -25,7 +26,6 @@ use crate::{
     },
     entity_index::EntityIndex,
     image_store::Image,
-    sonic_service,
 };
 use anyhow::Result;
 
