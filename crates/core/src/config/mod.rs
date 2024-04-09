@@ -516,9 +516,31 @@ impl Default for CorrectionConfig {
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct GossipConfig {
+    pub cluster_id: String,
+    pub seed_nodes: Option<Vec<SocketAddr>>,
+    pub addr: SocketAddr,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct DhtConfig {
     pub node_id: dht::NodeId,
     pub host: SocketAddr,
     pub shard: ShardId,
     pub seed_node: Option<SocketAddr>,
+    pub gossip: GossipConfig,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct HarmonicCoordinatorConfig {
+    pub gossip: GossipConfig,
+    pub host: SocketAddr,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct HarmonicWorkerConfig {
+    pub gossip: GossipConfig,
+    pub shard: ShardId,
+    pub graph_path: String,
+    pub host: SocketAddr,
 }

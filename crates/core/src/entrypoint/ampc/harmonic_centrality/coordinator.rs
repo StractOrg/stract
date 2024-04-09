@@ -14,7 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use crate::ampc::{dht::ShardId, prelude::*, Coordinator, DhtConn};
+use crate::{
+    ampc::{dht::ShardId, prelude::*, Coordinator, DhtConn},
+    config::HarmonicCoordinatorConfig,
+    distributed::member::Member,
+    Result,
+};
 use std::net::SocketAddr;
 
 use crate::{
@@ -43,10 +48,10 @@ impl CentralitySetup {
             })
             .collect();
 
-        Self::new_for_members(&members)
+        Self::new_for_dht_members(&members)
     }
 
-    pub fn new_for_members(members: &[(ShardId, SocketAddr)]) -> Self {
+    pub fn new_for_dht_members(members: &[(ShardId, SocketAddr)]) -> Self {
         let initial = CentralityTables {
             counters: DefaultDhtTable::new(members, "counters"),
             meta: DefaultDhtTable::new(members, "meta"),
@@ -96,11 +101,83 @@ impl Finisher for CentralityFinish {
 }
 
 pub fn build(
-    setup: CentralitySetup,
+    dht: &[(ShardId, SocketAddr)],
     workers: Vec<RemoteCentralityWorker>,
 ) -> Coordinator<CentralityJob> {
+    let setup = CentralitySetup::new_for_dht_members(dht);
+
     Coordinator::new(setup, workers)
         .with_mapper(CentralityMapper::SetupCounters)
         .with_mapper(CentralityMapper::Cardinalities)
         .with_mapper(CentralityMapper::Centralities)
+}
+
+struct ClusterInfo {
+    // dropping the handle will leave the cluster
+    _handle: Cluster,
+    dht: Vec<(ShardId, SocketAddr)>,
+    workers: Vec<RemoteCentralityWorker>,
+}
+
+async fn setup_gossip(config: HarmonicCoordinatorConfig) -> Result<ClusterInfo> {
+    let handle = Cluster::join(
+        Member {
+            id: config.gossip.cluster_id,
+            service: Service::HarmonicCoordinator { host: config.host },
+        },
+        config.gossip.addr,
+        config.gossip.seed_nodes.unwrap_or_default(),
+    )
+    .await?;
+
+    let members = handle.members().await;
+
+    let dht = members
+        .iter()
+        .filter_map(|member| {
+            if let Service::Dht { host, shard } = member.service {
+                Some((shard, host))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let workers = members
+        .iter()
+        .filter_map(|member| {
+            if let Service::HarmonicWorker { host, shard } = member.service {
+                Some(RemoteCentralityWorker::new(shard, host))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(ClusterInfo {
+        _handle: handle,
+        dht,
+        workers,
+    })
+}
+
+pub fn run(config: HarmonicCoordinatorConfig) -> Result<()> {
+    let tokio_conf = config.clone();
+    let cluster = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?
+        .block_on(setup_gossip(tokio_conf))?;
+
+    let jobs = cluster
+        .workers
+        .iter()
+        .map(|worker| CentralityJob {
+            shard: worker.shard(),
+        })
+        .collect();
+
+    let coordinator = build(&cluster.dht, cluster.workers);
+    coordinator.run(jobs, CentralityFinish)?;
+
+    Ok(())
 }

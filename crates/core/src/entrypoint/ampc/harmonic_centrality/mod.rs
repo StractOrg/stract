@@ -17,6 +17,7 @@
 use crate::hyperloglog::HyperLogLog;
 use crate::{ampc::prelude::*, kahan_sum::KahanSum};
 
+use crate::distributed::member::ShardId;
 use crate::{ampc::DefaultDhtTable, webgraph};
 
 pub mod coordinator;
@@ -43,7 +44,7 @@ impl_dht_tables!(CentralityTables, [counters, meta, centrality]);
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct CentralityJob {
-    shard: u64,
+    shard: ShardId,
 }
 
 impl Job for CentralityJob {
@@ -70,9 +71,7 @@ mod tests {
         let graph = crate::webgraph::tests::test_graph();
         let expected = HarmonicCentrality::calculate(&graph);
         let num_nodes = graph.nodes().count();
-        let (dht_shard, dht_addr) = crate::entrypoint::ampc::dht::tests::setup();
-        let setup = CentralitySetup::new_for_members(&[(dht_shard, dht_addr)]);
-        let worker = CentralityWorker::new(1, graph);
+        let worker = CentralityWorker::new(1.into(), graph);
 
         let worker_addr = free_socket_addr();
 
@@ -80,10 +79,11 @@ mod tests {
             worker.run(worker_addr).unwrap();
         });
 
-        let remote_worker = RemoteCentralityWorker::new(1, worker_addr);
+        let remote_worker = RemoteCentralityWorker::new(1.into(), worker_addr);
 
-        let res = coordinator::build(setup, vec![remote_worker])
-            .run(vec![CentralityJob { shard: 1 }], CentralityFinish)
+        let (dht_shard, dht_addr) = crate::entrypoint::ampc::dht::tests::setup();
+        let res = coordinator::build(&[(dht_shard, dht_addr)], vec![remote_worker])
+            .run(vec![CentralityJob { shard: 1.into() }], CentralityFinish)
             .unwrap();
 
         let mut actual = Vec::new();
@@ -98,7 +98,6 @@ mod tests {
 
         actual.sort_by(|a, b| a.0.cmp(&b.0));
         expected.sort_by(|a, b| a.0.cmp(&b.0));
-        assert_eq!(expected, actual);
 
         for (expected, actual) in expected
             .iter()

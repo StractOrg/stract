@@ -14,7 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use crate::{ampc::prelude::*, bloom::BloomFilter, webgraph::Webgraph};
+use crate::{
+    ampc::prelude::*,
+    bloom::BloomFilter,
+    config::HarmonicWorkerConfig,
+    distributed::{
+        cluster::Cluster,
+        member::{Member, Service, ShardId},
+    },
+    webgraph::Webgraph,
+    Result,
+};
 use std::{
     net::SocketAddr,
     sync::{atomic::AtomicU64, Arc, Mutex},
@@ -23,14 +33,14 @@ use std::{
 use super::CentralityJob;
 
 pub struct CentralityWorker {
-    shard: u64,
+    shard: ShardId,
     graph: Webgraph,
     changed_nodes: Arc<Mutex<BloomFilter>>,
     round: AtomicU64,
 }
 
 impl CentralityWorker {
-    pub fn new(shard: u64, graph: Webgraph) -> Self {
+    pub fn new(shard: ShardId, graph: Webgraph) -> Self {
         let num_nodes = graph.estimate_num_nodes() as u64;
         let mut changed_nodes = BloomFilter::new(num_nodes, 0.05);
 
@@ -46,7 +56,7 @@ impl CentralityWorker {
         }
     }
 
-    pub fn shard(&self) -> u64 {
+    pub fn shard(&self) -> ShardId {
         self.shard
     }
 
@@ -72,7 +82,7 @@ impl CentralityWorker {
 pub struct GetShard;
 
 impl Message<CentralityWorker> for GetShard {
-    type Response = u64;
+    type Response = ShardId;
 
     fn handle(self, worker: &CentralityWorker) -> Self::Response {
         worker.shard
@@ -82,16 +92,16 @@ impl Message<CentralityWorker> for GetShard {
 impl_worker!(CentralityJob, RemoteCentralityWorker => CentralityWorker, [GetShard,]);
 
 pub struct RemoteCentralityWorker {
-    shard: u64,
+    shard: ShardId,
     addr: SocketAddr,
 }
 
 impl RemoteCentralityWorker {
-    pub fn new(shard: u64, addr: SocketAddr) -> Self {
+    pub fn new(shard: ShardId, addr: SocketAddr) -> Self {
         Self { shard, addr }
     }
 
-    pub fn shard(&self) -> u64 {
+    pub fn shard(&self) -> ShardId {
         self.shard
     }
 }
@@ -102,4 +112,35 @@ impl RemoteWorker for RemoteCentralityWorker {
     fn remote_addr(&self) -> SocketAddr {
         self.addr
     }
+}
+
+async fn gossip_cluster(config: HarmonicWorkerConfig) -> Result<Cluster> {
+    Cluster::join(
+        Member {
+            id: config.gossip.cluster_id,
+            service: Service::HarmonicWorker {
+                host: config.host,
+                shard: config.shard,
+            },
+        },
+        config.gossip.addr,
+        config.gossip.seed_nodes.unwrap_or_default(),
+    )
+    .await
+}
+
+pub fn run(config: HarmonicWorkerConfig) -> Result<()> {
+    let tokio_conf = config.clone();
+
+    let graph = Webgraph::builder(config.graph_path).open();
+    let worker = CentralityWorker::new(config.shard, graph);
+
+    let _cluster = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?
+        .block_on(gossip_cluster(tokio_conf))?;
+
+    worker.run(config.host)?;
+
+    Ok(())
 }

@@ -137,6 +137,13 @@ enum Commands {
 enum AmpcOptions {
     /// Start a node for the distributed hash table (DHT).
     Dht { config_path: String },
+
+    /// Start a worker to compute the harmonic centrality of a graph.
+    HarmonicWorker { config_path: String },
+
+    /// Start a coordinator to distribute the harmonic centrality computation.
+    /// Workers needs to be started before the coordinator.
+    HarmonicCoordinator { config_path: String },
 }
 
 #[derive(Subcommand)]
@@ -420,6 +427,14 @@ fn main() -> Result<()> {
                     .enable_all()
                     .build()?
                     .block_on(entrypoint::ampc::dht::run(config))?;
+            }
+            AmpcOptions::HarmonicWorker { config_path } => {
+                let config: config::HarmonicWorkerConfig = load_toml_config(config_path);
+                entrypoint::ampc::harmonic_centrality::worker::run(config)?;
+            }
+            AmpcOptions::HarmonicCoordinator { config_path } => {
+                let config: config::HarmonicCoordinatorConfig = load_toml_config(config_path);
+                entrypoint::ampc::harmonic_centrality::coordinator::run(config)?;
             }
         },
     }

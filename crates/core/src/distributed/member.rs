@@ -35,6 +35,12 @@ impl From<u64> for ShardId {
     }
 }
 
+impl From<ShardId> for u64 {
+    fn from(id: ShardId) -> u64 {
+        id.0
+    }
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Debug)]
 pub enum Service {
     Searcher {
@@ -58,6 +64,13 @@ pub enum Service {
     Dht {
         host: SocketAddr,
         shard: ShardId,
+    },
+    HarmonicWorker {
+        host: SocketAddr,
+        shard: ShardId,
+    },
+    HarmonicCoordinator {
+        host: SocketAddr,
     },
 }
 

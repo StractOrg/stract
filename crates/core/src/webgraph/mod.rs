@@ -94,6 +94,10 @@ pub struct Webgraph {
 }
 
 impl Webgraph {
+    pub fn builder<P: AsRef<Path>>(path: P) -> WebgraphBuilder {
+        WebgraphBuilder::new(path)
+    }
+
     fn meta<P: AsRef<Path>>(path: P) -> Meta {
         let meta_path = path.as_ref().join("metadata.json");
         Meta::open(meta_path)

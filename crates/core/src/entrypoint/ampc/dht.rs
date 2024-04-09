@@ -14,15 +14,45 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 
 use anyhow::bail;
 use openraft::error::InitializeError;
 use tracing::info;
 
-use crate::{ampc::dht, config::DhtConfig, Result};
+use crate::{
+    ampc::dht::{self, ShardId},
+    config::{DhtConfig, GossipConfig},
+    distributed::{
+        cluster::Cluster,
+        member::{Member, Service},
+    },
+    Result,
+};
 
-pub async fn run(config: DhtConfig) -> Result<()> {
+pub struct Config {
+    node_id: dht::NodeId,
+    host: SocketAddr,
+    shard: ShardId,
+    seed_node: Option<SocketAddr>,
+    gossip: Option<GossipConfig>,
+}
+
+impl From<DhtConfig> for Config {
+    fn from(config: DhtConfig) -> Self {
+        Self {
+            node_id: config.node_id,
+            host: config.host,
+            shard: config.shard,
+            seed_node: config.seed_node,
+            gossip: Some(config.gossip),
+        }
+    }
+}
+
+pub async fn run<C: Into<Config>>(config: C) -> Result<()> {
+    let config: Config = config.into();
+
     let raft_config = openraft::Config::default();
     let raft_config = Arc::new(raft_config.validate()?);
 
@@ -69,6 +99,25 @@ pub async fn run(config: DhtConfig) -> Result<()> {
         }
     }
 
+    // dropping the handle leaves the cluster
+    let _cluster_handle = match config.gossip {
+        Some(gossip) => Some(
+            Cluster::join(
+                Member {
+                    id: gossip.cluster_id,
+                    service: Service::Dht {
+                        host: config.host,
+                        shard: config.shard,
+                    },
+                },
+                gossip.addr,
+                gossip.seed_nodes.unwrap_or_default(),
+            )
+            .await?,
+        ),
+        None => None,
+    };
+
     loop {
         server.accept().await?;
     }
@@ -76,13 +125,8 @@ pub async fn run(config: DhtConfig) -> Result<()> {
 
 #[cfg(test)]
 pub mod tests {
-    use std::net::SocketAddr;
-
-    use crate::free_socket_addr;
-
-    use self::dht::ShardId;
-
     use super::*;
+    use crate::free_socket_addr;
 
     pub fn setup() -> (ShardId, SocketAddr) {
         let (tx, rx) = crossbeam_channel::unbounded();
@@ -94,11 +138,12 @@ pub mod tests {
                 let addr = free_socket_addr();
                 tx.send((shard, addr)).unwrap();
 
-                run(DhtConfig {
+                run(Config {
                     node_id: 1,
                     host: addr,
                     seed_node: None,
                     shard,
+                    gossip: None,
                 })
                 .await
                 .unwrap();
