@@ -14,12 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, pin::Pin};
 
 use super::{
     block_on,
     dht::{self, store::UpsertAction, upsert::UpsertEnum},
 };
+
+use crate::Result;
 
 pub trait DhtTables
 where
@@ -62,6 +64,7 @@ macro_rules! impl_dht_tables {
     };
 }
 
+use futures::{Stream, StreamExt};
 pub(crate) use impl_dht_tables;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -235,6 +238,73 @@ pub trait DhtTable: Clone + serde::Serialize + serde::de::DeserializeOwned {
     fn drop_table(&self) {
         block_on(self.client().drop_table(self.table().dht())).unwrap();
     }
+
+    fn raw_iter(&self) -> impl Iterator<Item = (dht::Key, dht::Value)> + '_ {
+        let s = self.client().stream(self.table().dht());
+        DhtTableIterator::new(s)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (Self::Key, Self::Value)> + '_ {
+        self.raw_iter().map(|(key, value)| {
+            (
+                bincode::deserialize(key.as_bytes()).unwrap(),
+                bincode::deserialize(value.as_bytes()).unwrap(),
+            )
+        })
+    }
+}
+
+struct DhtTableIterator<S> {
+    stream: Pin<Box<S>>,
+    batch: Vec<(dht::Key, dht::Value)>,
+}
+
+impl<S> DhtTableIterator<S> {
+    fn new(stream: S) -> Self {
+        Self {
+            stream: Box::pin(stream),
+            batch: Vec::new(),
+        }
+    }
+}
+
+impl<'a, S> Iterator for DhtTableIterator<S>
+where
+    S: Stream<Item = Result<(dht::Key, dht::Value)>> + 'a,
+{
+    type Item = (dht::Key, dht::Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.batch.is_empty() {
+            self.batch = block_on(iter_batch(&mut self.stream));
+        }
+
+        self.batch.pop()
+    }
+}
+
+async fn iter_batch<S>(stream: &mut Pin<Box<S>>) -> Vec<(dht::Key, dht::Value)>
+where
+    S: Stream<Item = Result<(dht::Key, dht::Value)>>,
+{
+    let mut res = Vec::new();
+    let mut count = 0;
+
+    while let Some(item) = stream.next().await {
+        match item {
+            Ok((k, v)) => {
+                res.push((k, v));
+                count += 1;
+            }
+            Err(_) => break,
+        }
+
+        if count >= 1024 {
+            break;
+        }
+    }
+
+    res
 }
 
 impl<K, V> DhtTable for DefaultDhtTable<K, V>

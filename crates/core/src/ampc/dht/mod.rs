@@ -114,12 +114,13 @@ pub mod tests {
     use tokio::sync::Mutex;
     use tracing_test::traced_test;
 
-    use crate::{distributed::sonic, free_socket_addr};
+    use crate::{ampc::dht, distributed::sonic, free_socket_addr};
     use openraft::{error::InitializeError, Config};
 
     use proptest::prelude::*;
     use proptest_derive::Arbitrary;
 
+    use futures::{pin_mut, TryStreamExt};
     use rand::seq::SliceRandom;
 
     use super::*;
@@ -292,16 +293,84 @@ pub mod tests {
 
     #[tokio::test]
     #[traced_test]
+    async fn test_stream() -> anyhow::Result<()> {
+        let (raft, server, addr) = server(1).await?;
+
+        let servers = vec![server];
+
+        for server in servers {
+            tokio::spawn(async move {
+                loop {
+                    server.accept().await.unwrap();
+                }
+            });
+        }
+
+        let members: BTreeMap<u64, _> = vec![(1, addr)]
+            .into_iter()
+            .map(|(id, addr)| (id, BasicNode::new(addr)))
+            .collect();
+
+        if let Err(e) = raft.initialize(members.clone()).await {
+            match e {
+                openraft::error::RaftError::APIError(e) => match e {
+                    InitializeError::NotAllowed(_) => {}
+                    InitializeError::NotInMembers(_) => panic!("{:?}", e),
+                },
+                openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
+            }
+        };
+
+        let client = dht::client::Node::new(addr);
+        let table = Table::from("test");
+
+        client
+            .set(
+                table.clone(),
+                "hello".as_bytes().into(),
+                "world".as_bytes().into(),
+            )
+            .await?;
+
+        client
+            .set(
+                table.clone(),
+                "hello2".as_bytes().into(),
+                "world2".as_bytes().into(),
+            )
+            .await?;
+
+        let stream = client.stream(table.clone());
+        pin_mut!(stream);
+
+        let mut res = Vec::new();
+
+        while let Some((k, v)) = stream.try_next().await? {
+            res.push((k, v));
+        }
+
+        res.sort_by_key(|(k, _)| k.clone());
+
+        assert_eq!(
+            res,
+            vec![
+                ("hello".as_bytes().into(), "world".as_bytes().into()),
+                ("hello2".as_bytes().into(), "world2".as_bytes().into()),
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
     #[ignore = "comitted logs must be stored in stable storage for raft to be able to recover from a node crash"]
     // see: https://docs.rs/openraft/latest/openraft/docs/faq/index.html#what-will-happen-when-data-gets-lost
     async fn test_node_crash() -> anyhow::Result<()> {
         let (raft1, server1, addr1) = server(1).await?;
         let (raft2, server2, addr2) = server(2).await?;
-        let (_, server3, addr3) = server(3).await?;
-        let (_, server4, addr4) = server(4).await?;
-        let (_, server5, addr5) = server(5).await?;
 
-        let servers = vec![server1, server2, server3, server4, server5];
+        let servers = vec![server1, server2];
         let mut handles = Vec::new();
 
         for server in servers {
@@ -329,9 +398,6 @@ pub mod tests {
 
         let rc1 = network::raft::RemoteClient::new(addr1).await?;
         rc1.join(2, addr2).await?;
-        rc1.join(3, addr3).await?;
-        rc1.join(4, addr4).await?;
-        rc1.join(5, addr5).await?;
 
         let c1 = RemoteClient::new(addr1);
 

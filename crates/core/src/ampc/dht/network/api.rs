@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use std::{net::SocketAddr, time::Duration};
+use std::{
+    net::SocketAddr,
+    ops::{Bound, Range},
+    time::Duration,
+};
 
 use crate::{
     ampc::dht::{
@@ -92,6 +96,13 @@ pub struct AllTables;
 pub struct CloneTable {
     pub from: Table,
     pub to: Table,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RangeGet {
+    pub table: Table,
+    pub range: Range<Bound<Key>>,
+    pub limit: Option<usize>,
 }
 
 impl sonic::service::Message<Server> for Set {
@@ -225,6 +236,20 @@ impl sonic::service::Message<Server> for CloneTable {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
         }
+    }
+}
+
+impl sonic::service::Message<Server> for RangeGet {
+    type Response = Vec<(Key, Value)>;
+
+    async fn handle(self, server: &Server) -> Self::Response {
+        server
+            .state_machine_store
+            .state_machine
+            .read()
+            .await
+            .db
+            .range_get(&self.table, self.range, self.limit)
     }
 }
 
@@ -869,5 +894,49 @@ impl RemoteClient {
         }
 
         Err(anyhow!("failed to batch upsert values"))
+    }
+
+    pub async fn range_get(
+        &self,
+        table: Table,
+        range: Range<Bound<Key>>,
+        limit: Option<usize>,
+    ) -> Result<Vec<(Key, Value)>> {
+        for backoff in Self::retry_strat() {
+            let res = self
+                .self_remote
+                .send_with_timeout(
+                    &RangeGet {
+                        table: table.clone(),
+                        range: range.clone(),
+                        limit,
+                    },
+                    Duration::from_secs(5),
+                )
+                .await;
+
+            tracing::debug!(".range_get() got response: {res:?}");
+
+            match res {
+                Ok(res) => return Ok(res),
+                Err(e) => match e {
+                    sonic::Error::IO(_)
+                    | sonic::Error::Serialization(_)
+                    | sonic::Error::ConnectionTimeout
+                    | sonic::Error::RequestTimeout
+                    | sonic::Error::PoolCreation => {
+                        tokio::time::sleep(backoff).await;
+                    }
+                    sonic::Error::BadRequest
+                    | sonic::Error::BodyTooLarge {
+                        body_size: _,
+                        max_size: _,
+                    }
+                    | sonic::Error::Application(_) => return Err(e.into()),
+                },
+            }
+        }
+
+        Err(anyhow!("failed to perform range get"))
     }
 }

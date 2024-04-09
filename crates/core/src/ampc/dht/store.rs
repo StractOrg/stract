@@ -16,6 +16,8 @@
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::io::Cursor;
+use std::ops::Bound;
+use std::ops::Range;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -221,6 +223,28 @@ impl Db {
                 .iter()
                 .filter_map(|key| table.get(key).map(|value| (key.clone(), value.clone())))
                 .collect(),
+        }
+    }
+
+    pub fn range_get(
+        &self,
+        table: &Table,
+        range: Range<Bound<Key>>,
+        limit: Option<usize>,
+    ) -> Vec<(Key, Value)> {
+        match self.data.get(table) {
+            None => Vec::new(),
+            Some(table) => match limit {
+                None => table
+                    .range((range.start, range.end))
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect(),
+                Some(limit) => table
+                    .range((range.start, range.end))
+                    .take(limit)
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect(),
+            },
         }
     }
 }

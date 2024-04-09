@@ -14,8 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use async_stream::stream;
+use futures::{Stream, StreamExt};
 use rand::seq::SliceRandom;
-use std::{collections::BTreeMap, net::SocketAddr};
+use std::{
+    collections::BTreeMap,
+    net::SocketAddr,
+    ops::{Bound, Range},
+};
 
 use crate::{distributed::member::ShardId, Result};
 
@@ -26,7 +32,7 @@ use super::{
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct Node {
+pub struct Node {
     api: api::RemoteClient,
 }
 
@@ -39,29 +45,29 @@ impl Clone for Node {
 }
 
 impl Node {
-    fn new(addr: SocketAddr) -> Self {
+    pub fn new(addr: SocketAddr) -> Self {
         let api = api::RemoteClient::new(addr);
 
         Self { api }
     }
 
-    async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {
+    pub async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {
         self.api.get(table, key).await
     }
 
-    async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
+    pub async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
         self.api.batch_get(table, keys).await
     }
 
-    async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
+    pub async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
         self.api.set(table, key, value).await
     }
 
-    async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
+    pub async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
         self.api.batch_set(table, values).await
     }
 
-    async fn upsert<F: Into<UpsertEnum>>(
+    pub async fn upsert<F: Into<UpsertEnum>>(
         &self,
         table: Table,
         upsert: F,
@@ -71,7 +77,7 @@ impl Node {
         self.api.upsert(table, upsert, key, value).await
     }
 
-    async fn batch_upsert<F: Into<UpsertEnum>>(
+    pub async fn batch_upsert<F: Into<UpsertEnum>>(
         &self,
         table: Table,
         upsert: F,
@@ -85,6 +91,43 @@ impl Node {
             .all(|(k, _)| values.iter().any(|(key, _)| key == k)));
 
         Ok(res)
+    }
+
+    pub async fn range_get(
+        &self,
+        table: Table,
+        range: Range<Bound<Key>>,
+        limit: Option<usize>,
+    ) -> Result<Vec<(Key, Value)>> {
+        self.api.range_get(table, range, limit).await
+    }
+
+    pub fn stream(&self, table: Table) -> impl Stream<Item = Result<(Key, Value)>> + '_ {
+        const STREAM_BATCH_SIZE: usize = 1024;
+        stream! {
+            let mut prev_key = None;
+
+            loop {
+                let batch = self.range_get(
+                    table.clone(),
+                    prev_key
+                        .as_ref()
+                        .cloned()
+                        .map_or(Bound::Unbounded, Bound::Excluded)
+                        ..Bound::Unbounded,
+                    Some(STREAM_BATCH_SIZE),
+                ).await?;
+
+                if batch.is_empty() {
+                    break;
+                }
+
+                for (key, value) in batch {
+                    yield Ok((key.clone(), value));
+                    prev_key = Some(key);
+                }
+            }
+        }
     }
 }
 
@@ -139,6 +182,10 @@ impl Shard {
         values: Vec<(Key, Value)>,
     ) -> Result<Vec<(Key, UpsertAction)>> {
         self.node().batch_upsert(table, upsert, values).await
+    }
+
+    fn stream(&self, table: Table) -> impl Stream<Item = Result<(Key, Value)>> + '_ {
+        self.node().stream(table)
     }
 }
 
@@ -328,5 +375,14 @@ impl Client {
         }
 
         Ok(())
+    }
+
+    pub fn stream(&self, table: Table) -> impl Stream<Item = Result<(Key, Value)>> + '_ {
+        futures::stream::iter(
+            self.shards
+                .values()
+                .map(move |shard| shard.stream(table.clone())),
+        )
+        .flatten()
     }
 }

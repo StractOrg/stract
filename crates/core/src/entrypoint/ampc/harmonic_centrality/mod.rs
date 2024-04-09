@@ -86,15 +86,12 @@ mod tests {
             .run(vec![CentralityJob { shard: 1.into() }], CentralityFinish)
             .unwrap();
 
-        let mut actual = Vec::new();
+        let mut actual = res
+            .centrality
+            .iter()
+            .map(|(n, s)| (n, f64::from(s) / ((num_nodes - 1) as f64)))
+            .collect::<Vec<_>>();
         let mut expected = expected.iter().map(|(n, c)| (*n, c)).collect::<Vec<_>>();
-
-        for (node, _) in &expected {
-            actual.push((
-                *node,
-                f64::from(res.centrality.get(*node).unwrap_or_default()) / (num_nodes - 1) as f64,
-            ));
-        }
 
         actual.sort_by(|a, b| a.0.cmp(&b.0));
         expected.sort_by(|a, b| a.0.cmp(&b.0));

@@ -18,8 +18,8 @@ pub mod api;
 pub mod raft;
 
 use api::{
-    AllTables, BatchGet, BatchSet, BatchUpsert, CloneTable, CreateTable, DropTable, Get, Set,
-    Upsert,
+    AllTables, BatchGet, BatchSet, BatchUpsert, CloneTable, CreateTable, DropTable, Get, RangeGet,
+    Set, Upsert,
 };
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 
@@ -83,6 +83,7 @@ sonic_service!(
         CreateTable,
         AllTables,
         CloneTable,
+        RangeGet,
     ]
 );
 
