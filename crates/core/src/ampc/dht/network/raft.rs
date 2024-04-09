@@ -23,7 +23,7 @@ use std::{
 use openraft::{
     error::{ClientWriteError, ForwardToLeader, InstallSnapshotError, RaftError},
     network::RPCOption,
-    BasicNode, ChangeMembers, RaftNetwork,
+    BasicNode, ChangeMembers, RaftMetrics, RaftNetwork,
 };
 use tokio::sync::RwLock;
 
@@ -38,7 +38,7 @@ use crate::{
 
 use super::{
     AddLearner, AddNodes, AppendEntries, AppendEntriesResponse, InstallSnapshot,
-    InstallSnapshotResponse, Server, Vote, VoteResponse,
+    InstallSnapshotResponse, Metrics, Server, Vote, VoteResponse,
 };
 
 impl sonic::service::Message<Server> for AppendEntries {
@@ -79,17 +79,28 @@ impl sonic::service::Message<Server> for AddLearner {
 
         server
             .raft
-            .change_membership(ChangeMembers::RemoveVoters(rem.clone()), true)
+            .change_membership(ChangeMembers::RemoveVoters(rem.clone()), false)
             .await?;
         server
             .raft
-            .change_membership(ChangeMembers::RemoveNodes(rem.clone()), true)
+            .change_membership(ChangeMembers::RemoveNodes(rem.clone()), false)
             .await?;
 
         let node = BasicNode::new(self.addr);
-        server.raft.add_learner(self.id, node, false).await?;
+        server.raft.add_learner(self.id, node, true).await?;
 
         Ok(())
+    }
+}
+
+impl sonic::service::Message<Server> for Metrics {
+    type Response = RaftMetrics<NodeId, BasicNode>;
+
+    async fn handle(self, server: &Server) -> Self::Response {
+        tracing::debug!("received metrics request: {:?}", self);
+        let metrics = server.raft.metrics().borrow().clone();
+
+        metrics
     }
 }
 
@@ -100,7 +111,7 @@ impl sonic::service::Message<Server> for AddNodes {
         tracing::debug!("received add nodes request: {:?}", self);
         server
             .raft
-            .change_membership(ChangeMembers::AddNodes(self.members), true)
+            .change_membership(ChangeMembers::AddNodes(self.members), false)
             .await?;
 
         Ok(())
@@ -110,6 +121,28 @@ impl sonic::service::Message<Server> for AddNodes {
 type RPCError<E = openraft::error::Infallible> =
     openraft::error::RPCError<NodeId, BasicNode, RaftError<NodeId, E>>;
 
+async fn metrics(
+    client: &sonic::replication::RemoteClient<Server>,
+) -> Result<RaftMetrics<NodeId, BasicNode>> {
+    let rpc = Metrics;
+    let retry = ExponentialBackoff::from_millis(500)
+        .with_limit(Duration::from_secs(60))
+        .take(5);
+
+    for backoff in retry {
+        let res = client
+            .send_with_timeout(&rpc, Duration::from_secs(30))
+            .await;
+
+        match res {
+            Ok(res) => return Ok(res),
+            Err(_) => tokio::time::sleep(backoff).await,
+        };
+    }
+
+    Err(anyhow::anyhow!("failed to get metrics"))
+}
+
 pub struct RemoteClient {
     target: NodeId,
     node: BasicNode,
@@ -118,17 +151,17 @@ pub struct RemoteClient {
 }
 
 impl RemoteClient {
-    pub fn new(target: NodeId, node: BasicNode) -> Self {
-        let addr: SocketAddr = node.addr.parse().expect("addr is not a valid address");
+    pub async fn new(addr: SocketAddr) -> Result<Self> {
         let inner = sonic::replication::RemoteClient::new(addr);
         let likely_leader = RwLock::new(inner.clone());
+        let metrics = metrics(&inner).await?;
 
-        Self {
-            target,
-            node,
+        Ok(Self {
+            target: metrics.id,
+            node: BasicNode::new(addr),
             inner,
             likely_leader,
-        }
+        })
     }
     async fn raft_conn<E: std::error::Error>(&self) -> Result<Connection<Server>, RPCError<E>> {
         self.inner
@@ -157,6 +190,10 @@ impl RemoteClient {
                     panic!("unexpected error: {:?}", e)
                 }
             })
+    }
+
+    pub async fn metrics(&self) -> Result<RaftMetrics<NodeId, BasicNode>> {
+        metrics(&self.inner).await
     }
 
     async fn add_learner(&self, id: NodeId, addr: SocketAddr) -> Result<()> {
@@ -277,14 +314,22 @@ impl RemoteClient {
         unreachable!("should continue to retry");
     }
 
-    pub async fn join(
-        &self,
-        id: NodeId,
-        addr: SocketAddr,
-        new_all_nodes: BTreeMap<NodeId, BasicNode>,
-    ) -> Result<()> {
+    pub async fn join(&self, id: NodeId, addr: SocketAddr) -> Result<()> {
         self.add_learner(id, addr).await?;
-        self.add_nodes(new_all_nodes).await?;
+        let metrics = self.metrics().await?;
+
+        let nodes_in_cluster = metrics
+            .membership_config
+            .nodes()
+            .map(|(nid, node)| (*nid, node.clone()))
+            .collect::<BTreeMap<_, _>>();
+
+        debug_assert!(
+            nodes_in_cluster.contains_key(&id),
+            "node should be in the cluster"
+        );
+
+        self.add_nodes(nodes_in_cluster).await?;
 
         Ok(())
     }

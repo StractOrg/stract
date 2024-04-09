@@ -17,6 +17,7 @@
 pub mod defaults;
 
 use super::Result;
+use crate::ampc::dht;
 use crate::distributed::member::ShardId;
 use crate::feed::scheduler::SplitId;
 use serde::{Deserialize, Serialize};
@@ -515,4 +516,9 @@ impl Default for CorrectionConfig {
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-pub struct DhtConfig {}
+pub struct DhtConfig {
+    pub node_id: dht::NodeId,
+    pub host: SocketAddr,
+    pub shard: ShardId,
+    pub seed_node: Option<SocketAddr>,
+}

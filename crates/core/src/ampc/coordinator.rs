@@ -55,7 +55,7 @@ where
         }
     }
 
-    pub fn with_mapper(&mut self, mapper: J::Mapper) -> &mut Self {
+    pub fn with_mapper(mut self, mapper: J::Mapper) -> Self {
         self.mappers.push(mapper);
         self
     }
@@ -107,6 +107,7 @@ where
         mut scheduled_jobs: BTreeMap<WorkerRef, J>,
         mapper: J::Mapper,
     ) -> Result<()> {
+        tracing::debug!("Awaiting scheduled jobs");
         let mut sleeper =
             ExponentialBackoff::new(Duration::from_millis(100), Duration::from_secs(10), 2.0);
 
@@ -149,17 +150,19 @@ where
         Ok(())
     }
 
-    pub fn run<F>(self, jobs: Vec<J>, finisher: F) -> Result<()>
+    pub fn run<F>(self, jobs: Vec<J>, finisher: F) -> Result<J::DhtTables>
     where
         F: Finisher<Job = J>,
     {
         let mut dht = self.setup.init_dht();
         dht.cleanup_prev_tables();
 
+        self.setup.setup_first_round(dht.prev());
         self.setup.setup_first_round(dht.next());
-        dht.next_round();
 
         while !finisher.is_finished(dht.prev()) {
+            tracing::debug!("Starting new round");
+            self.setup.setup_round(dht.next());
             self.send_dht_to_workers(&dht)?;
 
             for mapper in &self.mappers {
@@ -207,10 +210,9 @@ where
                 self.await_scheduled_jobs(scheduled_jobs, mapper.clone())?;
             }
 
-            self.setup.setup_round(dht.next());
             dht.next_round();
         }
 
-        Ok(())
+        Ok(dht.take_prev())
     }
 }

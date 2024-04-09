@@ -14,8 +14,97 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{config::DhtConfig, Result};
+use std::{collections::BTreeMap, sync::Arc};
+
+use anyhow::bail;
+use openraft::error::InitializeError;
+use tracing::info;
+
+use crate::{ampc::dht, config::DhtConfig, Result};
 
 pub async fn run(config: DhtConfig) -> Result<()> {
-    todo!()
+    let raft_config = openraft::Config::default();
+    let raft_config = Arc::new(raft_config.validate()?);
+
+    let log_store = dht::log_store::LogStore::<dht::TypeConfig>::default();
+    let state_machine_store = Arc::new(dht::store::StateMachineStore::default());
+
+    let network = dht::network::Network;
+
+    let raft = openraft::Raft::new(
+        config.node_id,
+        raft_config,
+        network,
+        log_store,
+        state_machine_store.clone(),
+    )
+    .await?;
+
+    let server = dht::Server::new(raft.clone(), state_machine_store)
+        .bind(config.host)
+        .await?;
+
+    match config.seed_node {
+        Some(seed) => {
+            let client = dht::RaftClient::new(seed).await?;
+            client.join(config.node_id, config.host).await?;
+
+            info!("Joined cluster with node_id: {}", config.node_id);
+        }
+        None => {
+            let members: BTreeMap<u64, _> =
+                BTreeMap::from([(config.node_id, openraft::BasicNode::new(config.host))]);
+
+            if let Err(e) = raft.initialize(members.clone()).await {
+                match e {
+                    openraft::error::RaftError::APIError(e) => match e {
+                        InitializeError::NotAllowed(_) => {}
+                        InitializeError::NotInMembers(_) => bail!(e),
+                    },
+                    openraft::error::RaftError::Fatal(_) => bail!(e),
+                }
+            }
+
+            info!("Initialized cluster with node_id: {}", config.node_id);
+        }
+    }
+
+    loop {
+        server.accept().await?;
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use std::net::SocketAddr;
+
+    use crate::free_socket_addr;
+
+    use self::dht::ShardId;
+
+    use super::*;
+
+    pub fn setup() -> (ShardId, SocketAddr) {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let shard = ShardId::new(1);
+
+            rt.block_on(async {
+                let addr = free_socket_addr();
+                tx.send((shard, addr)).unwrap();
+
+                run(DhtConfig {
+                    node_id: 1,
+                    host: addr,
+                    seed_node: None,
+                    shard,
+                })
+                .await
+                .unwrap();
+            })
+        });
+
+        rx.recv().unwrap()
+    }
 }

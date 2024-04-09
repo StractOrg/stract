@@ -14,164 +14,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use crate::ampc::{
-    dht::{F64Add, UpsertAction},
-    prelude::*,
-    DhtConn,
-};
 use std::{
     collections::BTreeMap,
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
 };
 
 use crate::{
-    ampc::{dht::upsert::HyperLogLog64Upsert, DefaultDhtTable},
+    ampc::{
+        dht::{HyperLogLog64Upsert, UpsertAction},
+        prelude::*,
+        DhtConn,
+    },
     bloom::BloomFilter,
-    distributed::{cluster::Cluster, member::Service},
     hyperloglog::HyperLogLog,
-    webgraph::{self, Edge, Webgraph},
+    webgraph,
 };
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct Meta {
-    round_had_changes: bool,
-}
+use super::{CentralityJob, CentralityTables, CentralityWorker, Meta};
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct CentralityTables {
-    counters: DefaultDhtTable<webgraph::NodeID, HyperLogLog<64>>,
-    meta: DefaultDhtTable<(), Meta>,
-    centrality: DefaultDhtTable<webgraph::NodeID, f64>,
-}
-
-impl_dht_tables!(CentralityTables, [counters, meta, centrality]);
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct CentralityJob {
-    shard: u64,
-}
-
-impl Job for CentralityJob {
-    type DhtTables = CentralityTables;
-    type Worker = CentralityWorker;
-    type Mapper = CentralityMapper;
-
-    fn is_schedulable(&self, worker: &RemoteCentralityWorker) -> bool {
-        self.shard == worker.shard()
-    }
-}
-
-struct CentralitySetup {
-    dht: DhtConn<CentralityTables>,
-}
-
-impl CentralitySetup {
-    pub async fn new(cluster: &Cluster) -> Self {
-        let members: Vec<_> = cluster
-            .members()
-            .await
-            .into_iter()
-            .filter_map(|member| {
-                if let Service::Dht { host, shard } = member.service {
-                    Some((shard, host))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let initial = CentralityTables {
-            counters: DefaultDhtTable::new(&members, "counters"),
-            meta: DefaultDhtTable::new(&members, "meta"),
-            centrality: DefaultDhtTable::new(&members, "centrality"),
-        };
-
-        let dht = DhtConn::new(initial);
-
-        Self { dht }
-    }
-}
-
-impl Setup for CentralitySetup {
-    type DhtTables = CentralityTables;
-
-    fn init_dht(&self) -> DhtConn<Self::DhtTables> {
-        self.dht.clone()
-    }
-
-    fn setup_round(&self, dht: &Self::DhtTables) {
-        dht.meta.set(
-            (),
-            Meta {
-                round_had_changes: false,
-            },
-        );
-    }
-}
-
-struct CentralityWorker {
-    shard: u64,
-    graph: Webgraph,
-    changed_nodes: Arc<Mutex<BloomFilter>>,
-    round: AtomicU64,
-}
-
-impl CentralityWorker {
-    fn new(shard: u64, graph: Webgraph) -> Self {
-        let num_nodes = graph.estimate_num_nodes() as u64;
-        let mut changed_nodes = BloomFilter::new(num_nodes, 0.05);
-
-        for node in graph.nodes() {
-            changed_nodes.insert(node.as_u64());
-        }
-
-        Self {
-            shard,
-            graph,
-            changed_nodes: Arc::new(Mutex::new(changed_nodes)),
-            round: AtomicU64::new(0),
-        }
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct GetShard;
-
-impl Message<CentralityWorker> for GetShard {
-    type Response = u64;
-
-    fn handle(self, worker: &CentralityWorker) -> Self::Response {
-        worker.shard
-    }
-}
-
-impl_worker!(CentralityJob, RemoteCentralityWorker => CentralityWorker, [GetShard,]);
-
-struct RemoteCentralityWorker {
-    shard: u64,
-    addr: SocketAddr,
-}
-
-impl RemoteCentralityWorker {
-    fn shard(&self) -> u64 {
-        self.shard
-    }
-}
-
-impl RemoteWorker for RemoteCentralityWorker {
-    type Job = CentralityJob;
-
-    fn remote_addr(&self) -> SocketAddr {
-        self.addr
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-enum CentralityMapper {
+pub enum CentralityMapper {
+    SetupCounters,
     Cardinalities,
     Centralities,
 }
@@ -179,7 +42,7 @@ enum CentralityMapper {
 impl CentralityMapper {
     /// get old values from prev dht using edge.from where edge.from in changed_nodes
     fn get_old_counters(
-        batch: &[Edge<()>],
+        batch: &[webgraph::Edge<()>],
         changed_nodes: &Mutex<BloomFilter>,
         dht: &DhtConn<CentralityTables>,
     ) -> BTreeMap<webgraph::NodeID, HyperLogLog<64>> {
@@ -203,15 +66,38 @@ impl CentralityMapper {
             .collect()
     }
 
+    fn setup_counters(nodes: &[webgraph::NodeID], dht: &DhtConn<CentralityTables>) {
+        dht.prev().counters.batch_set(
+            nodes
+                .iter()
+                .map(|node| {
+                    let mut hll = HyperLogLog::default();
+                    hll.add(node.as_u64());
+                    (*node, hll)
+                })
+                .collect(),
+        );
+
+        dht.next().counters.batch_set(
+            nodes
+                .iter()
+                .map(|node| {
+                    let mut hll = HyperLogLog::default();
+                    hll.add(node.as_u64());
+                    (*node, hll)
+                })
+                .collect(),
+        );
+    }
+
     /// upsert old edge.from `old_counters` into edge.to in dht.next,
     /// thereby updating their hyperloglog counters
     fn update_counters(
-        batch: &[Edge<()>],
+        batch: &[webgraph::Edge<()>],
         changed_nodes: &Mutex<BloomFilter>,
-        old_counters: BTreeMap<webgraph::NodeID, HyperLogLog<64>>,
         dht: &DhtConn<CentralityTables>,
     ) -> Vec<(webgraph::NodeID, UpsertAction)> {
-        let mut old_counters = old_counters;
+        let old_counters = Self::get_old_counters(batch, changed_nodes, dht);
         let changed_nodes = changed_nodes.lock().unwrap();
 
         dht.next().counters.batch_upsert(
@@ -220,9 +106,7 @@ impl CentralityMapper {
                 .iter()
                 .filter(|edge| changed_nodes.contains(edge.from.as_u64()))
                 .map(|edge| {
-                    let mut counter = old_counters
-                        .remove(&edge.from)
-                        .unwrap_or_else(HyperLogLog::default);
+                    let mut counter = old_counters.get(&edge.from).cloned().unwrap_or_default();
                     counter.add(edge.from.as_u64());
                     (edge.to, counter)
                 })
@@ -245,14 +129,12 @@ impl CentralityMapper {
     }
 
     fn update_dht(
-        batch: &[Edge<()>],
+        batch: &[webgraph::Edge<()>],
         changed_nodes: &Mutex<BloomFilter>,
         new_changed_nodes: &Mutex<BloomFilter>,
         dht: &DhtConn<CentralityTables>,
     ) {
-        let old_counters = Self::get_old_counters(batch, changed_nodes, dht);
-        let changes = Self::update_counters(batch, changed_nodes, old_counters, dht);
-
+        let changes = Self::update_counters(batch, changed_nodes, dht);
         Self::update_changed_nodes(&changes, new_changed_nodes);
 
         // if any nodes changed, indicate in dht that we aren't finished yet
@@ -288,24 +170,70 @@ impl CentralityMapper {
             .into_iter()
             .collect();
 
-        let mut delta = Vec::with_capacity(nodes.len());
+        let mut new_values = BTreeMap::new();
+        let old_values: BTreeMap<_, _> = dht
+            .prev()
+            .centrality
+            .batch_get(nodes.to_vec())
+            .into_iter()
+            .collect();
 
         for node in nodes {
-            let old_size = old_counters.get(node).map(|s| s.size() as u64).unwrap_or(0);
-            let new_size = new_counters.get(node).map(|s| s.size() as u64).unwrap_or(0);
+            if let (Some(old_size), Some(new_size)) = (
+                old_counters.get(node).map(|s| s.size() as u64),
+                new_counters.get(node).map(|s| s.size() as u64),
+            ) {
+                let d = new_size.saturating_sub(old_size);
 
-            if let Some(d) = new_size.checked_sub(old_size) {
-                delta.push((*node, d as f64 / (round + 1) as f64));
+                if d == 0 {
+                    continue;
+                }
+
+                new_values.insert(
+                    *node,
+                    old_values.get(node).copied().unwrap_or(0.0.into())
+                        + (d as f64 / (round + 1) as f64),
+                );
             }
         }
 
-        dht.next().centrality.batch_upsert(F64Add, delta);
+        dht.next()
+            .centrality
+            .batch_set(new_values.into_iter().collect());
+    }
+
+    fn map_setup_counters(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+        const BATCH_SIZE: usize = 16_384;
+        let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
+
+        if worker.round() == 0 {
+            pool.scope(|s| {
+                let mut batch = Vec::with_capacity(BATCH_SIZE);
+                let mut changed_nodes = worker.changed_nodes().lock().unwrap();
+
+                for node in worker.graph().nodes() {
+                    changed_nodes.insert(node.as_u64());
+                    batch.push(node);
+                    if batch.len() >= BATCH_SIZE {
+                        let update_batch = batch.clone();
+                        s.spawn(move |_| Self::setup_counters(&update_batch, dht));
+
+                        batch.clear();
+                    }
+                }
+
+                if !batch.is_empty() {
+                    let update_batch = batch.clone();
+                    s.spawn(move |_| Self::setup_counters(&update_batch, dht));
+                }
+            });
+        }
     }
 
     fn map_cardinalities(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
         const BATCH_SIZE: usize = 16_384;
         let new_changed_nodes = Arc::new(Mutex::new(BloomFilter::empty_from(
-            &worker.changed_nodes.lock().unwrap(),
+            &worker.changed_nodes().lock().unwrap(),
         )));
 
         let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
@@ -313,10 +241,10 @@ impl CentralityMapper {
         pool.scope(|s| {
             let mut batch = Vec::with_capacity(BATCH_SIZE);
 
-            for edge in worker.graph.edges() {
+            for edge in worker.graph().edges() {
                 batch.push(edge);
                 if batch.len() >= BATCH_SIZE {
-                    let changed_nodes = Arc::clone(&worker.changed_nodes);
+                    let changed_nodes = Arc::clone(worker.changed_nodes());
                     let new_changed_nodes = Arc::clone(&new_changed_nodes);
                     let update_batch = batch.clone();
 
@@ -329,7 +257,7 @@ impl CentralityMapper {
             }
 
             if !batch.is_empty() {
-                let changed_nodes = Arc::clone(&worker.changed_nodes);
+                let changed_nodes = Arc::clone(worker.changed_nodes());
                 let new_changed_nodes = Arc::clone(&new_changed_nodes);
                 let update_batch = batch.clone();
 
@@ -338,21 +266,25 @@ impl CentralityMapper {
                 });
             }
         });
-        *worker.changed_nodes.lock().unwrap() = new_changed_nodes.lock().unwrap().clone();
+        *worker.changed_nodes().lock().unwrap() = new_changed_nodes.lock().unwrap().clone();
     }
 
     fn map_centralities(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
         const BATCH_SIZE: usize = 16_384;
-        let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
 
-        let round = worker.round.fetch_add(1, Ordering::Relaxed);
+        if !dht.prev().meta.get(()).unwrap().round_had_changes {
+            return;
+        }
+
+        let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
+        let round = worker.inc_round();
 
         // count cardinality of hyperloglogs in dht.next and update count after all mappers are done
         pool.scope(|s| {
             let mut batch = Vec::with_capacity(BATCH_SIZE);
-            let changed_nodes = worker.changed_nodes.lock().unwrap();
+            let changed_nodes = worker.changed_nodes().lock().unwrap();
             for node in worker
-                .graph
+                .graph()
                 .nodes()
                 .filter(|node| changed_nodes.contains(node.as_u64()))
             {
@@ -377,28 +309,9 @@ impl Mapper for CentralityMapper {
 
     fn map(&self, _: Self::Job, worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
         match self {
+            CentralityMapper::SetupCounters => Self::map_setup_counters(worker, dht),
             CentralityMapper::Cardinalities => Self::map_cardinalities(worker, dht),
             CentralityMapper::Centralities => Self::map_centralities(worker, dht),
         }
-    }
-}
-
-struct CentralityFinish {}
-
-impl Finisher for CentralityFinish {
-    type Job = CentralityJob;
-
-    fn is_finished(&self, dht: &CentralityTables) -> bool {
-        dht.meta.get(()).unwrap().round_had_changes
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_triangle_graph() {
-        todo!()
     }
 }

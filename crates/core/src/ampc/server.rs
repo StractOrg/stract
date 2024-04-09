@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tokio::net::ToSocketAddrs;
 
@@ -29,7 +29,7 @@ where
 {
     dht: Option<Arc<JobDht<W::Job>>>,
     worker: Arc<W>,
-    current_job: Option<W::Job>,
+    current_job: Arc<Mutex<Option<W::Job>>>,
     conn: sonic::Server<JobReq<W::Job>, JobResp<W::Job>>,
 }
 
@@ -43,16 +43,18 @@ where
         match req.body().clone() {
             Req::Coordinator(coord_req) => {
                 let res = match coord_req {
-                    CoordReq::CurrentJob => {
-                        Resp::Coordinator(CoordResp::CurrentJob(self.current_job.clone()))
-                    }
+                    CoordReq::CurrentJob => Resp::Coordinator(CoordResp::CurrentJob(
+                        self.current_job.lock().unwrap().clone(),
+                    )),
                     CoordReq::ScheduleJob { job, mapper } => {
-                        self.current_job = Some(job.clone());
+                        *self.current_job.lock().unwrap() = Some(job.clone());
                         let worker = Arc::clone(&self.worker);
                         let dht = self.dht.clone();
 
+                        let current_job = Arc::clone(&self.current_job);
                         std::thread::spawn(move || {
                             mapper.map(job.clone(), &worker, dht.as_ref().expect("DHT not set"));
+                            current_job.lock().unwrap().take();
                         });
 
                         Resp::Coordinator(CoordResp::ScheduleJob(()))
@@ -85,7 +87,7 @@ where
         Ok(Server {
             dht: None,
             worker,
-            current_job: None,
+            current_job: Arc::new(Mutex::new(None)),
             conn,
         })
     }

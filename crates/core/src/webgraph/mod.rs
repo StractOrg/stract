@@ -305,7 +305,7 @@ impl Webgraph {
 }
 
 #[cfg(test)]
-mod test {
+pub mod tests {
     use super::*;
 
     fn test_edges() -> Vec<(Node, Node, String)> {
@@ -318,12 +318,12 @@ mod test {
         ]
     }
 
-    fn test_graph() -> Webgraph {
-        //     ┌────┐
-        //     │    │
-        // ┌───A◄─┐ │
-        // │      │ │
-        // ▼      │ │
+    pub fn test_graph() -> Webgraph {
+        //     ┌------┐
+        //     │      │
+        // ┌───A◄─┐  │
+        // │       │  │
+        // ▼      │  │
         // B─────►C◄┘
         //        ▲
         //        │

@@ -36,8 +36,8 @@ pub struct Network;
 impl RaftNetworkFactory<TypeConfig> for Network {
     type Network = RemoteClient;
 
-    async fn new_client(&mut self, target: NodeId, node: &BasicNode) -> Self::Network {
-        RemoteClient::new(target, node.clone())
+    async fn new_client(&mut self, _: NodeId, node: &BasicNode) -> Self::Network {
+        RemoteClient::new(node.addr.parse().unwrap()).await.unwrap()
     }
 }
 
@@ -61,12 +61,16 @@ pub struct AddNodes {
     members: BTreeMap<NodeId, BasicNode>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct Metrics;
+
 sonic_service!(
     Server,
     [
         AppendEntries,
         InstallSnapshot,
         Vote,
+        Metrics,
         AddLearner,
         AddNodes,
         Get,

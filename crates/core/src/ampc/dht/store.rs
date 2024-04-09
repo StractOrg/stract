@@ -181,7 +181,6 @@ impl Db {
             match table.get(&key).cloned() {
                 Some(old) => {
                     let merged = upsert_fn.upsert(old.clone(), value);
-
                     let has_changed = merged != old;
 
                     table.insert(key.clone(), merged);

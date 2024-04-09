@@ -16,7 +16,7 @@
 
 use std::ops::{Add, AddAssign};
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct KahanSum {
     sum: f64,
     err: f64,

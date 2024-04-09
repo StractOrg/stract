@@ -27,7 +27,11 @@ byteorder = "1.4.3"
 bzip2 = "0.4.4"
 candle-core = "0.3.3"
 candle-nn = "0.3.3"
-openraft = { version = "0.9.1", features = ["storage-v2", "serde"] }
+openraft = { version = "0.9.1", features = [
+    "storage-v2",
+    "serde",
+    "tracing-log",
+] }
 candle-transformers = "0.3.3"
 cc = { version = "1", features = ["parallel"] }
 chardetng = "0.1.17"

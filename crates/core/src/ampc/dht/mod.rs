@@ -28,7 +28,7 @@
 
 mod client;
 pub mod log_store;
-mod network;
+pub mod network;
 pub mod store;
 pub mod upsert;
 
@@ -42,9 +42,9 @@ use std::io::Cursor;
 use openraft::BasicNode;
 use openraft::TokioRuntime;
 
-use self::network::Server;
+pub use self::network::Server;
 
-pub use network::api::RemoteClient as ApiClient;
+pub use network::api::RemoteClient;
 pub use network::raft::RemoteClient as RaftClient;
 
 pub use crate::distributed::member::ShardId;
@@ -111,7 +111,6 @@ raft_sonic_request_response!(
 #[cfg(test)]
 pub mod tests {
     use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
-    use tests::network::api::RemoteClient;
     use tokio::sync::Mutex;
     use tracing_test::traced_test;
 
@@ -234,8 +233,8 @@ pub mod tests {
     #[traced_test]
     async fn test_member_join() -> anyhow::Result<()> {
         let (raft1, server1, addr1) = server(1).await?;
-        let (raft2, server2, addr2) = server(2).await?;
-        let (raft3, server3, addr3) = server(3).await?;
+        let (_, server2, addr2) = server(2).await?;
+        let (_, server3, addr3) = server(3).await?;
 
         let servers = vec![server1, server2, server3];
 
@@ -247,7 +246,7 @@ pub mod tests {
             });
         }
 
-        let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2)]
+        let members: BTreeMap<u64, _> = vec![(1, addr1)]
             .into_iter()
             .map(|(id, addr)| (id, BasicNode::new(addr)))
             .collect();
@@ -262,15 +261,9 @@ pub mod tests {
             }
         };
 
-        if let Err(e) = raft2.initialize(members.clone()).await {
-            match e {
-                openraft::error::RaftError::APIError(e) => match e {
-                    InitializeError::NotAllowed(_) => {}
-                    InitializeError::NotInMembers(_) => panic!("{:?}", e),
-                },
-                openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
-            }
-        };
+        let rc1 = network::raft::RemoteClient::new(addr1).await?;
+
+        rc1.join(2, addr2).await?;
 
         let c1 = RemoteClient::new(addr1);
         let c2 = RemoteClient::new(addr2);
@@ -288,14 +281,7 @@ pub mod tests {
 
         assert_eq!(res, Some("world".as_bytes().into()));
 
-        let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2), (3, addr3)]
-            .into_iter()
-            .map(|(id, addr)| (id, BasicNode::new(addr)))
-            .collect();
-
-        raft3.initialize(members.clone()).await?;
-        let rc1 = network::raft::RemoteClient::new(1, BasicNode::new(addr1));
-        rc1.join(3, addr3, members.clone()).await?;
+        rc1.join(3, addr3).await?;
 
         let c3 = RemoteClient::new(addr3);
         let res = c3.get(table.clone(), "hello".as_bytes().into()).await?;
@@ -306,12 +292,16 @@ pub mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore = "comitted logs must be stored in stable storage for raft to be able to recover from a node crash"]
+    // see: https://docs.rs/openraft/latest/openraft/docs/faq/index.html#what-will-happen-when-data-gets-lost
     async fn test_node_crash() -> anyhow::Result<()> {
         let (raft1, server1, addr1) = server(1).await?;
         let (raft2, server2, addr2) = server(2).await?;
-        let (raft3, server3, addr3) = server(3).await?;
+        let (_, server3, addr3) = server(3).await?;
+        let (_, server4, addr4) = server(4).await?;
+        let (_, server5, addr5) = server(5).await?;
 
-        let servers = vec![server1, server2, server3];
+        let servers = vec![server1, server2, server3, server4, server5];
         let mut handles = Vec::new();
 
         for server in servers {
@@ -322,7 +312,7 @@ pub mod tests {
             }));
         }
 
-        let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2), (3, addr3)]
+        let members: BTreeMap<u64, _> = vec![(1, addr1)]
             .into_iter()
             .map(|(id, addr)| (id, BasicNode::new(addr)))
             .collect();
@@ -337,29 +327,13 @@ pub mod tests {
             }
         };
 
-        if let Err(e) = raft2.initialize(members.clone()).await {
-            match e {
-                openraft::error::RaftError::APIError(e) => match e {
-                    InitializeError::NotAllowed(_) => {}
-                    InitializeError::NotInMembers(_) => panic!("{:?}", e),
-                },
-                openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
-            }
-        };
-
-        if let Err(e) = raft3.initialize(members.clone()).await {
-            match e {
-                openraft::error::RaftError::APIError(e) => match e {
-                    InitializeError::NotAllowed(_) => {}
-                    InitializeError::NotInMembers(_) => panic!("{:?}", e),
-                },
-                openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
-            }
-        };
+        let rc1 = network::raft::RemoteClient::new(addr1).await?;
+        rc1.join(2, addr2).await?;
+        rc1.join(3, addr3).await?;
+        rc1.join(4, addr4).await?;
+        rc1.join(5, addr5).await?;
 
         let c1 = RemoteClient::new(addr1);
-
-        let rc1 = network::raft::RemoteClient::new(1, BasicNode::new(addr1));
 
         let table = Table::from("test");
 
@@ -374,6 +348,7 @@ pub mod tests {
         assert_eq!(res, Some("world".as_bytes().into()));
 
         // crash node 2
+        tracing::info!("crashing node 2");
         handles[1].abort();
         drop(raft2);
 
@@ -384,7 +359,7 @@ pub mod tests {
             }
         });
 
-        rc1.join(2, addr2, members.clone()).await?;
+        rc1.join(2, addr2).await?;
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let c2 = RemoteClient::new(addr2);
@@ -393,6 +368,7 @@ pub mod tests {
         assert_eq!(res, Some("world".as_bytes().into()));
 
         // crash node 2 again
+        tracing::info!("crashing node 2 again");
         handles[1].abort();
         drop(raft2);
 
@@ -403,14 +379,13 @@ pub mod tests {
         )
         .await?;
 
-        let (raft2, server2, addr2) = server(2).await?;
+        let (_raft2, server2, addr2) = server(2).await?;
         handles[1] = tokio::spawn(async move {
             loop {
                 server2.accept().await.unwrap();
             }
         });
-        raft2.initialize(members.clone()).await?;
-        rc1.join(2, addr2, members.clone()).await?;
+        rc1.join(2, addr2).await?;
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let c2 = RemoteClient::new(addr2);

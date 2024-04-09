@@ -303,6 +303,10 @@ where
     pub fn next(&self) -> &T {
         &self.next
     }
+
+    pub fn take_prev(self) -> T {
+        self.prev
+    }
 }
 
 #[cfg(test)]

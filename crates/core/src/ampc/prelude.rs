@@ -17,6 +17,7 @@
 pub(crate) use super::dht_conn::impl_dht_tables;
 pub(crate) use super::worker::impl_worker;
 
+pub use super::dht_conn::{DhtTable, DhtTables};
 pub use super::finisher::Finisher;
 pub use super::job::Job;
 pub use super::mapper::Mapper;
