@@ -34,7 +34,7 @@ use self::prelude::*;
 pub use coordinator::Coordinator;
 pub use dht_conn::{DefaultDhtTable, DhtConn, DhtTable, DhtTables, Table};
 pub use server::Server;
-pub use worker::{Message, Worker};
+pub use worker::{Message, RequestWrapper, Worker};
 
 static TOKIO_RUNTIME: once_cell::sync::Lazy<tokio::runtime::Runtime> =
     once_cell::sync::Lazy::new(|| {

@@ -24,6 +24,7 @@ where
     V: Serialize + DeserializeOwned,
     Self: Send + Sync,
 {
+    fn approx_len(&self) -> usize;
     fn get_raw(&self, key: &[u8]) -> Option<Vec<u8>>;
     fn insert_raw(&self, key: Vec<u8>, value: Vec<u8>);
     fn flush(&self);

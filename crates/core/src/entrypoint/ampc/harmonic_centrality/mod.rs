@@ -81,6 +81,8 @@ mod tests {
 
         let remote_worker = RemoteCentralityWorker::new(1.into(), worker_addr);
 
+        assert_eq!(remote_worker.num_nodes(), num_nodes as u64);
+
         let (dht_shard, dht_addr) = crate::entrypoint::ampc::dht::tests::setup();
         let res = coordinator::build(&[(dht_shard, dht_addr)], vec![remote_worker])
             .run(vec![CentralityJob { shard: 1.into() }], CentralityFinish)

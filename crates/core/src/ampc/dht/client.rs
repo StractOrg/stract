@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use async_stream::stream;
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use rand::seq::SliceRandom;
 use std::{
     collections::BTreeMap,
@@ -378,11 +378,11 @@ impl Client {
     }
 
     pub fn stream(&self, table: Table) -> impl Stream<Item = Result<(Key, Value)>> + '_ {
-        futures::stream::iter(
-            self.shards
-                .values()
-                .map(move |shard| shard.stream(table.clone())),
-        )
-        .flatten()
+        let mut streams = Vec::new();
+        for shard in self.shards.values() {
+            streams.push(Box::pin(shard.stream(table.clone())));
+        }
+
+        futures::stream::select_all(streams)
     }
 }

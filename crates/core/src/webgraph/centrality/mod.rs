@@ -14,9 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::kv::{rocksdb_store::RocksDbStore, Kv};
+use std::{cmp::Reverse, collections::BinaryHeap, fs::File, path::Path};
 
-use super::NodeID;
+use crate::{
+    external_sort::ExternalSorter,
+    kv::{rocksdb_store::RocksDbStore, Kv},
+    SortableFloat,
+};
+
+use super::{Node, NodeID};
 
 pub mod approx_harmonic;
 pub mod betweenness;
@@ -24,33 +30,84 @@ pub mod derived_harmonic;
 pub mod harmonic;
 
 #[derive(Debug, Clone, Copy)]
-pub enum TopHosts {
+pub enum TopNodes {
     Top(usize),
     Fraction(f64),
 }
 
-pub fn top_hosts(host_centrality: &RocksDbStore<NodeID, f64>, top: TopHosts) -> Vec<NodeID> {
-    let mut hosts = host_centrality
-        .iter()
-        .map(|(id, centrality)| {
-            if !centrality.is_finite() {
-                (id, 0.0)
-            } else {
-                (id, centrality)
-            }
-        })
-        .collect::<Vec<_>>();
-
-    hosts.sort_by(|(_, a), (_, b)| b.total_cmp(a));
-
+pub fn top_nodes(host_centrality: &RocksDbStore<NodeID, f64>, top: TopNodes) -> Vec<(NodeID, f64)> {
     let num_hosts = match top {
-        TopHosts::Top(abs) => abs,
-        TopHosts::Fraction(frac) => (hosts.len() as f64 * frac) as usize,
+        TopNodes::Top(abs) => abs,
+        TopNodes::Fraction(frac) => (host_centrality.approx_len() as f64 * frac) as usize,
     };
 
-    hosts
+    let mut top: BinaryHeap<Reverse<(SortableFloat, NodeID)>> = BinaryHeap::new();
+
+    for (id, centrality) in host_centrality.iter() {
+        if top.len() >= num_hosts {
+            let mut min = top.peek_mut().unwrap();
+
+            if centrality > min.0 .0 .0 {
+                min.0 .1 = id;
+                min.0 .0 .0 = centrality;
+            }
+        } else {
+            top.push(Reverse((SortableFloat(centrality), id)));
+        }
+    }
+
+    top.into_sorted_vec()
         .into_iter()
-        .take(num_hosts)
-        .map(|(id, _)| id)
+        .map(|Reverse((SortableFloat(c), id))| (id, c))
+        .rev()
         .collect()
+}
+
+pub fn store_csv<P: AsRef<Path>>(data: Vec<(Node, f64)>, output: P) {
+    let csv_file = File::options()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(output)
+        .unwrap();
+
+    let mut data = data;
+    data.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    let mut wtr = csv::Writer::from_writer(csv_file);
+    for (node, centrality) in data {
+        wtr.write_record(&[node.as_str().to_string(), centrality.to_string()])
+            .unwrap();
+    }
+    wtr.flush().unwrap();
+}
+
+pub fn store_harmonic<I, P>(centralities: I, output: P) -> RocksDbStore<NodeID, f64>
+where
+    I: Iterator<Item = (NodeID, f64)>,
+    P: AsRef<Path>,
+{
+    let store = RocksDbStore::open(output.as_ref().join("harmonic"));
+
+    for (node_id, centrality) in centralities {
+        store.insert(node_id, centrality);
+    }
+    store.flush();
+
+    let rank_store: RocksDbStore<crate::webgraph::NodeID, u64> =
+        RocksDbStore::open(output.as_ref().join("harmonic_rank"));
+    for (rank, node_id) in ExternalSorter::new()
+        .with_chunk_size(100_000_000)
+        .sort(
+            store
+                .iter()
+                .map(|(node_id, centrality)| (Reverse(SortableFloat(centrality)), node_id)),
+        )
+        .unwrap()
+        .enumerate()
+        .map(|(rank, (_, node_id))| (rank, node_id))
+    {
+        rank_store.insert(node_id, rank as u64);
+    }
+
+    store
 }

@@ -18,9 +18,10 @@ use crate::{
     ampc::{dht::ShardId, prelude::*, Coordinator, DhtConn},
     config::HarmonicCoordinatorConfig,
     distributed::member::Member,
+    webgraph::centrality::{store_csv, store_harmonic, top_nodes, TopNodes},
     Result,
 };
-use std::net::SocketAddr;
+use std::{collections::BTreeMap, net::SocketAddr, path::Path};
 
 use crate::{
     ampc::DefaultDhtTable,
@@ -130,6 +131,8 @@ async fn setup_gossip(config: HarmonicCoordinatorConfig) -> Result<ClusterInfo> 
     )
     .await?;
 
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
     let members = handle.members().await;
 
     let dht = members
@@ -176,8 +179,34 @@ pub fn run(config: HarmonicCoordinatorConfig) -> Result<()> {
         })
         .collect();
 
-    let coordinator = build(&cluster.dht, cluster.workers);
-    coordinator.run(jobs, CentralityFinish)?;
+    let coordinator = build(&cluster.dht, cluster.workers.clone());
+    let res = coordinator.run(jobs, CentralityFinish)?;
+
+    let num_nodes = cluster.workers.iter().map(|w| w.num_nodes()).sum::<u64>();
+    let output_path = Path::new(&config.output_path);
+
+    let store = store_harmonic(
+        res.centrality
+            .iter()
+            .map(|(n, c)| (n, f64::from(c) / (num_nodes - 1) as f64)),
+        output_path,
+    );
+
+    let top_nodes = top_nodes(&store, TopNodes::Top(1_000_000));
+
+    let ids = top_nodes.iter().map(|(id, _)| *id).collect::<Vec<_>>();
+    let id2node: BTreeMap<_, _> = cluster
+        .workers
+        .iter()
+        .flat_map(|w| w.batch_id2node(ids.clone()))
+        .collect();
+
+    let top_nodes = top_nodes
+        .iter()
+        .map(|(id, c)| (id2node[id].clone(), *c))
+        .collect::<Vec<_>>();
+
+    store_csv(top_nodes, output_path.join("harmonic.csv"));
 
     Ok(())
 }

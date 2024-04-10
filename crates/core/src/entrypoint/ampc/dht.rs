@@ -31,11 +31,11 @@ use crate::{
 };
 
 pub struct Config {
-    node_id: dht::NodeId,
-    host: SocketAddr,
-    shard: ShardId,
-    seed_node: Option<SocketAddr>,
-    gossip: Option<GossipConfig>,
+    pub node_id: dht::NodeId,
+    pub host: SocketAddr,
+    pub shard: ShardId,
+    pub seed_node: Option<SocketAddr>,
+    pub gossip: Option<GossipConfig>,
 }
 
 impl From<DhtConfig> for Config {
@@ -77,6 +77,16 @@ pub async fn run<C: Into<Config>>(config: C) -> Result<()> {
     match config.seed_node {
         Some(seed) => {
             let client = dht::RaftClient::new(seed).await?;
+            let metrics = client.metrics().await?;
+
+            if metrics
+                .membership_config
+                .nodes()
+                .any(|(id, node)| *id == config.node_id || node.addr == config.host.to_string())
+            {
+                bail!("Already member of cluster. It is currently not safe for a node to rejoin a cluster it was previously a member of.");
+            }
+
             client.join(config.node_id, config.host).await?;
 
             info!("Joined cluster with node_id: {}", config.node_id);

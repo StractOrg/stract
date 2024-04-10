@@ -16,7 +16,9 @@
 
 use std::net::SocketAddr;
 
-use super::{block_on, CoordReq, CoordResp, DhtConn, Job, JobConn, JobReq, JobResp, Resp, Server};
+use super::{
+    block_on, CoordReq, CoordResp, DhtConn, Job, JobConn, JobReq, JobResp, Req, Resp, Server,
+};
 use crate::Result;
 use anyhow::anyhow;
 use tokio::net::ToSocketAddrs;
@@ -55,10 +57,11 @@ where
     Self: Send + Sync,
 {
     type Job: Job;
+
     fn remote_addr(&self) -> SocketAddr;
 
     fn schedule_job(&self, job: &Self::Job, mapper: <Self::Job as Job>::Mapper) -> Result<()> {
-        self.send(&JobReq::Coordinator(CoordReq::ScheduleJob {
+        self.send_raw(&JobReq::Coordinator(CoordReq::ScheduleJob {
             job: job.clone(),
             mapper,
         }))?;
@@ -67,14 +70,14 @@ where
     }
 
     fn send_dht(&self, dht: &DhtConn<<Self::Job as Job>::DhtTables>) -> Result<()> {
-        self.send(&JobReq::Coordinator(CoordReq::Setup { dht: dht.clone() }))?;
+        self.send_raw(&JobReq::Coordinator(CoordReq::Setup { dht: dht.clone() }))?;
 
         Ok(())
     }
 
     fn current_job(&self) -> Result<Option<Self::Job>> {
         let req = JobReq::Coordinator(CoordReq::CurrentJob);
-        let res = self.send(&req)?;
+        let res = self.send_raw(&req)?;
 
         match res {
             Resp::Coordinator(CoordResp::CurrentJob(job)) => Ok(job),
@@ -87,11 +90,26 @@ where
         Ok(conn)
     }
 
-    fn send(&self, req: &JobReq<Self::Job>) -> Result<JobResp<Self::Job>> {
+    fn send_raw(&self, req: &JobReq<Self::Job>) -> Result<JobResp<Self::Job>> {
         let conn = self.conn()?;
         let res = block_on(conn.send(req))?;
         Ok(res)
     }
+
+    fn send<R>(&self, req: R) -> R::Response
+    where
+        R: RequestWrapper<<Self::Job as Job>::Worker>,
+    {
+        match self.send_raw(&Req::User(R::wrap(req))).unwrap() {
+            Resp::Coordinator(_) => panic!("unexpected coordinator response"),
+            Resp::User(res) => R::unwrap_response(res).unwrap(),
+        }
+    }
+}
+
+pub trait RequestWrapper<W: Worker>: Message<W> {
+    fn wrap(req: Self) -> W::Request;
+    fn unwrap_response(res: W::Response) -> Result<Self::Response>;
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
@@ -128,6 +146,23 @@ macro_rules! impl_worker {
                     }
                 }
             }
+
+            $(
+                impl ampc::RequestWrapper<$worker> for $req {
+                    fn wrap(req: Self) -> <$worker as ampc::Worker>::Request {
+                        <$worker as ampc::Worker>::Request::$req(req)
+                    }
+
+                    fn unwrap_response(res: <$worker as ampc::Worker>::Response) -> anyhow::Result<Self::Response> {
+                        match res {
+                            Response::$req(res) => Ok(res),
+                            _ => Err(anyhow::anyhow!("unexpected response")),
+                        }
+                    }
+                }
+            )*
+
+
 
         }
     };

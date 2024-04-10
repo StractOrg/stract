@@ -154,6 +154,15 @@ where
             value: PhantomData,
         })
     }
+
+    fn approx_len(&self) -> usize {
+        self.db
+            .property_value("rocksdb.estimate-num-keys")
+            .unwrap()
+            .unwrap()
+            .parse()
+            .unwrap()
+    }
 }
 
 pub struct IntoIter<'a, K, V>

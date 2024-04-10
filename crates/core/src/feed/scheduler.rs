@@ -23,7 +23,7 @@ use url::Url;
 use crate::{
     kv::rocksdb_store::RocksDbStore,
     webgraph::{
-        centrality::{top_hosts, TopHosts},
+        centrality::{top_nodes, TopNodes},
         NodeID, Webgraph,
     },
     webpage::url_ext::UrlExt,
@@ -109,11 +109,11 @@ pub fn schedule(
     host_graph: &Webgraph,
     num_splits: u64,
 ) -> Schedule {
-    let top_hosts = top_hosts(host_centrality, TopHosts::Top(1_000_000));
+    let top_hosts = top_nodes(host_centrality, TopNodes::Top(1_000_000));
 
     let mut all_feeds = HashMap::new();
 
-    for host in top_hosts {
+    for (host, _) in top_hosts {
         let host = host_graph.id2node(&host).unwrap();
         let url = Url::parse(&format!("http://{}", host.as_str()));
 

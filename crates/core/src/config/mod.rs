@@ -535,6 +535,7 @@ pub struct DhtConfig {
 pub struct HarmonicCoordinatorConfig {
     pub gossip: GossipConfig,
     pub host: SocketAddr,
+    pub output_path: String,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]

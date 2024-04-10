@@ -22,7 +22,7 @@ use crate::{
         cluster::Cluster,
         member::{Member, Service, ShardId},
     },
-    webgraph::Webgraph,
+    webgraph::{self, Webgraph},
     Result,
 };
 use std::{
@@ -88,9 +88,34 @@ impl Message<CentralityWorker> for GetShard {
         worker.shard
     }
 }
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct NumNodes;
 
-impl_worker!(CentralityJob, RemoteCentralityWorker => CentralityWorker, [GetShard,]);
+impl Message<CentralityWorker> for NumNodes {
+    type Response = u64;
 
+    fn handle(self, worker: &CentralityWorker) -> Self::Response {
+        worker.graph.estimate_num_nodes() as u64
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct BatchId2Node(Vec<webgraph::NodeID>);
+
+impl Message<CentralityWorker> for BatchId2Node {
+    type Response = Vec<(webgraph::NodeID, webgraph::Node)>;
+
+    fn handle(self, worker: &CentralityWorker) -> Self::Response {
+        self.0
+            .iter()
+            .filter_map(|id| worker.graph.id2node(id).map(|node| (*id, node)))
+            .collect()
+    }
+}
+
+impl_worker!(CentralityJob, RemoteCentralityWorker => CentralityWorker, [GetShard, NumNodes, BatchId2Node]);
+
+#[derive(Clone)]
 pub struct RemoteCentralityWorker {
     shard: ShardId,
     addr: SocketAddr,
@@ -104,6 +129,17 @@ impl RemoteCentralityWorker {
     pub fn shard(&self) -> ShardId {
         self.shard
     }
+
+    pub fn num_nodes(&self) -> u64 {
+        self.send(NumNodes)
+    }
+
+    pub fn batch_id2node(
+        &self,
+        id: Vec<webgraph::NodeID>,
+    ) -> Vec<(webgraph::NodeID, webgraph::Node)> {
+        self.send(BatchId2Node(id))
+    }
 }
 
 impl RemoteWorker for RemoteCentralityWorker {
@@ -114,19 +150,34 @@ impl RemoteWorker for RemoteCentralityWorker {
     }
 }
 
-async fn gossip_cluster(config: HarmonicWorkerConfig) -> Result<Cluster> {
-    Cluster::join(
-        Member {
-            id: config.gossip.cluster_id,
-            service: Service::HarmonicWorker {
-                host: config.host,
-                shard: config.shard,
-            },
-        },
-        config.gossip.addr,
-        config.gossip.seed_nodes.unwrap_or_default(),
-    )
-    .await
+fn start_gossip_cluster_thread(config: HarmonicWorkerConfig) {
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            let _cluster = Cluster::join(
+                Member {
+                    id: config.gossip.cluster_id,
+                    service: Service::HarmonicWorker {
+                        host: config.host,
+                        shard: config.shard,
+                    },
+                },
+                config.gossip.addr,
+                config.gossip.seed_nodes.unwrap_or_default(),
+            )
+            .await;
+
+            // need to keep tokio runtime alive
+            // otherwise the spawned task in Cluster::join will be dropped
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        });
+    });
 }
 
 pub fn run(config: HarmonicWorkerConfig) -> Result<()> {
@@ -134,11 +185,7 @@ pub fn run(config: HarmonicWorkerConfig) -> Result<()> {
 
     let graph = Webgraph::builder(config.graph_path).open();
     let worker = CentralityWorker::new(config.shard, graph);
-
-    let _cluster = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?
-        .block_on(gossip_cluster(tokio_conf))?;
+    start_gossip_cluster_thread(tokio_conf);
 
     worker.run(config.host)?;
 

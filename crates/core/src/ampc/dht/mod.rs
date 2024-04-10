@@ -359,6 +359,46 @@ pub mod tests {
             ]
         );
 
+        let table = Table::from("test2");
+
+        const N: u64 = 100_000;
+        client
+            .batch_set(
+                table.clone(),
+                (0..N)
+                    .into_iter()
+                    .map(|i| {
+                        (
+                            i.to_be_bytes().as_ref().into(),
+                            i.to_be_bytes().as_ref().into(),
+                        )
+                    })
+                    .collect::<Vec<(Key, Value)>>(),
+            )
+            .await?;
+
+        let stream = client.stream(table.clone());
+        pin_mut!(stream);
+
+        let mut res = Vec::new();
+
+        while let Some((k, v)) = stream.try_next().await? {
+            res.push((k, v));
+        }
+
+        res.sort_by_key(|(k, _)| k.clone());
+        assert_eq!(res.len(), N as usize);
+
+        for i in 0..N as usize {
+            assert_eq!(
+                res[i],
+                (
+                    i.to_be_bytes().as_ref().into(),
+                    i.to_be_bytes().as_ref().into(),
+                )
+            );
+        }
+
         Ok(())
     }
 
