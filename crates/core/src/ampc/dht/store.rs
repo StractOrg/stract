@@ -125,7 +125,13 @@ pub struct Db {
 
 impl Db {
     pub fn drop_table(&mut self, table: &Table) {
-        self.data.remove(table);
+        let table = self.data.remove(table);
+        if let Some(table) = table {
+            // drop in background as some tables can be large
+            std::thread::spawn(move || {
+                drop(table);
+            });
+        }
     }
 
     pub fn get(&self, table: &Table, key: &Key) -> Option<Value> {

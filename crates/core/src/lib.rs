@@ -270,3 +270,8 @@ macro_rules! enum_dispatch_from_discriminant {
 }
 
 pub(crate) use enum_dispatch_from_discriminant;
+
+const XXH3_SECRET: &[u8] = &xxhash_rust::const_xxh3::const_custom_default_secret(42);
+pub fn fast_stable_hash(t: &[u8]) -> u64 {
+    xxhash_rust::xxh3::xxh3_64_with_secret(t, XXH3_SECRET)
+}

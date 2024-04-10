@@ -79,6 +79,8 @@ mod tests {
             worker.run(worker_addr).unwrap();
         });
 
+        std::thread::sleep(std::time::Duration::from_secs(1)); // Wait for worker to start
+
         let remote_worker = RemoteCentralityWorker::new(1.into(), worker_addr);
 
         assert_eq!(remote_worker.num_nodes(), num_nodes as u64);

@@ -121,6 +121,7 @@ uuid = "1.1.2"
 whatlang = { version = "0.16.0", features = ["serde"] }
 zstd = "0.13"
 tracing-test = "0.2.4"
+xxhash-rust = { version = "0.8.10", features = ["xxh3", "const_xxh3"] }
 
 [profile.test.package]
 flate2.opt-level = 3

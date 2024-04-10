@@ -111,6 +111,7 @@ utoipa-swagger-ui = { workspace = true }
 uuid = { workspace = true }
 whatlang = { workspace = true }
 zimba = { path = "../zimba" }
+xxhash-rust = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { workspace = true }
