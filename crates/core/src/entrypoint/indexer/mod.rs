@@ -22,7 +22,6 @@ use rayon::prelude::*;
 use std::thread;
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 
 pub use crate::entrypoint::indexer::indexable_webpage::IndexableWebpage;
 pub use crate::entrypoint::indexer::job::{Job, JobSettings};
@@ -32,7 +31,7 @@ use crate::config::{self, WarcSource};
 use crate::index::Index;
 use crate::Result;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct IndexPointer(String);
 
 impl From<String> for IndexPointer {

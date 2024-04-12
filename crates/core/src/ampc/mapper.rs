@@ -16,7 +16,7 @@
 
 use super::{prelude::Job, DhtConn};
 
-pub trait Mapper: serde::Serialize + serde::de::DeserializeOwned + Send + Sync + Clone {
+pub trait Mapper: bincode::Encode + bincode::Decode + Send + Sync + Clone {
     type Job: Job<Mapper = Self>;
 
     fn map(

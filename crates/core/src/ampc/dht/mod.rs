@@ -39,7 +39,6 @@ use network::api::{
 use std::fmt::Debug;
 use std::io::Cursor;
 
-use openraft::BasicNode;
 use openraft::TokioRuntime;
 
 pub use self::network::Server;
@@ -55,6 +54,30 @@ pub use upsert::*;
 
 pub type NodeId = u64;
 
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Default,
+)]
+pub struct BasicNode {
+    pub addr: String,
+}
+
+impl BasicNode {
+    /// Creates as [`BasicNode`].
+    pub fn new(addr: impl ToString) -> Self {
+        Self {
+            addr: addr.to_string(),
+        }
+    }
+}
+
 openraft::declare_raft_types!(
     /// Declare the type configuration for example K/V store.
     pub TypeConfig:
@@ -69,14 +92,14 @@ openraft::declare_raft_types!(
 
 macro_rules! raft_sonic_request_response {
     ($service:ident, [$($req:ident),*$(,)?]) => {
-        #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+        #[derive(::serde::Serialize, ::serde::Deserialize, ::bincode::Decode, Clone, Debug)]
         pub enum Request {
             $(
                 $req($req),
             )*
         }
 
-        #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+        #[derive(::serde::Serialize, ::serde::Deserialize, ::bincode::Encode, Clone, Debug)]
         pub enum Response {
             $(
                 $req(<$req as $crate::distributed::sonic::service::Message<$service>>::Response),
@@ -91,7 +114,7 @@ macro_rules! raft_sonic_request_response {
             }
         }
         )*
-    };
+    }
 }
 
 raft_sonic_request_response!(
@@ -502,7 +525,16 @@ pub mod tests {
         Ok(())
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Arbitrary)]
+    #[derive(
+        Debug,
+        Clone,
+        serde::Serialize,
+        serde::Deserialize,
+        bincode::Encode,
+        bincode::Decode,
+        PartialEq,
+        Arbitrary,
+    )]
     enum Action {
         Set { key: Vec<u8>, value: Vec<u8> },
         // get actions[prev_key % actions.len()]

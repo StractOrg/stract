@@ -22,17 +22,17 @@ use crate::{
     Result,
 };
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+
 use std::{fs, path::Path};
 use tokio::pin;
 use tracing::{info, trace};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 struct GraphPointer {
     path: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub enum JobConfig {
     Http(config::HttpConfig),
     Local(config::LocalConfig),
@@ -59,7 +59,7 @@ impl From<JobConfig> for config::WarcSource {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub struct Job {
     pub config: JobConfig,
     pub warc_paths: Vec<String>,

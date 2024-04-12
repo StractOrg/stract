@@ -16,8 +16,6 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
-use serde::{Deserialize, Serialize};
-
 use crate::{
     config,
     crawler::{self, planner::CrawlPlanner, CrawlCoordinator, Crawler},
@@ -98,7 +96,9 @@ pub mod router {
 
     sonic_service!(RouterService, [NewJob]);
 
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(
+        Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+    )]
     pub struct NewJob {}
 
     impl Message<RouterService> for NewJob {
@@ -121,7 +121,9 @@ pub mod coordinator {
 
     sonic_service!(CoordinatorService, [GetJob]);
 
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(
+        Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+    )]
     pub struct GetJob {}
 
     impl Message<CoordinatorService> for GetJob {

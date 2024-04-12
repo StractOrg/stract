@@ -26,7 +26,18 @@ use crate::Result;
 const MAX_NUM_WORDS: usize = 100;
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
 )]
 pub enum Label {
     SFW,
@@ -57,7 +68,7 @@ impl TryFrom<&str> for Label {
 
 impl naive_bayes::Label for Label {}
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, bincode::Encode, bincode::Decode, serde::Serialize, serde::Deserialize)]
 pub struct Datapoint {
     pub label: Label,
     pub text: String,
@@ -93,7 +104,7 @@ pub struct Evaluation {
     pub f1: f64,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(bincode::Encode, bincode::Decode)]
 pub struct Model {
     pipeline: naive_bayes::Pipeline<Label>,
 }
@@ -169,22 +180,22 @@ impl Model {
     }
 
     pub fn save<P: AsRef<Path>>(self, path: P) -> Result<()> {
-        let file = OpenOptions::new()
+        let mut file = OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
             .open(path)?;
 
-        bincode::serialize_into(file, &self)?;
+        bincode::encode_into_std_write(&self, &mut file, bincode::config::standard())?;
 
         Ok(())
     }
 
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let file = OpenOptions::new().read(true).open(path)?;
-        let reader = std::io::BufReader::new(file);
+        let mut reader = std::io::BufReader::new(file);
 
-        let model = bincode::deserialize_from(reader)?;
+        let model = bincode::decode_from_std_read(&mut reader, bincode::config::standard())?;
 
         Ok(model)
     }

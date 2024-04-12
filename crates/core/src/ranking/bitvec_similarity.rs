@@ -15,9 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 struct VeryJankyBloomFilter {
     data: Vec<u64>,
     ones: usize,
@@ -66,7 +65,7 @@ impl VeryJankyBloomFilter {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 struct Posting {
     ranks: Vec<u64>,
 }
@@ -105,7 +104,7 @@ impl Posting {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct BitVec {
     bloom: VeryJankyBloomFilter,
     posting: Posting,

@@ -37,7 +37,6 @@ use std::ops::Range;
 use crate::ceil_char_boundary;
 use crate::floor_char_boundary;
 use itertools::intersperse;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -50,8 +49,11 @@ pub enum Error {
     #[error("Serde error: {0}")]
     Serde(#[from] serde_json::Error),
 
-    #[error("Bincode error: {0}")]
-    Bincode(#[from] bincode::Error),
+    #[error("Encode error: {0}")]
+    Encode(#[from] bincode::error::EncodeError),
+
+    #[error("Decode error: {0}")]
+    Decode(#[from] bincode::error::DecodeError),
 
     #[error("Checker not found")]
     CheckerNotFound,
@@ -59,13 +61,31 @@ pub enum Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(PartialEq, Eq, Debug, Serialize, Deserialize, Clone)]
+#[derive(
+    PartialEq,
+    Eq,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Clone,
+)]
 pub struct Correction {
     original: String,
     pub terms: Vec<CorrectionTerm>,
 }
 
-#[derive(PartialEq, Eq, Debug, Serialize, Deserialize, Clone)]
+#[derive(
+    PartialEq,
+    Eq,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Clone,
+)]
 pub enum CorrectionTerm {
     Corrected { orig: String, correction: String },
     NotCorrected(String),

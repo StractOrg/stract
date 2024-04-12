@@ -16,9 +16,9 @@
 
 use std::hash::Hash;
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(
+    Debug, Eq, Clone, Copy, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+)]
 pub struct Prehashed(pub u128);
 
 impl From<u128> for Prehashed {

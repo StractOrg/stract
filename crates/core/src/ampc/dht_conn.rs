@@ -25,7 +25,7 @@ use crate::Result;
 
 pub trait DhtTables
 where
-    Self: Clone + serde::Serialize + serde::de::DeserializeOwned + Send + Sync,
+    Self: Clone + bincode::Encode + bincode::Decode + Send + Sync,
 {
     fn drop_tables(&self);
     fn next(&self) -> Self;
@@ -67,7 +67,7 @@ macro_rules! impl_dht_tables {
 use futures::{Stream, StreamExt};
 pub(crate) use impl_dht_tables;
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone, Debug)]
 pub struct Table {
     prefix: String,
     round: u64,
@@ -97,7 +97,7 @@ impl Table {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug)]
 pub struct DefaultDhtTable<K, V> {
     table: Table,
     client: dht::Client,
@@ -115,8 +115,8 @@ impl<K, V> Clone for DefaultDhtTable<K, V> {
 }
 impl<K, V> DefaultDhtTable<K, V>
 where
-    K: serde::Serialize + serde::de::DeserializeOwned,
-    V: serde::Serialize + serde::de::DeserializeOwned,
+    K: bincode::Encode + bincode::Decode,
+    V: bincode::Encode + bincode::Decode,
 {
     pub fn new<S: AsRef<str>>(members: &[(dht::ShardId, SocketAddr)], prefix: S) -> Self {
         Self {
@@ -127,43 +127,53 @@ where
     }
 }
 
-pub trait DhtTable: Clone + serde::Serialize + serde::de::DeserializeOwned {
-    type Key: serde::Serialize + serde::de::DeserializeOwned;
-    type Value: serde::Serialize + serde::de::DeserializeOwned;
+pub trait DhtTable: Clone + bincode::Encode + bincode::Decode {
+    type Key: bincode::Encode + bincode::Decode;
+    type Value: bincode::Encode + bincode::Decode;
 
     fn client(&self) -> &dht::Client;
     fn table(&self) -> &Table;
     fn next(&self) -> Self;
 
     fn get(&self, key: Self::Key) -> Option<Self::Value> {
-        let key = bincode::serialize(&key).unwrap();
+        let key = bincode::encode_to_vec(&key, bincode::config::standard()).unwrap();
 
         block_on(self.client().get(self.table().dht(), key.into()))
             .unwrap()
-            .map(|v| bincode::deserialize(v.as_bytes()).unwrap())
+            .map(|v| {
+                let (k, _) =
+                    bincode::decode_from_slice(v.as_bytes(), bincode::config::standard()).unwrap();
+                k
+            })
     }
 
     fn batch_get(&self, keys: Vec<Self::Key>) -> Vec<(Self::Key, Self::Value)> {
         let keys: Vec<dht::Key> = keys
             .into_iter()
-            .map(|k| bincode::serialize(&k).unwrap().into())
+            .map(|k| {
+                bincode::encode_to_vec(&k, bincode::config::standard())
+                    .unwrap()
+                    .into()
+            })
             .collect::<Vec<_>>();
         let values = block_on(self.client().batch_get(self.table().dht(), keys)).unwrap();
 
         values
             .into_iter()
             .map(|(k, v)| {
-                (
-                    bincode::deserialize(k.as_bytes()).unwrap(),
-                    bincode::deserialize(v.as_bytes()).unwrap(),
-                )
+                let (k, _) =
+                    bincode::decode_from_slice(k.as_bytes(), bincode::config::standard()).unwrap();
+                let (v, _) =
+                    bincode::decode_from_slice(v.as_bytes(), bincode::config::standard()).unwrap();
+
+                (k, v)
             })
             .collect()
     }
 
     fn set(&self, key: Self::Key, value: Self::Value) {
-        let key = bincode::serialize(&key).unwrap();
-        let value = bincode::serialize(&value).unwrap();
+        let key = bincode::encode_to_vec(&key, bincode::config::standard()).unwrap();
+        let value = bincode::encode_to_vec(&value, bincode::config::standard()).unwrap();
 
         block_on(
             self.client()
@@ -177,8 +187,12 @@ pub trait DhtTable: Clone + serde::Serialize + serde::de::DeserializeOwned {
             .into_iter()
             .map(|(k, v)| {
                 (
-                    bincode::serialize(&k).unwrap().into(),
-                    bincode::serialize(&v).unwrap().into(),
+                    bincode::encode_to_vec(&k, bincode::config::standard())
+                        .unwrap()
+                        .into(),
+                    bincode::encode_to_vec(&v, bincode::config::standard())
+                        .unwrap()
+                        .into(),
                 )
             })
             .collect();
@@ -192,8 +206,8 @@ pub trait DhtTable: Clone + serde::Serialize + serde::de::DeserializeOwned {
         key: Self::Key,
         value: Self::Value,
     ) -> UpsertAction {
-        let key = bincode::serialize(&key).unwrap();
-        let value = bincode::serialize(&value).unwrap();
+        let key = bincode::encode_to_vec(&key, bincode::config::standard()).unwrap();
+        let value = bincode::encode_to_vec(&value, bincode::config::standard()).unwrap();
 
         block_on(
             self.client()
@@ -211,8 +225,12 @@ pub trait DhtTable: Clone + serde::Serialize + serde::de::DeserializeOwned {
             .into_iter()
             .map(|(k, v)| {
                 (
-                    bincode::serialize(&k).unwrap().into(),
-                    bincode::serialize(&v).unwrap().into(),
+                    bincode::encode_to_vec(&k, bincode::config::standard())
+                        .unwrap()
+                        .into(),
+                    bincode::encode_to_vec(&v, bincode::config::standard())
+                        .unwrap()
+                        .into(),
                 )
             })
             .collect();
@@ -223,7 +241,11 @@ pub trait DhtTable: Clone + serde::Serialize + serde::de::DeserializeOwned {
         )
         .unwrap()
         .into_iter()
-        .map(|(k, did_upsert)| (bincode::deserialize(k.as_bytes()).unwrap(), did_upsert))
+        .map(|(k, did_upsert)| {
+            let (k, _) =
+                bincode::decode_from_slice(k.as_bytes(), bincode::config::standard()).unwrap();
+            (k, did_upsert)
+        })
         .collect()
     }
 
@@ -246,10 +268,12 @@ pub trait DhtTable: Clone + serde::Serialize + serde::de::DeserializeOwned {
 
     fn iter(&self) -> impl Iterator<Item = (Self::Key, Self::Value)> + '_ {
         self.raw_iter().map(|(key, value)| {
-            (
-                bincode::deserialize(key.as_bytes()).unwrap(),
-                bincode::deserialize(value.as_bytes()).unwrap(),
-            )
+            let (key, _) =
+                bincode::decode_from_slice(key.as_bytes(), bincode::config::standard()).unwrap();
+            let (value, _) =
+                bincode::decode_from_slice(value.as_bytes(), bincode::config::standard()).unwrap();
+
+            (key, value)
         })
     }
 }
@@ -309,8 +333,8 @@ where
 
 impl<K, V> DhtTable for DefaultDhtTable<K, V>
 where
-    K: serde::Serialize + serde::de::DeserializeOwned,
-    V: serde::Serialize + serde::de::DeserializeOwned,
+    K: bincode::Encode + bincode::Decode,
+    V: bincode::Encode + bincode::Decode,
 {
     type Key = K;
     type Value = V;
@@ -336,7 +360,7 @@ where
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub struct DhtConn<T> {
     prev: T,
     next: T,
@@ -383,21 +407,39 @@ where
 mod tests {
     use std::collections::BTreeMap;
 
-    use openraft::{error::InitializeError, BasicNode};
+    use openraft::error::InitializeError;
     use tracing_test::traced_test;
 
-    use self::dht::upsert;
+    use self::dht::{upsert, BasicNode};
 
     use super::*;
 
     #[derive(
-        Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord,
+        Debug,
+        Clone,
+        serde::Serialize,
+        serde::Deserialize,
+        bincode::Encode,
+        bincode::Decode,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
     )]
     struct Id(u64);
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+    #[derive(
+        Debug,
+        Clone,
+        serde::Serialize,
+        serde::Deserialize,
+        bincode::Encode,
+        bincode::Decode,
+        PartialEq,
+        Eq,
+    )]
     struct Counter(u64);
 
-    #[derive(Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
     struct Tables {
         id: DefaultDhtTable<Id, Counter>,
     }

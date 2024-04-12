@@ -17,7 +17,6 @@
 use std::collections::HashMap;
 
 use kuchiki::NodeRef;
-use serde::{Deserialize, Serialize};
 
 use crate::tokenizer::FlattenedJson;
 use crate::Result;
@@ -25,7 +24,16 @@ use crate::Result;
 mod json_ld;
 mod microdata;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub enum Property {
     String(String),
     Item(Item),
@@ -46,7 +54,16 @@ impl Property {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 #[serde(untagged)]
 enum SingleMap {
     Leaf(String),
@@ -85,7 +102,7 @@ impl From<Property> for SingleMap {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 pub struct RawItem {
     #[serde(rename = "@type")]
     itemtype: Option<RawOneOrMany<String>>,
@@ -93,7 +110,7 @@ pub struct RawItem {
     properties: HashMap<String, RawOneOrMany<RawProperty>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 #[serde(untagged)]
 enum RawProperty {
     String(String),
@@ -126,7 +143,16 @@ impl From<RawProperty> for Property {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Item {
     pub itemtype: Option<OneOrMany<String>>,
     pub properties: HashMap<String, OneOrMany<Property>>,
@@ -170,8 +196,18 @@ impl From<RawItem> for Item {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Hash)]
-pub enum OneOrMany<T> {
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
+    Hash,
+)]
+pub enum OneOrMany<T: 'static> {
     One(T),
     Many(Vec<T>),
 }
@@ -192,9 +228,19 @@ impl<T> OneOrMany<T> {
     }
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone, Hash)]
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
+    Hash,
+)]
 #[serde(untagged)]
-enum RawOneOrMany<T> {
+enum RawOneOrMany<T: 'static> {
     One(T),
     Many(Vec<T>),
 }

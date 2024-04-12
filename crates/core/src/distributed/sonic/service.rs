@@ -21,9 +21,9 @@ use tokio::net::ToSocketAddrs;
 use super::Result;
 
 pub trait Service: Sized + Send + Sync + 'static {
-    type Request: serde::de::DeserializeOwned + Send + Sync;
-    type RequestRef<'a>: serde::Serialize + Send + Sync;
-    type Response: serde::Serialize + serde::de::DeserializeOwned + Send + Sync;
+    type Request: bincode::Decode + Send + Sync;
+    type RequestRef<'a>: bincode::Encode + Send + Sync;
+    type Response: bincode::Encode + bincode::Decode + Send + Sync;
 
     fn handle(
         req: Self::Request,
@@ -137,15 +137,15 @@ macro_rules! sonic_service {
 
             use $crate::distributed::sonic;
 
-            #[derive(Debug, Clone, ::serde::Deserialize)]
+            #[derive(Debug, Clone, ::bincode::Decode)]
             pub enum Request {
                 $($req($req),)*
             }
-            #[derive(Debug, Clone, ::serde::Serialize)]
+            #[derive(Debug, Clone, ::bincode::Encode)]
             pub enum RequestRef<'a> {
                 $($req(&'a $req),)*
             }
-            #[derive(::serde::Serialize, ::serde::Deserialize)]
+            #[derive(::bincode::Encode, ::bincode::Decode)]
             pub enum Response {
                 $($req(<$req as sonic::service::Message<$service>>::Response),)*
             }
@@ -261,7 +261,6 @@ mod tests {
         use std::sync::atomic::AtomicI32;
 
         use proptest_derive::Arbitrary;
-        use serde::{Deserialize, Serialize};
 
         use super::super::Message;
 
@@ -271,11 +270,21 @@ mod tests {
 
         sonic_service!(CounterService, [Change, Reset]);
 
-        #[derive(Debug, Clone, Serialize, Deserialize, Arbitrary)]
+        #[derive(
+            Debug,
+            Clone,
+            serde::Serialize,
+            serde::Deserialize,
+            bincode::Encode,
+            bincode::Decode,
+            Arbitrary,
+        )]
         pub struct Change {
             pub amount: i32,
         }
-        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[derive(
+            Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+        )]
         pub struct Reset;
 
         impl Message<CounterService> for Change {

@@ -16,7 +16,6 @@
 
 use std::{collections::HashMap, path::Path};
 
-use serde::{Deserialize, Serialize};
 use tracing::info;
 use url::Url;
 
@@ -104,7 +103,7 @@ impl SearchService {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct RetrieveWebsites {
     pub websites: Vec<inverted_index::WebpagePointer>,
     pub query: String,
@@ -119,7 +118,7 @@ impl sonic::service::Message<SearchService> for RetrieveWebsites {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Search {
     pub query: SearchQuery,
 }
@@ -130,7 +129,7 @@ impl sonic::service::Message<SearchService> for Search {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct GetWebpage {
     pub url: String,
 }
@@ -141,12 +140,13 @@ impl sonic::service::Message<SearchService> for GetWebpage {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct GetHomepageDescriptions {
+    #[bincode(with_serde)]
     pub urls: Vec<Url>,
 }
 impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
-    type Response = HashMap<Url, String>;
+    type Response = crate::bincode_utils::SerdeCompat<HashMap<Url, String>>;
     async fn handle(self, server: &SearchService) -> Self::Response {
         let mut result = HashMap::with_capacity(self.urls.len());
 
@@ -158,7 +158,7 @@ impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
             }
         }
 
-        result
+        crate::bincode_utils::SerdeCompat(result)
     }
 }
 

@@ -16,7 +16,7 @@
 
 use std::{collections::VecDeque, future::Future, sync::Arc, time::Duration};
 
-use hashbrown::HashMap;
+type HashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
 use url::Url;
 
@@ -65,11 +65,31 @@ pub enum Error {
 type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
 
 #[derive(
-    Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
 )]
 struct Site(String);
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Domain(String);
 
 impl From<&Url> for Domain {
@@ -96,8 +116,9 @@ impl Domain {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct WeightedUrl {
+    #[bincode(with_serde)]
     pub url: Url,
     pub weight: f64,
 }
@@ -118,22 +139,44 @@ impl std::hash::Hash for WeightedUrl {
 
 /// All urls in a job must be from the same domain and only one job per domain.
 /// at a time. This ensures that we stay polite when crawling.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct Job {
     pub domain: Domain,
     pub urls: VecDeque<WeightedUrl>,
     pub wandering_urls: u64,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub enum UrlResponse {
-    Success { url: Url },
-    Failed { url: Url, status_code: Option<u16> },
-    Redirected { url: Url, new_url: Url },
+    Success {
+        #[bincode(with_serde)]
+        url: Url,
+    },
+    Failed {
+        #[bincode(with_serde)]
+        url: Url,
+        status_code: Option<u16>,
+    },
+    Redirected {
+        #[bincode(with_serde)]
+        url: Url,
+        #[bincode(with_serde)]
+        new_url: Url,
+    },
 }
 
 #[derive(
-    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
 )]
 pub struct UrlString(String);
 
@@ -156,18 +199,18 @@ impl TryFrom<&UrlString> for Url {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct UrlToInsert {
     pub url: UrlString,
     pub weight: f64,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct DiscoveredUrls {
     pub urls: HashMap<Domain, Vec<UrlToInsert>>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct DomainCrawled {
     pub domain: Domain,
     pub budget_used: f64,

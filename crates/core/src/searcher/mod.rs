@@ -22,7 +22,7 @@ pub mod local;
 pub use distributed::*;
 pub use local::*;
 use optics::{HostRankings, Optic};
-use serde::{Deserialize, Serialize};
+
 use utoipa::ToSchema;
 
 use crate::{
@@ -32,13 +32,15 @@ use crate::{
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub enum SearchResult {
     Websites(WebsitesResult),
     Bang(Box<BangHit>),
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct WebsitesResult {
     pub webpages: Vec<DisplayedWebpage>,
@@ -47,7 +49,7 @@ pub struct WebsitesResult {
     pub has_more_results: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub struct SearchQuery {
     pub query: String,
     pub page: usize,
@@ -60,7 +62,7 @@ pub struct SearchQuery {
     pub count_results: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct InitialWebsiteResult {
     pub num_websites: Option<usize>,
     pub websites: Vec<RecallRankingWebpage>,

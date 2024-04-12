@@ -17,7 +17,7 @@
 use crate::enum_map::EnumMap;
 use optics::ast::RankingTarget;
 use optics::Optic;
-use serde::{Deserialize, Serialize};
+
 use std::str::FromStr;
 
 use thiserror::Error;
@@ -102,7 +102,16 @@ pub struct ComputedSignal {
     pub score: SignalScore,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct SignalScore {
     pub coefficient: f64,

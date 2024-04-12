@@ -47,7 +47,7 @@ mod writer;
 
 type SegmentID = String;
 
-#[derive(serde::Serialize, serde::Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default)]
 struct Meta {
     comitted_segments: Vec<SegmentID>,
 }

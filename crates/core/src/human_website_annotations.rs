@@ -15,20 +15,50 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+
 use tantivy::schema::Facet;
 
 use crate::Result;
 use std::{
     collections::{HashMap, HashSet},
     fs::File,
-    io::{BufReader, Read, Write},
+    io::{BufReader, Write},
     path::Path,
 };
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Topic<const N: usize = 2> {
     detailed_topics: Vec<String>,
+}
+
+/// bincode seems to not like default const generics, therefore manual impl
+impl<const N: usize> bincode::Encode for Topic<N> {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
+        self.detailed_topics.encode(encoder)
+    }
+}
+
+impl<const N: usize> bincode::Decode for Topic<N> {
+    fn decode<D: bincode::de::Decoder>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        Ok(Self {
+            detailed_topics: Vec::decode(decoder)?,
+        })
+    }
+}
+
+impl<'de, const N: usize> bincode::BorrowDecode<'de> for Topic<N> {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        Ok(Self {
+            detailed_topics: Vec::borrow_decode(decoder)?,
+        })
+    }
 }
 
 impl<const N: usize> From<Facet> for Topic<N> {
@@ -57,13 +87,13 @@ impl<const N: usize> Topic<N> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Info {
     pub description: String,
     pub topic: Topic,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Mapper(HashMap<String, Info>);
 
 impl From<HashMap<String, Info>> for Mapper {
@@ -80,7 +110,7 @@ impl Mapper {
             .write(true)
             .open(path)?;
 
-        let bytes = bincode::serialize(&self)?;
+        let bytes = bincode::encode_to_vec(self, bincode::config::standard())?;
         file.write_all(&bytes)?;
 
         Ok(())
@@ -89,10 +119,10 @@ impl Mapper {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut reader = BufReader::new(File::open(path)?);
 
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes)?;
-
-        Ok(bincode::deserialize(&bytes)?)
+        Ok(bincode::decode_from_std_read(
+            &mut reader,
+            bincode::config::standard(),
+        )?)
     }
 
     pub fn get(&self, host: &String) -> Option<&Info> {

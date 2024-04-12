@@ -16,8 +16,6 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
-
 use crate::{
     collector,
     config::CollectorConfig,
@@ -34,7 +32,7 @@ use crate::{
     searcher::SearchQuery,
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct StoredEmbeddings(Vec<u8>);
 
 impl StoredEmbeddings {
@@ -43,7 +41,7 @@ impl StoredEmbeddings {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct RecallRankingWebpage {
     pub pointer: WebpagePointer,
     pub signals: EnumMap<SignalEnum, SignalScore>,

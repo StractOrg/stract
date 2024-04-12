@@ -20,7 +20,6 @@
 use std::collections::{HashMap, VecDeque};
 
 use indicatif::{ProgressBar, ProgressStyle};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     intmap::IntMap,
@@ -135,7 +134,9 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
     )
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+)]
 pub struct Betweenness {
     pub centrality: HashMap<Node, f64>,
     pub max_dist: usize,

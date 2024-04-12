@@ -20,14 +20,13 @@ use rocksdb::{
     BlockBasedOptions, DBIteratorWithThreadMode, DBWithThreadMode, IteratorMode, Options,
     SingleThreaded, DB,
 };
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::kv::Kv;
 
 pub struct RocksDbStore<K, V>
 where
-    K: Serialize + DeserializeOwned,
-    V: Serialize + DeserializeOwned,
+    K: bincode::Encode + bincode::Decode,
+    V: bincode::Encode + bincode::Decode,
 {
     db: DB,
     _cache: rocksdb::Cache,
@@ -36,8 +35,8 @@ where
 
 impl<K, V> RocksDbStore<K, V>
 where
-    K: Serialize + DeserializeOwned,
-    V: Serialize + DeserializeOwned,
+    K: bincode::Encode + bincode::Decode,
+    V: bincode::Encode + bincode::Decode,
 {
     fn options(cache: &rocksdb::Cache) -> Options {
         let mut options = Options::default();
@@ -113,8 +112,8 @@ where
 
 impl<K, V> Kv<K, V> for RocksDbStore<K, V>
 where
-    K: Serialize + DeserializeOwned + 'static + Send + Sync,
-    V: Serialize + DeserializeOwned + 'static + Send + Sync,
+    K: bincode::Encode + bincode::Decode + 'static + Send + Sync,
+    V: bincode::Encode + bincode::Decode + 'static + Send + Sync,
 {
     fn get_raw(&self, key: &[u8]) -> Option<Vec<u8>> {
         let mut opts = rocksdb::ReadOptions::default();
@@ -167,8 +166,8 @@ where
 
 pub struct IntoIter<'a, K, V>
 where
-    K: Serialize + DeserializeOwned,
-    V: Serialize + DeserializeOwned,
+    K: bincode::Encode + bincode::Decode,
+    V: bincode::Encode + bincode::Decode,
 {
     inner: DBIteratorWithThreadMode<'a, DBWithThreadMode<SingleThreaded>>,
     key: PhantomData<K>,
@@ -177,8 +176,8 @@ where
 
 impl<'a, K, V> Iterator for IntoIter<'a, K, V>
 where
-    K: Serialize + DeserializeOwned,
-    V: Serialize + DeserializeOwned,
+    K: bincode::Encode + bincode::Decode,
+    V: bincode::Encode + bincode::Decode,
 {
     type Item = (K, V);
 
@@ -187,10 +186,14 @@ where
             .next()
             .and_then(|r| r.ok())
             .map(|(key_bytes, value_bytes)| {
-                (
-                    bincode::deserialize(&key_bytes).expect("Failed to deserialize key"),
-                    bincode::deserialize(&value_bytes).expect("Failed to deserialize value"),
-                )
+                let (key, _) = bincode::decode_from_slice(&key_bytes, bincode::config::standard())
+                    .expect("Failed to deserialize key");
+
+                let (val, _) =
+                    bincode::decode_from_slice(&value_bytes, bincode::config::standard())
+                        .expect("Failed to deserialize val");
+
+                (key, val)
             })
     }
 }

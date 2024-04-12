@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use fnv::FnvHashMap;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+
 use tracing::{debug, info};
 use whatlang::Lang;
 
@@ -117,7 +117,7 @@ impl SpellWorker {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Job {
     pub source_config: config::WarcSource,
     pub warc_path: String,

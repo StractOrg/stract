@@ -32,7 +32,6 @@ mod search;
 pub use indexing::merge_tantivy_segments;
 
 use chrono::NaiveDateTime;
-use serde::{Deserialize, Serialize};
 
 use tantivy::directory::MmapDirectory;
 
@@ -61,20 +60,31 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct InitialSearchResult {
     pub num_websites: Option<usize>,
     pub top_websites: Vec<WebpagePointer>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone, PartialEq,
+)]
 pub struct WebpagePointer {
     pub score: Score,
     pub hashes: Hashes,
     pub address: DocAddress,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[derive(
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Clone,
+    Copy,
+    PartialEq,
+)]
 pub struct DocAddress {
     pub segment: u32,
     pub doc_id: u32,
@@ -202,13 +212,22 @@ impl InvertedIndex {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize, bincode::Encode)]
 pub struct SearchResult {
     pub num_docs: Option<usize>,
     pub documents: Vec<RetrievedWebpage>,
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(
+    Default,
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+)]
 pub struct RetrievedWebpage {
     pub title: String,
     pub url: String,
@@ -217,6 +236,7 @@ pub struct RetrievedWebpage {
     pub dirty_body: String,
     pub description: Option<String>,
     pub dmoz_description: Option<String>,
+    #[bincode(with_serde)]
     pub updated_time: Option<NaiveDateTime>,
     pub schema_org: Vec<schema_org::Item>,
     pub region: Region,

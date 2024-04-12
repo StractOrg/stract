@@ -17,7 +17,7 @@
 use std::path::Path;
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+
 use tokio::pin;
 use tracing::{info, trace, warn};
 
@@ -28,7 +28,7 @@ use crate::warc::PayloadType;
 
 use super::{IndexableWebpage, IndexingWorker};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Job {
     pub source_config: config::WarcSource,
     pub warc_path: String,
@@ -36,7 +36,9 @@ pub struct Job {
     pub settings: JobSettings,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+)]
 pub struct JobSettings {
     pub host_centrality_threshold: Option<f64>,
     pub minimum_clean_words: Option<usize>,

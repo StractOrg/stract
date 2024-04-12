@@ -23,7 +23,6 @@ use std::sync::Mutex;
 
 use openraft::storage::RaftStateMachine;
 use openraft::storage::Snapshot;
-use openraft::BasicNode;
 use openraft::Entry;
 use openraft::EntryPayload;
 use openraft::LogId;
@@ -33,19 +32,29 @@ use openraft::SnapshotMeta;
 use openraft::StorageError;
 use openraft::StorageIOError;
 use openraft::StoredMembership;
-use serde::Deserialize;
-use serde::Serialize;
 use tokio::sync::RwLock;
 
 use crate::ampc::dht::network::api;
 
 use super::upsert::UpsertEnum;
 use super::upsert::UpsertFn;
+use super::BasicNode;
 use super::NodeId;
 use super::TypeConfig;
 use super::{Request, Response};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Debug,
+    Clone,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+)]
 #[serde(transparent)]
 pub struct Table(String);
 
@@ -67,7 +76,18 @@ impl From<&str> for Table {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Debug,
+    Clone,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+)]
 #[serde(transparent)]
 pub struct Key(Vec<u8>);
 
@@ -89,7 +109,16 @@ impl From<&[u8]> for Key {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+)]
 #[serde(transparent)]
 pub struct Value(Vec<u8>);
 
@@ -111,14 +140,18 @@ impl From<&[u8]> for Value {
     }
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+)]
 pub enum UpsertAction {
     Merged,
     NoChange,
     Inserted,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(
+    serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Default, Clone,
+)]
 pub struct Db {
     data: BTreeMap<Table, BTreeMap<Key, Value>>,
 }
@@ -263,9 +296,13 @@ pub struct StoredSnapshot {
     pub data: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(
+    serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Default, Clone,
+)]
 pub struct StateMachineData {
+    #[bincode(with_serde)]
     pub last_applied_log: Option<LogId<NodeId>>,
+    #[bincode(with_serde)]
     pub last_membership: StoredMembership<NodeId, BasicNode>,
 
     /// Application data.
@@ -291,8 +328,9 @@ impl RaftSnapshotBuilder<TypeConfig> for Arc<StateMachineStore> {
         {
             // Serialize the data of the state machine.
             let state_machine = self.state_machine.read().await;
-            data = bincode::serialize(&*state_machine)
+            let encoded = bincode::encode_to_vec(&*state_machine, bincode::config::standard())
                 .map_err(|e| StorageIOError::read_state_machine(&e))?;
+            data = encoded;
 
             last_applied_log = state_machine.last_applied_log;
             last_membership = state_machine.last_membership.clone();
@@ -448,9 +486,11 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
 
         // Update the state machine.
         {
-            let data: Db = bincode::deserialize(&new_snapshot.data).map_err(|e| {
-                StorageIOError::read_snapshot(Some(new_snapshot.meta.signature()), &e)
-            })?;
+            let (data, _): (Db, _) =
+                bincode::decode_from_slice(&new_snapshot.data, bincode::config::standard())
+                    .map_err(|e| {
+                        StorageIOError::read_snapshot(Some(new_snapshot.meta.signature()), &e)
+                    })?;
 
             let mut state_machine = self.state_machine.write().await;
             state_machine.db = data;

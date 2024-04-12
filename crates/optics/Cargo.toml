@@ -12,6 +12,7 @@ itertools = { workspace = true }
 logos = { workspace = true }
 serde = { workspace = true }
 utoipa = { workspace = true }
+bincode = { workspace = true }
 
 [build-dependencies]
 lalrpop = { workspace = true }

@@ -23,12 +23,12 @@ use api::{
 };
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 
-use openraft::{BasicNode, Raft, RaftNetworkFactory};
+use openraft::{Raft, RaftNetworkFactory};
 
 use self::raft::RemoteClient;
 use crate::distributed::sonic::service::sonic_service;
 
-use super::{store::StateMachineStore, NodeId, TypeConfig};
+use super::{store::StateMachineStore, BasicNode, NodeId, TypeConfig};
 
 #[derive(Clone)]
 pub struct Network;
@@ -41,27 +41,39 @@ impl RaftNetworkFactory<TypeConfig> for Network {
     }
 }
 
-pub type AppendEntries = openraft::raft::AppendEntriesRequest<TypeConfig>;
-pub type AppendEntriesResponse = openraft::raft::AppendEntriesResponse<NodeId>;
+#[derive(bincode::Encode, bincode::Decode, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct AppendEntries(#[bincode(with_serde)] openraft::raft::AppendEntriesRequest<TypeConfig>);
+#[derive(bincode::Encode, bincode::Decode, serde::Serialize, serde::Deserialize, Debug)]
+pub struct AppendEntriesResponse(
+    #[bincode(with_serde)] pub openraft::raft::AppendEntriesResponse<NodeId>,
+);
 
-pub type InstallSnapshot = openraft::raft::InstallSnapshotRequest<TypeConfig>;
-pub type InstallSnapshotResponse = openraft::raft::InstallSnapshotResponse<NodeId>;
+#[derive(bincode::Encode, bincode::Decode, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct InstallSnapshot(
+    #[bincode(with_serde)] pub openraft::raft::InstallSnapshotRequest<TypeConfig>,
+);
+#[derive(bincode::Encode, bincode::Decode, serde::Serialize, serde::Deserialize, Debug)]
+pub struct InstallSnapshotResponse(
+    #[bincode(with_serde)] pub openraft::raft::InstallSnapshotResponse<NodeId>,
+);
 
-pub type Vote = openraft::raft::VoteRequest<NodeId>;
-pub type VoteResponse = openraft::raft::VoteResponse<NodeId>;
+#[derive(bincode::Encode, bincode::Decode, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct Vote(#[bincode(with_serde)] pub openraft::raft::VoteRequest<NodeId>);
+#[derive(bincode::Encode, bincode::Decode, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct VoteResponse(#[bincode(with_serde)] pub openraft::raft::VoteResponse<NodeId>);
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct AddLearner {
     pub id: NodeId,
     pub addr: SocketAddr,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct AddNodes {
     members: BTreeMap<NodeId, BasicNode>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct Metrics;
 
 sonic_service!(

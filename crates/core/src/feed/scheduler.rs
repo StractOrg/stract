@@ -31,10 +31,20 @@ use crate::{
 
 use super::{index::FeedIndex, Feed};
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Hash,
+)]
 pub struct Domain(String);
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct DomainFeeds {
     pub domain: Domain,
     pub feeds: Vec<Feed>,
@@ -46,8 +56,18 @@ impl From<&Url> for Domain {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub struct SplitId(uuid::Uuid);
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Hash,
+)]
+pub struct SplitId(#[bincode(with_serde)] uuid::Uuid);
 
 impl SplitId {
     pub fn id(&self) -> uuid::Uuid {
@@ -55,7 +75,7 @@ impl SplitId {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Split {
     pub id: SplitId,
     pub feeds: Vec<DomainFeeds>,

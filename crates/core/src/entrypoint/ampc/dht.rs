@@ -21,7 +21,7 @@ use openraft::error::InitializeError;
 use tracing::info;
 
 use crate::{
-    ampc::dht::{self, ShardId},
+    ampc::dht::{self, BasicNode, ShardId},
     config::{DhtConfig, GossipConfig},
     distributed::{
         cluster::Cluster,
@@ -93,7 +93,7 @@ pub async fn run<C: Into<Config>>(config: C) -> Result<()> {
         }
         None => {
             let members: BTreeMap<u64, _> =
-                BTreeMap::from([(config.node_id, openraft::BasicNode::new(config.host))]);
+                BTreeMap::from([(config.node_id, BasicNode::new(config.host))]);
 
             if let Err(e) = raft.initialize(members.clone()).await {
                 match e {

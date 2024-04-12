@@ -22,7 +22,7 @@ use std::{
 use anyhow::Result;
 use itertools::Itertools;
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
+
 use tracing::info;
 use url::Url;
 
@@ -33,14 +33,14 @@ use crate::{
     warc::PayloadType,
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Job {
     pub source_config: WarcSource,
     pub warc_path: String,
     pub base_path: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct IndexPointer(PathBuf);
 
 impl From<String> for IndexPointer {

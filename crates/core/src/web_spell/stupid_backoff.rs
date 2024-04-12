@@ -23,11 +23,21 @@ use std::{
 };
 
 use fst::{Automaton, IntoStreamer, Streamer};
-use serde::{Deserialize, Serialize};
 
 const DISCOUNT: f64 = 0.4;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Ngram {
     terms: Vec<String>,
 }
@@ -129,10 +139,10 @@ impl StupidBackoffTrainer {
 
         builder.finish()?;
 
-        bincode::serialize_into(
-            File::create(path.as_ref().join("n_counts.bin"))?,
-            &self.n_counts,
-        )?;
+        let f = File::create(path.as_ref().join("n_counts.bin"))?;
+        let mut wrt = BufWriter::new(f);
+
+        bincode::encode_into_std_write(&self.n_counts, &mut wrt, bincode::config::standard())?;
 
         Ok(())
     }
@@ -213,8 +223,8 @@ impl StupidBackoff {
         let rotated_ngrams = fst::Map::new(mmap)?;
 
         let file = File::open(path.as_ref().join("n_counts.bin"))?;
-        let reader = std::io::BufReader::new(file);
-        let n_counts = bincode::deserialize_from(reader)?;
+        let mut reader = std::io::BufReader::new(file);
+        let n_counts = bincode::decode_from_std_read(&mut reader, bincode::config::standard())?;
 
         Ok(Self {
             ngrams,
@@ -243,7 +253,8 @@ impl StupidBackoff {
             .write(true)
             .open(path.as_ref().join("n_counts.bin"))?;
 
-        bincode::serialize_into(file, &n_counts)?;
+        let mut wrt = BufWriter::new(file);
+        bincode::encode_into_std_write(&n_counts, &mut wrt, bincode::config::standard())?;
 
         let file = OpenOptions::new()
             .create(true)

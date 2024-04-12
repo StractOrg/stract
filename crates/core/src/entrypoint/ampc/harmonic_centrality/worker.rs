@@ -78,7 +78,7 @@ impl CentralityWorker {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct GetShard;
 
 impl Message<CentralityWorker> for GetShard {
@@ -88,7 +88,7 @@ impl Message<CentralityWorker> for GetShard {
         worker.shard
     }
 }
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct NumNodes;
 
 impl Message<CentralityWorker> for NumNodes {
@@ -99,7 +99,7 @@ impl Message<CentralityWorker> for NumNodes {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct BatchId2Node(Vec<webgraph::NodeID>);
 
 impl Message<CentralityWorker> for BatchId2Node {

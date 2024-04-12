@@ -16,7 +16,7 @@
 
 use chrono::NaiveDate;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+
 use utoipa::ToSchema;
 
 use crate::entity_index::{
@@ -24,7 +24,9 @@ use crate::entity_index::{
     EntityMatch,
 };
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone, ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayedEntity {
     pub title: String,

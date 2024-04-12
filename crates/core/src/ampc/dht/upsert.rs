@@ -26,47 +26,69 @@ pub trait UpsertFn {
 }
 
 #[enum_dispatch(UpsertFn)]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub enum UpsertEnum {
     HyperLogLog64Upsert,
     U64Add,
     F64Add,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct HyperLogLog64Upsert;
 
 impl UpsertFn for HyperLogLog64Upsert {
     fn upsert(&self, old: Value, new: Value) -> Value {
-        let mut old: HyperLogLog<64> = bincode::deserialize(old.as_bytes()).unwrap();
-        let new: HyperLogLog<64> = bincode::deserialize(new.as_bytes()).unwrap();
+        let (mut old, _) = bincode::decode_from_slice::<HyperLogLog<64>, _>(
+            old.as_bytes(),
+            bincode::config::standard(),
+        )
+        .unwrap();
+        let (new, _) = bincode::decode_from_slice::<HyperLogLog<64>, _>(
+            new.as_bytes(),
+            bincode::config::standard(),
+        )
+        .unwrap();
 
         old.merge(&new);
 
-        bincode::serialize(&old).unwrap().into()
+        bincode::encode_to_vec(&old, bincode::config::standard())
+            .unwrap()
+            .into()
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct U64Add;
 
 impl UpsertFn for U64Add {
     fn upsert(&self, old: Value, new: Value) -> Value {
-        let old: u64 = bincode::deserialize(old.as_bytes()).unwrap();
-        let new: u64 = bincode::deserialize(new.as_bytes()).unwrap();
+        let (old, _) =
+            bincode::decode_from_slice::<u64, _>(old.as_bytes(), bincode::config::standard())
+                .unwrap();
+        let (new, _) =
+            bincode::decode_from_slice::<u64, _>(new.as_bytes(), bincode::config::standard())
+                .unwrap();
 
-        bincode::serialize(&(old + new)).unwrap().into()
+        bincode::encode_to_vec(old + new, bincode::config::standard())
+            .unwrap()
+            .into()
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct F64Add;
 
 impl UpsertFn for F64Add {
     fn upsert(&self, old: Value, new: Value) -> Value {
-        let old: f64 = bincode::deserialize(old.as_bytes()).unwrap();
-        let new: f64 = bincode::deserialize(new.as_bytes()).unwrap();
+        let (old, _) =
+            bincode::decode_from_slice::<f64, _>(old.as_bytes(), bincode::config::standard())
+                .unwrap();
+        let (new, _) =
+            bincode::decode_from_slice::<f64, _>(new.as_bytes(), bincode::config::standard())
+                .unwrap();
 
-        bincode::serialize(&(old + new)).unwrap().into()
+        bincode::encode_to_vec(old + new, bincode::config::standard())
+            .unwrap()
+            .into()
     }
 }

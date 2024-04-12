@@ -18,7 +18,7 @@ use super::{DhtTables, Mapper, Worker};
 
 pub trait Job
 where
-    Self: serde::Serialize + serde::de::DeserializeOwned + std::fmt::Debug + Clone + Send + Sync,
+    Self: bincode::Encode + bincode::Decode + std::fmt::Debug + Clone + Send + Sync,
 {
     type DhtTables: DhtTables;
     type Worker: Worker<Job = Self>;

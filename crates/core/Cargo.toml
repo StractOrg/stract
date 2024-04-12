@@ -20,6 +20,7 @@ name = "stract"
 path = "src/main.rs"
 
 [dependencies]
+ahash = { workspace = true }
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }
 async-channel = { workspace = true }
@@ -75,6 +76,7 @@ once_cell = { workspace = true }
 openraft = { workspace = true }
 optics = { path = "../optics" }
 publicsuffix = { workspace = true }
+postcard = { workspace = true }
 quick-xml = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }

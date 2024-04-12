@@ -15,9 +15,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::intmap::IntMap;
-use hashbrown::{HashMap, HashSet};
+use ahash::{HashMapExt, HashSetExt};
 use itertools::Itertools;
 use std::hash::Hash;
+
+type HashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
+type HashSet<T> = std::collections::HashSet<T, ahash::RandomState>;
 
 /// Laplace smoothing factor
 const ALPHA: f32 = 1.0;
@@ -30,7 +33,7 @@ pub struct TfIdf {
 }
 
 /// Vectorizer to convert text into TF-IDF features
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(bincode::Encode, bincode::Decode)]
 struct TfidfVectorizer {
     vocabulary: HashMap<String, u64>,
     idf: IntMap<u64, f32>,
@@ -127,7 +130,7 @@ pub struct Prediction<L> {
 }
 
 /// Naive Bayes Classifier
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(bincode::Encode, bincode::Decode)]
 pub struct NaiveBayes<L: Label> {
     classes: Vec<L>,
     class_prior: Vec<f32>,
@@ -260,7 +263,7 @@ impl<L: Label> NaiveBayes<L> {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(bincode::Encode, bincode::Decode)]
 pub struct Pipeline<L: Label> {
     vectorizer: TfidfVectorizer,
     classifier: NaiveBayes<L>,

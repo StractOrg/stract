@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
-
 use super::Result;
 use std::{
     collections::HashMap,
@@ -24,7 +22,18 @@ use std::{
     path::Path,
 };
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub enum ErrorType {
     Insertion(char),
     Deletion(char),
@@ -32,7 +41,18 @@ pub enum ErrorType {
     Transposition(char, char),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct ErrorSequence(Vec<ErrorType>);
 
 pub fn possible_errors(a: &str, b: &str) -> Option<ErrorSequence> {
@@ -109,7 +129,7 @@ pub fn possible_errors(a: &str, b: &str) -> Option<ErrorSequence> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 struct StoredErrorModel {
     errors: HashMap<String, u64>,
     total: u64,

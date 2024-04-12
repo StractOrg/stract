@@ -1,5 +1,11 @@
 [workspace]
-members = ["crates/core", "crates/optics", "crates/kuchiki", "crates/zimba"]
+members = [
+    "crates/core",
+    "crates/optics",
+    "crates/kuchiki",
+    "crates/zimba",
+    "crates/client-wasm",
+]
 resolver = "2"
 
 [profile.release]
@@ -10,6 +16,7 @@ lto = "thin"
 debug = true
 
 [workspace.dependencies]
+ahash = "0.8.11"
 aes-gcm = "0.10.2"
 anyhow = { version = "1.0.72", features = ["backtrace"] }
 async-channel = "1.8.0"
@@ -18,7 +25,9 @@ axum = "0.7.2"
 axum-extra = { version = "0.9.0" }
 axum-macros = "0.4.0"
 base64 = "0.21.4"
-bincode = "1.3.3"
+bincode = { git = "https://github.com/bincode-org/bincode", rev = "8f65c60", features = [
+    "serde",
+] }
 bindgen = "0.69.2"
 bitvec = "1.0.1"
 bytecount = "0.6.7"
@@ -75,6 +84,7 @@ min-max-heap = "1.3.0"
 nom = "7.1.3"
 num_cpus = "1.15.0"
 once_cell = "1.13.1"
+postcard = { version = "1.0.8", features = ["experimental-derive", "alloc"] }
 proptest = "1.2.0"
 proptest-derive = "0.4.0"
 publicsuffix = "2.2.3"

@@ -27,6 +27,37 @@ pub struct RemoteClient<S> {
     _phantom: std::marker::PhantomData<S>,
 }
 
+impl<S> bincode::Encode for RemoteClient<S> {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
+        self.addr.encode(encoder)
+    }
+}
+
+impl<S> bincode::Decode for RemoteClient<S> {
+    fn decode<D: bincode::de::Decoder>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        Ok(Self {
+            addr: SocketAddr::decode(decoder)?,
+            _phantom: std::marker::PhantomData,
+        })
+    }
+}
+
+impl<'de, S> bincode::BorrowDecode<'de> for RemoteClient<S> {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        Ok(Self {
+            addr: SocketAddr::borrow_decode(decoder)?,
+            _phantom: std::marker::PhantomData,
+        })
+    }
+}
+
 impl<S> Clone for RemoteClient<S>
 where
     S: sonic::service::Service,

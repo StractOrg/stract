@@ -48,21 +48,21 @@ pub fn block_on<F: std::future::Future>(f: F) -> F::Output {
     TOKIO_RUNTIME.block_on(f)
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub enum CoordReq<J, M, T> {
     CurrentJob,
     ScheduleJob { job: J, mapper: M },
     Setup { dht: DhtConn<T> },
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub enum CoordResp<J> {
     CurrentJob(Option<J>),
     ScheduleJob(()),
     Setup(()),
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub enum Req<J, M, R, T> {
     Coordinator(CoordReq<J, M, T>),
     User(R),
@@ -73,7 +73,7 @@ type JobReq<J> =
 
 type JobResp<J> = Resp<J, <<J as Job>::Worker as Worker>::Response>;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub enum Resp<J, R> {
     Coordinator(CoordResp<J>),
     User(R),

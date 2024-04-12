@@ -23,12 +23,15 @@ use std::{
 use openraft::{
     error::{ClientWriteError, ForwardToLeader, InstallSnapshotError, RaftError},
     network::RPCOption,
-    BasicNode, ChangeMembers, RaftMetrics, RaftNetwork,
+    ChangeMembers, RaftMetrics, RaftNetwork,
 };
 use tokio::sync::RwLock;
 
 use crate::{
-    ampc::dht::{NodeId, TypeConfig},
+    ampc::{
+        self,
+        dht::{BasicNode, NodeId, TypeConfig},
+    },
     distributed::{
         retry_strategy::ExponentialBackoff,
         sonic::{self, service::Connection},
@@ -42,34 +45,59 @@ use super::{
 };
 
 impl sonic::service::Message<Server> for AppendEntries {
-    type Response = Result<AppendEntriesResponse, RaftError<NodeId>>;
+    type Response =
+        Result<AppendEntriesResponse, crate::bincode_utils::SerdeCompat<RaftError<NodeId>>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received append entries request: {:?}", self);
-        server.raft.append_entries(self).await
+        Ok(AppendEntriesResponse(
+            server
+                .raft
+                .append_entries(self.0)
+                .await
+                .map_err(crate::bincode_utils::SerdeCompat)?,
+        ))
     }
 }
 
 impl sonic::service::Message<Server> for InstallSnapshot {
-    type Response = Result<InstallSnapshotResponse, RaftError<NodeId, InstallSnapshotError>>;
+    type Response = Result<
+        InstallSnapshotResponse,
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, InstallSnapshotError>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received install snapshot request: {:?}", self);
-        server.raft.install_snapshot(self).await
+        Ok(InstallSnapshotResponse(
+            server
+                .raft
+                .install_snapshot(self.0)
+                .await
+                .map_err(crate::bincode_utils::SerdeCompat)?,
+        ))
     }
 }
 
 impl sonic::service::Message<Server> for Vote {
-    type Response = Result<VoteResponse, RaftError<NodeId>>;
+    type Response = Result<VoteResponse, crate::bincode_utils::SerdeCompat<RaftError<NodeId>>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received vote request: {:?}", self);
-        server.raft.vote(self).await
+        Ok(VoteResponse(
+            server
+                .raft
+                .vote(self.0)
+                .await
+                .map_err(crate::bincode_utils::SerdeCompat)?,
+        ))
     }
 }
 
 impl sonic::service::Message<Server> for AddLearner {
-    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<
+        (),
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received add learner request: {:?}", self);
@@ -80,39 +108,49 @@ impl sonic::service::Message<Server> for AddLearner {
         server
             .raft
             .change_membership(ChangeMembers::RemoveVoters(rem.clone()), false)
-            .await?;
+            .await
+            .map_err(crate::bincode_utils::SerdeCompat)?;
         server
             .raft
             .change_membership(ChangeMembers::RemoveNodes(rem.clone()), false)
-            .await?;
+            .await
+            .map_err(crate::bincode_utils::SerdeCompat)?;
 
         let node = BasicNode::new(self.addr);
-        server.raft.add_learner(self.id, node, true).await?;
+        server
+            .raft
+            .add_learner(self.id, node, true)
+            .await
+            .map_err(crate::bincode_utils::SerdeCompat)?;
 
         Ok(())
     }
 }
 
 impl sonic::service::Message<Server> for Metrics {
-    type Response = RaftMetrics<NodeId, BasicNode>;
+    type Response = crate::bincode_utils::SerdeCompat<RaftMetrics<NodeId, BasicNode>>;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received metrics request: {:?}", self);
         let metrics = server.raft.metrics().borrow().clone();
 
-        metrics
+        crate::bincode_utils::SerdeCompat(metrics)
     }
 }
 
 impl sonic::service::Message<Server> for AddNodes {
-    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<
+        (),
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received add nodes request: {:?}", self);
         server
             .raft
             .change_membership(ChangeMembers::AddNodes(self.members), false)
-            .await?;
+            .await
+            .map_err(crate::bincode_utils::SerdeCompat)?;
 
         Ok(())
     }
@@ -135,7 +173,7 @@ async fn metrics(
             .await;
 
         match res {
-            Ok(res) => return Ok(res),
+            Ok(crate::bincode_utils::SerdeCompat(res)) => return Ok(res),
             Err(_) => tokio::time::sleep(backoff).await,
         };
     }
@@ -163,18 +201,21 @@ impl RemoteClient {
             likely_leader,
         })
     }
-    async fn raft_conn<E: std::error::Error>(&self) -> Result<Connection<Server>, RPCError<E>> {
-        self.inner
-            .conn()
-            .await
-            .map_err(|e| RPCError::Unreachable(openraft::error::Unreachable::new(&e)))
+    async fn raft_conn<E: std::error::Error>(
+        &self,
+    ) -> Result<Connection<Server>, crate::bincode_utils::SerdeCompat<RPCError<E>>> {
+        self.inner.conn().await.map_err(|e| {
+            crate::bincode_utils::SerdeCompat(RPCError::Unreachable(
+                openraft::error::Unreachable::new(&e),
+            ))
+        })
     }
 
     async fn send_raft_rpc<R, E>(
         &self,
         rpc: R,
         option: RPCOption,
-    ) -> Result<R::Response, RPCError<E>>
+    ) -> Result<R::Response, crate::bincode_utils::SerdeCompat<RPCError<E>>>
     where
         R: sonic::service::Wrapper<Server>,
         E: std::error::Error,
@@ -184,7 +225,9 @@ impl RemoteClient {
             .await
             .map_err(|e| match e {
                 sonic::Error::ConnectionTimeout | sonic::Error::RequestTimeout => {
-                    RPCError::Unreachable(openraft::error::Unreachable::new(&e))
+                    crate::bincode_utils::SerdeCompat(RPCError::Unreachable(
+                        openraft::error::Unreachable::new(&e),
+                    ))
                 }
                 _ => {
                     panic!("unexpected error: {:?}", e)
@@ -213,7 +256,7 @@ impl RemoteClient {
             match res {
                 Ok(res) => match res {
                     Ok(_) => return Ok(()),
-                    Err(RaftError::APIError(e)) => match e {
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::APIError(e))) => match e {
                         ClientWriteError::ForwardToLeader(ForwardToLeader {
                             leader_id: _,
                             leader_node,
@@ -233,11 +276,12 @@ impl RemoteClient {
                             tokio::time::sleep(backoff).await
                         }
                     },
-                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::Fatal(e))) => {
+                        return Err(e.into())
+                    }
                 },
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -271,7 +315,7 @@ impl RemoteClient {
             match res {
                 Ok(res) => match res {
                     Ok(_) => return Ok(()),
-                    Err(RaftError::APIError(e)) => match e {
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::APIError(e))) => match e {
                         ClientWriteError::ForwardToLeader(ForwardToLeader {
                             leader_id: _,
                             leader_node,
@@ -291,11 +335,12 @@ impl RemoteClient {
                             tokio::time::sleep(backoff).await
                         }
                     },
-                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::Fatal(e))) => {
+                        return Err(e.into())
+                    }
                 },
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -338,42 +383,64 @@ impl RemoteClient {
 impl RaftNetwork<TypeConfig> for RemoteClient {
     async fn append_entries(
         &mut self,
-        rpc: AppendEntries,
+        rpc: openraft::raft::AppendEntriesRequest<ampc::dht::TypeConfig>,
         option: RPCOption,
-    ) -> Result<AppendEntriesResponse, RPCError> {
-        self.send_raft_rpc(rpc, option).await?.map_err(|e| {
-            openraft::error::RemoteError {
-                target: self.target,
-                target_node: Some(self.node.clone()),
-                source: e,
-            }
-            .into()
-        })
+    ) -> Result<openraft::raft::AppendEntriesResponse<NodeId>, RPCError> {
+        Ok(self
+            .send_raft_rpc(AppendEntries(rpc), option)
+            .await
+            .map_err(|crate::bincode_utils::SerdeCompat(e)| e)?
+            .map_err(|crate::bincode_utils::SerdeCompat(e)| -> RPCError {
+                openraft::error::RemoteError {
+                    target: self.target,
+                    target_node: Some(self.node.clone()),
+                    source: e,
+                }
+                .into()
+            })?
+            .0)
     }
 
     async fn install_snapshot(
         &mut self,
-        rpc: InstallSnapshot,
+        rpc: openraft::raft::InstallSnapshotRequest<ampc::dht::TypeConfig>,
         option: RPCOption,
-    ) -> Result<InstallSnapshotResponse, RPCError<InstallSnapshotError>> {
-        self.send_raft_rpc(rpc, option).await?.map_err(|e| {
-            openraft::error::RemoteError {
-                target: self.target,
-                target_node: Some(self.node.clone()),
-                source: e,
-            }
-            .into()
-        })
+    ) -> Result<openraft::raft::InstallSnapshotResponse<NodeId>, RPCError<InstallSnapshotError>>
+    {
+        Ok(self
+            .send_raft_rpc(InstallSnapshot(rpc), option)
+            .await
+            .map_err(|crate::bincode_utils::SerdeCompat(e)| e)?
+            .map_err(
+                |crate::bincode_utils::SerdeCompat(e)| -> RPCError<InstallSnapshotError> {
+                    openraft::error::RemoteError {
+                        target: self.target,
+                        target_node: Some(self.node.clone()),
+                        source: e,
+                    }
+                    .into()
+                },
+            )?
+            .0)
     }
 
-    async fn vote(&mut self, rpc: Vote, option: RPCOption) -> Result<VoteResponse, RPCError> {
-        self.send_raft_rpc(rpc, option).await?.map_err(|e| {
-            openraft::error::RemoteError {
-                target: self.target,
-                target_node: Some(self.node.clone()),
-                source: e,
-            }
-            .into()
-        })
+    async fn vote(
+        &mut self,
+        rpc: openraft::raft::VoteRequest<NodeId>,
+        option: RPCOption,
+    ) -> Result<openraft::raft::VoteResponse<NodeId>, RPCError> {
+        Ok(self
+            .send_raft_rpc(Vote(rpc), option)
+            .await
+            .map_err(|crate::bincode_utils::SerdeCompat(e)| e)?
+            .map_err(|crate::bincode_utils::SerdeCompat(e)| -> RPCError {
+                openraft::error::RemoteError {
+                    target: self.target,
+                    target_node: Some(self.node.clone()),
+                    source: e,
+                }
+                .into()
+            })?
+            .0)
     }
 }

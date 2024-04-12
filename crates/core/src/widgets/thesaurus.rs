@@ -16,7 +16,7 @@
 
 use itertools::Itertools;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -33,7 +33,18 @@ static VALUE_STR_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::ne
     regex::Regex::new(r#""(.*)"@"#).expect("Failed to compile regex")
 });
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase", transparent)]
 pub struct Lemma(String);
 
@@ -49,15 +60,48 @@ impl Lemma {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Id(String);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase", transparent)]
 pub struct Definition(String);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase", transparent)]
 pub struct Example(String);
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum PartOfSpeech {
     Noun,
@@ -502,7 +546,9 @@ impl Dictionary {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct WordMeaning {
     pub definition: Definition,
@@ -510,7 +556,9 @@ pub struct WordMeaning {
     pub similar: Vec<Lemma>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct PartOfSpeechMeaning {
     pub pos: PartOfSpeech,
@@ -537,7 +585,9 @@ impl PartialOrd for PartOfSpeechMeaning {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ThesaurusWidget {
     pub term: Lemma,

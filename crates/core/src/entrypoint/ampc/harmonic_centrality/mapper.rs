@@ -32,7 +32,7 @@ use crate::{
 
 use super::{CentralityJob, CentralityTables, CentralityWorker, Meta};
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub enum CentralityMapper {
     SetupCounters,
     Cardinalities,

@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
-
 use crate::{
     config,
     distributed::sonic::service::sonic_service,
@@ -58,7 +56,7 @@ impl SearchService {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Search {
     pub query: String,
 }
@@ -70,7 +68,7 @@ impl sonic::service::Message<SearchService> for Search {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct GetEntityImage {
     pub image_id: String,
     pub max_width: Option<u64>,

@@ -14,14 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use serde::{de::DeserializeOwned, Serialize};
-
 pub mod rocksdb_store;
 
 pub trait Kv<K, V>
 where
-    K: Serialize + DeserializeOwned,
-    V: Serialize + DeserializeOwned,
+    K: bincode::Encode + bincode::Decode,
+    V: bincode::Encode + bincode::Decode,
     Self: Send + Sync,
 {
     fn approx_len(&self) -> usize;
@@ -31,15 +29,21 @@ where
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a>;
 
     fn get(&self, key: &K) -> Option<V> {
-        let key_bytes = bincode::serialize(key).expect("failed to serialize key");
+        let key_bytes = bincode::encode_to_vec(key, bincode::config::standard())
+            .expect("failed to serialize key");
 
-        self.get_raw(&key_bytes)
-            .map(|bytes| bincode::deserialize(&bytes).expect("failed to deserialize stored value"))
+        self.get_raw(&key_bytes).map(|bytes| {
+            let (res, _) = bincode::decode_from_slice(&bytes, bincode::config::standard())
+                .expect("failed to deserialize stored value");
+            res
+        })
     }
 
     fn insert(&self, key: K, value: V) {
-        let key_bytes = bincode::serialize(&key).expect("failed to serialize key");
-        let val_bytes = bincode::serialize(&value).expect("failed to serialize value");
+        let key_bytes = bincode::encode_to_vec(&key, bincode::config::standard())
+            .expect("failed to serialize key");
+        let val_bytes = bincode::encode_to_vec(&value, bincode::config::standard())
+            .expect("failed to serialize value");
 
         self.insert_raw(key_bytes, val_bytes);
     }

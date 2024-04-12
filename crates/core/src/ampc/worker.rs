@@ -26,8 +26,8 @@ use tokio::net::ToSocketAddrs;
 pub trait Worker: Send + Sync {
     type Remote: RemoteWorker<Job = Self::Job>;
 
-    type Request: serde::Serialize + serde::de::DeserializeOwned + Clone + Send + Sync;
-    type Response: serde::Serialize + serde::de::DeserializeOwned + Send + Sync;
+    type Request: bincode::Encode + bincode::Decode + Clone + Send + Sync;
+    type Response: bincode::Encode + bincode::Decode + Send + Sync;
     type Job: Job<Worker = Self>;
 
     fn handle(&self, req: Self::Request) -> Self::Response;
@@ -125,13 +125,69 @@ macro_rules! impl_worker {
             use $crate::ampc;
             use $crate::ampc::Message;
 
-            #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
+            #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize, ::bincode::Decode, ::strum::EnumDiscriminants)]
             pub enum Request {
                 $($req($req),)*
             }
-            #[derive(::serde::Serialize, ::serde::Deserialize)]
+
+            fn req_to_index(req: &Request) -> u32 {
+                RequestDiscriminants::from(req) as u32
+            }
+
+            fn index_to_req(index: u32) -> RequestDiscriminants {
+                match index {
+                    $(x if x == RequestDiscriminants::$req as u32 => RequestDiscriminants::$req,)*
+                    _ => panic!("invalid request index"),
+                }
+            }
+
+            impl ::bincode::Encode for Request {
+                fn encode<E: ::bincode::enc::Encoder>(
+                    &self,
+                    encoder: &mut E,
+                ) -> Result<(), bincode::error::EncodeError> {
+                    let index = req_to_index(self);
+                    index.encode(encoder)?;
+
+                    match self {
+                        $(Request::$req(req) => {
+                            req.encode(encoder)
+                        })*
+                    }
+                }
+            }
+
+
+            fn res_to_index(res: &Response) -> u32 {
+                ResponseDiscriminants::from(res) as u32
+            }
+
+            fn index_to_res(index: u32) -> ResponseDiscriminants {
+                match index {
+                    $(x if x == ResponseDiscriminants::$req as u32 => ResponseDiscriminants::$req,)*
+                    _ => panic!("invalid response index"),
+                }
+            }
+
+            #[derive(::serde::Serialize, ::serde::Deserialize, ::bincode::Decode, ::strum::EnumDiscriminants)]
             pub enum Response {
                 $($req(<$req as ampc::Message<$worker>>::Response),)*
+            }
+
+            impl ::bincode::Encode for Response {
+                fn encode<E: ::bincode::enc::Encoder>(
+                    &self,
+                    encoder: &mut E,
+                ) -> Result<(), bincode::error::EncodeError> {
+                    let index = res_to_index(self);
+                    index.encode(encoder)?;
+
+                    match self {
+                        $(Response::$req(res) => {
+                            res.encode(encoder)
+                        })*
+                    }
+                }
             }
 
             impl ampc::Worker for $worker {

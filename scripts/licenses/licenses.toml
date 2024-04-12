@@ -23,5 +23,8 @@ workarounds = ["ring"]
 [stract]
 accepted = ["AGPL-3.0"]
 
+[client-wasm]
+accepted = ["AGPL-3.0"]
+
 [wav]
 accepted = ["LGPL-3.0"]

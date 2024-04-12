@@ -17,8 +17,6 @@
 use super::Error;
 use super::Result as ModResult;
 use lalrpop_util::lalrpop_mod;
-use serde::Deserialize;
-use serde::Serialize;
 use std::fmt::Display;
 
 use super::lexer;
@@ -28,12 +26,16 @@ lalrpop_mod!(pub parser, "/parser.rs");
 pub static PARSER: once_cell::sync::Lazy<parser::BlocksParser> =
     once_cell::sync::Lazy::new(parser::BlocksParser::new);
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+)]
 pub enum RankingTarget {
     Signal(String),
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+)]
 pub struct RankingCoeff {
     pub target: RankingTarget,
     pub value: f64,

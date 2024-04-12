@@ -16,14 +16,26 @@
 
 use std::{collections::HashMap, fs::File, io::Write, path::Path};
 
-use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{Error, Result};
 
 use super::Webpage;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Default, ToSchema)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Default,
+    ToSchema,
+)]
 pub enum Region {
     #[default]
     All,
@@ -123,7 +135,9 @@ impl Region {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(
+    serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default, Clone,
+)]
 pub struct RegionCount {
     map: HashMap<Region, u64>,
     fast_count: Vec<Option<u64>>,

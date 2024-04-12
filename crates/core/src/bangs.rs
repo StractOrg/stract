@@ -22,7 +22,7 @@ use std::{
 };
 
 use itertools::intersperse;
-use serde::{Deserialize, Serialize};
+
 use url::Url;
 use utoipa::ToSchema;
 
@@ -30,7 +30,17 @@ use crate::query::parser::Term;
 
 pub const BANG_PREFIXES: [char; 2] = ['!', '！'];
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Bang {
     #[serde(rename = "c")]
@@ -56,9 +66,19 @@ pub struct Bang {
 }
 
 /// Wrapper around `Url` that implements `ToSchema` for `Url`.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, ToSchema)]
+#[derive(
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Clone,
+    ToSchema,
+)]
 #[schema(value_type = String, title = "Url")]
-pub struct UrlWrapper(Url);
+pub struct UrlWrapper(#[bincode(with_serde)] Url);
 
 impl DerefMut for UrlWrapper {
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -80,7 +100,17 @@ impl From<Url> for UrlWrapper {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, ToSchema)]
+#[derive(
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Clone,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct BangHit {
     pub bang: Bang,

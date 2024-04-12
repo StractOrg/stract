@@ -24,35 +24,33 @@ use crate::{
     ampc::dht::{
         store::{Key, Table, UpsertAction, Value},
         upsert::UpsertEnum,
+        BasicNode,
     },
     distributed::retry_strategy::RandomBackoff,
     Result,
 };
 use anyhow::anyhow;
-use openraft::{
-    error::{ClientWriteError, ForwardToLeader, RaftError},
-    BasicNode,
-};
+use openraft::error::{ClientWriteError, ForwardToLeader, RaftError};
 use tokio::sync::RwLock;
 
 use crate::{ampc::dht::NodeId, distributed::sonic};
 
 use super::Server;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Set {
     pub table: Table,
     pub key: Key,
     pub value: Value,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct BatchSet {
     pub table: Table,
     pub values: Vec<(Key, Value)>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Upsert {
     pub table: Table,
     pub key: Key,
@@ -60,45 +58,45 @@ pub struct Upsert {
     pub upsert_fn: UpsertEnum,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct BatchUpsert {
     pub table: Table,
     pub values: Vec<(Key, Value)>,
     pub upsert_fn: UpsertEnum,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Get {
     pub table: Table,
     pub key: Key,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct BatchGet {
     pub table: Table,
     pub keys: Vec<Key>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct DropTable {
     pub table: Table,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct CreateTable {
     pub table: Table,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct AllTables;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct CloneTable {
     pub from: Table,
     pub to: Table,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct RangeGet {
     pub table: Table,
     pub range: Range<Bound<Key>>,
@@ -106,33 +104,42 @@ pub struct RangeGet {
 }
 
 impl sonic::service::Message<Server> for Set {
-    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<
+        (),
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received set request: {:?}", self);
 
         match server.raft.client_write(self.into()).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(e),
+            Err(e) => Err(crate::bincode_utils::SerdeCompat(e)),
         }
     }
 }
 
 impl sonic::service::Message<Server> for BatchSet {
-    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<
+        (),
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received batch set request: {:?}", self);
 
         match server.raft.client_write(self.into()).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(e),
+            Err(e) => Err(crate::bincode_utils::SerdeCompat(e)),
         }
     }
 }
 
 impl sonic::service::Message<Server> for Upsert {
-    type Response = Result<UpsertAction, RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<
+        UpsertAction,
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received upsert request: {:?}", self);
@@ -142,14 +149,16 @@ impl sonic::service::Message<Server> for Upsert {
                 crate::ampc::dht::Response::Upsert(res) => res,
                 _ => panic!("unexpected response from raft"),
             },
-            Err(e) => Err(e),
+            Err(e) => Err(crate::bincode_utils::SerdeCompat(e)),
         }
     }
 }
 
 impl sonic::service::Message<Server> for BatchUpsert {
-    type Response =
-        Result<Vec<(Key, UpsertAction)>, RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<
+        Vec<(Key, UpsertAction)>,
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         tracing::debug!("received batch upsert request: {:?}", self);
@@ -159,7 +168,7 @@ impl sonic::service::Message<Server> for BatchUpsert {
                 crate::ampc::dht::Response::BatchUpsert(res) => res,
                 _ => panic!("unexpected response from raft"),
             },
-            Err(e) => Err(e),
+            Err(e) => Err(crate::bincode_utils::SerdeCompat(e)),
         }
     }
 }
@@ -193,29 +202,38 @@ impl sonic::service::Message<Server> for BatchGet {
 }
 
 impl sonic::service::Message<Server> for DropTable {
-    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<
+        (),
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         match server.raft.client_write(self.into()).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(e),
+            Err(e) => Err(crate::bincode_utils::SerdeCompat(e)),
         }
     }
 }
 
 impl sonic::service::Message<Server> for CreateTable {
-    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<
+        (),
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         match server.raft.client_write(self.into()).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(e),
+            Err(e) => Err(crate::bincode_utils::SerdeCompat(e)),
         }
     }
 }
 
 impl sonic::service::Message<Server> for AllTables {
-    type Response = Result<Vec<Table>, RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<
+        Vec<Table>,
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         match server.raft.client_write(self.into()).await {
@@ -223,18 +241,21 @@ impl sonic::service::Message<Server> for AllTables {
                 crate::ampc::dht::Response::AllTables(tables) => tables,
                 _ => panic!("unexpected response from raft"),
             },
-            Err(e) => Err(e),
+            Err(e) => Err(crate::bincode_utils::SerdeCompat(e)),
         }
     }
 }
 
 impl sonic::service::Message<Server> for CloneTable {
-    type Response = Result<(), RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>;
+    type Response = Result<
+        (),
+        crate::bincode_utils::SerdeCompat<RaftError<NodeId, ClientWriteError<NodeId, BasicNode>>>,
+    >;
 
     async fn handle(self, server: &Server) -> Self::Response {
         match server.raft.client_write(self.into()).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(e),
+            Err(e) => Err(crate::bincode_utils::SerdeCompat(e)),
         }
     }
 }
@@ -266,6 +287,39 @@ pub struct RemoteClient {
     self_remote: sonic::replication::RemoteClient<Server>,
     #[serde(skip)]
     likely_leader: RwLock<Option<sonic::replication::RemoteClient<Server>>>,
+}
+
+impl bincode::Encode for RemoteClient {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
+        self.self_remote.encode(encoder)
+    }
+}
+
+impl bincode::Decode for RemoteClient {
+    fn decode<D: bincode::de::Decoder>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let self_remote = sonic::replication::RemoteClient::decode(decoder)?;
+        Ok(Self {
+            self_remote,
+            likely_leader: RwLock::new(None),
+        })
+    }
+}
+
+impl<'de> bincode::BorrowDecode<'de> for RemoteClient {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let self_remote = sonic::replication::RemoteClient::borrow_decode(decoder)?;
+        Ok(Self {
+            self_remote,
+            likely_leader: RwLock::new(None),
+        })
+    }
 }
 
 impl RemoteClient {
@@ -305,12 +359,10 @@ impl RemoteClient {
                 )
                 .await;
 
-            tracing::debug!(".set() got response: {res:?}");
-
             match res {
                 Ok(res) => match res {
                     Ok(_) => return Ok(()),
-                    Err(RaftError::APIError(e)) => match e {
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::APIError(e))) => match e {
                         ClientWriteError::ForwardToLeader(ForwardToLeader {
                             leader_id: _,
                             leader_node,
@@ -332,11 +384,12 @@ impl RemoteClient {
                             unreachable!(".set() should not change membership")
                         }
                     },
-                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::Fatal(e))) => {
+                        return Err(e.into())
+                    }
                 },
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -372,12 +425,10 @@ impl RemoteClient {
                 )
                 .await;
 
-            tracing::debug!(".batch_set() got response: {res:?}");
-
             match res {
                 Ok(res) => match res {
                     Ok(_) => return Ok(()),
-                    Err(RaftError::APIError(e)) => match e {
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::APIError(e))) => match e {
                         ClientWriteError::ForwardToLeader(ForwardToLeader {
                             leader_id: _,
                             leader_node,
@@ -399,11 +450,12 @@ impl RemoteClient {
                             unreachable!(".batch_set() should not change membership")
                         }
                     },
-                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::Fatal(e))) => {
+                        return Err(e.into())
+                    }
                 },
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -438,7 +490,6 @@ impl RemoteClient {
                 Ok(res) => return Ok(res),
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -473,7 +524,6 @@ impl RemoteClient {
                 Ok(res) => return Ok(res),
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -511,7 +561,7 @@ impl RemoteClient {
             match res {
                 Ok(res) => match res {
                     Ok(_) => return Ok(()),
-                    Err(RaftError::APIError(e)) => match e {
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::APIError(e))) => match e {
                         ClientWriteError::ForwardToLeader(ForwardToLeader {
                             leader_id: _,
                             leader_node,
@@ -533,11 +583,12 @@ impl RemoteClient {
                             unreachable!(".drop_table() should not change membership")
                         }
                     },
-                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::Fatal(e))) => {
+                        return Err(e.into())
+                    }
                 },
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -575,7 +626,7 @@ impl RemoteClient {
             match res {
                 Ok(res) => match res {
                     Ok(_) => return Ok(()),
-                    Err(RaftError::APIError(e)) => match e {
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::APIError(e))) => match e {
                         ClientWriteError::ForwardToLeader(ForwardToLeader {
                             leader_id: _,
                             leader_node,
@@ -597,11 +648,12 @@ impl RemoteClient {
                             unreachable!(".create_table() should not change membership")
                         }
                     },
-                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::Fatal(e))) => {
+                        return Err(e.into())
+                    }
                 },
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -634,7 +686,7 @@ impl RemoteClient {
             match res {
                 Ok(res) => match res {
                     Ok(res) => return Ok(res),
-                    Err(RaftError::APIError(e)) => match e {
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::APIError(e))) => match e {
                         ClientWriteError::ForwardToLeader(ForwardToLeader {
                             leader_id: _,
                             leader_node,
@@ -656,11 +708,12 @@ impl RemoteClient {
                             unreachable!(".all_tables() should not change membership")
                         }
                     },
-                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::Fatal(e))) => {
+                        return Err(e.into())
+                    }
                 },
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -699,7 +752,7 @@ impl RemoteClient {
             match res {
                 Ok(res) => match res {
                     Ok(res) => return Ok(res),
-                    Err(RaftError::APIError(e)) => match e {
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::APIError(e))) => match e {
                         ClientWriteError::ForwardToLeader(ForwardToLeader {
                             leader_id: _,
                             leader_node,
@@ -721,11 +774,12 @@ impl RemoteClient {
                             unreachable!(".clone_table() should not change membership")
                         }
                     },
-                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::Fatal(e))) => {
+                        return Err(e.into())
+                    }
                 },
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -771,12 +825,10 @@ impl RemoteClient {
                 )
                 .await;
 
-            tracing::debug!(".upsert() got response: {res:?}");
-
             match res {
                 Ok(res) => match res {
                     Ok(res) => return Ok(res),
-                    Err(RaftError::APIError(e)) => match e {
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::APIError(e))) => match e {
                         ClientWriteError::ForwardToLeader(ForwardToLeader {
                             leader_id: _,
                             leader_node,
@@ -798,11 +850,12 @@ impl RemoteClient {
                             unreachable!(".upert() should not change membership")
                         }
                     },
-                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::Fatal(e))) => {
+                        return Err(e.into())
+                    }
                 },
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -846,12 +899,10 @@ impl RemoteClient {
                 )
                 .await;
 
-            tracing::debug!(".batch_upsert() got response: {res:?}");
-
             match res {
                 Ok(res) => match res {
                     Ok(res) => return Ok(res),
-                    Err(RaftError::APIError(e)) => match e {
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::APIError(e))) => match e {
                         ClientWriteError::ForwardToLeader(ForwardToLeader {
                             leader_id: _,
                             leader_node,
@@ -873,11 +924,12 @@ impl RemoteClient {
                             unreachable!(".batch_upsert() should not change membership")
                         }
                     },
-                    Err(RaftError::Fatal(e)) => return Err(e.into()),
+                    Err(crate::bincode_utils::SerdeCompat(RaftError::Fatal(e))) => {
+                        return Err(e.into())
+                    }
                 },
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {
@@ -921,7 +973,6 @@ impl RemoteClient {
                 Ok(res) => return Ok(res),
                 Err(e) => match e {
                     sonic::Error::IO(_)
-                    | sonic::Error::Serialization(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
                     | sonic::Error::PoolCreation => {

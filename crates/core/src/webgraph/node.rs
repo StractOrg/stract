@@ -20,7 +20,18 @@ use utoipa::ToSchema;
 use crate::{intmap, webpage::url_ext::UrlExt};
 
 #[derive(
-    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash,
+    Debug,
+    Clone,
+    Copy,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
 )]
 pub struct NodeID(u64);
 
@@ -42,7 +53,17 @@ impl From<u64> for NodeID {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct FullNodeID {
     pub prefix: NodeID,
     pub id: NodeID,
@@ -79,6 +100,8 @@ impl intmap::Key for NodeID {
     Hash,
     serde::Serialize,
     serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
     ToSchema,
 )]
 #[serde(rename_all = "camelCase")]
