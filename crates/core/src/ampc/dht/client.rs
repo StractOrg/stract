@@ -27,8 +27,9 @@ use crate::{distributed::member::ShardId, fast_stable_hash, Result};
 
 use super::{
     network::api,
-    store::{Key, Table, UpsertAction, Value},
+    store::{Key, Table, Value},
     upsert::UpsertEnum,
+    UpsertAction,
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
@@ -253,15 +254,11 @@ impl Client {
             futures.push(self.shards[&shard_id].batch_get(table.clone(), keys));
         }
 
-        let mut results: Vec<_> = futures::future::try_join_all(futures)
+        Ok(futures::future::try_join_all(futures)
             .await?
             .into_iter()
             .flatten()
-            .collect();
-        results.sort_by(|(a, _), (b, _)| a.cmp(b));
-        results.dedup_by(|(a, _), (b, _)| a == b);
-
-        Ok(results)
+            .collect())
     }
 
     pub async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {

@@ -93,7 +93,7 @@ rand = "0.8.5"
 rayon = "1.5.3"
 regex = "1.6.0"
 reqwest = { version = "0.11.16", features = ["blocking", "stream", "json"] }
-rkyv = { version = "0.7.44", features = ["validation"] }
+rkyv = { version = "0.7.44", features = ["validation", "bytecheck"] }
 ring = "0.17.3"
 rio_api = "0.8.4"
 rio_turtle = "0.8.4"

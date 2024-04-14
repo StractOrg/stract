@@ -18,7 +18,7 @@ use std::{net::SocketAddr, pin::Pin};
 
 use super::{
     block_on,
-    dht::{self, store::UpsertAction, upsert::UpsertEnum},
+    dht::{self, upsert::UpsertEnum, UpsertAction},
 };
 
 use crate::Result;

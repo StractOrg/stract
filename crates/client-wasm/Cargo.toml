@@ -5,7 +5,6 @@ license = "AGPL-3.0"
 name = "client-wasm"
 publish = false
 version = "0.1.0"
-wasm-opt = false
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false

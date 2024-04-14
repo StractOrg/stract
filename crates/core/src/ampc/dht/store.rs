@@ -41,6 +41,7 @@ use super::upsert::UpsertFn;
 use super::BasicNode;
 use super::NodeId;
 use super::TypeConfig;
+use super::UpsertAction;
 use super::{Request, Response};
 
 #[derive(
@@ -126,6 +127,10 @@ impl Value {
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
+
+    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
+        &mut self.0
+    }
 }
 
 impl From<Vec<u8>> for Value {
@@ -141,19 +146,10 @@ impl From<&[u8]> for Value {
 }
 
 #[derive(
-    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
-)]
-pub enum UpsertAction {
-    Merged,
-    NoChange,
-    Inserted,
-}
-
-#[derive(
     serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Default, Clone,
 )]
 pub struct Db {
-    data: BTreeMap<Table, BTreeMap<Key, Value>>,
+    data: BTreeMap<Table, BTreeMap<Arc<Key>, Arc<Value>>>,
 }
 
 impl Db {
@@ -168,15 +164,23 @@ impl Db {
     }
 
     pub fn get(&self, table: &Table, key: &Key) -> Option<Value> {
-        self.data.get(table).and_then(|m| m.get(key).cloned())
+        self.data
+            .get(table)
+            .and_then(|m| m.get(key).map(|v| v.as_ref().clone()))
     }
 
     pub fn set(&mut self, table: Table, key: Key, value: Value) {
-        self.data.entry(table).or_default().insert(key, value);
+        self.data
+            .entry(table)
+            .or_default()
+            .insert(Arc::new(key), Arc::new(value));
     }
 
     pub fn batch_set(&mut self, table: Table, values: Vec<(Key, Value)>) {
-        self.data.entry(table).or_default().extend(values);
+        self.data
+            .entry(table)
+            .or_default()
+            .extend(values.into_iter().map(|(k, v)| (Arc::new(k), Arc::new(v))));
     }
 
     pub fn upsert(
@@ -188,13 +192,13 @@ impl Db {
     ) -> UpsertAction {
         let table = self.data.entry(table).or_default();
 
-        match table.get(&key).cloned() {
+        match table.get_mut(&key) {
             Some(old) => {
-                let merged = upsert_fn.upsert(old.clone(), value);
+                let merged = upsert_fn.upsert(old.as_ref().clone(), value);
 
-                let has_changed = merged != old;
+                let has_changed = merged != **old;
 
-                table.insert(key, merged);
+                *old = Arc::new(merged);
 
                 if has_changed {
                     UpsertAction::Merged
@@ -203,7 +207,7 @@ impl Db {
                 }
             }
             None => {
-                table.insert(key, value);
+                table.insert(Arc::new(key), Arc::new(value));
                 UpsertAction::Inserted
             }
         }
@@ -219,12 +223,12 @@ impl Db {
         let mut res = Vec::with_capacity(values.len());
 
         for (key, value) in values {
-            match table.get(&key).cloned() {
+            match table.get_mut(&key) {
                 Some(old) => {
-                    let merged = upsert_fn.upsert(old.clone(), value);
-                    let has_changed = merged != old;
+                    let merged = upsert_fn.upsert(old.as_ref().clone(), value);
+                    let has_changed = merged != **old;
 
-                    table.insert(key.clone(), merged);
+                    *old = Arc::new(merged);
 
                     if has_changed {
                         res.push((key, UpsertAction::Merged));
@@ -233,7 +237,7 @@ impl Db {
                     }
                 }
                 None => {
-                    table.insert(key.clone(), value);
+                    table.insert(Arc::new(key.clone()), Arc::new(value));
                     res.push((key, UpsertAction::Inserted));
                 }
             }
@@ -260,7 +264,11 @@ impl Db {
             None => Vec::new(),
             Some(table) => keys
                 .iter()
-                .filter_map(|key| table.get(key).map(|value| (key.clone(), value.clone())))
+                .filter_map(|key| {
+                    table
+                        .get(key)
+                        .map(|value| (key.clone(), value.as_ref().clone()))
+                })
                 .collect(),
         }
     }
@@ -276,12 +284,12 @@ impl Db {
             Some(table) => match limit {
                 None => table
                     .range((range.start, range.end))
-                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .map(|(key, value)| (key.as_ref().clone(), value.as_ref().clone()))
                     .collect(),
                 Some(limit) => table
                     .range((range.start, range.end))
                     .take(limit)
-                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .map(|(key, value)| (key.as_ref().clone(), value.as_ref().clone()))
                     .collect(),
             },
         }
@@ -413,7 +421,7 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
                         res.push(Response::Set(Ok(())))
                     }
                     Request::BatchSet(api::BatchSet { table, values }) => {
-                        sm.db.batch_set(table.clone(), values.clone());
+                        sm.db.batch_set(table.clone(), values.as_ref().clone());
                         res.push(Response::Set(Ok(())))
                     }
                     Request::Upsert(api::Upsert {
@@ -434,7 +442,7 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
                     }) => res.push(Response::BatchUpsert(Ok(sm.db.batch_upsert(
                         table.clone(),
                         upsert_fn,
-                        values.clone(),
+                        values.as_ref().clone(),
                     )))),
                     Request::CreateTable(api::CreateTable { table }) => {
                         sm.db.new_table(table.clone());

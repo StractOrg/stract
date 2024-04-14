@@ -17,14 +17,15 @@
 use std::{
     net::SocketAddr,
     ops::{Bound, Range},
+    sync::Arc,
     time::Duration,
 };
 
 use crate::{
     ampc::dht::{
-        store::{Key, Table, UpsertAction, Value},
+        store::{Key, Table, Value},
         upsert::UpsertEnum,
-        BasicNode,
+        BasicNode, UpsertAction,
     },
     distributed::retry_strategy::RandomBackoff,
     Result,
@@ -47,7 +48,7 @@ pub struct Set {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct BatchSet {
     pub table: Table,
-    pub values: Vec<(Key, Value)>,
+    pub values: Arc<Vec<(Key, Value)>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
@@ -61,7 +62,7 @@ pub struct Upsert {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct BatchUpsert {
     pub table: Table,
-    pub values: Vec<(Key, Value)>,
+    pub values: Arc<Vec<(Key, Value)>>,
     pub upsert_fn: UpsertEnum,
 }
 
@@ -74,7 +75,7 @@ pub struct Get {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct BatchGet {
     pub table: Table,
-    pub keys: Vec<Key>,
+    pub keys: Arc<Vec<Key>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
@@ -409,6 +410,8 @@ impl RemoteClient {
     }
 
     pub async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
+        let values = Arc::new(values);
+
         for backoff in Self::retry_strat() {
             let res = self
                 .likely_leader
@@ -509,6 +512,8 @@ impl RemoteClient {
     }
 
     pub async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
+        let keys = Arc::new(keys);
+
         for backoff in Self::retry_strat() {
             match self
                 .self_remote
@@ -881,6 +886,7 @@ impl RemoteClient {
         values: Vec<(Key, Value)>,
     ) -> Result<Vec<(Key, UpsertAction)>> {
         let upsert = upsert.into();
+        let values = Arc::new(values);
 
         for backoff in Self::retry_strat() {
             let res = self

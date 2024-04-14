@@ -20,6 +20,15 @@ use crate::hyperloglog::HyperLogLog;
 
 use super::Value;
 
+#[derive(
+    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+)]
+pub enum UpsertAction {
+    Merged,
+    NoChange,
+    Inserted,
+}
+
 #[enum_dispatch]
 pub trait UpsertFn {
     fn upsert(&self, old: Value, new: Value) -> Value;

@@ -43,27 +43,15 @@ impl CentralityMapper {
     /// get old values from prev dht using edge.from where edge.from in changed_nodes
     fn get_old_counters(
         batch: &[webgraph::Edge<()>],
-        changed_nodes: &Mutex<BloomFilter>,
         dht: &DhtConn<CentralityTables>,
     ) -> BTreeMap<webgraph::NodeID, HyperLogLog<64>> {
-        let changed_nodes = changed_nodes.lock().unwrap();
+        let nodes: Vec<_> = batch.iter().map(|edge| edge.from).collect();
 
-        dht.prev()
-            .counters
-            .batch_get(
-                batch
-                    .iter()
-                    .filter_map(|edge| {
-                        if changed_nodes.contains(edge.from.as_u64()) {
-                            Some(edge.from)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect(),
-            )
-            .into_iter()
-            .collect()
+        if nodes.is_empty() {
+            return BTreeMap::new();
+        }
+
+        dht.prev().counters.batch_get(nodes).into_iter().collect()
     }
 
     fn setup_counters(nodes: &[webgraph::NodeID], dht: &DhtConn<CentralityTables>) {
@@ -94,24 +82,26 @@ impl CentralityMapper {
     /// thereby updating their hyperloglog counters
     fn update_counters(
         batch: &[webgraph::Edge<()>],
-        changed_nodes: &Mutex<BloomFilter>,
         dht: &DhtConn<CentralityTables>,
     ) -> Vec<(webgraph::NodeID, UpsertAction)> {
-        let old_counters = Self::get_old_counters(batch, changed_nodes, dht);
-        let changed_nodes = changed_nodes.lock().unwrap();
+        let old_counters = Self::get_old_counters(batch, dht);
 
-        dht.next().counters.batch_upsert(
-            HyperLogLog64Upsert,
-            batch
-                .iter()
-                .filter(|edge| changed_nodes.contains(edge.from.as_u64()))
-                .map(|edge| {
-                    let mut counter = old_counters.get(&edge.from).cloned().unwrap_or_default();
-                    counter.add(edge.from.as_u64());
-                    (edge.to, counter)
-                })
-                .collect(),
-        )
+        let updates: Vec<_> = batch
+            .iter()
+            .map(|edge| {
+                let mut counter = old_counters.get(&edge.from).cloned().unwrap_or_default();
+                counter.add(edge.from.as_u64());
+                (edge.to, counter)
+            })
+            .collect();
+
+        if updates.is_empty() {
+            return vec![];
+        }
+
+        dht.next()
+            .counters
+            .batch_upsert(HyperLogLog64Upsert, updates)
     }
 
     /// update new bloom filter with the nodes that changed
@@ -130,11 +120,14 @@ impl CentralityMapper {
 
     fn update_dht(
         batch: &[webgraph::Edge<()>],
-        changed_nodes: &Mutex<BloomFilter>,
         new_changed_nodes: &Mutex<BloomFilter>,
         dht: &DhtConn<CentralityTables>,
     ) {
-        let changes = Self::update_counters(batch, changed_nodes, dht);
+        if batch.is_empty() {
+            return;
+        }
+
+        let changes = Self::update_counters(batch, dht);
         Self::update_changed_nodes(&changes, new_changed_nodes);
 
         // if any nodes changed, indicate in dht that we aren't finished yet
@@ -157,6 +150,10 @@ impl CentralityMapper {
         round: u64,
         dht: &DhtConn<CentralityTables>,
     ) {
+        if nodes.is_empty() {
+            return;
+        }
+
         let old_counters: BTreeMap<_, _> = dht
             .prev()
             .counters
@@ -240,30 +237,29 @@ impl CentralityMapper {
 
         pool.scope(|s| {
             let mut batch = Vec::with_capacity(BATCH_SIZE);
+            let changed_nodes = worker.changed_nodes().lock().unwrap();
 
-            for edge in worker.graph().edges() {
+            for edge in worker
+                .graph()
+                .edges()
+                .filter(|e| changed_nodes.contains(e.from.as_u64()))
+            {
                 batch.push(edge);
                 if batch.len() >= BATCH_SIZE {
-                    let changed_nodes = Arc::clone(worker.changed_nodes());
                     let new_changed_nodes = Arc::clone(&new_changed_nodes);
                     let update_batch = batch.clone();
 
-                    s.spawn(move |_| {
-                        Self::update_dht(&update_batch, &changed_nodes, &new_changed_nodes, dht)
-                    });
+                    s.spawn(move |_| Self::update_dht(&update_batch, &new_changed_nodes, dht));
 
                     batch.clear();
                 }
             }
 
             if !batch.is_empty() {
-                let changed_nodes = Arc::clone(worker.changed_nodes());
                 let new_changed_nodes = Arc::clone(&new_changed_nodes);
                 let update_batch = batch.clone();
 
-                s.spawn(move |_| {
-                    Self::update_dht(&update_batch, &changed_nodes, &new_changed_nodes, dht)
-                });
+                s.spawn(move |_| Self::update_dht(&update_batch, &new_changed_nodes, dht));
             }
         });
         *worker.changed_nodes().lock().unwrap() = new_changed_nodes.lock().unwrap().clone();
@@ -286,7 +282,7 @@ impl CentralityMapper {
             for node in worker
                 .graph()
                 .nodes()
-                .filter(|node| changed_nodes.contains(node.as_u64()))
+                .filter(|n| changed_nodes.contains(n.as_u64()))
             {
                 batch.push(node);
                 if batch.len() >= BATCH_SIZE {
