@@ -133,40 +133,46 @@ impl Node {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
-struct Shard {
+pub struct Shard {
     nodes: Vec<Node>,
 }
 
+impl Default for Shard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Shard {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self { nodes: Vec::new() }
     }
 
-    fn add_node(&mut self, addr: SocketAddr) {
+    pub fn add_node(&mut self, addr: SocketAddr) {
         self.nodes.push(Node::new(addr));
     }
 
-    fn node(&self) -> &Node {
+    pub fn node(&self) -> &Node {
         self.nodes.choose(&mut rand::thread_rng()).unwrap()
     }
 
-    async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {
+    pub async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {
         self.node().get(table, key).await
     }
 
-    async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
+    pub async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
         self.node().batch_get(table, keys).await
     }
 
-    async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
+    pub async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
         self.node().set(table, key, value).await
     }
 
-    async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
+    pub async fn batch_set(&self, table: Table, values: Vec<(Key, Value)>) -> Result<()> {
         self.node().batch_set(table, values).await
     }
 
-    async fn upsert<F: Into<UpsertEnum>>(
+    pub async fn upsert<F: Into<UpsertEnum>>(
         &self,
         table: Table,
         upsert: F,
@@ -176,7 +182,7 @@ impl Shard {
         self.node().upsert(table, upsert, key, value).await
     }
 
-    async fn batch_upsert<F: Into<UpsertEnum>>(
+    pub async fn batch_upsert<F: Into<UpsertEnum>>(
         &self,
         table: Table,
         upsert: F,
@@ -185,7 +191,7 @@ impl Shard {
         self.node().batch_upsert(table, upsert, values).await
     }
 
-    fn stream(&self, table: Table) -> impl Stream<Item = Result<(Key, Value)>> + '_ {
+    pub fn stream(&self, table: Table) -> impl Stream<Item = Result<(Key, Value)>> + '_ {
         self.node().stream(table)
     }
 }
@@ -212,11 +218,12 @@ impl Client {
         Self { shards, ids }
     }
 
+    pub fn shards(&self) -> &BTreeMap<ShardId, Shard> {
+        &self.shards
+    }
+
     pub fn add_node(&mut self, shard_id: ShardId, addr: SocketAddr) {
-        self.shards
-            .entry(shard_id)
-            .or_insert_with(Shard::new)
-            .add_node(addr);
+        self.shards.entry(shard_id).or_default().add_node(addr);
 
         self.ids = self.shards.keys().cloned().collect();
     }

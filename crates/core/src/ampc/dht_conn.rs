@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, pin::Pin};
+use std::{collections::BTreeMap, net::SocketAddr, pin::Pin};
 
 use super::{
     block_on,
@@ -124,6 +124,10 @@ where
             client: dht::Client::new(members),
             _maker: std::marker::PhantomData,
         }
+    }
+
+    pub fn shards(&self) -> &BTreeMap<dht::ShardId, dht::Shard> {
+        self.client.shards()
     }
 }
 
@@ -405,8 +409,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use openraft::error::InitializeError;
     use tracing_test::traced_test;
 

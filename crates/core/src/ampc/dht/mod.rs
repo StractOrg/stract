@@ -47,7 +47,7 @@ pub use network::api::RemoteClient;
 pub use network::raft::RemoteClient as RaftClient;
 
 pub use crate::distributed::member::ShardId;
-pub use client::Client;
+pub use client::{Client, Shard};
 pub use store::{Key, Table, Value};
 pub use upsert::*;
 

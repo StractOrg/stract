@@ -32,6 +32,8 @@ use crate::{
 
 use super::{CentralityJob, CentralityTables, CentralityWorker, Meta};
 
+const OPS_BATCH_PER_SHARD: u64 = 4096;
+
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub enum CentralityMapper {
     SetupCounters,
@@ -200,18 +202,21 @@ impl CentralityMapper {
     }
 
     fn map_setup_counters(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
-        const BATCH_SIZE: usize = 16_384;
+        // shards are the same for both prev and next
+        let num_shards = dht.prev().num_shards();
+        let batch_size = (num_shards * OPS_BATCH_PER_SHARD) as usize;
+
         let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
 
         if worker.round() == 0 {
             pool.scope(|s| {
-                let mut batch = Vec::with_capacity(BATCH_SIZE);
+                let mut batch = Vec::with_capacity(batch_size);
                 let mut changed_nodes = worker.changed_nodes().lock().unwrap();
 
                 for node in worker.graph().nodes() {
                     changed_nodes.insert(node.as_u64());
                     batch.push(node);
-                    if batch.len() >= BATCH_SIZE {
+                    if batch.len() >= batch_size {
                         let update_batch = batch.clone();
                         s.spawn(move |_| Self::setup_counters(&update_batch, dht));
 
@@ -228,7 +233,10 @@ impl CentralityMapper {
     }
 
     fn map_cardinalities(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
-        const BATCH_SIZE: usize = 16_384;
+        // shards are the same for both prev and next
+        let num_shards = dht.prev().num_shards();
+        let batch_size = (num_shards * OPS_BATCH_PER_SHARD) as usize;
+
         let new_changed_nodes = Arc::new(Mutex::new(BloomFilter::empty_from(
             &worker.changed_nodes().lock().unwrap(),
         )));
@@ -236,7 +244,7 @@ impl CentralityMapper {
         let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
 
         pool.scope(|s| {
-            let mut batch = Vec::with_capacity(BATCH_SIZE);
+            let mut batch = Vec::with_capacity(batch_size);
             let changed_nodes = worker.changed_nodes().lock().unwrap();
 
             for edge in worker
@@ -245,7 +253,7 @@ impl CentralityMapper {
                 .filter(|e| changed_nodes.contains(e.from.as_u64()))
             {
                 batch.push(edge);
-                if batch.len() >= BATCH_SIZE {
+                if batch.len() >= batch_size {
                     let new_changed_nodes = Arc::clone(&new_changed_nodes);
                     let update_batch = batch.clone();
 
@@ -266,18 +274,20 @@ impl CentralityMapper {
     }
 
     fn map_centralities(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
-        const BATCH_SIZE: usize = 16_384;
-
         if !dht.prev().meta.get(()).unwrap().round_had_changes {
             return;
         }
+
+        // shards are the same for both prev and next
+        let num_shards = dht.prev().num_shards();
+        let batch_size = (num_shards * OPS_BATCH_PER_SHARD) as usize;
 
         let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
         let round = worker.inc_round();
 
         // count cardinality of hyperloglogs in dht.next and update count after all mappers are done
         pool.scope(|s| {
-            let mut batch = Vec::with_capacity(BATCH_SIZE);
+            let mut batch = Vec::with_capacity(batch_size);
             let changed_nodes = worker.changed_nodes().lock().unwrap();
             for node in worker
                 .graph()
@@ -285,7 +295,7 @@ impl CentralityMapper {
                 .filter(|n| changed_nodes.contains(n.as_u64()))
             {
                 batch.push(node);
-                if batch.len() >= BATCH_SIZE {
+                if batch.len() >= batch_size {
                     let update_batch = batch.clone();
                     s.spawn(move |_| Self::update_centralities(&update_batch, round, dht));
 

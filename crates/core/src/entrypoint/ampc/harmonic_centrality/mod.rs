@@ -40,6 +40,12 @@ pub struct CentralityTables {
     centrality: DefaultDhtTable<webgraph::NodeID, KahanSum>,
 }
 
+impl CentralityTables {
+    pub fn num_shards(&self) -> u64 {
+        self.counters.shards().len() as u64
+    }
+}
+
 impl_dht_tables!(CentralityTables, [counters, meta, centrality]);
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
