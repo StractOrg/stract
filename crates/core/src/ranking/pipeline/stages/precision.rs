@@ -16,8 +16,6 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
-
 use crate::{
     collector,
     config::CollectorConfig,
@@ -35,7 +33,7 @@ use crate::{
 
 use super::RecallRankingWebpage;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct PrecisionRankingWebpage {
     pub retrieved_webpage: RetrievedWebpage,
     pub ranking: RecallRankingWebpage,

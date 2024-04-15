@@ -16,6 +16,7 @@
 
 use anyhow::Result;
 use memmap2::Mmap;
+use postcard::experimental::max_size::MaxSize;
 use std::{
     fs::File,
     io::{BufWriter, Read, Seek, Write},
@@ -25,7 +26,7 @@ use std::{
 const POINTER_KEY: &str = "pointer";
 const DATA_KEY: &str = "data";
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, MaxSize, serde::Serialize, serde::Deserialize)]
 struct Header {
     body_size: usize,
 }
@@ -38,7 +39,7 @@ pub struct FileQueueWriter<T> {
 
 impl<T> FileQueueWriter<T>
 where
-    T: serde::Serialize + serde::de::DeserializeOwned,
+    T: bincode::Encode + bincode::Decode,
 {
     pub fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
         if !path.as_ref().exists() {
@@ -60,12 +61,16 @@ where
     }
 
     pub fn push(&mut self, item: T) -> Result<()> {
-        let body = bincode::serialize(&item)?;
+        let body = bincode::encode_to_vec(&item, bincode::config::standard())?;
         let header = Header {
             body_size: body.len(),
         };
 
-        let header_bytes = bincode::serialize(&header)?;
+        let mut header_bytes = postcard::to_allocvec(&header).unwrap();
+
+        if header_bytes.len() < Header::POSTCARD_MAX_SIZE {
+            header_bytes.resize(Header::POSTCARD_MAX_SIZE, 0);
+        }
 
         self.writer.write_all(&header_bytes)?;
         self.writer.write_all(&body)?;
@@ -140,7 +145,7 @@ pub struct FileQueue<T> {
 
 impl<T> FileQueue<T>
 where
-    T: serde::Serialize + serde::de::DeserializeOwned,
+    T: bincode::Encode + bincode::Decode,
 {
     pub fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
         if !path.as_ref().exists() {
@@ -164,13 +169,15 @@ where
             return Ok(None);
         }
 
-        let header_size = std::mem::size_of::<Header>();
-        let header: Header =
-            bincode::deserialize(&self.file[cur_pointer..cur_pointer + header_size])?;
+        let header_size = Header::POSTCARD_MAX_SIZE;
+
+        let header_bytes = &self.file[cur_pointer..cur_pointer + header_size];
+
+        let header: Header = postcard::from_bytes(header_bytes).unwrap();
 
         let body =
             &self.file[cur_pointer + header_size..cur_pointer + header_size + header.body_size];
-        let item = bincode::deserialize(body)?;
+        let (item, _) = bincode::decode_from_slice(body, bincode::config::standard())?;
 
         self.pointer
             .set(cur_pointer + header_size + header.body_size)?;

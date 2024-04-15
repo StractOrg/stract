@@ -16,7 +16,7 @@
 
 use crate::fastfield_reader::FastFieldReader;
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
+
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
 use tantivy::{DocId, SegmentReader};
 
@@ -69,7 +69,9 @@ pub struct InitialSegmentScoreTweaker {
     computer: SignalComputer,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone, PartialEq,
+)]
 pub struct Score {
     pub total: f64,
 }

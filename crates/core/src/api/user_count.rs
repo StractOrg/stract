@@ -78,12 +78,12 @@ impl<F: Frequency> InnerUserCount<F> {
         })
     }
 
-    fn inc<T: serde::Serialize>(&mut self, user_id: &T) -> Result<()> {
+    fn inc<T: bincode::Encode>(&mut self, user_id: &T) -> Result<()> {
         // It is important that we do not store the user_id as it might be sensitive.
         // It is first hashed with a salt for good measure, and then we only use
         // the id for a probabilistic count using hyperloglog.
         self.maybe_reset();
-        let bytes = bincode::serialize(user_id)?;
+        let bytes = bincode::encode_to_vec(user_id, bincode::config::standard())?;
         let mut hash = [0u8; digest::SHA512_OUTPUT_LEN];
 
         pbkdf2::derive(
@@ -130,7 +130,7 @@ impl<F: Frequency> UserCount<F> {
         })
     }
 
-    pub fn inc<T: serde::Serialize>(&self, user_id: &T) -> Result<()> {
+    pub fn inc<T: bincode::Encode>(&self, user_id: &T) -> Result<()> {
         self.inner
             .lock()
             .unwrap_or_else(|e| e.into_inner())

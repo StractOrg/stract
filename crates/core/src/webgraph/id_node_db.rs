@@ -19,7 +19,7 @@ use std::{collections::BTreeMap, io::Write, path::Path};
 use super::{Node, NodeID};
 use crate::Result;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 struct StoredPtr {
     file_offset: usize,
     len: usize,
@@ -31,7 +31,7 @@ impl StoredPtr {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 struct Index {
     map: BTreeMap<NodeID, StoredPtr>,
 }
@@ -46,9 +46,10 @@ impl Index {
     fn open_or_new<P: AsRef<Path>>(path: P) -> Result<Self> {
         if path.as_ref().exists() {
             let file = std::fs::File::open(path)?;
-            let reader = std::io::BufReader::new(file);
+            let mut reader = std::io::BufReader::new(file);
 
-            Ok(bincode::deserialize_from(reader)?)
+            let res = bincode::decode_from_std_read(&mut reader, bincode::config::standard())?;
+            Ok(res)
         } else {
             Ok(Self::new())
         }
@@ -56,9 +57,9 @@ impl Index {
 
     fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let file = std::fs::File::create(path)?;
-        let writer = std::io::BufWriter::new(file);
+        let mut writer = std::io::BufWriter::new(file);
 
-        bincode::serialize_into(writer, self)?;
+        bincode::encode_into_std_write(self, &mut writer, bincode::config::standard())?;
 
         Ok(())
     }
@@ -110,7 +111,7 @@ impl FileStore {
     }
 
     fn write(&mut self, node: &Node) -> Result<StoredPtr> {
-        let bytes = bincode::serialize(node)?;
+        let bytes = bincode::encode_to_vec(node, bincode::config::standard())?;
         self.writer.write_all(&bytes)?;
 
         let file_offset = self.cur_offset;
@@ -130,7 +131,7 @@ impl FileStore {
         }
 
         let bytes = &self.mmap[range];
-        let node = bincode::deserialize(bytes)?;
+        let (node, _) = bincode::decode_from_slice(bytes, bincode::config::standard())?;
         Ok(Some(node))
     }
 

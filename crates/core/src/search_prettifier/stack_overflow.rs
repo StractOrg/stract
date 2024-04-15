@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
 use url::Url;
 use utoipa::ToSchema;
 
@@ -27,7 +26,9 @@ use crate::{
 use super::DisplayedSidebar;
 use crate::Result;
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone, ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct StackOverflowAnswer {
     pub body: Vec<CodeOrText>,
@@ -37,13 +38,17 @@ pub struct StackOverflowAnswer {
     pub accepted: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone, ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct StackOverflowQuestion {
     pub body: Vec<CodeOrText>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone, ToSchema,
+)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum CodeOrText {
     Code(String),

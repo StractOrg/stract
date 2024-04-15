@@ -15,36 +15,21 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
-use std::{cmp::Reverse, fs::File, path::Path};
+use std::{cmp::Reverse, path::Path};
 
 use crate::{
     external_sort::ExternalSorter,
     kv::{rocksdb_store::RocksDbStore, Kv},
     ranking::inbound_similarity::InboundSimilarity,
     webgraph::{
-        centrality::{approx_harmonic::ApproxHarmonic, harmonic::HarmonicCentrality},
-        Node, WebgraphBuilder,
+        centrality::{
+            approx_harmonic::ApproxHarmonic, harmonic::HarmonicCentrality, store_csv,
+            store_harmonic, TopNodes,
+        },
+        WebgraphBuilder,
     },
     SortableFloat,
 };
-
-fn store_csv<P: AsRef<Path>>(data: Vec<(Node, f64)>, output: P) {
-    let csv_file = File::options()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(output)
-        .unwrap();
-
-    let mut data = data;
-    data.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-    let mut wtr = csv::Writer::from_writer(csv_file);
-    for (node, centrality) in data {
-        wtr.write_record(&[node.as_str().to_string(), centrality.to_string()])
-            .unwrap();
-    }
-    wtr.flush().unwrap();
-}
 
 pub struct Centrality;
 
@@ -56,35 +41,16 @@ impl Centrality {
         );
         let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
         let harmonic_centrality = HarmonicCentrality::calculate(&graph);
-        let store = RocksDbStore::open(base_output.as_ref().join("harmonic"));
+        let store = store_harmonic(
+            harmonic_centrality.iter().map(|(n, c)| (*n, c)),
+            base_output.as_ref(),
+        );
 
-        for (node_id, centrality) in harmonic_centrality.iter() {
-            store.insert(*node_id, centrality);
-        }
-        store.flush();
-
-        let rank_store: RocksDbStore<crate::webgraph::NodeID, u64> =
-            RocksDbStore::open(base_output.as_ref().join("harmonic_rank"));
-        let mut top_harmonics = Vec::new();
-        for (rank, node, centrality) in ExternalSorter::new()
-            .with_chunk_size(100_000_000)
-            .sort(
-                harmonic_centrality
-                    .iter()
-                    .map(|(node_id, centrality)| (Reverse(SortableFloat(centrality)), *node_id)),
-            )
-            .unwrap()
-            .enumerate()
-            .map(|(rank, (Reverse(SortableFloat(centrality)), node_id))| {
-                (rank, node_id, centrality)
-            })
-        {
-            rank_store.insert(node, rank as u64);
-
-            if top_harmonics.len() < 1_000_000 {
-                top_harmonics.push((graph.id2node(&node).unwrap(), centrality));
-            }
-        }
+        let top_harmonics =
+            crate::webgraph::centrality::top_nodes(&store, TopNodes::Top(1_000_000))
+                .into_iter()
+                .map(|(n, c)| (graph.id2node(&n).unwrap(), c))
+                .collect();
 
         store_csv(top_harmonics, base_output.as_ref().join("harmonic.csv"));
     }

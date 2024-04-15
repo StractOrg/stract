@@ -29,8 +29,11 @@ pub enum Error {
     #[error("Html node was expected to have an itemscope attribute, but did not have one.")]
     ExpectedItemScope,
 
-    #[error("Error while serializing/deserializing to/from bytes")]
-    Serialization(#[from] bincode::Error),
+    #[error("Error while encoding to bytes: {0}")]
+    Encode(#[from] bincode::error::EncodeError),
+
+    #[error("Error while decoding from bytes: {0}")]
+    Decode(#[from] bincode::error::DecodeError),
 
     #[error("Could not convert to/from JSON")]
     Json(#[from] serde_json::Error),

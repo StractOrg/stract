@@ -19,7 +19,6 @@ use tantivy::tokenizer::PreTokenizedString;
 
 use super::{find_recipe_first_ingredient_tag_id, Html};
 
-#[macro_export]
 macro_rules! cache {
     ($($fn:ident -> $res:ty),*$(,)?) => {
         /// Dynamically compute the different webpage functions

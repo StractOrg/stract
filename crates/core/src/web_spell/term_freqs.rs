@@ -16,7 +16,7 @@
 
 use super::{MergePointer, Result};
 use fst::{IntoStreamer, Streamer};
-use serde::{Deserialize, Serialize};
+
 use std::{
     collections::{BTreeMap, BinaryHeap},
     fs::{File, OpenOptions},
@@ -156,8 +156,9 @@ impl StoredDict {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 struct Metadata {
+    #[bincode(with_serde)]
     dicts: Vec<Uuid>,
 }
 

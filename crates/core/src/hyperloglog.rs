@@ -24,8 +24,6 @@ use std::{
     marker::PhantomData,
 };
 
-use serde::{Deserialize, Serialize};
-
 pub(crate) const THRESHOLD_DATA_OFFSET: usize = 4;
 pub(crate) const THRESHOLD_DATA_VEC: &[usize] = &[
     10,     // b = 4
@@ -4305,7 +4303,7 @@ pub trait HyperLogLogHasher: std::fmt::Debug + Clone + Copy + Send + Sync + 'sta
     fn hash(item: u64) -> u64;
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
 pub struct FastHasher;
 
 impl HyperLogLogHasher for FastHasher {
@@ -4327,7 +4325,21 @@ impl HyperLogLogHasher for StableHasher {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use bytecheck::CheckBytes;
+use rkyv::bytecheck;
+
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+)]
+#[archive_attr(derive(CheckBytes))]
 pub struct HyperLogLog<const N: usize, H = FastHasher>
 where
     H: HyperLogLogHasher,

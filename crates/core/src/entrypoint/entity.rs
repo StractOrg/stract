@@ -243,7 +243,6 @@ mod tests {
 
     use super::*;
 
-    #[macro_export]
     macro_rules! expect {
         ($($t:tt)*) => {
             |res| assert_snapshot!(res, $($t)*)

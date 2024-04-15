@@ -245,7 +245,11 @@ impl SearchClient for DistributedSearcher {
             .await;
 
         match res {
-            Ok(v) => v.into_iter().flat_map(|(_, v)| v).flatten().collect(),
+            Ok(v) => v
+                .into_iter()
+                .flat_map(|(_, v)| v.into_iter().map(|crate::bincode_utils::SerdeCompat(v)| v))
+                .flatten()
+                .collect(),
             _ => HashMap::new(),
         }
     }

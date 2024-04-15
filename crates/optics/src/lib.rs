@@ -19,7 +19,6 @@ mod lexer;
 
 use ast::RankingCoeff;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use thiserror::Error;
 use utoipa::ToSchema;
@@ -145,7 +144,16 @@ impl From<RawAction> for Action {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Matching {
     pub pattern: Vec<PatternPart>,
     pub location: MatchLocation,
@@ -215,7 +223,16 @@ impl TryFrom<RawMatchPart> for Matching {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 enum PatternToken {
     Raw(String),
 
@@ -268,7 +285,16 @@ impl PatternToken {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub enum PatternPart {
     Raw(String),
     Wildcard,
@@ -285,7 +311,16 @@ impl Display for PatternPart {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub enum MatchLocation {
     Site,
     Url,
@@ -297,7 +332,17 @@ pub enum MatchLocation {
     Schema,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub enum Action {
     Boost(u64),
     Downrank(u64),
@@ -318,7 +363,16 @@ impl Display for Action {
     }
 }
 
-#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Default,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Optic {
     pub rankings: Vec<RankingCoeff>,
     pub host_rankings: HostRankings,
@@ -350,7 +404,16 @@ impl Display for Optic {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Rule {
     /// A list of matchings, structured as an OR of ANDs (i.e. the rule matches if all of the matchings inside one list match).
     pub matches: Vec<Vec<Matching>>,
@@ -411,7 +474,17 @@ impl Display for Rule {
     }
 }
 
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(
+    Debug,
+    PartialEq,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Clone,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct HostRankings {
     pub liked: Vec<String>,

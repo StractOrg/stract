@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
-
 pub trait Key: PartialOrd + Ord + PartialEq + Copy + std::fmt::Debug {
     const BIG_PRIME: Self;
 
@@ -35,7 +33,7 @@ impl Key for u64 {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug)]
 pub struct IntMap<K: Key, V> {
     bins: Vec<Vec<(K, V)>>,
     len: usize,

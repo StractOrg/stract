@@ -17,7 +17,7 @@
 use std::{collections::HashSet, fs, path::Path, sync::Arc};
 
 use base64::{prelude::BASE64_STANDARD as BASE64_ENGINE, Engine};
-use serde::{Deserialize, Serialize};
+
 use tantivy::{
     collector::TopDocs,
     query::{BooleanQuery, BoostQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
@@ -89,11 +89,11 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> Tantiv
     );
     doc.add_bytes(
         schema.get_field("info").unwrap(),
-        bincode::serialize(&entity.info).unwrap(),
+        bincode::encode_to_vec(&entity.info, bincode::config::standard()).unwrap(),
     );
     doc.add_bytes(
         schema.get_field("links").unwrap(),
-        bincode::serialize(&entity.page_abstract.links).unwrap(),
+        bincode::encode_to_vec(&entity.page_abstract.links, bincode::config::standard()).unwrap(),
     );
     let has_image = if entity.image.is_some() {
         "true"
@@ -110,7 +110,7 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> Tantiv
     doc
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub struct StoredEntity {
     pub title: String,
     pub entity_abstract: String,
@@ -120,7 +120,7 @@ pub struct StoredEntity {
     pub links: Vec<Link>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub struct EntityMatch {
     pub entity: StoredEntity,
     pub score: f32,
@@ -340,15 +340,18 @@ impl EntityIndex {
             .unwrap();
 
         let info = if decode_info {
-            bincode::deserialize(
+            let (info, _) = bincode::decode_from_slice(
                 doc.get_first(info)
                     .and_then(|val| match val {
                         tantivy::schema::OwnedValue::Bytes(bytes) => Some(bytes),
                         _ => None,
                     })
                     .unwrap(),
+                bincode::config::standard(),
             )
-            .unwrap()
+            .unwrap();
+
+            info
         } else {
             Vec::new()
         };
@@ -382,15 +385,18 @@ impl EntityIndex {
         };
 
         let links: Vec<Link> = if get_links {
-            bincode::deserialize(
+            let (links, _) = bincode::decode_from_slice(
                 doc.get_first(links)
                     .and_then(|val| match val {
                         tantivy::schema::OwnedValue::Bytes(bytes) => Some(bytes),
                         _ => None,
                     })
                     .unwrap(),
+                bincode::config::standard(),
             )
-            .unwrap()
+            .unwrap();
+
+            links
         } else {
             Vec::new()
         };

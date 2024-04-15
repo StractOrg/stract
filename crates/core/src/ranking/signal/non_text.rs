@@ -101,7 +101,18 @@ fn host_id(fastfield_reader: &FieldReader<'_>) -> Option<NodeID> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct HostCentrality;
 impl Signal for HostCentrality {
     fn default_coefficient(&self) -> f64 {
@@ -128,7 +139,18 @@ impl Signal for HostCentrality {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct HostCentralityRank;
 impl Signal for HostCentralityRank {
     fn default_coefficient(&self) -> f64 {
@@ -155,7 +177,18 @@ impl Signal for HostCentralityRank {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct PageCentrality;
 impl Signal for PageCentrality {
     fn default_coefficient(&self) -> f64 {
@@ -182,7 +215,18 @@ impl Signal for PageCentrality {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct PageCentralityRank;
 impl Signal for PageCentralityRank {
     fn default_coefficient(&self) -> f64 {
@@ -209,7 +253,18 @@ impl Signal for PageCentralityRank {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IsHomepage;
 impl Signal for IsHomepage {
     fn default_coefficient(&self) -> f64 {
@@ -236,7 +291,18 @@ impl Signal for IsHomepage {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct FetchTimeMs;
 impl Signal for FetchTimeMs {
     fn default_coefficient(&self) -> f64 {
@@ -273,7 +339,18 @@ impl Signal for FetchTimeMs {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct UpdateTimestamp;
 impl Signal for UpdateTimestamp {
     fn default_coefficient(&self) -> f64 {
@@ -307,7 +384,18 @@ impl Signal for UpdateTimestamp {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct TrackerScore;
 impl Signal for TrackerScore {
     fn default_coefficient(&self) -> f64 {
@@ -335,7 +423,18 @@ impl Signal for TrackerScore {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Region;
 impl Signal for Region {
     fn default_coefficient(&self) -> f64 {
@@ -365,7 +464,18 @@ impl Signal for Region {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct QueryCentrality;
 impl Signal for QueryCentrality {
     fn default_coefficient(&self) -> f64 {
@@ -385,7 +495,18 @@ impl Signal for QueryCentrality {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct InboundSimilarity;
 impl Signal for InboundSimilarity {
     fn default_coefficient(&self) -> f64 {
@@ -405,7 +526,18 @@ impl Signal for InboundSimilarity {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct LambdaMart;
 impl Signal for LambdaMart {
     fn default_coefficient(&self) -> f64 {
@@ -421,7 +553,18 @@ impl Signal for LambdaMart {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct UrlDigits;
 impl Signal for UrlDigits {
     fn default_coefficient(&self) -> f64 {
@@ -466,7 +609,18 @@ impl Signal for UrlDigits {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct UrlSlashes;
 impl Signal for UrlSlashes {
     fn default_coefficient(&self) -> f64 {
@@ -502,7 +656,18 @@ impl Signal for UrlSlashes {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct LinkDensity;
 impl Signal for LinkDensity {
     fn default_coefficient(&self) -> f64 {

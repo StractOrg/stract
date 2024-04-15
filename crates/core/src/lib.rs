@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -28,18 +28,18 @@
 // #![allow(clippy::module_name_repetitions)] // maybe we should remove this later
 // #![allow(clippy::missing_errors_doc)]
 
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use thiserror::Error;
 
 pub mod entrypoint;
 pub mod inverted_index;
 
-pub mod mapreduce;
+pub mod ampc;
 
 mod api;
 pub mod autosuggest;
 pub mod bangs;
+mod bincode_utils;
 mod bloom;
 mod collector;
 pub mod config;
@@ -208,7 +208,9 @@ pub fn combine_u64s(nums: [u64; 2]) -> u128 {
     ((nums[0] as u128) << 64) | (nums[1] as u128)
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+)]
 pub struct SortableFloat(f64);
 
 impl From<f64> for SortableFloat {
@@ -255,7 +257,6 @@ mod tests {
     }
 }
 
-#[macro_export]
 macro_rules! enum_dispatch_from_discriminant {
     ($discenum:ident => $enum:ident, [$($disc:ident),*$(,)?]) => {
         impl From<$discenum> for $enum {
@@ -268,4 +269,11 @@ macro_rules! enum_dispatch_from_discriminant {
             }
         }
     };
+}
+
+pub(crate) use enum_dispatch_from_discriminant;
+
+const XXH3_SECRET: &[u8] = &xxhash_rust::const_xxh3::const_custom_default_secret(42);
+pub fn fast_stable_hash(t: &[u8]) -> u64 {
+    xxhash_rust::xxh3::xxh3_64_with_secret(t, XXH3_SECRET)
 }

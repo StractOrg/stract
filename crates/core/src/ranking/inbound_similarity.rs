@@ -16,7 +16,7 @@
 
 use std::{
     fs::File,
-    io::{BufReader, BufWriter, Read},
+    io::{BufReader, BufWriter},
     path::Path,
     sync::Arc,
 };
@@ -26,7 +26,6 @@ use fnv::FnvHashMap as HashMap;
 use fnv::FnvHashSet as HashSet;
 use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     webgraph::{NodeID, Webgraph},
@@ -164,7 +163,7 @@ impl Scorer {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default)]
 struct PreCalculatedSimilarities {
     map: HashMap<NodeID, HashMap<NodeID, f64>>,
 }
@@ -179,7 +178,7 @@ impl PreCalculatedSimilarities {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default)]
 struct VecMap {
     map: HashMap<NodeID, bitvec_similarity::BitVec>,
 }
@@ -213,7 +212,7 @@ impl VecMap {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default)]
 pub struct InboundSimilarity {
     vectors: Arc<VecMap>,
     precalculated: Arc<PreCalculatedSimilarities>,
@@ -312,7 +311,7 @@ impl InboundSimilarity {
                 .open(path)?,
         );
 
-        bincode::serialize_into(&mut file, &self)?;
+        bincode::encode_into_std_write(self, &mut file, bincode::config::standard())?;
 
         Ok(())
     }
@@ -325,10 +324,10 @@ impl InboundSimilarity {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
 
-        let mut buf = Vec::new();
-        reader.read_to_end(&mut buf)?;
-
-        Ok(bincode::deserialize(&buf)?)
+        Ok(bincode::decode_from_std_read(
+            &mut reader,
+            bincode::config::standard(),
+        )?)
     }
 
     pub fn knows_about(&self, node_id: NodeID) -> bool {

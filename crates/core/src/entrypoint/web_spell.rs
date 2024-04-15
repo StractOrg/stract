@@ -19,14 +19,13 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use fnv::FnvHashMap;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+
 use tracing::{debug, info};
 use whatlang::Lang;
 
 use crate::{
     config::{self, WebSpellConfig},
     entrypoint::download_all_warc_files,
-    mapreduce::Worker,
     web_spell::{FirstTrainer, FirstTrainerResult, SecondTrainer},
     webpage::Html,
 };
@@ -118,13 +117,11 @@ impl SpellWorker {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Job {
     pub source_config: config::WarcSource,
     pub warc_path: String,
 }
-
-impl Worker for SpellWorker {}
 
 pub fn run(config: WebSpellConfig) -> Result<()> {
     let warc_paths = config.warc_source.paths()?;

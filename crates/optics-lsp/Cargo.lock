@@ -33,6 +33,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
 
 [[package]]
+name = "bincode"
+version = "2.0.0-rc.3"
+source = "git+https://github.com/bincode-org/bincode?rev=8f65c60#8f65c60f192ff6093e6a1326b9d078a3b26c9a29"
+dependencies = [
+ "bincode_derive",
+ "serde",
+ "unty",
+]
+
+[[package]]
+name = "bincode_derive"
+version = "2.0.0-rc.3"
+source = "git+https://github.com/bincode-org/bincode?rev=8f65c60#8f65c60f192ff6093e6a1326b9d078a3b26c9a29"
+dependencies = [
+ "virtue",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -409,6 +427,7 @@ checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
 name = "optics"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "itertools 0.11.0",
  "lalrpop",
  "lalrpop-util",
@@ -793,6 +812,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
 
 [[package]]
+name = "unty"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1a88342087869553c259588a3ec9ca73ce9b2d538b7051ba5789ff236b6c129"
+
+[[package]]
 name = "url"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -834,6 +859,12 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "virtue"
+version = "0.0.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b6826a786a78cf1bb0937507b5551fb6f827d66269a24b00af0de247b19bbc7"
 
 [[package]]
 name = "wasi"

@@ -22,7 +22,7 @@ use std::{
 use anyhow::Result;
 use itertools::Itertools;
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
+
 use tracing::info;
 use url::Url;
 
@@ -30,32 +30,22 @@ use crate::{
     config::{FeedIndexingConfig, WarcSource},
     entrypoint::download_all_warc_files,
     feed::{index::FeedIndex, Feed, FeedKind},
-    mapreduce::{Map, Worker},
     warc::PayloadType,
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Job {
     pub source_config: WarcSource,
     pub warc_path: String,
     pub base_path: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct IndexPointer(PathBuf);
 
 impl From<String> for IndexPointer {
     fn from(path: String) -> Self {
         IndexPointer(Path::new(&path).to_path_buf())
-    }
-}
-
-impl Worker for IndexingWorker {}
-
-impl Map<IndexingWorker, IndexPointer> for Job {
-    fn map(&self, worker: &IndexingWorker) -> IndexPointer {
-        let index = worker.process_job(self);
-        IndexPointer(index.path)
     }
 }
 
@@ -131,10 +121,7 @@ pub fn build(config: FeedIndexingConfig) -> Result<()> {
             warc_path,
             base_path: config.output_path.clone(),
         })
-        .map(|job| {
-            let pointer: IndexPointer = job.map(&worker);
-            pointer
-        })
+        .map(|job| IndexPointer(worker.process_job(&job).path))
         .collect();
 
     merge(indexes)?;

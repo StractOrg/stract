@@ -18,7 +18,7 @@ use crate::widgets::Error;
 use anyhow::{anyhow, Result};
 use hashbrown::HashMap;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+
 use std::{
     fmt::Debug,
     sync::{atomic::AtomicUsize, Arc, Mutex},
@@ -28,7 +28,9 @@ use utoipa::ToSchema;
 static DICE_REGEX: once_cell::sync::Lazy<regex::Regex> =
     once_cell::sync::Lazy::new(|| regex::Regex::new(r"^d[0-9]+").unwrap());
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Calculation {
     pub input: String,

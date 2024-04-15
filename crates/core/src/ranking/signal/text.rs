@@ -61,7 +61,18 @@ fn idf_sum(field: &mut TextFieldData, doc: DocId) -> f64 {
         .sum::<f32>() as f64
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25Title;
 impl Signal for Bm25Title {
     fn default_coefficient(&self) -> f64 {
@@ -82,7 +93,18 @@ impl Signal for Bm25Title {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25TitleBigrams;
 impl Signal for Bm25TitleBigrams {
     fn default_coefficient(&self) -> f64 {
@@ -103,7 +125,18 @@ impl Signal for Bm25TitleBigrams {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25TitleTrigrams;
 impl Signal for Bm25TitleTrigrams {
     fn default_coefficient(&self) -> f64 {
@@ -124,7 +157,18 @@ impl Signal for Bm25TitleTrigrams {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25CleanBody;
 impl Signal for Bm25CleanBody {
     fn default_coefficient(&self) -> f64 {
@@ -145,7 +189,18 @@ impl Signal for Bm25CleanBody {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25CleanBodyBigrams;
 impl Signal for Bm25CleanBodyBigrams {
     fn default_coefficient(&self) -> f64 {
@@ -166,7 +221,18 @@ impl Signal for Bm25CleanBodyBigrams {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25CleanBodyTrigrams;
 impl Signal for Bm25CleanBodyTrigrams {
     fn default_coefficient(&self) -> f64 {
@@ -187,7 +253,18 @@ impl Signal for Bm25CleanBodyTrigrams {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25StemmedTitle;
 impl Signal for Bm25StemmedTitle {
     fn default_coefficient(&self) -> f64 {
@@ -208,7 +285,18 @@ impl Signal for Bm25StemmedTitle {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25StemmedCleanBody;
 impl Signal for Bm25StemmedCleanBody {
     fn default_coefficient(&self) -> f64 {
@@ -229,7 +317,18 @@ impl Signal for Bm25StemmedCleanBody {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25AllBody;
 impl Signal for Bm25AllBody {
     fn default_coefficient(&self) -> f64 {
@@ -250,7 +349,18 @@ impl Signal for Bm25AllBody {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25Keywords;
 impl Signal for Bm25Keywords {
     fn default_coefficient(&self) -> f64 {
@@ -271,7 +381,18 @@ impl Signal for Bm25Keywords {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25BacklinkText;
 impl Signal for Bm25BacklinkText {
     fn default_coefficient(&self) -> f64 {
@@ -292,7 +413,18 @@ impl Signal for Bm25BacklinkText {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IdfSumUrl;
 impl Signal for IdfSumUrl {
     fn default_coefficient(&self) -> f64 {
@@ -313,7 +445,18 @@ impl Signal for IdfSumUrl {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IdfSumSite;
 impl Signal for IdfSumSite {
     fn default_coefficient(&self) -> f64 {
@@ -334,7 +477,18 @@ impl Signal for IdfSumSite {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IdfSumDomain;
 impl Signal for IdfSumDomain {
     fn default_coefficient(&self) -> f64 {
@@ -355,7 +509,18 @@ impl Signal for IdfSumDomain {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IdfSumSiteNoTokenizer;
 impl Signal for IdfSumSiteNoTokenizer {
     fn default_coefficient(&self) -> f64 {
@@ -376,7 +541,18 @@ impl Signal for IdfSumSiteNoTokenizer {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IdfSumDomainNoTokenizer;
 impl Signal for IdfSumDomainNoTokenizer {
     fn default_coefficient(&self) -> f64 {
@@ -397,7 +573,18 @@ impl Signal for IdfSumDomainNoTokenizer {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IdfSumDomainNameNoTokenizer;
 impl Signal for IdfSumDomainNameNoTokenizer {
     fn default_coefficient(&self) -> f64 {
@@ -420,7 +607,18 @@ impl Signal for IdfSumDomainNameNoTokenizer {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IdfSumDomainIfHomepage;
 impl Signal for IdfSumDomainIfHomepage {
     fn default_coefficient(&self) -> f64 {
@@ -441,7 +639,18 @@ impl Signal for IdfSumDomainIfHomepage {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IdfSumDomainNameIfHomepageNoTokenizer;
 impl Signal for IdfSumDomainNameIfHomepageNoTokenizer {
     fn default_coefficient(&self) -> f64 {
@@ -464,7 +673,18 @@ impl Signal for IdfSumDomainNameIfHomepageNoTokenizer {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IdfSumDomainIfHomepageNoTokenizer;
 impl Signal for IdfSumDomainIfHomepageNoTokenizer {
     fn default_coefficient(&self) -> f64 {
@@ -487,7 +707,18 @@ impl Signal for IdfSumDomainIfHomepageNoTokenizer {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct IdfSumTitleIfHomepage;
 impl Signal for IdfSumTitleIfHomepage {
     fn default_coefficient(&self) -> f64 {
@@ -508,7 +739,18 @@ impl Signal for IdfSumTitleIfHomepage {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct CrossEncoderSnippet;
 impl Signal for CrossEncoderSnippet {
     fn default_coefficient(&self) -> f64 {
@@ -524,7 +766,18 @@ impl Signal for CrossEncoderSnippet {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct CrossEncoderTitle;
 impl Signal for CrossEncoderTitle {
     fn default_coefficient(&self) -> f64 {
@@ -540,7 +793,18 @@ impl Signal for CrossEncoderTitle {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct TitleEmbeddingSimilarity;
 impl Signal for TitleEmbeddingSimilarity {
     fn default_coefficient(&self) -> f64 {
@@ -556,7 +820,18 @@ impl Signal for TitleEmbeddingSimilarity {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct KeywordEmbeddingSimilarity;
 impl Signal for KeywordEmbeddingSimilarity {
     fn default_coefficient(&self) -> f64 {

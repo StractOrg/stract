@@ -18,8 +18,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use itertools::Itertools;
-use serde::Deserialize;
-use serde::Serialize;
 use tracing::info;
 use url::Url;
 use utoipa::ToSchema;
@@ -29,12 +27,12 @@ use crate::config::WebgraphGranularity;
 use crate::distributed::cluster::Cluster;
 use crate::distributed::member::Member;
 use crate::distributed::member::Service;
+use crate::distributed::sonic::service::sonic_service;
 use crate::distributed::sonic::service::Message;
 use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::searcher::DistributedSearcher;
 use crate::searcher::SearchClient;
 use crate::similar_hosts::SimilarHostsFinder;
-use crate::sonic_service;
 use crate::webgraph::Compression;
 use crate::webgraph::FullEdge;
 use crate::webgraph::Node;
@@ -42,7 +40,7 @@ use crate::webgraph::Webgraph;
 use crate::webgraph::WebgraphBuilder;
 use crate::Result;
 
-#[derive(serde::Serialize, serde::Deserialize, ToSchema)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ScoredHost {
     pub host: String,
@@ -64,13 +62,13 @@ sonic_service!(
     [SimilarHosts, Knows, IngoingLinks, OutgoingLinks]
 );
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct SimilarHosts {
     pub hosts: Vec<String>,
     pub top_n: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Knows {
     pub host: String,
 }
@@ -145,7 +143,7 @@ impl Message<WebGraphService> for Knows {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct IngoingLinks {
     pub node: Node,
 }
@@ -164,7 +162,7 @@ impl Message<WebGraphService> for IngoingLinks {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct OutgoingLinks {
     pub node: Node,
 }

@@ -22,7 +22,7 @@ use crate::enum_map::EnumMap;
 use crate::ranking::SignalEnum;
 use crate::Result;
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug)]
 struct SerialziedLinearRegression {
     weights: HashMap<SignalEnum, f64>,
 }
@@ -39,7 +39,7 @@ impl From<SerialziedLinearRegression> for LinearRegression {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug)]
 pub struct LinearRegression {
     pub weights: EnumMap<SignalEnum, f64>,
 }

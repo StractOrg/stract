@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
-
 pub trait InsertEnumMapKey: Sized {
     fn into_usize(self) -> usize;
 }
@@ -24,7 +22,7 @@ pub trait GetEnumMapKey: Sized {
     fn from_usize(value: usize) -> Option<Self>;
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct EnumMap<K: InsertEnumMapKey, V> {
     inner: Vec<Option<V>>,
     len: usize,
@@ -125,7 +123,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct EnumSet<K: InsertEnumMapKey> {
     map: EnumMap<K, ()>,
 }

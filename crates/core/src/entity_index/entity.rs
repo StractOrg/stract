@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+
 use utoipa::ToSchema;
 
 #[derive(Debug)]
@@ -28,7 +28,17 @@ pub struct Entity {
     pub image: Option<String>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Span {
     pub text: String,
     pub links: Vec<Link>,
@@ -87,21 +97,49 @@ impl Span {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Clone,
+)]
 pub struct Link {
     pub start: usize,
     pub end: usize,
     pub target: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum EntitySnippetFragment {
     Normal { text: String },
     Link { text: String, href: String },
 }
 
-#[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, ToSchema)]
+#[derive(
+    Default,
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct EntitySnippet {
     pub fragments: Vec<EntitySnippetFragment>,

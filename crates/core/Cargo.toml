@@ -20,6 +20,7 @@ name = "stract"
 path = "src/main.rs"
 
 [dependencies]
+ahash = { workspace = true }
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }
 async-channel = { workspace = true }
@@ -75,11 +76,13 @@ once_cell = { workspace = true }
 openraft = { workspace = true }
 optics = { path = "../optics" }
 publicsuffix = { workspace = true }
+postcard = { workspace = true }
 quick-xml = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+rkyv = { workspace = true }
 ring = { workspace = true }
 rio_api = { workspace = true }
 rio_turtle = { workspace = true }
@@ -110,6 +113,7 @@ utoipa-swagger-ui = { workspace = true }
 uuid = { workspace = true }
 whatlang = { workspace = true }
 zimba = { path = "../zimba" }
+xxhash-rust = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { workspace = true }
@@ -154,3 +158,6 @@ name = "bitvec_similarity"
 
 [[example]]
 name = "indexer"
+
+[[example]]
+name = "distributed_harmonic"

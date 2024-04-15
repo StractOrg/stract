@@ -1,7 +1,6 @@
 // source: https://github.com/quickwit-oss/tantivy/blob/main/src/query/bm25.rs
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::query::Explanation;
@@ -29,7 +28,9 @@ fn compute_tf_cache(average_fieldnorm: Score) -> [Score; 256] {
     cache
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(
+    Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+)]
 pub struct Bm25Params {
     pub idf: Score,
     pub avg_fieldnorm: Score,

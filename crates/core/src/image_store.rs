@@ -16,60 +16,54 @@
 
 use crate::kv::{rocksdb_store::RocksDbStore, Kv};
 use crate::Result;
+use bincode::de::read::Reader;
+use bincode::enc::write::Writer;
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageOutputFormat};
-use serde::{de, ser::SerializeStruct, Serialize};
+use serde::Serialize;
 use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Image(DynamicImage);
 
-impl Serialize for Image {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
+impl bincode::Encode for Image {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
         let bytes = self.as_raw_bytes();
-
-        let mut image = serializer.serialize_struct("image", 1)?;
-        image.serialize_field("0", &bytes)?;
-        image.end()
+        let len = bytes.len() as u64;
+        len.encode(encoder)?;
+        encoder.writer().write(bytes.as_slice())
     }
 }
 
-impl<'de> de::Deserialize<'de> for Image {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct ImageVisitor;
+impl bincode::Decode for Image {
+    fn decode<D: bincode::de::Decoder>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let len = u64::decode(decoder)?;
+        let mut raw = vec![0; len as usize];
+        decoder.reader().read(&mut raw)?;
 
-        impl<'de> de::Visitor<'de> for ImageVisitor {
-            type Value = Image;
+        Ok(Image(
+            image::load_from_memory(&raw).expect("bytes does not seem to represent an image"),
+        ))
+    }
+}
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a serialized `Image` struct")
-            }
+impl<'de> bincode::BorrowDecode<'de> for Image {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let len = u64::borrow_decode(decoder)?;
+        let mut raw = vec![0; len as usize];
+        decoder.reader().read(&mut raw)?;
 
-            fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'de>,
-            {
-                let raw = seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-
-                let image = Image(
-                    image::load_from_memory(raw)
-                        .expect("bytes does not seem to represent an image"),
-                );
-
-                Ok(image)
-            }
-        }
-
-        deserializer.deserialize_struct("image", &["0"], ImageVisitor)
+        Ok(Image(
+            image::load_from_memory(&raw).expect("bytes does not seem to represent an image"),
+        ))
     }
 }
 
@@ -244,8 +238,9 @@ mod tests {
             ImageBuffer::from_pixel(2, 2, image::Rgb::<u16>([u16::MAX, u16::MAX, u16::MAX])).into(),
         );
 
-        let bytes = bincode::serialize(&image).unwrap();
-        let decoded_image = bincode::deserialize(&bytes).unwrap();
+        let bytes = bincode::encode_to_vec(&image, bincode::config::standard()).unwrap();
+        let (decoded_image, _) =
+            bincode::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
 
         assert_eq!(image, decoded_image);
     }

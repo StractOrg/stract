@@ -52,12 +52,12 @@ impl<T> Chunk<T> {
 
     fn write_into(self, file: &mut File) -> Result<()>
     where
-        T: serde::Serialize,
+        T: bincode::Encode,
     {
         let mut wrt = BufWriter::new(file);
 
         for item in self.data {
-            let bytes = bincode::serialize(&item)?;
+            let bytes = bincode::encode_to_vec(&item, bincode::config::standard())?;
             let size = bytes.len() as u64;
 
             wrt.write_all(&size.to_le_bytes())?;
@@ -71,7 +71,7 @@ impl<T> Chunk<T> {
 
     fn store(mut self, mut file: TempFile) -> Result<StoredChunk<T>>
     where
-        T: serde::Serialize + Ord,
+        T: bincode::Encode + Ord,
     {
         self.sort();
         self.write_into(&mut file.inner)?;
@@ -161,7 +161,7 @@ impl<T> StoredChunk<T> {
 
     fn next(&mut self) -> Option<T>
     where
-        T: serde::de::DeserializeOwned,
+        T: bincode::Decode,
     {
         self.buf.clear();
         self.buf.resize(u64::BITS as usize / 8, 0);
@@ -175,7 +175,7 @@ impl<T> StoredChunk<T> {
 
         self.data.read_exact(&mut self.buf).ok()?;
 
-        let next = bincode::deserialize(&self.buf).ok()?;
+        let (next, _) = bincode::decode_from_slice(&self.buf, bincode::config::standard()).ok()?;
 
         Some(next)
     }
@@ -208,7 +208,7 @@ impl<T> ExternalSorter<T> {
     pub fn sort<I>(self, iter: I) -> Result<SortedIterator<T>>
     where
         I: Iterator<Item = T>,
-        T: serde::Serialize + serde::de::DeserializeOwned + Ord,
+        T: bincode::Encode + bincode::Decode + Ord,
     {
         let dir = TempDir::new()?;
         let mut stored_chunks = Vec::new();
@@ -251,7 +251,7 @@ struct Head<T> {
 
 impl<T> Head<T>
 where
-    T: serde::de::DeserializeOwned,
+    T: bincode::Decode,
 {
     fn new(mut chunk: StoredChunk<T>) -> Option<Self> {
         let item = chunk.next()?;
@@ -306,7 +306,7 @@ pub struct SortedIterator<T> {
 
 impl<T> Iterator for SortedIterator<T>
 where
-    T: serde::de::DeserializeOwned + Ord,
+    T: bincode::Decode + Ord,
 {
     type Item = T;
 

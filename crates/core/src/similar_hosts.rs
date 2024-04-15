@@ -26,7 +26,7 @@ use crate::{
     webpage::url_ext::UrlExt,
 };
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug)]
 pub struct ScoredNode {
     pub node: Node,
     pub score: f64,

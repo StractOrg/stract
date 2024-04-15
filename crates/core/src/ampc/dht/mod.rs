@@ -28,25 +28,54 @@
 
 mod client;
 pub mod log_store;
-mod network;
+pub mod network;
 pub mod store;
+pub mod upsert;
 
-use network::api::{Get, Set};
+use network::api::{
+    AllTables, BatchSet, BatchUpsert, CloneTable, CreateTable, DropTable, Set, Upsert,
+};
 
 use std::fmt::Debug;
 use std::io::Cursor;
 
-use openraft::BasicNode;
 use openraft::TokioRuntime;
 
-use self::network::Server;
+pub use self::network::Server;
 
-pub use network::api::RemoteClient as ApiClient;
+pub use network::api::RemoteClient;
 pub use network::raft::RemoteClient as RaftClient;
 
-pub use client::Client;
+pub use crate::distributed::member::ShardId;
+pub use client::{Client, Shard};
+pub use store::{Key, Table, Value};
+pub use upsert::*;
 
 pub type NodeId = u64;
+
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Default,
+)]
+pub struct BasicNode {
+    pub addr: String,
+}
+
+impl BasicNode {
+    /// Creates as [`BasicNode`].
+    pub fn new(addr: impl ToString) -> Self {
+        Self {
+            addr: addr.to_string(),
+        }
+    }
+}
 
 openraft::declare_raft_types!(
     /// Declare the type configuration for example K/V store.
@@ -60,17 +89,16 @@ openraft::declare_raft_types!(
         AsyncRuntime = TokioRuntime,
 );
 
-#[macro_export]
 macro_rules! raft_sonic_request_response {
     ($service:ident, [$($req:ident),*$(,)?]) => {
-        #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+        #[derive(::serde::Serialize, ::serde::Deserialize, ::bincode::Decode, Clone, Debug)]
         pub enum Request {
             $(
                 $req($req),
             )*
         }
 
-        #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+        #[derive(::serde::Serialize, ::serde::Deserialize, ::bincode::Encode, Clone, Debug)]
         pub enum Response {
             $(
                 $req(<$req as $crate::distributed::sonic::service::Message<$service>>::Response),
@@ -79,47 +107,47 @@ macro_rules! raft_sonic_request_response {
         }
 
         $(
-        impl TryFrom<Response> for <$req as $crate::distributed::sonic::service::Message<$service>>::Response {
-            type Error = $crate::distributed::sonic::Error;
-            fn try_from(res: Response) -> Result<Self, Self::Error> {
-                match res {
-                    Response::$req(res) => Ok(res),
-                    _ => Err($crate::distributed::sonic::Error::Application(anyhow::anyhow!("Invalid response for request from Raft"))),
-                }
-            }
-        }
-        )*
-
-        $(
         impl From<$req> for Request {
             fn from(req: $req) -> Self {
                 Request::$req(req)
             }
         }
         )*
-    };
+    }
 }
 
-raft_sonic_request_response!(Server, [Get, Set]);
+raft_sonic_request_response!(
+    Server,
+    [
+        Set,
+        BatchSet,
+        Upsert,
+        BatchUpsert,
+        CreateTable,
+        DropTable,
+        AllTables,
+        CloneTable
+    ]
+);
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
-    use tests::network::api::RemoteClient;
     use tokio::sync::Mutex;
     use tracing_test::traced_test;
 
-    use crate::{distributed::sonic, free_socket_addr};
+    use crate::{ampc::dht, distributed::sonic, free_socket_addr};
     use openraft::{error::InitializeError, Config};
 
     use proptest::prelude::*;
     use proptest_derive::Arbitrary;
 
+    use futures::{pin_mut, TryStreamExt};
     use rand::seq::SliceRandom;
 
     use super::*;
 
-    async fn server(
+    pub async fn server(
         id: u64,
     ) -> anyhow::Result<(
         openraft::Raft<TypeConfig>,
@@ -196,20 +224,30 @@ mod tests {
         let c1 = RemoteClient::new(addr1);
         let c2 = RemoteClient::new(addr2);
 
-        c1.set("hello".as_bytes().to_vec(), "world".as_bytes().to_vec())
-            .await?;
+        let table = Table::from("test");
 
-        let res = c1.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        c1.set(
+            table.clone(),
+            "hello".as_bytes().to_vec().into(),
+            "world".as_bytes().to_vec().into(),
+        )
+        .await?;
 
-        let res = c2.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
 
-        c2.set("hello".as_bytes().to_vec(), "world2".as_bytes().to_vec())
-            .await?;
+        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
 
-        let res = c1.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world2".as_bytes().to_vec()));
+        c2.set(
+            table.clone(),
+            "hello".as_bytes().into(),
+            "world2".as_bytes().into(),
+        )
+        .await?;
+
+        let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world2".as_bytes().into()));
 
         Ok(())
     }
@@ -218,8 +256,8 @@ mod tests {
     #[traced_test]
     async fn test_member_join() -> anyhow::Result<()> {
         let (raft1, server1, addr1) = server(1).await?;
-        let (raft2, server2, addr2) = server(2).await?;
-        let (raft3, server3, addr3) = server(3).await?;
+        let (_, server2, addr2) = server(2).await?;
+        let (_, server3, addr3) = server(3).await?;
 
         let servers = vec![server1, server2, server3];
 
@@ -231,7 +269,7 @@ mod tests {
             });
         }
 
-        let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2)]
+        let members: BTreeMap<u64, _> = vec![(1, addr1)]
             .into_iter()
             .map(|(id, addr)| (id, BasicNode::new(addr)))
             .collect();
@@ -246,7 +284,58 @@ mod tests {
             }
         };
 
-        if let Err(e) = raft2.initialize(members.clone()).await {
+        let rc1 = network::raft::RemoteClient::new(addr1).await?;
+
+        rc1.join(2, addr2).await?;
+
+        let c1 = RemoteClient::new(addr1);
+        let c2 = RemoteClient::new(addr2);
+
+        let table = Table::from("test");
+
+        c1.set(
+            table.clone(),
+            "hello".as_bytes().into(),
+            "world".as_bytes().into(),
+        )
+        .await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await; // reads are not linearized (only eventual consistency)
+
+        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
+
+        assert_eq!(res, Some("world".as_bytes().into()));
+
+        rc1.join(3, addr3).await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await; // join is not blocking
+
+        let c3 = RemoteClient::new(addr3);
+        let res = c3.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_stream() -> anyhow::Result<()> {
+        let (raft, server, addr) = server(1).await?;
+
+        let servers = vec![server];
+
+        for server in servers {
+            tokio::spawn(async move {
+                loop {
+                    server.accept().await.unwrap();
+                }
+            });
+        }
+
+        let members: BTreeMap<u64, _> = vec![(1, addr)]
+            .into_iter()
+            .map(|(id, addr)| (id, BasicNode::new(addr)))
+            .collect();
+
+        if let Err(e) = raft.initialize(members.clone()).await {
             match e {
                 openraft::error::RaftError::APIError(e) => match e {
                     InitializeError::NotAllowed(_) => {}
@@ -256,40 +345,96 @@ mod tests {
             }
         };
 
-        let c1 = RemoteClient::new(addr1);
-        let c2 = RemoteClient::new(addr2);
+        let client = dht::client::Node::new(addr);
+        let table = Table::from("test");
 
-        c1.set("hello".as_bytes().to_vec(), "world".as_bytes().to_vec())
+        client
+            .set(
+                table.clone(),
+                "hello".as_bytes().into(),
+                "world".as_bytes().into(),
+            )
             .await?;
 
-        let res = c2.get("hello".as_bytes().to_vec()).await?;
+        client
+            .set(
+                table.clone(),
+                "hello2".as_bytes().into(),
+                "world2".as_bytes().into(),
+            )
+            .await?;
 
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        let stream = client.stream(table.clone());
+        pin_mut!(stream);
 
-        let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2), (3, addr3)]
-            .into_iter()
-            .map(|(id, addr)| (id, BasicNode::new(addr)))
-            .collect();
+        let mut res = Vec::new();
 
-        raft3.initialize(members.clone()).await?;
-        let rc1 = network::raft::RemoteClient::new(1, BasicNode::new(addr1));
-        rc1.join(3, addr3, members.clone()).await?;
+        while let Some((k, v)) = stream.try_next().await? {
+            res.push((k, v));
+        }
 
-        let c3 = RemoteClient::new(addr3);
-        let res = c3.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        res.sort_by_key(|(k, _)| k.clone());
+
+        assert_eq!(
+            res,
+            vec![
+                ("hello".as_bytes().into(), "world".as_bytes().into()),
+                ("hello2".as_bytes().into(), "world2".as_bytes().into()),
+            ]
+        );
+
+        let table = Table::from("test2");
+
+        const N: u64 = 100_000;
+        client
+            .batch_set(
+                table.clone(),
+                (0..N)
+                    .into_iter()
+                    .map(|i| {
+                        (
+                            i.to_be_bytes().as_ref().into(),
+                            i.to_be_bytes().as_ref().into(),
+                        )
+                    })
+                    .collect::<Vec<(Key, Value)>>(),
+            )
+            .await?;
+
+        let stream = client.stream(table.clone());
+        pin_mut!(stream);
+
+        let mut res = Vec::new();
+
+        while let Some((k, v)) = stream.try_next().await? {
+            res.push((k, v));
+        }
+
+        res.sort_by_key(|(k, _)| k.clone());
+        assert_eq!(res.len(), N as usize);
+
+        for i in 0..N as usize {
+            assert_eq!(
+                res[i],
+                (
+                    i.to_be_bytes().as_ref().into(),
+                    i.to_be_bytes().as_ref().into(),
+                )
+            );
+        }
 
         Ok(())
     }
 
     #[tokio::test]
     #[traced_test]
+    #[ignore = "comitted logs must be stored in stable storage for raft to be able to recover from a node crash"]
+    // see: https://docs.rs/openraft/latest/openraft/docs/faq/index.html#what-will-happen-when-data-gets-lost
     async fn test_node_crash() -> anyhow::Result<()> {
         let (raft1, server1, addr1) = server(1).await?;
         let (raft2, server2, addr2) = server(2).await?;
-        let (raft3, server3, addr3) = server(3).await?;
 
-        let servers = vec![server1, server2, server3];
+        let servers = vec![server1, server2];
         let mut handles = Vec::new();
 
         for server in servers {
@@ -300,7 +445,7 @@ mod tests {
             }));
         }
 
-        let members: BTreeMap<u64, _> = vec![(1, addr1), (2, addr2), (3, addr3)]
+        let members: BTreeMap<u64, _> = vec![(1, addr1)]
             .into_iter()
             .map(|(id, addr)| (id, BasicNode::new(addr)))
             .collect();
@@ -315,41 +460,25 @@ mod tests {
             }
         };
 
-        if let Err(e) = raft2.initialize(members.clone()).await {
-            match e {
-                openraft::error::RaftError::APIError(e) => match e {
-                    InitializeError::NotAllowed(_) => {}
-                    InitializeError::NotInMembers(_) => panic!("{:?}", e),
-                },
-                openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
-            }
-        };
-
-        if let Err(e) = raft3.initialize(members.clone()).await {
-            match e {
-                openraft::error::RaftError::APIError(e) => match e {
-                    InitializeError::NotAllowed(_) => {}
-                    InitializeError::NotInMembers(_) => panic!("{:?}", e),
-                },
-                openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
-            }
-        };
+        let rc1 = network::raft::RemoteClient::new(addr1).await?;
+        rc1.join(2, addr2).await?;
 
         let c1 = RemoteClient::new(addr1);
-        let c2 = RemoteClient::new(addr2);
 
-        let rc1 = network::raft::RemoteClient::new(1, BasicNode::new(addr1));
+        let table = Table::from("test");
 
-        c1.set("hello".as_bytes().to_vec(), "world".as_bytes().to_vec())
-            .await?;
+        c1.set(
+            table.clone(),
+            "hello".as_bytes().into(),
+            "world".as_bytes().into(),
+        )
+        .await?;
 
-        let res = c1.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
-
-        let res = c2.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
 
         // crash node 2
+        tracing::info!("crashing node 2");
         handles[1].abort();
         drop(raft2);
 
@@ -360,38 +489,53 @@ mod tests {
             }
         });
 
-        rc1.join(2, addr2, members.clone()).await?;
+        rc1.join(2, addr2).await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let c2 = RemoteClient::new(addr2);
 
-        let res = c2.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world".as_bytes().to_vec()));
+        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world".as_bytes().into()));
 
         // crash node 2 again
+        tracing::info!("crashing node 2 again");
         handles[1].abort();
         drop(raft2);
 
-        c1.set("hello".as_bytes().to_vec(), "world2".as_bytes().to_vec())
-            .await?;
+        c1.set(
+            table.clone(),
+            "hello".as_bytes().into(),
+            "world2".as_bytes().into(),
+        )
+        .await?;
 
-        let (raft2, server2, addr2) = server(2).await?;
+        let (_raft2, server2, addr2) = server(2).await?;
         handles[1] = tokio::spawn(async move {
             loop {
                 server2.accept().await.unwrap();
             }
         });
-        raft2.initialize(members.clone()).await?;
-        rc1.join(2, addr2, members.clone()).await?;
+        rc1.join(2, addr2).await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let c2 = RemoteClient::new(addr2);
 
-        let res = c2.get("hello".as_bytes().to_vec()).await?;
-        assert_eq!(res, Some("world2".as_bytes().to_vec()));
+        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
+        assert_eq!(res, Some("world2".as_bytes().into()));
 
         Ok(())
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Arbitrary)]
+    #[derive(
+        Debug,
+        Clone,
+        serde::Serialize,
+        serde::Deserialize,
+        bincode::Encode,
+        bincode::Decode,
+        PartialEq,
+        Arbitrary,
+    )]
     enum Action {
         Set { key: Vec<u8>, value: Vec<u8> },
         // get actions[prev_key % actions.len()]
@@ -457,34 +601,35 @@ mod tests {
                     let clients = Arc::new(vec![c1, c2]);
 
                     let shared_actions = Arc::new(actions.clone());
+                    let table = Table::from("test");
 
                     for (i, action) in actions.into_iter().enumerate() {
                         match action {
                             Action::Set { key, value } => {
                                 let client = clients.choose(&mut rand::thread_rng()).unwrap();
 
-                                client.set(key.clone(), value.clone()).await.unwrap();
+                                client.set(table.clone(), key.clone().into(), value.clone().into()).await.unwrap();
                                 ground_truth.lock().await.insert(key.clone(), value.clone());
                             }
                             Action::Get { prev_key } => {
                                 let client = clients.choose(&mut rand::thread_rng()).unwrap();
-                                client.set(b"ensure-linearized-read".to_vec(), vec![]).await.unwrap();
+                                client.set(table.clone(), b"ensure-linearized-read".to_vec().into(), vec![].into()).await.unwrap();
 
                                 let key = if i == 0 {
                                     b"non-existent-key".to_vec()
                                 } else {
-                                    match shared_actions[dbg!(prev_key % dbg!(i))] {
+                                    match shared_actions[prev_key % i] {
                                         Action::Set { ref key, .. } => {
-                                            dbg!(key.clone())
+                                            key.clone()
                                         },
                                         Action::Get { .. } => b"non-existent-key".to_vec(),
                                     }
                                 };
 
-                                let res = client.get(key.clone()).await.unwrap();
+                                let res = client.get(table.clone(), key.clone().into()).await.unwrap();
                                 let expected = ground_truth.lock().await.get(&key).cloned();
 
-                                assert_eq!(res, expected);
+                                assert_eq!(res.map(|v| v.as_bytes().to_vec()), expected);
                             }
                         }
                     }

@@ -47,7 +47,7 @@ mod writer;
 
 type SegmentID = String;
 
-#[derive(serde::Serialize, serde::Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default)]
 struct Meta {
     comitted_segments: Vec<SegmentID>,
 }
@@ -94,6 +94,10 @@ pub struct Webgraph {
 }
 
 impl Webgraph {
+    pub fn builder<P: AsRef<Path>>(path: P) -> WebgraphBuilder {
+        WebgraphBuilder::new(path)
+    }
+
     fn meta<P: AsRef<Path>>(path: P) -> Meta {
         let meta_path = path.as_ref().join("metadata.json");
         Meta::open(meta_path)
@@ -305,7 +309,7 @@ impl Webgraph {
 }
 
 #[cfg(test)]
-mod test {
+pub mod tests {
     use super::*;
 
     fn test_edges() -> Vec<(Node, Node, String)> {
@@ -318,12 +322,12 @@ mod test {
         ]
     }
 
-    fn test_graph() -> Webgraph {
-        //     ┌────┐
-        //     │    │
-        // ┌───A◄─┐ │
-        // │      │ │
-        // ▼      │ │
+    pub fn test_graph() -> Webgraph {
+        //     ┌------┐
+        //     │      │
+        // ┌───A◄─┐  │
+        // │       │  │
+        // ▼      │  │
         // B─────►C◄┘
         //        ▲
         //        │

@@ -19,7 +19,6 @@ pub mod service;
 
 use std::{marker::PhantomData, time::Duration};
 
-use serde::{de::DeserializeOwned, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, ToSocketAddrs},
@@ -33,9 +32,6 @@ const MAX_BODY_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024; // 1TB
 pub enum Error {
     #[error("Got an IO error")]
     IO(#[from] std::io::Error),
-
-    #[error("Error while serializing/deserializing to/from bytes")]
-    Serialization(#[from] bincode::Error),
 
     #[error("Failed to connect to peer: connection timeout")]
     ConnectionTimeout,
@@ -63,9 +59,13 @@ pub struct Connection<Req, Res> {
 
 impl<Req, Res> Connection<Req, Res>
 where
-    Req: Serialize,
-    Res: DeserializeOwned,
+    Req: bincode::Encode,
+    Res: bincode::Decode,
 {
+    pub async fn connect(server: impl ToSocketAddrs) -> Result<Self> {
+        Self::create(server).await
+    }
+
     pub async fn create(server: impl ToSocketAddrs) -> Result<Self> {
         Self::create_with_timeout(server, Duration::from_secs(30)).await
     }
@@ -110,7 +110,7 @@ where
     }
 
     async fn send_without_timeout(mut self, request: &Req) -> Result<Res> {
-        let bytes = bincode::serialize(&request).unwrap();
+        let bytes = bincode::encode_to_vec(request, bincode::config::standard()).unwrap();
 
         // disable linger to avoid TIME_WAIT.
         // should be safe since the connection is closed from the client side.
@@ -142,7 +142,9 @@ where
         self.stream.shutdown().await?;
 
         tracing::debug!("deserializing {:?}", std::any::type_name::<(Req, Res)>());
-        Ok(bincode::deserialize(&buf).unwrap())
+        let (res, _) = bincode::decode_from_slice(&buf, bincode::config::standard()).unwrap();
+
+        Ok(res)
     }
 
     pub async fn send(self, request: &Req) -> Result<Res> {
@@ -171,7 +173,7 @@ pub struct Server<Req, Res> {
 
 impl<Req, Res> Server<Req, Res>
 where
-    Req: DeserializeOwned,
+    Req: bincode::Decode,
 {
     pub async fn bind(addr: impl ToSocketAddrs) -> Result<Self> {
         let listener = TcpListener::bind(addr).await?;
@@ -197,11 +199,11 @@ where
 
         stream.read_exact(&mut buf).await?;
 
-        let body = Some(bincode::deserialize(&buf).unwrap());
+        let (body, _) = bincode::decode_from_slice(&buf, bincode::config::standard()).unwrap();
 
         Ok(Request {
             stream,
-            body,
+            body: Some(body),
             marker: PhantomData,
         })
     }
@@ -224,10 +226,10 @@ pub struct Request<Req, Res> {
 
 impl<Req, Res> Request<Req, Res>
 where
-    Res: Serialize,
+    Res: bincode::Encode,
 {
     async fn respond_without_timeout(mut self, response: Res) -> Result<()> {
-        let bytes = bincode::serialize(&response).unwrap();
+        let bytes = bincode::encode_to_vec(&response, bincode::config::standard()).unwrap();
         let header = Header {
             body_size: bytes.len(),
         };
@@ -269,15 +271,14 @@ mod tests {
 
     use proptest::prelude::*;
     use proptest_derive::Arbitrary;
-    use serde::Deserialize;
 
     use crate::free_socket_addr;
 
     use super::*;
 
     fn fixture<
-        Req: Serialize + DeserializeOwned + Send + 'static,
-        Res: Serialize + DeserializeOwned + Send + 'static,
+        Req: bincode::Encode + bincode::Decode + Send + 'static,
+        Res: bincode::Encode + bincode::Decode + Send + 'static,
         A: Send + 'static,
         B: Send + 'static,
         X: Future<Output = Result<A, TestCaseError>> + Send,
@@ -306,7 +307,7 @@ mod tests {
             })
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Arbitrary)]
+    #[derive(Debug, Clone, bincode::Encode, bincode::Decode, PartialEq, Arbitrary)]
     struct Message {
         text: String,
         other: HashMap<String, f32>,

@@ -30,7 +30,7 @@ use std::{
 use url::Url;
 
 use crate::crawler::WeightedUrl;
-use crate::webgraph::centrality::{top_hosts, TopHosts};
+use crate::webgraph::centrality::{top_nodes, TopNodes};
 use crate::SortableFloat;
 use crate::{
     config::CrawlPlannerConfig,
@@ -311,10 +311,13 @@ impl CrawlPlanner {
         let queue_path = output.as_ref().join("job_queue");
         std::fs::create_dir_all(&queue_path)?;
 
-        let hosts = top_hosts(
+        let hosts = top_nodes(
             &self.host_centrality,
-            TopHosts::Fraction(self.config.top_host_fraction),
-        );
+            TopNodes::Fraction(self.config.top_host_fraction),
+        )
+        .into_iter()
+        .map(|(host, _)| host)
+        .collect::<Vec<_>>();
         tracing::info!("found {} hosts", hosts.len());
 
         let grouped_hosts = self.group_domain(&hosts);

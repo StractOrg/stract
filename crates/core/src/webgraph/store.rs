@@ -22,7 +22,17 @@ use rocksdb::BlockBasedOptions;
 
 use super::{Compression, Edge, EdgeLabel, FullNodeID, InnerEdge, NodeID};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 struct SerializedEdge {
     from_prefix: NodeID,
     to_prefix: NodeID,
@@ -87,11 +97,14 @@ impl EdgeStoreWriter {
         for edge in edges {
             let value_bytes = L::to_bytes(&edge.label).unwrap();
 
-            let value_bytes = bincode::serialize(&SerializedEdge {
-                from_prefix: edge.from.prefix,
-                to_prefix: edge.to.prefix,
-                label: value_bytes.clone(),
-            })
+            let value_bytes = bincode::encode_to_vec(
+                &SerializedEdge {
+                    from_prefix: edge.from.prefix,
+                    to_prefix: edge.to.prefix,
+                    label: value_bytes.clone(),
+                },
+                bincode::config::standard(),
+            )
             .unwrap();
 
             let key_bytes = if self.reversed {
@@ -141,7 +154,8 @@ impl EdgeStoreWriter {
                     )
                 };
 
-                let val: SerializedEdge = bincode::deserialize(&val).unwrap();
+                let (val, _): (SerializedEdge, _) =
+                    bincode::decode_from_slice(&val, bincode::config::standard()).unwrap();
 
                 Some(InnerEdge {
                     from: FullNodeID {
@@ -413,8 +427,10 @@ impl EdgeStore {
             });
         }
 
-        let edge_labels_bytes = bincode::serialize(&edge_labels).unwrap();
-        let edge_nodes_bytes = bincode::serialize(&edge_nodes).unwrap();
+        let edge_labels_bytes =
+            bincode::encode_to_vec(&edge_labels, bincode::config::standard()).unwrap();
+        let edge_nodes_bytes =
+            bincode::encode_to_vec(&edge_nodes, bincode::config::standard()).unwrap();
 
         let edge_labels_bytes = self.compression.compress(&edge_labels_bytes);
         let edge_nodes_bytes = self.compression.compress(&edge_nodes_bytes);
@@ -435,7 +451,7 @@ impl EdgeStore {
             .put_cf_opt(
                 node_cf,
                 node_bytes,
-                bincode::serialize(&node_range).unwrap(),
+                bincode::encode_to_vec(node_range, bincode::config::standard()).unwrap(),
                 &opt,
             )
             .unwrap();
@@ -444,7 +460,7 @@ impl EdgeStore {
             .put_cf_opt(
                 label_cf,
                 node_bytes,
-                bincode::serialize(&label_range).unwrap(),
+                bincode::encode_to_vec(label_range, bincode::config::standard()).unwrap(),
                 &opt,
             )
             .unwrap();
@@ -528,16 +544,26 @@ impl EdgeStore {
             self.ranges.get_cf_opt(edge_cf, node_bytes, &opts).unwrap(),
         ) {
             (Some(node_range_bytes), Some(edge_range_bytes)) => {
-                let node_range = bincode::deserialize::<Range<usize>>(&node_range_bytes).unwrap();
-                let edge_range = bincode::deserialize::<Range<usize>>(&edge_range_bytes).unwrap();
+                let (node_range, _) = bincode::decode_from_slice::<Range<usize>, _>(
+                    &node_range_bytes,
+                    bincode::config::standard(),
+                )
+                .unwrap();
+                let (edge_range, _) = bincode::decode_from_slice::<Range<usize>, _>(
+                    &edge_range_bytes,
+                    bincode::config::standard(),
+                )
+                .unwrap();
 
                 let edge_labels = &self.edge_labels[edge_range];
                 let edge_labels = self.compression.decompress(edge_labels);
-                let edge_labels: Vec<_> = bincode::deserialize(&edge_labels).unwrap();
+                let (edge_labels, _): (Vec<_>, _) =
+                    bincode::decode_from_slice(&edge_labels, bincode::config::standard()).unwrap();
 
                 let edge_nodes = &self.edge_nodes[node_range];
                 let edge_nodes = self.compression.decompress(edge_nodes);
-                let edge_nodes: Vec<_> = bincode::deserialize(&edge_nodes).unwrap();
+                let (edge_nodes, _): (Vec<_>, _) =
+                    bincode::decode_from_slice(&edge_nodes, bincode::config::standard()).unwrap();
 
                 edge_labels
                     .into_iter()
@@ -573,11 +599,16 @@ impl EdgeStore {
 
         match self.ranges.get_cf_opt(node_cf, node_bytes, &opts).unwrap() {
             Some(node_range_bytes) => {
-                let node_range = bincode::deserialize::<Range<usize>>(&node_range_bytes).unwrap();
+                let (node_range, _) = bincode::decode_from_slice::<Range<usize>, _>(
+                    &node_range_bytes,
+                    bincode::config::standard(),
+                )
+                .unwrap();
 
                 let edge_nodes = &self.edge_nodes[node_range];
                 let edge_nodes = self.compression.decompress(edge_nodes);
-                let edge_nodes: Vec<_> = bincode::deserialize(&edge_nodes).unwrap();
+                let (edge_nodes, _): (Vec<_>, _) =
+                    bincode::decode_from_slice(&edge_nodes, bincode::config::standard()).unwrap();
 
                 edge_nodes
                     .into_iter()
@@ -621,10 +652,15 @@ impl EdgeStore {
                 let node = u64::from_le_bytes((*key).try_into().unwrap());
                 let node = NodeID::from(node);
 
-                let node_range = bincode::deserialize::<Range<usize>>(&val).unwrap();
+                let (node_range, _) = bincode::decode_from_slice::<Range<usize>, _>(
+                    &val,
+                    bincode::config::standard(),
+                )
+                .unwrap();
                 let edge_nodes = &self.edge_nodes[node_range];
                 let edge_nodes = self.compression.decompress(edge_nodes);
-                let edge_nodes: Vec<_> = bincode::deserialize(&edge_nodes).unwrap();
+                let (edge_nodes, _): (Vec<_>, _) =
+                    bincode::decode_from_slice(&edge_nodes, bincode::config::standard()).unwrap();
 
                 edge_nodes.into_iter().map(move |other| {
                     if self.reversed {

@@ -21,10 +21,41 @@ use super::Result;
 use crate::distributed::{retry_strategy::ExponentialBackoff, sonic};
 use std::{net::SocketAddr, time::Duration};
 
-#[derive(Debug)]
-pub struct RemoteClient<S: sonic::service::Service> {
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct RemoteClient<S> {
     addr: SocketAddr,
     _phantom: std::marker::PhantomData<S>,
+}
+
+impl<S> bincode::Encode for RemoteClient<S> {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
+        self.addr.encode(encoder)
+    }
+}
+
+impl<S> bincode::Decode for RemoteClient<S> {
+    fn decode<D: bincode::de::Decoder>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        Ok(Self {
+            addr: SocketAddr::decode(decoder)?,
+            _phantom: std::marker::PhantomData,
+        })
+    }
+}
+
+impl<'de, S> bincode::BorrowDecode<'de> for RemoteClient<S> {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        Ok(Self {
+            addr: SocketAddr::borrow_decode(decoder)?,
+            _phantom: std::marker::PhantomData,
+        })
+    }
 }
 
 impl<S> Clone for RemoteClient<S>
@@ -49,6 +80,10 @@ where
             addr,
             _phantom: std::marker::PhantomData,
         }
+    }
+
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
     }
 }
 

@@ -49,7 +49,9 @@ pub struct Suggestion {
     raw: String,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, IntoParams)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, IntoParams,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct AutosuggestQuery {
     q: String,

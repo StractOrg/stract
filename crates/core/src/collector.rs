@@ -17,7 +17,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use min_max_heap::MinMaxHeap;
-use serde::{Deserialize, Serialize};
+
 use tantivy::{
     collector::{Collector, ScoreSegmentTweaker, ScoreTweaker, SegmentCollector},
     DocId, SegmentOrdinal, SegmentReader,
@@ -42,7 +42,16 @@ pub struct MaxDocsConsidered {
     pub segments: usize,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+)]
 pub struct Hashes {
     pub site: Prehashed,
     pub title: Prehashed,

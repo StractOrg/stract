@@ -23,7 +23,7 @@ use url::Url;
 use crate::{
     kv::rocksdb_store::RocksDbStore,
     webgraph::{
-        centrality::{top_hosts, TopHosts},
+        centrality::{top_nodes, TopNodes},
         NodeID, Webgraph,
     },
     webpage::url_ext::UrlExt,
@@ -31,10 +31,20 @@ use crate::{
 
 use super::{index::FeedIndex, Feed};
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Hash,
+)]
 pub struct Domain(String);
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct DomainFeeds {
     pub domain: Domain,
     pub feeds: Vec<Feed>,
@@ -46,8 +56,18 @@ impl From<&Url> for Domain {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub struct SplitId(uuid::Uuid);
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Hash,
+)]
+pub struct SplitId(#[bincode(with_serde)] uuid::Uuid);
 
 impl SplitId {
     pub fn id(&self) -> uuid::Uuid {
@@ -55,7 +75,7 @@ impl SplitId {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Split {
     pub id: SplitId,
     pub feeds: Vec<DomainFeeds>,
@@ -109,11 +129,11 @@ pub fn schedule(
     host_graph: &Webgraph,
     num_splits: u64,
 ) -> Schedule {
-    let top_hosts = top_hosts(host_centrality, TopHosts::Top(1_000_000));
+    let top_hosts = top_nodes(host_centrality, TopNodes::Top(1_000_000));
 
     let mut all_feeds = HashMap::new();
 
-    for host in top_hosts {
+    for (host, _) in top_hosts {
         let host = host_graph.id2node(&host).unwrap();
         let url = Url::parse(&format!("http://{}", host.as_str()));
 

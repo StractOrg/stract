@@ -138,13 +138,13 @@ fn update_centralities(centralities: &mut BTreeMap<NodeID, KahanSum>, counters: 
             .new
             .get(node)
             .map(|counter| counter.size())
-            .unwrap_or_default()
+            .unwrap_or(1)
             .checked_sub(
                 counters
                     .old
                     .get(node)
                     .map(|counter| counter.size())
-                    .unwrap_or_default(),
+                    .unwrap_or(1),
             )
             .unwrap_or_default() as f64
             / (t + 1) as f64;
@@ -275,6 +275,14 @@ impl HarmonicCentrality {
 
     pub fn iter(&self) -> impl Iterator<Item = (&NodeID, f64)> {
         self.0.iter().map(|(node, centrality)| (node, *centrality))
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 

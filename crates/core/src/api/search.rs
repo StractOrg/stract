@@ -33,7 +33,9 @@ use super::State;
 
 use axum::{extract, response::IntoResponse};
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 #[schema(title = "SearchQuery", example = json!({"query": "hello world"}))]
 pub struct ApiSearchQuery {
@@ -81,7 +83,9 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ApiSearchResult {
     Websites(WebsitesResult),
@@ -145,7 +149,9 @@ pub async fn search(
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 pub struct WidgetQuery {
     pub query: String,
 }
@@ -166,7 +172,9 @@ pub async fn widget(
     Json(state.searcher.widget(&req.query).await)
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 pub struct SidebarQuery {
     pub query: String,
 }
@@ -187,7 +195,9 @@ pub async fn sidebar(
     Json(state.searcher.sidebar(&req.query).await)
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 pub struct SpellcheckQuery {
     pub query: String,
 }
@@ -208,7 +218,9 @@ pub async fn spellcheck(
     Json(state.searcher.spell_check(&req.query))
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityImageParams {
     pub image_id: String,

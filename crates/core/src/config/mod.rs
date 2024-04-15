@@ -17,14 +17,15 @@
 pub mod defaults;
 
 use super::Result;
+use crate::ampc::dht;
 use crate::distributed::member::ShardId;
 use crate::feed::scheduler::SplitId;
-use serde::{Deserialize, Serialize};
+
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::net::SocketAddr;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct IndexingLocalConfig {
     pub output_path: String,
     pub limit_warc_files: Option<usize>,
@@ -44,7 +45,7 @@ pub struct IndexingLocalConfig {
     pub dual_encoder: Option<IndexingDualEncoderConfig>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct IndexingDualEncoderConfig {
     pub model_path: String,
 
@@ -53,7 +54,7 @@ pub struct IndexingDualEncoderConfig {
     pub page_centrality_rank_threshold: Option<u64>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct WebgraphConstructConfig {
     pub host_graph_base_path: String,
     pub page_graph_base_path: String,
@@ -63,7 +64,7 @@ pub struct WebgraphConstructConfig {
     pub batch_size: Option<usize>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 #[serde(tag = "type")]
 pub enum WarcSource {
     HTTP(HttpConfig),
@@ -130,19 +131,19 @@ impl WarcSource {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub struct LocalConfig {
     pub folder: String,
     pub names: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub struct HttpConfig {
     pub base_url: String,
     pub warc_paths_file: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub struct S3Config {
     pub bucket: String,
     pub folder: String,
@@ -151,7 +152,7 @@ pub struct S3Config {
     pub endpoint: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct CollectorConfig {
     #[serde(default = "defaults::Collector::site_penalty")]
     pub site_penalty: f64,
@@ -181,7 +182,7 @@ impl Default for CollectorConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ApiThresholds {
     #[serde(default = "defaults::Api::stackoverflow")]
     pub stackoverflow: f64,
@@ -199,14 +200,14 @@ impl Default for ApiThresholds {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct LLMConfig {
     pub api_base: String,
     pub model: String,
     pub api_key: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ApiConfig {
     pub summarizer_path: String,
     pub queries_csv_path: String,
@@ -239,7 +240,7 @@ pub struct ApiConfig {
     pub max_concurrent_searches: Option<usize>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct SnippetConfig {
     #[serde(default = "defaults::Snippet::desired_num_chars")]
     pub desired_num_chars: usize,
@@ -279,7 +280,7 @@ impl Default for SnippetConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct SearchServerConfig {
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
@@ -299,7 +300,7 @@ pub struct SearchServerConfig {
     pub snippet: SnippetConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct EntitySearchServerConfig {
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
@@ -308,19 +309,19 @@ pub struct EntitySearchServerConfig {
     pub host: SocketAddr,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct CrawlCoordinatorConfig {
     pub job_queue: String,
     pub host: SocketAddr,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct UserAgent {
     pub full: String,
     pub token: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct CrawlerConfig {
     pub num_worker_threads: usize,
     pub user_agent: UserAgent,
@@ -354,13 +355,13 @@ pub struct CrawlerConfig {
     pub router_hosts: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct CrawlRouterConfig {
     pub host: SocketAddr,
     pub coordinator_addrs: Vec<SocketAddr>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 #[serde(tag = "type", content = "args", rename_all = "snake_case")]
 pub enum AcceleratorDevice {
     Cpu,
@@ -368,14 +369,25 @@ pub enum AcceleratorDevice {
     Mps,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy, Debug)]
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Hash,
+    Clone,
+    Copy,
+    Debug,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum WebgraphGranularity {
     Host,
     Page,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct WebgraphServerConfig {
     pub host: SocketAddr,
     pub graph_path: String,
@@ -390,7 +402,7 @@ pub struct WebgraphServerConfig {
     pub max_similar_hosts: usize,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct WidgetsConfig {
     pub thesaurus_paths: Vec<String>,
 
@@ -398,7 +410,7 @@ pub struct WidgetsConfig {
     pub calculator_fetch_currencies_exchange: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct CrawlPlannerConfig {
     pub page_harmonic_path: String,
     pub host_harmonic_path: String,
@@ -416,7 +428,7 @@ pub struct CrawlPlannerConfig {
     pub num_threads: Option<usize>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct LiveIndexConfig {
     pub split_path: String,
     pub downloaded_db_path: String,
@@ -462,7 +474,7 @@ pub struct LiveIndexConfig {
     pub snippet: SnippetConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct LiveIndexSchedulerConfig {
     pub schedule_path: String,
     pub feed_index_path: String,
@@ -470,7 +482,7 @@ pub struct LiveIndexSchedulerConfig {
     pub host_graph_path: String,
     pub num_splits: u64,
 }
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct FeedIndexingConfig {
     pub output_path: String,
     pub warc_source: WarcSource,
@@ -478,7 +490,7 @@ pub struct FeedIndexingConfig {
     pub skip_warc_files: Option<usize>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct WebSpellConfig {
     pub output_path: String,
     pub warc_source: WarcSource,
@@ -512,4 +524,35 @@ impl Default for CorrectionConfig {
             correction_threshold: defaults::Correction::correction_threshold(),
         }
     }
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct GossipConfig {
+    pub cluster_id: String,
+    pub seed_nodes: Option<Vec<SocketAddr>>,
+    pub addr: SocketAddr,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct DhtConfig {
+    pub node_id: dht::NodeId,
+    pub host: SocketAddr,
+    pub shard: ShardId,
+    pub seed_node: Option<SocketAddr>,
+    pub gossip: GossipConfig,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct HarmonicCoordinatorConfig {
+    pub gossip: GossipConfig,
+    pub host: SocketAddr,
+    pub output_path: String,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct HarmonicWorkerConfig {
+    pub gossip: GossipConfig,
+    pub shard: ShardId,
+    pub graph_path: String,
+    pub host: SocketAddr,
 }
