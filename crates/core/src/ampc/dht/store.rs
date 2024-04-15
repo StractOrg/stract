@@ -177,10 +177,19 @@ impl Db {
     }
 
     pub fn batch_set(&mut self, table: Table, values: Vec<(Key, Value)>) {
-        self.data
-            .entry(table)
-            .or_default()
-            .extend(values.into_iter().map(|(k, v)| (Arc::new(k), Arc::new(v))));
+        let table = self.data.entry(table).or_default();
+
+        // for some reason, the entry API seems to be faster than using extend or inserts
+        for (k, v) in values {
+            match table.entry(Arc::new(k)) {
+                std::collections::btree_map::Entry::Occupied(mut e) => {
+                    *e.get_mut() = Arc::new(v);
+                }
+                std::collections::btree_map::Entry::Vacant(e) => {
+                    e.insert(Arc::new(v));
+                }
+            }
+        }
     }
 
     pub fn upsert(

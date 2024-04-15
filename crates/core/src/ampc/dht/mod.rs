@@ -299,12 +299,14 @@ pub mod tests {
             "world".as_bytes().into(),
         )
         .await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await; // reads are not linearized (only eventual consistency)
 
         let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
 
         assert_eq!(res, Some("world".as_bytes().into()));
 
         rc1.join(3, addr3).await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await; // join is not blocking
 
         let c3 = RemoteClient::new(addr3);
         let res = c3.get(table.clone(), "hello".as_bytes().into()).await?;

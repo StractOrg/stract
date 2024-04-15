@@ -119,7 +119,7 @@ impl sonic::service::Message<Server> for AddLearner {
         let node = BasicNode::new(self.addr);
         server
             .raft
-            .add_learner(self.id, node, true)
+            .add_learner(self.id, node, false)
             .await
             .map_err(crate::bincode_utils::SerdeCompat)?;
 
