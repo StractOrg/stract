@@ -21,7 +21,7 @@ use std::{
 
 use std::sync::atomic::Ordering;
 
-use crate::bloom::BloomFilter;
+use crate::bloom::U64BloomFilter;
 use tracing::info;
 
 use crate::{
@@ -60,7 +60,7 @@ fn update_changed_counters(
     graph: &Webgraph,
     exact_changed_nodes: &mut BTreeSet<NodeID>,
     counters: &mut Counters,
-    new_changed_nodes: &mut BloomFilter,
+    new_changed_nodes: &mut U64BloomFilter,
 ) -> bool {
     let mut new_exact_changed_nodes = BTreeSet::default();
     let has_changes = AtomicBool::new(false);
@@ -96,8 +96,8 @@ fn update_all_counters(
     graph: &Webgraph,
     mut exact_changed_nodes: Option<&mut BTreeSet<NodeID>>,
     counters: &mut Counters,
-    changed_nodes: &BloomFilter,
-    new_changed_nodes: &mut BloomFilter,
+    changed_nodes: &U64BloomFilter,
+    new_changed_nodes: &mut U64BloomFilter,
 ) -> bool {
     let has_changes = AtomicBool::new(false);
 
@@ -194,7 +194,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
 
     let num_nodes = initialize(graph, &mut counters, &mut centralities);
 
-    let mut changed_nodes = BloomFilter::new(num_nodes, 0.05);
+    let mut changed_nodes = U64BloomFilter::new(num_nodes, 0.05);
 
     for node in graph.nodes() {
         changed_nodes.insert(node.as_u64());
@@ -215,7 +215,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
             break;
         }
 
-        let mut new_changed_nodes = BloomFilter::new(num_nodes, 0.05);
+        let mut new_changed_nodes = U64BloomFilter::new(num_nodes, 0.05);
 
         if !exact_changed_nodes.is_empty()
             && exact_changed_nodes.len() as u64 <= exact_counting_threshold

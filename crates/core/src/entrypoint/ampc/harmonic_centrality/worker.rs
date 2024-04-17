@@ -16,7 +16,7 @@
 
 use crate::{
     ampc::prelude::*,
-    bloom::BloomFilter,
+    bloom::U64BloomFilter,
     config::HarmonicWorkerConfig,
     distributed::{
         cluster::Cluster,
@@ -35,14 +35,14 @@ use super::CentralityJob;
 pub struct CentralityWorker {
     shard: ShardId,
     graph: Webgraph,
-    changed_nodes: Arc<Mutex<BloomFilter>>,
+    changed_nodes: Arc<Mutex<U64BloomFilter>>,
     round: AtomicU64,
 }
 
 impl CentralityWorker {
     pub fn new(shard: ShardId, graph: Webgraph) -> Self {
         let num_nodes = graph.estimate_num_nodes() as u64;
-        let mut changed_nodes = BloomFilter::new(num_nodes, 0.05);
+        let mut changed_nodes = U64BloomFilter::new(num_nodes, 0.05);
 
         for node in graph.nodes() {
             changed_nodes.insert(node.as_u64());
@@ -64,7 +64,7 @@ impl CentralityWorker {
         &self.graph
     }
 
-    pub fn changed_nodes(&self) -> &Arc<Mutex<BloomFilter>> {
+    pub fn changed_nodes(&self) -> &Arc<Mutex<U64BloomFilter>> {
         &self.changed_nodes
     }
 

@@ -30,12 +30,12 @@ use std::{
 use url::Url;
 
 use crate::crawler::WeightedUrl;
+use crate::speedy_kv;
 use crate::webgraph::centrality::{top_nodes, TopNodes};
 use crate::SortableFloat;
 use crate::{
     config::CrawlPlannerConfig,
     crawler::{file_queue::FileQueueWriter, Job},
-    kv::{rocksdb_store::RocksDbStore, Kv},
     webgraph::{NodeID, Webgraph},
 };
 
@@ -44,8 +44,8 @@ use super::Domain;
 const MAX_SURPLUS_BUDGET_ITERATIONS: usize = 100;
 
 pub struct CrawlPlanner {
-    host_centrality: RocksDbStore<NodeID, f64>,
-    page_centrality: RocksDbStore<NodeID, f64>,
+    host_centrality: speedy_kv::Db<NodeID, f64>,
+    page_centrality: speedy_kv::Db<NodeID, f64>,
     host_graph: Webgraph,
     page_graph: Webgraph,
     config: CrawlPlannerConfig,
@@ -53,8 +53,8 @@ pub struct CrawlPlanner {
 
 impl CrawlPlanner {
     pub fn new(
-        host_centrality: RocksDbStore<NodeID, f64>,
-        page_centrality: RocksDbStore<NodeID, f64>,
+        host_centrality: speedy_kv::Db<NodeID, f64>,
+        page_centrality: speedy_kv::Db<NodeID, f64>,
         host_graph: Webgraph,
         page_graph: Webgraph,
         config: CrawlPlannerConfig,
@@ -74,7 +74,16 @@ impl CrawlPlanner {
         self.page_graph
             .pages_by_host(&host)
             .into_iter()
-            .map(|id| (id, self.page_centrality.get(&id).unwrap_or_default()))
+            .map(|id| {
+                (
+                    id,
+                    self.page_centrality
+                        .get(&id)
+                        .ok()
+                        .flatten()
+                        .unwrap_or_default(),
+                )
+            })
             .collect::<Vec<_>>()
     }
 
@@ -94,7 +103,13 @@ impl CrawlPlanner {
             .sorted_by_cached_key(|(_, hosts)| {
                 let s = hosts
                     .iter()
-                    .map(|host| self.host_centrality.get(host).unwrap_or_default())
+                    .map(|host| {
+                        self.host_centrality
+                            .get(host)
+                            .ok()
+                            .flatten()
+                            .unwrap_or_default()
+                    })
                     .sum::<f64>();
 
                 SortableFloat::from(s)
@@ -214,7 +229,7 @@ impl CrawlPlanner {
     fn assign_host_budgets(&self, hosts: &[NodeID]) -> BTreeMap<NodeID, u64> {
         let mut total_host_centrality = hosts
             .iter()
-            .filter_map(|v| self.host_centrality.get(v))
+            .filter_map(|v| self.host_centrality.get(v).ok().flatten())
             .sum::<f64>();
 
         let host_pages: BTreeMap<_, _> = hosts
@@ -230,7 +245,12 @@ impl CrawlPlanner {
             .par_iter()
             .progress_count(hosts.len() as u64)
             .map(|host| {
-                let host_centrality = self.host_centrality.get(host).unwrap_or_default();
+                let host_centrality = self
+                    .host_centrality
+                    .get(host)
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default();
 
                 let host_budget = ((self.config.crawl_budget as f64 * host_centrality)
                     / total_host_centrality)
@@ -273,7 +293,12 @@ impl CrawlPlanner {
                 let host_budget = host_budgets.get_mut(host).unwrap();
 
                 if num_pages > *host_budget {
-                    let centrality = self.host_centrality.get(host).unwrap_or_default();
+                    let centrality = self
+                        .host_centrality
+                        .get(host)
+                        .ok()
+                        .flatten()
+                        .unwrap_or_default();
                     new_total_host_centrality += centrality;
 
                     let part = (centrality * surplus_budget as f64 / total_host_centrality)
@@ -524,20 +549,20 @@ mod tests {
         let page_graph = test_graph(page_test_edges());
 
         let centrality = HarmonicCentrality::calculate(&host_graph);
-        let host_centrality = RocksDbStore::open(crate::gen_temp_path());
+        let mut host_centrality = speedy_kv::Db::open_or_create(crate::gen_temp_path()).unwrap();
 
         for (node, score) in centrality.iter() {
-            host_centrality.insert(*node, score);
+            host_centrality.insert(*node, score).unwrap();
         }
-        host_centrality.flush();
+        host_centrality.commit().unwrap();
 
         let centrality = HarmonicCentrality::calculate(&page_graph);
-        let page_centrality = RocksDbStore::open(crate::gen_temp_path());
+        let mut page_centrality = speedy_kv::Db::open_or_create(crate::gen_temp_path()).unwrap();
 
         for (node, score) in centrality.iter() {
-            page_centrality.insert(*node, score);
+            page_centrality.insert(*node, score).unwrap();
         }
-        page_centrality.flush();
+        page_centrality.commit().unwrap();
 
         let planner = CrawlPlanner::new(
             host_centrality,

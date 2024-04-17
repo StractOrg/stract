@@ -25,7 +25,7 @@ use crate::{
         prelude::*,
         DhtConn,
     },
-    bloom::BloomFilter,
+    bloom::U64BloomFilter,
     hyperloglog::HyperLogLog,
     webgraph,
 };
@@ -109,7 +109,7 @@ impl CentralityMapper {
     /// update new bloom filter with the nodes that changed
     fn update_changed_nodes(
         changes: &[(webgraph::NodeID, UpsertAction)],
-        new_changed_nodes: &Mutex<BloomFilter>,
+        new_changed_nodes: &Mutex<U64BloomFilter>,
     ) {
         let mut new_changed_nodes = new_changed_nodes.lock().unwrap();
 
@@ -122,7 +122,7 @@ impl CentralityMapper {
 
     fn update_dht(
         batch: &[webgraph::Edge<()>],
-        new_changed_nodes: &Mutex<BloomFilter>,
+        new_changed_nodes: &Mutex<U64BloomFilter>,
         dht: &DhtConn<CentralityTables>,
     ) {
         if batch.is_empty() {
@@ -237,7 +237,7 @@ impl CentralityMapper {
         let num_shards = dht.prev().num_shards();
         let batch_size = (num_shards * OPS_BATCH_PER_SHARD) as usize;
 
-        let new_changed_nodes = Arc::new(Mutex::new(BloomFilter::empty_from(
+        let new_changed_nodes = Arc::new(Mutex::new(U64BloomFilter::empty_from(
             &worker.changed_nodes().lock().unwrap(),
         )));
 

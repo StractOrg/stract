@@ -18,18 +18,17 @@ use std::{path::Path, sync::Arc};
 
 use crate::{
     config::{LiveIndexConfig, LiveIndexSchedulerConfig},
-    distributed::sonic::service::sonic_service,
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
-        sonic,
+        sonic::{self, service::sonic_service},
     },
     feed::{self, index::FeedIndex},
     inverted_index,
-    kv::rocksdb_store::RocksDbStore,
     live_index::{Index, IndexManager},
     ranking::inbound_similarity::InboundSimilarity,
     searcher::{InitialWebsiteResult, LocalSearcher},
+    speedy_kv,
     webgraph::WebgraphBuilder,
 };
 use anyhow::Result;
@@ -112,8 +111,10 @@ pub async fn serve(config: LiveIndexConfig) -> Result<()> {
 
 pub fn schedule(config: LiveIndexSchedulerConfig) -> Result<()> {
     let feed_index = FeedIndex::open(config.feed_index_path)?;
-    let host_harmonic =
-        RocksDbStore::open(Path::new(&config.host_centrality_store_path).join("harmonic"));
+    let host_harmonic = speedy_kv::Db::open_or_create(
+        Path::new(&config.host_centrality_store_path).join("harmonic"),
+    )
+    .unwrap();
     let host_graph = WebgraphBuilder::new(config.host_graph_path).open();
 
     let schedule =

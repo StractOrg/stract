@@ -23,7 +23,7 @@ use std::{
     ops::{Bound, Range},
 };
 
-use crate::{distributed::member::ShardId, fast_stable_hash, Result};
+use crate::{distributed::member::ShardId, fast_stable_hash_64, Result};
 
 use super::{
     network::api,
@@ -233,7 +233,7 @@ impl Client {
             return Err(anyhow::anyhow!("No shards"));
         }
 
-        let hash = fast_stable_hash(key);
+        let hash = fast_stable_hash_64(key);
 
         Ok(&self.ids[hash as usize % self.ids.len()])
     }

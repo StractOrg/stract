@@ -21,7 +21,7 @@ use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 
 use crate::{
-    kv::{rocksdb_store::RocksDbStore, Kv},
+    speedy_kv,
     webgraph::{NodeID, ShortestPaths, Webgraph},
 };
 
@@ -32,7 +32,7 @@ const EPSILON: f64 = 0.05;
 //
 // Epsilong is set to 0.05.
 pub struct ApproxHarmonic {
-    inner: RocksDbStore<NodeID, f64>,
+    inner: speedy_kv::Db<NodeID, f64>,
 }
 
 impl ApproxHarmonic {
@@ -65,19 +65,26 @@ impl ApproxHarmonic {
             }
         });
 
-        let res = Self {
-            inner: RocksDbStore::open(output),
+        let mut res = Self {
+            inner: speedy_kv::Db::open_or_create(output).unwrap(),
         };
 
         for (node, centrality) in centralities {
-            res.inner.insert(node, centrality as f64);
+            res.inner.insert(node, centrality as f64).unwrap();
+
+            if res.inner.uncommitted_inserts() >= 1_000_000 {
+                res.inner.commit().unwrap();
+            }
         }
+
+        res.inner.commit().unwrap();
+        res.inner.merge_all_segments().unwrap();
 
         res
     }
 
     pub fn get(&self, node: &NodeID) -> Option<f64> {
-        self.inner.get(node)
+        self.inner.get(node).unwrap()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (NodeID, f64)> + '_ {

@@ -19,8 +19,8 @@ use std::{cmp::Reverse, path::Path};
 
 use crate::{
     external_sort::ExternalSorter,
-    kv::{rocksdb_store::RocksDbStore, Kv},
     ranking::inbound_similarity::InboundSimilarity,
+    speedy_kv,
     webgraph::{
         centrality::{
             approx_harmonic::ApproxHarmonic, harmonic::HarmonicCentrality, store_csv,
@@ -77,8 +77,9 @@ impl Centrality {
         let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
 
         let approx = ApproxHarmonic::build(&graph, base_output.as_ref().join("approx_harmonic"));
-        let approx_rank: RocksDbStore<crate::webgraph::NodeID, u64> =
-            RocksDbStore::open(base_output.as_ref().join("approx_harmonic_rank"));
+        let mut approx_rank: speedy_kv::Db<crate::webgraph::NodeID, u64> =
+            speedy_kv::Db::open_or_create(base_output.as_ref().join("approx_harmonic_rank"))
+                .unwrap();
 
         let mut top_nodes = Vec::new();
 
@@ -94,11 +95,19 @@ impl Centrality {
                 (rank, node_id, centrality)
             })
         {
-            approx_rank.insert(node, rank as u64);
+            approx_rank.insert(node, rank as u64).unwrap();
+
+            if approx_rank.uncommitted_inserts() > 1_000_000 {
+                approx_rank.commit().unwrap();
+            }
+
             if top_nodes.len() < 1_000_000 {
                 top_nodes.push((graph.id2node(&node).unwrap(), centrality));
             }
         }
+
+        approx_rank.commit().unwrap();
+        approx_rank.merge_all_segments().unwrap();
 
         store_csv(top_nodes, base_output.as_ref().join("approx_harmonic.csv"));
 

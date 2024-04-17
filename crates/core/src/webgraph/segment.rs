@@ -16,8 +16,6 @@
 
 use std::path::{Path, PathBuf};
 
-use itertools::Itertools;
-
 use super::{
     store::{EdgeStore, EdgeStoreWriter},
     Compression, Edge, InnerEdge, NodeID,
@@ -139,10 +137,7 @@ impl Segment {
     }
 
     pub fn pages_by_host(&self, host_node: &NodeID) -> Vec<NodeID> {
-        let rev = self.reversed_adjacency.nodes_by_prefix(host_node);
-        let fwd = self.adjacency.nodes_by_prefix(host_node);
-
-        rev.into_iter().chain(fwd).sorted().dedup().collect()
+        self.reversed_adjacency.nodes_by_prefix(host_node)
     }
 
     pub fn id(&self) -> String {

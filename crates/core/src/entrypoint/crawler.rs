@@ -19,9 +19,8 @@ use std::{net::SocketAddr, sync::Arc};
 use crate::{
     config,
     crawler::{self, planner::CrawlPlanner, CrawlCoordinator, Crawler},
-    distributed::sonic::service::sonic_service,
-    distributed::sonic::service::Message,
-    kv::rocksdb_store::RocksDbStore,
+    distributed::sonic::service::{sonic_service, Message},
+    speedy_kv,
     webgraph::WebgraphBuilder,
     Result,
 };
@@ -65,8 +64,8 @@ pub async fn router(config: config::CrawlRouterConfig) -> Result<()> {
 }
 
 pub fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
-    let page_centrality = RocksDbStore::open(&config.page_harmonic_path);
-    let host_centrality = RocksDbStore::open(&config.host_harmonic_path);
+    let page_centrality = speedy_kv::Db::open_or_create(&config.page_harmonic_path).unwrap();
+    let host_centrality = speedy_kv::Db::open_or_create(&config.host_harmonic_path).unwrap();
     let page_graph = WebgraphBuilder::new(&config.page_graph_path)
         .single_threaded()
         .open();

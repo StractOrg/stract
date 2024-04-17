@@ -40,7 +40,7 @@ mod api;
 pub mod autosuggest;
 pub mod bangs;
 mod bincode_utils;
-mod bloom;
+pub mod bloom;
 mod collector;
 pub mod config;
 pub mod crawler;
@@ -59,7 +59,6 @@ mod improvement;
 pub mod index;
 mod intmap;
 mod kahan_sum;
-mod kv;
 mod leaky_queue;
 mod live_index;
 mod llm_utils;
@@ -77,6 +76,7 @@ pub mod searcher;
 mod simhash;
 pub mod similar_hosts;
 mod snippet;
+pub mod speedy_kv;
 mod stopwords;
 pub mod summarizer;
 mod tokenizer;
@@ -274,6 +274,10 @@ macro_rules! enum_dispatch_from_discriminant {
 pub(crate) use enum_dispatch_from_discriminant;
 
 const XXH3_SECRET: &[u8] = &xxhash_rust::const_xxh3::const_custom_default_secret(42);
-pub fn fast_stable_hash(t: &[u8]) -> u64 {
+pub fn fast_stable_hash_64(t: &[u8]) -> u64 {
     xxhash_rust::xxh3::xxh3_64_with_secret(t, XXH3_SECRET)
+}
+
+pub fn fast_stable_hash_128(t: &[u8]) -> u128 {
+    xxhash_rust::xxh3::xxh3_128_with_secret(t, XXH3_SECRET)
 }

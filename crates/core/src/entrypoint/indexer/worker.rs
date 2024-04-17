@@ -24,12 +24,10 @@ pub use super::indexable_webpage::IndexableWebpage;
 pub use super::job::{Job, JobSettings};
 use crate::config::{IndexingDualEncoderConfig, IndexingLocalConfig, LiveIndexConfig};
 use crate::models::dual_encoder::DualEncoder as DualEncoderModel;
-use crate::Result;
+use crate::{speedy_kv, Result};
 
 use crate::human_website_annotations;
 use crate::index::Index;
-use crate::kv::rocksdb_store::RocksDbStore;
-use crate::kv::Kv;
 use crate::rake::RakeModel;
 use crate::ranking::SignalComputer;
 use crate::webgraph::{Node, NodeID, Webgraph, WebgraphBuilder};
@@ -76,10 +74,10 @@ struct DualEncoder {
 }
 
 pub struct IndexingWorker {
-    host_centrality_store: RocksDbStore<NodeID, f64>,
-    host_centrality_rank_store: RocksDbStore<NodeID, u64>,
-    page_centrality_store: Option<RocksDbStore<NodeID, f64>>,
-    page_centrality_rank_store: Option<RocksDbStore<NodeID, u64>>,
+    host_centrality_store: speedy_kv::Db<NodeID, f64>,
+    host_centrality_rank_store: speedy_kv::Db<NodeID, u64>,
+    page_centrality_store: Option<speedy_kv::Db<NodeID, f64>>,
+    page_centrality_rank_store: Option<speedy_kv::Db<NodeID, u64>>,
     page_webgraph: Option<Webgraph>,
     topics: Option<human_website_annotations::Mapper>,
     safety_classifier: Option<safety_classifier::Model>,
@@ -96,20 +94,20 @@ impl IndexingWorker {
         let config = Config::from(config);
 
         Self {
-            host_centrality_store: RocksDbStore::open(
+            host_centrality_store: speedy_kv::Db::open_or_create(
                 Path::new(&config.host_centrality_store_path).join("harmonic"),
-            ),
-            host_centrality_rank_store: RocksDbStore::open(
+            )
+            .unwrap(),
+            host_centrality_rank_store: speedy_kv::Db::open_or_create(
                 Path::new(&config.host_centrality_store_path).join("harmonic_rank"),
-            ),
-            page_centrality_store: config
-                .page_centrality_store_path
-                .as_ref()
-                .map(|p| RocksDbStore::open(Path::new(&p).join("approx_harmonic"))),
-            page_centrality_rank_store: config
-                .page_centrality_store_path
-                .as_ref()
-                .map(|p| RocksDbStore::open(Path::new(&p).join("approx_harmonic_rank"))),
+            )
+            .unwrap(),
+            page_centrality_store: config.page_centrality_store_path.as_ref().map(|p| {
+                speedy_kv::Db::open_or_create(Path::new(&p).join("approx_harmonic")).unwrap()
+            }),
+            page_centrality_rank_store: config.page_centrality_store_path.as_ref().map(|p| {
+                speedy_kv::Db::open_or_create(Path::new(&p).join("approx_harmonic_rank")).unwrap()
+            }),
             page_webgraph: config
                 .page_webgraph_path
                 .as_ref()
@@ -138,7 +136,7 @@ impl IndexingWorker {
         }
     }
 
-    pub(super) fn page_centrality_store(&self) -> Option<&RocksDbStore<NodeID, f64>> {
+    pub(super) fn page_centrality_store(&self) -> Option<&speedy_kv::Db<NodeID, f64>> {
         self.page_centrality_store.as_ref()
     }
 
@@ -181,11 +179,13 @@ impl IndexingWorker {
         let host_centrality = self
             .host_centrality_store
             .get(&host_node_id)
+            .unwrap()
             .unwrap_or_default();
 
         let host_centrality_rank = self
             .host_centrality_rank_store
             .get(&host_node_id)
+            .unwrap()
             .unwrap_or(u64::MAX);
 
         if let Some(host_centrality_threshold) =
@@ -276,7 +276,7 @@ impl IndexingWorker {
         if let Some(store) = self.page_centrality_store.as_ref() {
             let node_id = node.id();
 
-            page.page_centrality = store.get(&node_id).unwrap_or_default();
+            page.page_centrality = store.get(&node_id).unwrap().unwrap_or_default();
         }
 
         page.page_centrality_rank = u64::MAX;
@@ -284,7 +284,7 @@ impl IndexingWorker {
         if let Some(store) = self.page_centrality_rank_store.as_ref() {
             let node_id = node.id();
 
-            page.page_centrality_rank = store.get(&node_id).unwrap_or(u64::MAX);
+            page.page_centrality_rank = store.get(&node_id).unwrap().unwrap_or(u64::MAX);
         }
 
         if !page.page_centrality.is_finite() {

@@ -23,13 +23,13 @@ use rayon::prelude::*;
 use std::{collections::BTreeMap, path::Path, sync::Mutex};
 
 use crate::{
-    bloom::BloomFilter,
-    kv::{rocksdb_store::RocksDbStore, Kv},
+    bloom::U64BloomFilter,
+    speedy_kv,
     webgraph::{NodeID, Webgraph},
 };
 
 struct BloomMap {
-    map: Vec<Mutex<BloomFilter>>,
+    map: Vec<Mutex<U64BloomFilter>>,
 }
 
 impl BloomMap {
@@ -37,7 +37,7 @@ impl BloomMap {
         let mut map = Vec::new();
 
         for _ in 0..num_blooms {
-            map.push(Mutex::new(BloomFilter::new(estimated_items, fp)));
+            map.push(Mutex::new(U64BloomFilter::new(estimated_items, fp)));
         }
 
         Self { map }
@@ -51,7 +51,7 @@ impl BloomMap {
             .insert(h);
     }
 
-    fn finalize(mut self) -> BloomFilter {
+    fn finalize(mut self) -> U64BloomFilter {
         let mut bf = self.map.pop().unwrap().into_inner().unwrap();
 
         for m in self.map {
@@ -63,17 +63,17 @@ impl BloomMap {
 }
 
 pub struct DerivedCentrality {
-    inner: RocksDbStore<NodeID, f64>,
+    inner: speedy_kv::Db<NodeID, f64>,
 }
 
 impl DerivedCentrality {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let inner = RocksDbStore::open(path);
+        let inner = speedy_kv::Db::open_or_create(path).unwrap();
         Self { inner }
     }
 
     pub fn build<P: AsRef<Path>>(
-        host_harmonic: &RocksDbStore<NodeID, f64>,
+        host_harmonic: &speedy_kv::Db<NodeID, f64>,
         page_graph: &Webgraph,
         output: P,
     ) -> Result<Self> {
@@ -91,7 +91,8 @@ impl DerivedCentrality {
 
         let has_outgoing = has_outgoing.finalize();
 
-        let non_normalized = RocksDbStore::open(output.as_ref().join("non_normalized"));
+        let mut non_normalized =
+            speedy_kv::Db::open_or_create(output.as_ref().join("non_normalized")).unwrap();
 
         let norms: Mutex<BTreeMap<NodeID, f64>> = Mutex::new(BTreeMap::new());
         let pb = indicatif::ProgressBar::new(num_nodes as u64);
@@ -101,7 +102,7 @@ impl DerivedCentrality {
             if has_outgoing.contains(id.as_u64()) {
                 let host_node = node.clone().into_host().id();
 
-                if let Some(harmonic) = host_harmonic.get(&host_node) {
+                if let Some(harmonic) = host_harmonic.get(&host_node).unwrap() {
                     let mut ingoing: Vec<_> = page_graph
                         .raw_ingoing_edges(&id)
                         .into_iter()
@@ -113,11 +114,15 @@ impl DerivedCentrality {
 
                     let votes = ingoing
                         .into_iter()
-                        .filter_map(|n| host_harmonic.get(&n.id()))
+                        .filter_map(|n| host_harmonic.get(&n.id()).unwrap())
                         .sum::<f64>();
                     let page_score = harmonic * votes;
 
-                    non_normalized.insert(id, page_score);
+                    non_normalized.insert(id, page_score).unwrap();
+
+                    if non_normalized.uncommitted_inserts() > 1_000_000 {
+                        non_normalized.commit().unwrap();
+                    }
 
                     let mut l = norms.lock().unwrap_or_else(|e| e.into_inner());
                     let norm = l.entry(host_node).or_insert(0.0);
@@ -126,18 +131,26 @@ impl DerivedCentrality {
             }
         });
 
+        non_normalized.commit().unwrap();
+        non_normalized.merge_all_segments().unwrap();
+
         pb.finish_and_clear();
 
         let norms = norms.into_inner().unwrap();
 
-        let db = RocksDbStore::open(output.as_ref());
+        let mut db = speedy_kv::Db::open_or_create(output.as_ref()).unwrap();
         for (id, score) in non_normalized.iter() {
             let node = page_graph.id2node(&id).unwrap().into_host().id();
             let norm = norms.get(&node).unwrap();
             let normalized = score / *norm;
-            db.insert(id, normalized);
+            db.insert(id, normalized).unwrap();
+
+            if db.uncommitted_inserts() > 1_000_000 {
+                db.commit().unwrap();
+            }
         }
-        db.flush();
+        db.commit().unwrap();
+        db.merge_all_segments().unwrap();
 
         drop(non_normalized);
         std::fs::remove_dir_all(output.as_ref().join("non_normalized"))?;
@@ -146,7 +159,7 @@ impl DerivedCentrality {
     }
 
     pub fn get(&self, node: &NodeID) -> Option<f64> {
-        self.inner.get(node)
+        self.inner.get(node).unwrap()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (NodeID, f64)> + '_ {

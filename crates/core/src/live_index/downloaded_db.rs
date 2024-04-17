@@ -16,51 +16,39 @@
 
 use url::Url;
 
-use crate::Result;
+use crate::{speedy_kv, Result};
 use std::path::Path;
 
-use super::TTL;
-
 pub struct DownloadedDb {
-    db: rocksdb::DB,
+    db: std::sync::Mutex<speedy_kv::Db<Url, ()>>,
 }
 
 impl DownloadedDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut options = rocksdb::Options::default();
-        options.create_if_missing(true);
+        let db = speedy_kv::Db::open_or_create(path)?;
 
-        // some recommended settings (https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning)
-        options.set_level_compaction_dynamic_level_bytes(true);
-        options.set_bytes_per_sync(1048576);
-        let mut block_options = rocksdb::BlockBasedOptions::default();
-        block_options.set_block_size(16 * 1024);
-        block_options.set_format_version(5);
-        block_options.set_cache_index_and_filter_blocks(true);
-        block_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
-
-        block_options.set_ribbon_filter(10.0);
-
-        options.set_block_based_table_factory(&block_options);
-        options.optimize_for_point_lookup(512); // 512 mb
-
-        let db = rocksdb::DB::open_with_ttl(&options, path, TTL)?;
-        Ok(Self { db })
+        Ok(Self {
+            db: std::sync::Mutex::new(db),
+        })
     }
 
-    pub fn has_downloaded(&self, url: &Url) -> Result<bool> {
+    pub fn has_downloaded(&self, url: &Url) -> bool {
         let key = url.as_str().as_bytes();
-
-        if self.db.key_may_exist(key) {
-            self.db.get(key).map(|v| v.is_some()).map_err(Into::into)
-        } else {
-            Ok(false)
-        }
+        self.db.lock().unwrap().get_raw_with_live(key).is_some()
     }
 
     pub fn insert(&self, url: &Url) -> Result<()> {
-        let key = url.as_str().as_bytes();
-        self.db.put(key, b"")?;
+        let key = url.as_str().as_bytes().to_vec();
+        let mut db = self.db.lock().unwrap();
+
+        db.insert_raw(key, vec![]);
+
+        if db.uncommitted_inserts() > 1_000_000 {
+            db.commit()?;
+
+            // TODO: Truncate the database using a ttl
+        }
+
         Ok(())
     }
 }

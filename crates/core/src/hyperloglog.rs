@@ -4325,21 +4325,7 @@ impl HyperLogLogHasher for StableHasher {
     }
 }
 
-use bytecheck::CheckBytes;
-use rkyv::bytecheck;
-
-#[derive(
-    Debug,
-    Clone,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-)]
-#[archive_attr(derive(CheckBytes))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct HyperLogLog<const N: usize, H = FastHasher>
 where
     H: HyperLogLogHasher,

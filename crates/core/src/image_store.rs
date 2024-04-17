@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::kv::{rocksdb_store::RocksDbStore, Kv};
-use crate::Result;
+use crate::{speedy_kv, Result};
 use bincode::de::read::Reader;
 use bincode::enc::write::Writer;
 use image::imageops::FilterType;
@@ -71,13 +70,12 @@ pub trait ImageStore<K: Serialize> {
     fn insert(&mut self, key: K, image: Image);
     fn get(&self, key: &K) -> Option<Image>;
     fn merge(&mut self, other: Self);
-    fn flush(&self);
+    fn flush(&mut self);
 }
 
 struct BaseImageStore {
-    store: RocksDbStore<String, Image>,
+    store: speedy_kv::Db<String, Image>,
     filters: Vec<Box<dyn ImageFilter>>,
-    path: std::path::PathBuf,
 }
 
 impl BaseImageStore {
@@ -87,39 +85,36 @@ impl BaseImageStore {
     }
 
     fn open_with_filters<P: AsRef<Path>>(path: P, filters: Vec<Box<dyn ImageFilter>>) -> Self {
-        let store = RocksDbStore::open_read_only(&path);
+        let store = speedy_kv::Db::open_or_create(&path).unwrap();
 
-        Self {
-            store,
-            filters,
-            path: path.as_ref().to_path_buf(),
-        }
+        Self { store, filters }
     }
 
-    fn prepare_writer(&mut self) {
-        self.store = RocksDbStore::open(&self.path);
-    }
+    fn prepare_writer(&mut self) {}
 
     fn insert(&mut self, key: String, mut image: Image) {
         for filter in &self.filters {
             image = filter.transform(image);
         }
 
-        self.store.insert(key, image);
+        self.store.insert(key, image).unwrap();
     }
 
-    fn flush(&self) {
-        self.store.flush();
+    fn flush(&mut self) {
+        self.store.commit().unwrap();
     }
 
     fn get(&self, key: &String) -> Option<Image> {
-        self.store.get(key)
+        self.store.get(key).unwrap()
     }
 
     fn merge(&mut self, other: &Self) {
         for (key, image) in other.store.iter() {
             self.insert(key, image);
         }
+
+        self.flush();
+        self.store.merge_all_segments().unwrap();
     }
 }
 
@@ -137,7 +132,7 @@ impl ImageFilter for MaxSizeFilter {
         Image(image.0.resize(
             self.width.min(image.0.width()),
             self.height.min(image.0.height()),
-            FilterType::Lanczos3,
+            FilterType::CatmullRom,
         ))
     }
 }
@@ -176,7 +171,7 @@ impl ImageStore<String> for EntityImageStore {
         self.store.merge(&other.store);
     }
 
-    fn flush(&self) {
+    fn flush(&mut self) {
         self.store.flush();
     }
 }
@@ -256,6 +251,7 @@ mod tests {
 
         assert_eq!(store.get(&key), None);
         store.insert(key.clone(), image.clone());
+        store.flush();
         assert_eq!(store.get(&key), Some(image));
     }
 

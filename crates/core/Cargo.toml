@@ -87,7 +87,6 @@ ring = { workspace = true }
 rio_api = { workspace = true }
 rio_turtle = { workspace = true }
 robotstxt-with-cache = { workspace = true }
-rocksdb = { workspace = true }
 rust-s3 = { workspace = true }
 rust-stemmers = { workspace = true }
 safetensors = { workspace = true }

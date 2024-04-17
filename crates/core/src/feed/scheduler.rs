@@ -21,7 +21,7 @@ use hashbrown::{HashMap, HashSet};
 use url::Url;
 
 use crate::{
-    kv::rocksdb_store::RocksDbStore,
+    speedy_kv,
     webgraph::{
         centrality::{top_nodes, TopNodes},
         NodeID, Webgraph,
@@ -125,7 +125,7 @@ impl Schedule {
 
 pub fn schedule(
     index: &FeedIndex,
-    host_centrality: &RocksDbStore<NodeID, f64>,
+    host_centrality: &speedy_kv::Db<NodeID, f64>,
     host_graph: &Webgraph,
     num_splits: u64,
 ) -> Schedule {
