@@ -14,7 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fs::File, io::Write, ops::Range, path::Path};
+use std::{
+    fs::File,
+    io::Write,
+    ops::Range,
+    path::{Path, PathBuf},
+};
 
 use fst::Automaton;
 use itertools::Itertools;
@@ -41,113 +46,67 @@ struct SerializedEdge {
     label: Vec<u8>,
 }
 
+struct SortableEdge<L: EdgeLabel> {
+    sort_node: NodeID,
+    edge: InnerEdge<L>,
+}
+
+impl<L: EdgeLabel> PartialOrd for SortableEdge<L> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<L: EdgeLabel> Ord for SortableEdge<L> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.sort_node.cmp(&other.sort_node)
+    }
+}
+
+impl<L: EdgeLabel> PartialEq for SortableEdge<L> {
+    fn eq(&self, other: &Self) -> bool {
+        self.sort_node == other.sort_node
+    }
+}
+
+impl<L: EdgeLabel> Eq for SortableEdge<L> {}
+
 pub struct EdgeStoreWriter {
     reversed: bool,
-    db: speedy_kv::Db<Vec<u8>, Vec<u8>>,
+    path: PathBuf,
+    edges: Vec<SortableEdge<String>>,
     compression: Compression,
 }
 
 impl EdgeStoreWriter {
     pub fn open<P: AsRef<Path>>(path: P, compression: Compression, reversed: bool) -> Self {
-        let db = speedy_kv::Db::open_or_create(path.as_ref().join("writer")).unwrap();
-
         Self {
-            db,
+            edges: Vec::new(),
             reversed,
+            path: path.as_ref().to_path_buf(),
             compression,
         }
     }
 
-    pub fn put<'a, L: EdgeLabel + 'a>(&'a mut self, edges: impl Iterator<Item = &'a InnerEdge<L>>) {
-        for edge in edges {
-            let value_bytes = L::to_bytes(&edge.label).unwrap();
+    pub fn put(&mut self, edge: InnerEdge<String>) {
+        let sort_node = if self.reversed {
+            edge.to.id
+        } else {
+            edge.from.id
+        };
 
-            let value_bytes = bincode::encode_to_vec(
-                &SerializedEdge {
-                    from_prefix: edge.from.prefix,
-                    to_prefix: edge.to.prefix,
-                    label: value_bytes.clone(),
-                },
-                bincode::config::standard(),
-            )
-            .unwrap();
-
-            let key_bytes = if self.reversed {
-                [
-                    edge.to.id.as_u64().to_le_bytes(),
-                    edge.from.id.as_u64().to_le_bytes(),
-                ]
-                .concat()
-            } else {
-                [
-                    edge.from.id.as_u64().to_le_bytes(),
-                    edge.to.id.as_u64().to_le_bytes(),
-                ]
-                .concat()
-            };
-
-            self.db.insert_raw(key_bytes, value_bytes);
-        }
-    }
-
-    pub fn iter<L: EdgeLabel>(&self) -> impl Iterator<Item = InnerEdge<L>> + '_ + Send + Sync {
-        self.db.iter_raw().map(|(key, val)| {
-            let (from, to) = if self.reversed {
-                (
-                    u64::from_le_bytes(
-                        key.as_bytes()[u64::BITS as usize / 8..].try_into().unwrap(),
-                    ),
-                    u64::from_le_bytes(
-                        key.as_bytes()[..u64::BITS as usize / 8].try_into().unwrap(),
-                    ),
-                )
-            } else {
-                (
-                    u64::from_le_bytes(
-                        key.as_bytes()[..u64::BITS as usize / 8].try_into().unwrap(),
-                    ),
-                    u64::from_le_bytes(
-                        key.as_bytes()[u64::BITS as usize / 8..].try_into().unwrap(),
-                    ),
-                )
-            };
-
-            let (val, _): (SerializedEdge, _) =
-                bincode::decode_from_slice(val.as_bytes(), bincode::config::standard()).unwrap();
-
-            InnerEdge {
-                from: FullNodeID {
-                    prefix: val.from_prefix,
-                    id: NodeID::from(from),
-                },
-                to: FullNodeID {
-                    prefix: val.to_prefix,
-                    id: NodeID::from(to),
-                },
-                label: L::from_bytes(&val.label).unwrap(),
-            }
-        })
-    }
-
-    pub fn flush(&mut self) {
-        self.db.commit().unwrap();
-        self.db.merge_all_segments().unwrap();
+        self.edges.push(SortableEdge { sort_node, edge });
     }
 
     pub fn finalize(mut self) -> EdgeStore {
-        self.flush();
+        self.edges.sort_unstable();
 
         let s = EdgeStore::build(
-            self.db.folder().parent().unwrap(),
+            self.path,
             self.compression,
             self.reversed,
-            self.iter(),
+            self.edges.into_iter().map(|e| e.edge),
         );
-
-        // delete the writer db
-        let p = self.db.folder().to_owned();
-        drop(self.db);
-        std::fs::remove_dir_all(p).unwrap();
 
         s
     }
@@ -550,7 +509,7 @@ mod tests {
             label: "test".to_string(),
         };
 
-        kv.put([e.clone()].iter());
+        kv.put(e.clone());
 
         let store = kv.finalize();
 
@@ -584,7 +543,7 @@ mod tests {
             label: "test".to_string(),
         };
 
-        kv.put([e.clone()].iter());
+        kv.put(e.clone());
 
         let store = kv.finalize();
 

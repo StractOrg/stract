@@ -57,9 +57,7 @@ impl SegmentWriter {
         }
     }
 
-    pub fn finalize(mut self) -> Segment {
-        self.flush();
-
+    pub fn finalize(self) -> Segment {
         Segment {
             adjacency: self.adjacency.finalize(),
             reversed_adjacency: self.reversed_adjacency.finalize(),
@@ -68,14 +66,9 @@ impl SegmentWriter {
         }
     }
 
-    pub fn flush(&mut self) {
-        self.adjacency.flush();
-        self.reversed_adjacency.flush();
-    }
-
-    pub fn insert(&mut self, edges: &[InnerEdge<String>]) {
-        self.adjacency.put(edges.iter());
-        self.reversed_adjacency.put(edges.iter());
+    pub fn insert(&mut self, edge: InnerEdge<String>) {
+        self.adjacency.put(edge.clone());
+        self.reversed_adjacency.put(edge);
     }
 }
 
@@ -210,7 +203,9 @@ mod test {
             label: String::new(),
         });
 
-        writer.insert(&edges);
+        for edge in &edges {
+            writer.insert(edge.clone());
+        }
         let segment = writer.finalize();
 
         let mut out: Vec<_> = segment.outgoing_edges(&a.id);
