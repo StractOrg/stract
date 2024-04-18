@@ -17,7 +17,7 @@
 use url::Url;
 use utoipa::ToSchema;
 
-use crate::{intmap, webpage::url_ext::UrlExt};
+use crate::{fast_stable_hash_128, intmap, webpage::url_ext::UrlExt};
 
 #[derive(
     Debug,
@@ -133,8 +133,7 @@ impl Node {
     }
 
     pub fn id(&self) -> NodeID {
-        let digest = md5::compute(self.name.as_bytes());
-        u128::from_le_bytes(*digest).into()
+        fast_stable_hash_128(self.name.as_bytes()).into()
     }
 }
 
