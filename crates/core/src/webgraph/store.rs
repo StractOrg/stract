@@ -101,14 +101,12 @@ impl EdgeStoreWriter {
     pub fn finalize(mut self) -> EdgeStore {
         self.edges.sort_unstable();
 
-        let s = EdgeStore::build(
+        EdgeStore::build(
             self.path,
             self.compression,
             self.reversed,
             self.edges.into_iter().map(|e| e.edge),
-        );
-
-        s
+        )
     }
 }
 

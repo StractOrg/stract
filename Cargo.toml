@@ -112,7 +112,7 @@ serde = { version = "1.0.137", features = ["rc", "derive"] }
 serde_json = "1.0.81"
 serde_urlencoded = "0.7.1"
 strum = { version = "0.26.2", features = ["derive"] }
-tantivy = { version = "0.22.0" }
+tantivy = { git = "https://github.com/quickwit-oss/tantivy", rev = "74940e9" }
 thiserror = "1.0.31"
 tikv-jemallocator = "0.5"
 tokenizers = "0.13.2"
