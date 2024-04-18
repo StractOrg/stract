@@ -186,8 +186,7 @@ where
         de_rank_similar: bool,
         computer: SignalComputer,
     ) -> Result<Ranker> {
-        let query_centrality_coeff =
-            computer.coefficient(&ranking::signal::QueryCentrality.into());
+        let query_centrality_coeff = computer.coefficient(&ranking::signal::QueryCentrality.into());
 
         let mut ranker = Ranker::new(
             computer,
@@ -404,7 +403,7 @@ where
 
         let mut webpages: Vec<_> = retrieved_sites
             .into_iter()
-            .map(DisplayedWebpage::from)
+            .map(|webpage| DisplayedWebpage::new(webpage, query))
             .collect();
 
         for (webpage, ranking) in webpages.iter_mut().zip(top_websites) {

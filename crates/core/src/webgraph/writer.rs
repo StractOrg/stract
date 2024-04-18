@@ -19,8 +19,8 @@ use std::{fs, path::Path};
 use crate::executor::Executor;
 
 use super::{
-    id_node_db::Id2NodeDb, segment::SegmentWriter, store, Compression, FullNodeID, InnerEdge, Meta,
-    Node, NodeID, Webgraph, MAX_LABEL_LENGTH,
+    id_node_db::Id2NodeDb, segment::SegmentWriter, Compression, FullNodeID, InnerEdge, Meta, Node,
+    NodeID, Webgraph, MAX_LABEL_LENGTH,
 };
 
 pub struct WebgraphWriter {
@@ -60,7 +60,7 @@ impl WebgraphWriter {
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
             segment,
             id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
-            insert_batch: Vec::with_capacity(store::MAX_BATCH_SIZE),
+            insert_batch: Vec::new(),
             executor,
             meta,
             compression,
@@ -96,10 +96,6 @@ impl WebgraphWriter {
         };
 
         self.insert_batch.push(edge);
-
-        if self.insert_batch.len() >= store::MAX_BATCH_SIZE {
-            self.commit();
-        }
     }
 
     pub fn commit(&mut self) {

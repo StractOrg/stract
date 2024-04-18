@@ -26,8 +26,9 @@ use optics::{HostRankings, Optic};
 use utoipa::ToSchema;
 
 use crate::{
-    bangs::BangHit, config::defaults, ranking::pipeline::RecallRankingWebpage,
-    search_prettifier::DisplayedWebpage, webpage::region::Region,
+    api::search::ReturnBody, bangs::BangHit, config::defaults,
+    ranking::pipeline::RecallRankingWebpage, search_prettifier::DisplayedWebpage,
+    webpage::region::Region,
 };
 
 pub const NUM_RESULTS_PER_PAGE: usize = 20;
@@ -60,6 +61,7 @@ pub struct SearchQuery {
     pub return_ranking_signals: bool,
     pub safe_search: bool,
     pub count_results: bool,
+    pub return_body: Option<ReturnBody>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
@@ -84,6 +86,7 @@ impl Default for SearchQuery {
             return_ranking_signals: defaults::SearchQuery::return_ranking_signals(),
             safe_search: defaults::SearchQuery::safe_search(),
             count_results: defaults::SearchQuery::count_results(),
+            return_body: None,
         }
     }
 }

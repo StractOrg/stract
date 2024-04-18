@@ -41,8 +41,6 @@ struct SerializedEdge {
     label: Vec<u8>,
 }
 
-pub const MAX_BATCH_SIZE: usize = 100_000;
-
 pub struct EdgeStoreWriter {
     reversed: bool,
     db: speedy_kv::Db<Vec<u8>, Vec<u8>>,
@@ -89,14 +87,6 @@ impl EdgeStoreWriter {
             };
 
             self.db.insert_raw(key_bytes, value_bytes);
-
-            if self.db.uncommitted_inserts() > MAX_BATCH_SIZE {
-                self.db.commit().unwrap();
-            }
-        }
-
-        if self.db.uncommitted_inserts() > MAX_BATCH_SIZE {
-            self.db.commit().unwrap();
         }
     }
 

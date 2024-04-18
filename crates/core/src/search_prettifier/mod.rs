@@ -25,9 +25,11 @@ use url::Url;
 use utoipa::ToSchema;
 
 use crate::{
+    api::search::ReturnBody,
     highlighted::HighlightedFragment,
     inverted_index::RetrievedWebpage,
     ranking::{SignalEnumDiscriminants, SignalScore},
+    searcher::SearchQuery,
     snippet::TextSnippet,
     web_spell::{self, CorrectionTerm},
     webpage::url_ext::UrlExt,
@@ -186,6 +188,7 @@ pub struct DisplayedWebpage {
     pub domain: String,
     pub pretty_url: String,
     pub snippet: Snippet,
+    pub body: Option<String>,
     pub rich_snippet: Option<RichSnippet>,
     pub ranking_signals: Option<HashMap<SignalEnumDiscriminants, SignalScore>>,
     pub score: Option<f64>,
@@ -205,14 +208,19 @@ pub struct DisplayedAnswer {
     pub answer: String,
 }
 
-impl From<RetrievedWebpage> for DisplayedWebpage {
-    fn from(webpage: RetrievedWebpage) -> Self {
+impl DisplayedWebpage {
+    pub fn new(webpage: RetrievedWebpage, query: &SearchQuery) -> Self {
         let snippet = generate_snippet(&webpage);
         let rich_snippet = generate_rich_snippet(&webpage);
 
         let url = Url::parse(&webpage.url).unwrap();
         let domain = url.root_domain().unwrap_or_default().to_string();
         let pretty_url = prettify_url(&url);
+
+        let body = query.return_body.map(|r| match r {
+            ReturnBody::All => webpage.body,
+            ReturnBody::Truncated(n) => webpage.body.chars().take(n).collect::<String>(),
+        });
 
         Self {
             title: webpage.title,
@@ -221,6 +229,7 @@ impl From<RetrievedWebpage> for DisplayedWebpage {
             pretty_url,
             domain,
             snippet,
+            body,
             ranking_signals: None,
             score: None,
             likely_has_ads: webpage.likely_has_ads,

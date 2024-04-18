@@ -440,7 +440,7 @@ where
         let mut retrieved_webpages: Vec<_> = retrieved_webpages
             .into_iter()
             .map(|webpage| webpage.into_retrieved_webpage())
-            .map(DisplayedWebpage::from)
+            .map(|webpage| DisplayedWebpage::new(webpage, query))
             .collect();
 
         if retrieved_webpages.len() != top_websites.len() {

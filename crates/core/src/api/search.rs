@@ -34,6 +34,22 @@ use super::State;
 use axum::{extract, response::IntoResponse};
 
 #[derive(
+    Clone,
+    Copy,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    ToSchema,
+)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+pub enum ReturnBody {
+    All,
+    Truncated(usize),
+}
+
+#[derive(
     Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
 )]
 #[serde(rename_all = "camelCase")]
@@ -55,6 +71,8 @@ pub struct ApiSearchQuery {
 
     #[serde(default = "defaults::SearchQuery::count_results")]
     pub count_results: bool,
+
+    pub return_body: Option<ReturnBody>,
 }
 
 impl TryFrom<ApiSearchQuery> for SearchQuery {
@@ -79,6 +97,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             return_ranking_signals: api.return_ranking_signals,
             safe_search: api.safe_search.unwrap_or(default.safe_search),
             count_results: api.count_results,
+            return_body: api.return_body,
         })
     }
 }
