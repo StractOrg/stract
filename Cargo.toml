@@ -91,6 +91,7 @@ publicsuffix = "2.2.3"
 quick-xml = "0.30.0"
 rand = "0.8.5"
 rayon = "1.5.3"
+redb = "2.0.0"
 regex = "1.6.0"
 reqwest = { version = "0.11.16", features = ["blocking", "stream", "json"] }
 rkyv = { version = "0.7.44", features = ["validation", "bytecheck"] }

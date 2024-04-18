@@ -19,10 +19,11 @@ use fst::{IntoStreamer, Streamer};
 use crate::Result;
 use std::{
     io::{BufWriter, Write},
+    ops::RangeBounds,
     path::{Path, PathBuf},
 };
 
-use super::{BlobId, Serialized};
+use super::{BlobId, Serialized, SerializedRef};
 
 pub struct BlobIdIndex<K> {
     path: PathBuf,
@@ -67,6 +68,27 @@ impl<K> BlobIdIndex<K> {
         A: fst::Automaton + 'a,
     {
         BlobIdIndexIter::new(self.fst.search(automaton).into_stream())
+    }
+
+    pub fn range<'a, R>(&'a self, range: R) -> impl Iterator<Item = (Serialized<K>, BlobId)> + 'a
+    where
+        R: RangeBounds<SerializedRef<'a, K>>,
+    {
+        let builder = self.fst.range();
+
+        let builder = match range.start_bound() {
+            std::ops::Bound::Included(s) => builder.ge(s),
+            std::ops::Bound::Excluded(s) => builder.gt(s),
+            std::ops::Bound::Unbounded => builder,
+        };
+
+        let builder = match range.end_bound() {
+            std::ops::Bound::Included(e) => builder.le(e),
+            std::ops::Bound::Excluded(e) => builder.lt(e),
+            std::ops::Bound::Unbounded => builder,
+        };
+
+        BlobIdIndexIter::new(builder.into_stream())
     }
 
     pub fn path(&self) -> &Path {

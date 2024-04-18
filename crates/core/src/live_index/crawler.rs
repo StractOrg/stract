@@ -108,7 +108,7 @@ impl Crawler {
             let feed = feed::parse(&content, feed.kind)?;
 
             for url in feed.links {
-                if !self.downloaded_db.has_downloaded(&url)
+                if !self.downloaded_db.has_downloaded(&url)?
                     && Domain::from(&url) == domain_feeds.domain
                 {
                     urls.push(url);

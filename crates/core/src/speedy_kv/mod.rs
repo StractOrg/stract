@@ -28,7 +28,7 @@
 use crate::Result;
 use std::{
     collections::BTreeMap,
-    ops::Range,
+    ops::{Range, RangeBounds},
     path::{Path, PathBuf},
 };
 
@@ -331,7 +331,7 @@ impl<K, V> Db<K, V> {
     pub fn search_raw<'a, A>(
         &'a self,
         query: A,
-    ) -> impl Iterator<Item = (Serialized<K>, Serialized<V>)> + 'a
+    ) -> impl Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)> + 'a
     where
         A: fst::Automaton + Clone + 'a,
     {
@@ -339,6 +339,19 @@ impl<K, V> Db<K, V> {
             .iter()
             .rev()
             .flat_map(move |segment| segment.search_raw(query.clone()))
+    }
+
+    pub fn range_raw<'a, R>(
+        &'a self,
+        range: R,
+    ) -> impl Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)> + 'a
+    where
+        R: RangeBounds<SerializedRef<'a, K>> + Clone + 'a,
+    {
+        self.segments
+            .iter()
+            .rev()
+            .flat_map(move |segment| segment.range_raw(range.clone()))
     }
 
     pub fn commit(&mut self) -> Result<()> {

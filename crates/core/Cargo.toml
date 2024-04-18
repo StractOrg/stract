@@ -80,6 +80,7 @@ postcard = { workspace = true }
 quick-xml = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+redb = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 rkyv = { workspace = true }

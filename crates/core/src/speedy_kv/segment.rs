@@ -16,6 +16,7 @@
 
 use std::{
     io::{BufWriter, Write},
+    ops::RangeBounds,
     path::{Path, PathBuf},
 };
 
@@ -221,16 +222,30 @@ impl<K, V> Segment<K, V> {
     pub fn search_raw<'a, A>(
         &'a self,
         query: A,
-    ) -> impl Iterator<Item = (Serialized<K>, Serialized<V>)> + 'a
+    ) -> impl Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)> + 'a
     where
         A: fst::Automaton + 'a,
     {
-        self.id_index.search(query).map(move |(ser_k, id)| {
+        self.id_index.search(query).map(move |(_, id)| {
             let ptr = self.blob_index.get(id);
             let blob = self.store.get_raw(&ptr).unwrap();
-            let value = Serialized::from(blob.value.as_bytes().to_vec());
 
-            (ser_k, value)
+            (blob.key, blob.value)
+        })
+    }
+
+    pub fn range_raw<'a, R>(
+        &'a self,
+        range: R,
+    ) -> impl Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)> + 'a
+    where
+        R: RangeBounds<SerializedRef<'a, K>>,
+    {
+        self.id_index.range(range).map(move |(_, id)| {
+            let ptr = self.blob_index.get(id);
+            let blob = self.store.get_raw(&ptr).unwrap();
+
+            (blob.key, blob.value)
         })
     }
 
