@@ -16,6 +16,23 @@
 
 use bitvec::vec::BitVec;
 
+pub fn combine_u64s(nums: [u64; 2]) -> u128 {
+    ((nums[0] as u128) << 64) | (nums[1] as u128)
+}
+
+pub fn split_u128(num: u128) -> [u64; 2] {
+    [(num >> 64) as u64, num as u64]
+}
+
+const XXH3_SECRET: &[u8] = &xxhash_rust::const_xxh3::const_custom_default_secret(42);
+pub fn fast_stable_hash_64(t: &[u8]) -> u64 {
+    xxhash_rust::xxh3::xxh3_64_with_secret(t, XXH3_SECRET)
+}
+
+pub fn fast_stable_hash_128(t: &[u8]) -> u128 {
+    xxhash_rust::xxh3::xxh3_128_with_secret(t, XXH3_SECRET)
+}
+
 const LARGE_PRIME: u64 = 11400714819323198549;
 
 /// Calculate the number of bits needed for a Bloom filter.
@@ -106,7 +123,7 @@ impl<T> BytesBloomFilter<T> {
     }
 
     fn hash_raw(item: &[u8]) -> [u64; 2] {
-        crate::split_u128(crate::fast_stable_hash_128(item))
+        split_u128(fast_stable_hash_128(item))
     }
 
     pub fn contains_raw(&self, item: &[u8]) -> bool {
@@ -191,5 +208,12 @@ mod tests {
         assert!(!bf.contains(&8u64.to_be_bytes()));
         assert!(!bf.contains(&9u64.to_be_bytes()));
         assert!(!bf.contains(&10u64.to_be_bytes()));
+    }
+
+    #[test]
+    fn split_combine_u128() {
+        for num in 0..10000_u128 {
+            assert_eq!(combine_u64s(split_u128(num)), num);
+        }
     }
 }

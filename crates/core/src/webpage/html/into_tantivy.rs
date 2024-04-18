@@ -23,10 +23,11 @@ use crate::{
         text_field::{self, TextField},
         TextFieldEnum,
     },
-    split_u128, tokenizer,
+    tokenizer,
     webpage::url_ext::UrlExt,
     Error, Result,
 };
+use bloom::split_u128;
 use tantivy::{
     tokenizer::{PreTokenizedString, Tokenizer},
     TantivyDocument,

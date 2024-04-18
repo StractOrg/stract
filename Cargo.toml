@@ -5,6 +5,7 @@ members = [
     "crates/kuchiki",
     "crates/zimba",
     "crates/client-wasm",
+    "crates/bloom",
 ]
 resolver = "2"
 

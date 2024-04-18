@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
+use bloom::fast_stable_hash_128;
 use url::Url;
 use utoipa::ToSchema;
 
-use crate::{fast_stable_hash_128, intmap, webpage::url_ext::UrlExt};
+use crate::{intmap, webpage::url_ext::UrlExt};
 
 #[derive(
     Debug,

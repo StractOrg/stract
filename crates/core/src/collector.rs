@@ -16,6 +16,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use bloom::combine_u64s;
 use min_max_heap::MinMaxHeap;
 
 use tantivy::{
@@ -24,7 +25,6 @@ use tantivy::{
 };
 
 use crate::{
-    combine_u64s,
     config::CollectorConfig,
     fastfield_reader,
     inverted_index::{DocAddress, WebpagePointer},
