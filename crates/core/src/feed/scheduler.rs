@@ -21,7 +21,6 @@ use hashbrown::{HashMap, HashSet};
 use url::Url;
 
 use crate::{
-    speedy_kv,
     webgraph::{
         centrality::{top_nodes, TopNodes},
         NodeID, Webgraph,

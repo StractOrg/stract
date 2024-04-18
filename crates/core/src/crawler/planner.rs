@@ -30,7 +30,6 @@ use std::{
 use url::Url;
 
 use crate::crawler::WeightedUrl;
-use crate::speedy_kv;
 use crate::webgraph::centrality::{top_nodes, TopNodes};
 use crate::SortableFloat;
 use crate::{

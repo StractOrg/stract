@@ -1,11 +1,13 @@
 [workspace]
 members = [
-    "crates/core",
-    "crates/optics",
-    "crates/kuchiki",
-    "crates/zimba",
-    "crates/client-wasm",
     "crates/bloom",
+    "crates/client-wasm",
+    "crates/client-wasm",
+    "crates/core",
+    "crates/kuchiki",
+    "crates/optics",
+    "crates/speedy-kv",
+    "crates/zimba",
 ]
 resolver = "2"
 

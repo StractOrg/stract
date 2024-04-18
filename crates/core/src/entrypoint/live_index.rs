@@ -28,7 +28,6 @@ use crate::{
     live_index::{Index, IndexManager},
     ranking::inbound_similarity::InboundSimilarity,
     searcher::{InitialWebsiteResult, LocalSearcher},
-    speedy_kv,
     webgraph::WebgraphBuilder,
 };
 use anyhow::Result;

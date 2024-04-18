@@ -17,7 +17,6 @@
 use std::path::Path;
 
 use super::{Node, NodeID};
-use crate::speedy_kv;
 
 pub struct Id2NodeDb {
     db: speedy_kv::Db<NodeID, Node>,

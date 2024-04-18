@@ -96,6 +96,7 @@ scylla = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_urlencoded = { workspace = true }
+speedy_kv = { path = "../speedy-kv" }
 strum = { workspace = true }
 tantivy = { workspace = true }
 thiserror = { workspace = true }

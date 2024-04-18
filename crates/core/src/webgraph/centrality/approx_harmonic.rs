@@ -20,10 +20,7 @@ use dashmap::DashMap;
 use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 
-use crate::{
-    speedy_kv,
-    webgraph::{NodeID, ShortestPaths, Webgraph},
-};
+use crate::webgraph::{NodeID, ShortestPaths, Webgraph};
 
 const EPSILON: f64 = 0.05;
 

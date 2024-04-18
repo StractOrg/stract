@@ -4600,6 +4600,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "speedy_kv"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bloom",
+ "fst",
+ "memmap",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4717,6 +4731,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
+ "speedy_kv",
  "strum 0.26.2",
  "tantivy",
  "thiserror",

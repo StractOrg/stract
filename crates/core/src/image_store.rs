@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{speedy_kv, Result};
+use crate::Result;
 use bincode::de::read::Reader;
 use bincode::enc::write::Writer;
 use image::imageops::FilterType;

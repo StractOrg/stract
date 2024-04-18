@@ -23,10 +23,7 @@ use bloom::U64BloomFilter;
 use rayon::prelude::*;
 use std::{collections::BTreeMap, path::Path, sync::Mutex};
 
-use crate::{
-    speedy_kv,
-    webgraph::{NodeID, Webgraph},
-};
+use crate::webgraph::{NodeID, Webgraph};
 
 struct BloomMap {
     map: Vec<Mutex<U64BloomFilter>>,

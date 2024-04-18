@@ -75,7 +75,6 @@ pub mod searcher;
 mod simhash;
 pub mod similar_hosts;
 mod snippet;
-pub mod speedy_kv;
 mod stopwords;
 pub mod summarizer;
 mod tokenizer;

@@ -20,8 +20,6 @@ use fst::Automaton;
 use itertools::Itertools;
 use memmap2::Mmap;
 
-use crate::speedy_kv;
-
 use super::{Compression, Edge, EdgeLabel, FullNodeID, InnerEdge, NodeID};
 
 #[derive(

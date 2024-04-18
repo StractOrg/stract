@@ -16,7 +16,7 @@
 
 use std::{cmp::Reverse, fs::File, path::Path};
 
-use crate::{external_sort::ExternalSorter, speedy_kv, SortableFloat};
+use crate::{external_sort::ExternalSorter, SortableFloat};
 
 use super::{Node, NodeID};
 

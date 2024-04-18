@@ -24,7 +24,7 @@ pub use super::indexable_webpage::IndexableWebpage;
 pub use super::job::{Job, JobSettings};
 use crate::config::{IndexingDualEncoderConfig, IndexingLocalConfig, LiveIndexConfig};
 use crate::models::dual_encoder::DualEncoder as DualEncoderModel;
-use crate::{speedy_kv, Result};
+use crate::Result;
 
 use crate::human_website_annotations;
 use crate::index::Index;

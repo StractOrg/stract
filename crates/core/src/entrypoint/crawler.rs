@@ -20,7 +20,6 @@ use crate::{
     config,
     crawler::{self, planner::CrawlPlanner, CrawlCoordinator, Crawler},
     distributed::sonic::service::{sonic_service, Message},
-    speedy_kv,
     webgraph::WebgraphBuilder,
     Result,
 };

@@ -20,7 +20,6 @@ use std::{cmp::Reverse, path::Path};
 use crate::{
     external_sort::ExternalSorter,
     ranking::inbound_similarity::InboundSimilarity,
-    speedy_kv,
     webgraph::{
         centrality::{
             approx_harmonic::ApproxHarmonic, harmonic::HarmonicCentrality, store_csv,
