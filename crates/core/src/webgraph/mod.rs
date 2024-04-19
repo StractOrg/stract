@@ -43,6 +43,7 @@ mod node;
 mod segment;
 mod shortest_path;
 mod store;
+mod store_writer;
 mod writer;
 
 type SegmentID = String;

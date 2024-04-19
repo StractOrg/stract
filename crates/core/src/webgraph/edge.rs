@@ -58,7 +58,7 @@ where
     pub label: L,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, bincode::Encode, bincode::Decode)]
 pub struct InnerEdge<L>
 where
     L: EdgeLabel,

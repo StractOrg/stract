@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -14,12 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    fs::File,
-    io::Write,
-    ops::Range,
-    path::{Path, PathBuf},
-};
+use std::{fs::File, io::Write, ops::Range, path::Path};
 
 use fst::Automaton;
 use itertools::Itertools;
@@ -27,7 +22,8 @@ use memmap2::Mmap;
 
 use crate::speedy_kv;
 
-use super::{Compression, Edge, EdgeLabel, FullNodeID, InnerEdge, NodeID};
+pub use super::store_writer::EdgeStoreWriter;
+use super::{Compression, Edge, FullNodeID, InnerEdge, NodeID};
 
 #[derive(
     Debug,
@@ -44,70 +40,6 @@ struct SerializedEdge {
     from_prefix: NodeID,
     to_prefix: NodeID,
     label: Vec<u8>,
-}
-
-struct SortableEdge<L: EdgeLabel> {
-    sort_node: NodeID,
-    edge: InnerEdge<L>,
-}
-
-impl<L: EdgeLabel> PartialOrd for SortableEdge<L> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<L: EdgeLabel> Ord for SortableEdge<L> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.sort_node.cmp(&other.sort_node)
-    }
-}
-
-impl<L: EdgeLabel> PartialEq for SortableEdge<L> {
-    fn eq(&self, other: &Self) -> bool {
-        self.sort_node == other.sort_node
-    }
-}
-
-impl<L: EdgeLabel> Eq for SortableEdge<L> {}
-
-pub struct EdgeStoreWriter {
-    reversed: bool,
-    path: PathBuf,
-    edges: Vec<SortableEdge<String>>,
-    compression: Compression,
-}
-
-impl EdgeStoreWriter {
-    pub fn open<P: AsRef<Path>>(path: P, compression: Compression, reversed: bool) -> Self {
-        Self {
-            edges: Vec::new(),
-            reversed,
-            path: path.as_ref().to_path_buf(),
-            compression,
-        }
-    }
-
-    pub fn put(&mut self, edge: InnerEdge<String>) {
-        let sort_node = if self.reversed {
-            edge.to.id
-        } else {
-            edge.from.id
-        };
-
-        self.edges.push(SortableEdge { sort_node, edge });
-    }
-
-    pub fn finalize(mut self) -> EdgeStore {
-        self.edges.sort_unstable();
-
-        EdgeStore::build(
-            self.path,
-            self.compression,
-            self.reversed,
-            self.edges.into_iter().map(|e| e.edge),
-        )
-    }
 }
 
 struct PrefixDb {
@@ -283,9 +215,11 @@ impl EdgeStore {
         );
     }
 
-    /// Build a new edge store from a set of edges. The edges must be sorted by
+    /// Build a new edge store from a set of edges.
+    ///
+    /// **IMPORTANT** The edges must be sorted by
     /// either the from or to node, depending on the value of `reversed`.
-    fn build<P: AsRef<Path>>(
+    pub fn build<P: AsRef<Path>>(
         path: P,
         compression: Compression,
         reversed: bool,
@@ -489,7 +423,7 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut kv: EdgeStoreWriter = EdgeStoreWriter::open(
+        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
             crate::gen_temp_path().join("test-segment"),
             Compression::default(),
             false,
@@ -523,7 +457,7 @@ mod tests {
 
     #[test]
     fn test_reversed() {
-        let mut kv: EdgeStoreWriter = EdgeStoreWriter::open(
+        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
             crate::gen_temp_path().join("test-segment"),
             Compression::default(),
             true,

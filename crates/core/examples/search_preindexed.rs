@@ -147,9 +147,13 @@ pub async fn main() {
     let searcher: ApiSearcher<Searcher, LiveSearcher> =
         ApiSearcher::new(searcher, None, None, None, None, bangs, config);
 
-    for query in &queries {
+    for query in queries {
+        let mut query = query;
+        query.push(' ');
+        let query = query.repeat(32);
+
         let mut desc = "search '".to_string();
-        desc.push_str(query);
+        desc.push_str(&query);
         desc.push('\'');
 
         println!("{desc}");

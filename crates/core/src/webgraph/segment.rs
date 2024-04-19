@@ -34,12 +34,12 @@ pub struct SegmentWriter {
 impl SegmentWriter {
     pub fn open<P: AsRef<Path>>(folder_path: P, id: String, compression: Compression) -> Self {
         SegmentWriter {
-            adjacency: EdgeStoreWriter::open(
+            adjacency: EdgeStoreWriter::new(
                 folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
                 compression,
                 false,
             ),
-            reversed_adjacency: EdgeStoreWriter::open(
+            reversed_adjacency: EdgeStoreWriter::new(
                 folder_path
                     .as_ref()
                     .join(&id)
