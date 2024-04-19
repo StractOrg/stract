@@ -56,9 +56,15 @@ impl FastFieldReader {
             for field in Field::all().filter_map(|f| f.as_fast()) {
                 match field.data_type() {
                     DataType::U64 => {
-                        if let Ok(reader) = fastfield_readers.u64(field.name()) {
-                            u64s.insert(field, reader);
+                        let num_docs = reader.max_doc() as usize;
+                        let mut data = vec![0; num_docs];
+                        if let Ok(field_reader) = fastfield_readers.u64(field.name()) {
+                            for (doc, elem) in data.iter_mut().enumerate() {
+                                *elem = field_reader.values.get_val(doc as u32);
+                            }
                         }
+
+                        u64s.insert(field, data);
                     }
                     DataType::Bytes => {
                         if let Some(reader) = fastfield_readers.bytes(field.name()).ok().flatten() {
@@ -83,7 +89,7 @@ impl FastFieldReader {
 }
 
 struct AllReaders {
-    u64s: EnumMap<FastFieldEnum, tantivy::columnar::Column<u64>>,
+    u64s: EnumMap<FastFieldEnum, Vec<u64>>,
     bytes: EnumMap<FastFieldEnum, tantivy::columnar::BytesColumn>,
 }
 
@@ -153,8 +159,8 @@ impl<'a> FieldReader<'a> {
                 self.readers
                     .u64s
                     .get(field)?
-                    .values
-                    .get_val(self.doc)
+                    .get(self.doc as usize)
+                    .copied()?
                     .into(),
             ),
 
