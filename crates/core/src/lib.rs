@@ -41,6 +41,7 @@ pub mod autosuggest;
 pub mod bangs;
 mod bincode_utils;
 pub mod bloom;
+pub mod canon_index;
 mod collector;
 pub mod config;
 pub mod crawler;

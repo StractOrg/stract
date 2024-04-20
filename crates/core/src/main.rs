@@ -20,6 +20,7 @@ use std::fs;
 use std::path::Path;
 use stract::config;
 use stract::entrypoint::autosuggest_scrape::{self, Gl};
+use tracing::level_filters::LevelFilter;
 
 #[cfg(feature = "dev")]
 use stract::entrypoint::configure;
@@ -219,7 +220,9 @@ enum WebgraphOptions {
 #[derive(Subcommand)]
 enum IndexingOptions {
     /// Create the search index.
-    Search { config_path: String },
+    Search {
+        config_path: String,
+    },
 
     /// Merge multiple search indexes into a single index.
     MergeSearch {
@@ -234,7 +237,14 @@ enum IndexingOptions {
     },
 
     /// Create the feed index. Used to find feeds to put into the live index.
-    Feed { config_path: String },
+    Feed {
+        config_path: String,
+    },
+
+    // Create an index of canonical urls.
+    Canonical {
+        config_path: String,
+    },
 }
 
 fn load_toml_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> T {
@@ -250,7 +260,12 @@ fn load_toml_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> T {
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(LevelFilter::OFF.into())
+                .from_env_lossy()
+                .add_directive("stract=info".parse().unwrap()),
+        )
         .without_time()
         .with_target(false)
         .finish()
@@ -278,6 +293,10 @@ fn main() -> Result<()> {
                     .map(entrypoint::indexer::IndexPointer::from)
                     .collect::<Vec<_>>();
                 entrypoint::indexer::merge(pointers)?;
+            }
+            IndexingOptions::Canonical { config_path } => {
+                let config: config::CanonicalIndexConfig = load_toml_config(config_path);
+                entrypoint::canonical::create(config)?;
             }
         },
         Commands::Centrality { mode } => {
@@ -308,7 +327,7 @@ fn main() -> Result<()> {
 
                 for other_path in paths {
                     let other = WebgraphBuilder::new(&other_path).single_threaded().open();
-                    webgraph.merge(other);
+                    webgraph.merge(other)?;
                     std::fs::remove_dir_all(other_path).unwrap();
                 }
             }

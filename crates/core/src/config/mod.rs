@@ -62,6 +62,7 @@ pub struct WebgraphConstructConfig {
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,
     pub batch_size: Option<usize>,
+    pub canonical_index_path: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
@@ -555,4 +556,12 @@ pub struct HarmonicWorkerConfig {
     pub shard: ShardId,
     pub graph_path: String,
     pub host: SocketAddr,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct CanonicalIndexConfig {
+    pub output_path: String,
+    pub warc_source: WarcSource,
+    pub limit_warc_files: Option<usize>,
+    pub skip_warc_files: Option<usize>,
 }

@@ -2,6 +2,7 @@ limit_warc_files = 5
 host_graph_base_path = "data/webgraph"
 page_graph_base_path = "data/webgraph_page"
 batch_size = 1
+canonical_index_path = "data/canonical"
 
 [warc_source]
 folder = "./data"
