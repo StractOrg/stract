@@ -15,9 +15,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
+    collections::BTreeSet,
     fs::File,
     path::{Path, PathBuf},
 };
+
+use itertools::Itertools;
 
 use crate::file_store::{
     self,
@@ -30,6 +33,7 @@ use super::{store::EdgeStore, Compression, EdgeLabel, InnerEdge, NodeID};
 #[derive(bincode::Encode, bincode::Decode)]
 struct SortableEdge<L: EdgeLabel> {
     sort_node: NodeID,
+    secondary_node: NodeID,
     edge: InnerEdge<L>,
 }
 
@@ -41,19 +45,21 @@ impl<L: EdgeLabel> PartialOrd for SortableEdge<L> {
 
 impl<L: EdgeLabel> Ord for SortableEdge<L> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.sort_node.cmp(&other.sort_node)
+        self.sort_node
+            .cmp(&other.sort_node)
+            .then(self.secondary_node.cmp(&other.secondary_node))
     }
 }
 
 impl<L: EdgeLabel> PartialEq for SortableEdge<L> {
     fn eq(&self, other: &Self) -> bool {
-        self.sort_node == other.sort_node
+        self.sort_node == other.sort_node && self.secondary_node == other.secondary_node
     }
 }
 
 impl<L: EdgeLabel> Eq for SortableEdge<L> {}
 
-pub const MAX_BATCH_SIZE: usize = 100_000;
+pub const MAX_BATCH_SIZE: usize = 1_000_000;
 
 struct SortedEdgeIterator<M, D>
 where
@@ -91,7 +97,7 @@ where
 pub struct EdgeStoreWriter {
     reversed: bool,
     path: PathBuf,
-    edges: Vec<SortableEdge<String>>,
+    edges: BTreeSet<SortableEdge<String>>,
     stored_writers: Vec<PathBuf>,
     compression: Compression,
 }
@@ -105,7 +111,7 @@ impl EdgeStoreWriter {
         }
 
         Self {
-            edges: Vec::new(),
+            edges: BTreeSet::new(),
             reversed,
             path: path.to_path_buf(),
             compression,
@@ -134,13 +140,17 @@ impl EdgeStoreWriter {
     }
 
     pub fn put(&mut self, edge: InnerEdge<String>) {
-        let sort_node = if self.reversed {
-            edge.to.id
+        let (sort_node, secondary_node) = if self.reversed {
+            (edge.to.id, edge.from.id)
         } else {
-            edge.from.id
+            (edge.from.id, edge.to.id)
         };
 
-        self.edges.push(SortableEdge { sort_node, edge });
+        self.edges.insert(SortableEdge {
+            sort_node,
+            secondary_node,
+            edge,
+        });
 
         if self.edges.len() >= MAX_BATCH_SIZE {
             self.flush_to_file().unwrap();
@@ -148,7 +158,6 @@ impl EdgeStoreWriter {
     }
 
     fn sorted_edges(mut self) -> impl Iterator<Item = SortableEdge<String>> {
-        self.edges.sort_unstable();
         let readers = self
             .stored_writers
             .iter()
@@ -174,14 +183,13 @@ impl EdgeStoreWriter {
             p,
             self.compression,
             self.reversed,
-            self.sorted_edges().map(|e| e.edge),
+            self.sorted_edges().dedup().map(|e| e.edge),
         )
     }
 }
 
 impl Drop for EdgeStoreWriter {
     fn drop(&mut self) {
-        // cleanup writer directory
         std::fs::remove_dir_all(&self.path).unwrap();
     }
 }
