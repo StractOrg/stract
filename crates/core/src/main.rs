@@ -330,6 +330,8 @@ fn main() -> Result<()> {
                     webgraph.merge(other)?;
                     std::fs::remove_dir_all(other_path).unwrap();
                 }
+
+                webgraph.optimize_read();
             }
             WebgraphOptions::Server { config_path } => {
                 let config: config::WebgraphServerConfig = load_toml_config(config_path);
