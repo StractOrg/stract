@@ -141,8 +141,8 @@ impl Bangs {
 
     pub fn get(&self, terms: &[Term]) -> Option<BangHit> {
         for possible_bang in terms.iter().filter_map(|term| {
-            if let Term::PossibleBang(possible_bang) = term {
-                Some(possible_bang)
+            if let Term::PossibleBang { prefix: _, bang } = term {
+                Some(bang)
             } else {
                 None
             }
@@ -152,7 +152,7 @@ impl Bangs {
                     terms
                         .iter()
                         .filter(|term| {
-                            if let Term::PossibleBang(bang) = term {
+                            if let Term::PossibleBang { prefix: _, bang } = term {
                                 bang != possible_bang
                             } else {
                                 true

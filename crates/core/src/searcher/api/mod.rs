@@ -213,13 +213,13 @@ where
         let parsed_terms = query::parser::parse(&query.query)?;
 
         if parsed_terms.iter().any(|term| match term {
-            query::parser::Term::PossibleBang(t) => t.is_empty(),
+            query::parser::Term::PossibleBang { prefix: _, bang } => bang.is_empty(),
             _ => false,
         }) {
             let q: String = intersperse(
                 parsed_terms
                     .iter()
-                    .filter(|term| !matches!(term, query::parser::Term::PossibleBang(_)))
+                    .filter(|term| !matches!(term, query::parser::Term::PossibleBang { .. }))
                     .map(|term| term.to_string()),
                 " ".to_string(),
             )

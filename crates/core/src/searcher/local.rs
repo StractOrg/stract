@@ -33,7 +33,7 @@ use crate::ranking::{self, query_centrality, Ranker, SignalComputer, SignalEnum}
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::DisplayedWebpage;
 use crate::webgraph::Node;
-use crate::{inverted_index, live_index, Error, Result};
+use crate::{inverted_index, live_index, Result};
 
 use super::WebsitesResult;
 use super::{InitialWebsiteResult, SearchQuery};
@@ -169,13 +169,7 @@ where
         guard: &G,
         query: &SearchQuery,
     ) -> Result<Query> {
-        let parsed_query = Query::parse(ctx, query, guard.inverted_index())?;
-
-        if parsed_query.is_empty() {
-            Err(Error::EmptyQuery.into())
-        } else {
-            Ok(parsed_query)
-        }
+        Query::parse(ctx, query, guard.inverted_index())
     }
 
     fn ranker<'a, G: SearchGuard<'a>>(
@@ -338,10 +332,6 @@ where
             ..Default::default()
         };
         let query = Query::parse(&ctx, &query, guard.inverted_index())?;
-
-        if query.is_empty() {
-            return Err(Error::EmptyQuery.into());
-        }
 
         guard.inverted_index().retrieve_websites(websites, &query)
     }

@@ -18,38 +18,34 @@ use crate::{
     inverted_index::InvertedIndex,
     query::parser::TermCompound,
     ranking::SignalCoefficient,
-    schema::{text_field, Field},
+    schema::text_field,
     search_ctx::Ctx,
     searcher::SearchQuery,
     webpage::{region::Region, safety_classifier},
-    Result,
+    Error, Result,
 };
+
 use optics::{HostRankings, Optic};
-use std::collections::HashMap;
-use tantivy::query::{BooleanQuery, Occur, QueryClone, TermQuery};
+
+use tantivy::query::{BooleanQuery, Occur, QueryClone};
 
 mod const_query;
 pub mod intersection;
 pub mod optic;
 pub mod parser;
 mod pattern_query;
+mod plan;
 pub mod shortcircuit;
 pub mod union;
 
 use parser::Term;
 
-use self::{
-    optic::AsMultipleTantivyQuery,
-    parser::{CompoundAwareTerm, SimpleOrPhrase},
-};
+use self::{optic::AsMultipleTantivyQuery, parser::SimpleOrPhrase};
 
-const MAX_SIMILAR_TERMS: usize = 10;
-
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Query {
-    terms: Vec<Term>,
     simple_terms_text: Vec<String>,
-    tantivy_query: Box<BooleanQuery>,
+    tantivy_query: Box<dyn tantivy::query::Query>,
     host_rankings: HostRankings,
     offset: usize,
     region: Option<Region>,
@@ -58,84 +54,40 @@ pub struct Query {
     count_results: bool,
 }
 
+impl Clone for Query {
+    fn clone(&self) -> Self {
+        Self {
+            simple_terms_text: self.simple_terms_text.clone(),
+            tantivy_query: self.tantivy_query.box_clone(),
+            host_rankings: self.host_rankings.clone(),
+            offset: self.offset,
+            region: self.region,
+            optics: self.optics.clone(),
+            top_n: self.top_n,
+            count_results: self.count_results,
+        }
+    }
+}
+
 impl Query {
     pub fn parse(ctx: &Ctx, query: &SearchQuery, index: &InvertedIndex) -> Result<Query> {
-        let parsed_terms = parser::parse(&query.query)?;
-        let mut term_count = HashMap::new();
-        let mut terms = Vec::new();
+        let parsed_terms = parser::truncate(parser::parse(&query.query)?);
 
-        for term in parsed_terms {
-            let count = term_count.entry(term.clone()).or_insert(0);
-
-            if *count < MAX_SIMILAR_TERMS {
-                terms.push(term);
-            }
-
-            *count += 1;
+        if parsed_terms.is_empty() {
+            tracing::error!("No terms found in query");
+            return Err(Error::EmptyQuery.into());
         }
 
-        let mut compound_terms: Vec<_> = terms
-            .clone()
-            .into_iter()
-            .map(|term| CompoundAwareTerm {
-                term,
-                adjacent_terms: Vec::new(),
-            })
-            .collect();
-
-        let term_ids: Vec<_> = compound_terms.iter().enumerate().map(|(i, _)| i).collect();
-
-        for window_size in 2..=3 {
-            for window in term_ids.windows(window_size) {
-                let mut window_terms = Vec::new();
-                for i in window {
-                    if let Term::SimpleOrPhrase(SimpleOrPhrase::Simple(t)) =
-                        &compound_terms[*i].term
-                    {
-                        window_terms.push(t.clone());
-                    }
-                }
-
-                let compound = TermCompound {
-                    terms: window_terms,
-                };
-
-                for i in window {
-                    compound_terms[*i].adjacent_terms.push(compound.clone());
-                }
-            }
-        }
-
-        let schema = index.schema();
-
-        let fields: Vec<tantivy::schema::Field> = schema.fields().map(|(field, _)| field).collect();
-
-        let mut queries: Vec<(Occur, Box<dyn tantivy::query::Query + 'static>)> = compound_terms
+        if parsed_terms
             .iter()
-            .map(|term| term.as_tantivy_query(&fields))
-            .collect();
-
-        if query.safe_search {
-            let field = Field::Text(text_field::SafetyClassification.into());
-            let field = schema.get_field(field.name()).unwrap();
-
-            queries.push((
-                Occur::MustNot,
-                Box::new(TermQuery::new(
-                    tantivy::Term::from_field_text(
-                        field,
-                        safety_classifier::Label::NSFW.to_string().as_str(),
-                    ),
-                    tantivy::schema::IndexRecordOption::Basic,
-                )),
-            ));
+            .all(|t| matches!(t, Term::PossibleBang { .. }))
+        {
+            tracing::error!("No non-bang terms found in query");
+            return Err(Error::EmptyQuery.into());
         }
 
-        let mut tantivy_query = Box::new(BooleanQuery::new(queries));
-
-        let simple_terms_text: Vec<String> = terms
-            .clone()
-            .into_iter()
+        let simple_terms_text: Vec<String> = parsed_terms
+            .iter()
             .filter_map(|term| term.as_simple_text().map(|s| s.to_string()))
             .flat_map(|term| {
                 // term might be a phrase, so we split it into words
@@ -144,6 +96,24 @@ impl Query {
                     .collect::<Vec<_>>()
             })
             .collect();
+
+        let mut plan = plan::initial(parsed_terms).expect("terms are not empty and not all bangs");
+
+        let schema = index.schema();
+
+        if query.safe_search {
+            plan = plan.and(plan::Node::Not(Box::new(plan::Node::Term(
+                plan::Term::new(
+                    parser::SimpleTerm::from(safety_classifier::Label::NSFW.to_string()).into(),
+                    text_field::SafetyClassification.into(),
+                ),
+            ))));
+        }
+
+        let mut tantivy_query = plan
+            .into_query()
+            .as_tantivy(&schema)
+            .expect("there should at least be one field in the index");
 
         let mut optics = Vec::new();
         if let Some(site_rankigns_optic) = query.host_rankings.clone().map(|sr| sr.into_optic()) {
@@ -161,7 +131,6 @@ impl Query {
         }
 
         Ok(Query {
-            terms,
             host_rankings: optics.iter().fold(HostRankings::default(), |mut acc, el| {
                 acc.merge_into(el.host_rankings.clone());
                 acc
@@ -184,16 +153,8 @@ impl Query {
         &self.simple_terms_text
     }
 
-    pub fn terms(&self) -> &[Term] {
-        &self.terms
-    }
-
     pub fn optics(&self) -> &[Optic] {
         &self.optics
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.terms.is_empty()
     }
 
     pub fn num_results(&self) -> usize {
@@ -260,8 +221,7 @@ mod tests {
         let query = Query::parse(
             &ctx,
             &SearchQuery {
-                query: "this is a simple query the the the the the the the the the the the the the"
-                    .to_string(),
+                query: "this is a simple query".to_string(),
                 ..Default::default()
             },
             &index,
@@ -276,16 +236,6 @@ mod tests {
                 "a".to_string(),
                 "simple".to_string(),
                 "query".to_string(),
-                "the".to_string(),
-                "the".to_string(),
-                "the".to_string(),
-                "the".to_string(),
-                "the".to_string(),
-                "the".to_string(),
-                "the".to_string(),
-                "the".to_string(),
-                "the".to_string(),
-                "the".to_string(),
             ]
         );
     }
@@ -621,10 +571,13 @@ mod tests {
                 ..Default::default()
             },
             &index,
-        )
-        .expect("failed to parse query");
+        );
 
-        assert!(query.is_empty())
+        assert!(query.is_err());
+        assert_eq!(
+            query.err().unwrap().to_string(),
+            anyhow::Error::from(Error::EmptyQuery).to_string()
+        );
     }
 
     #[test]
@@ -632,7 +585,7 @@ mod tests {
         let index = empty_index();
         let ctx = index.local_search_ctx();
 
-        let query = Query::parse(
+        let _query = Query::parse(
             &ctx,
             &SearchQuery {
                 query: "&".to_string(),
@@ -641,8 +594,6 @@ mod tests {
             &index,
         )
         .expect("Failed to parse query");
-
-        assert!(!query.is_empty());
     }
 
     #[test]
@@ -849,6 +800,19 @@ mod tests {
 
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 2);
+    }
+
+    #[test]
+    fn deduplicate_terms() {
+        let a = parser::parse("the the the the the").unwrap();
+        let a = plan::initial(a).unwrap();
+        let a = a.into_query();
+
+        let b = parser::parse("the the the the the the the the the the the the").unwrap();
+        let b = plan::initial(b).unwrap();
+        let b = b.into_query();
+
+        assert_eq!(a, b);
     }
 
     #[test]

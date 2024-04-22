@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+pub const MAX_TERMS_PER_QUERY: usize = 32;
+
 use crate::bangs::BANG_PREFIXES;
 
-mod as_tantivy;
 mod term;
 
 pub use term::*;
@@ -88,7 +89,13 @@ fn simple_or_phrase(input: &str) -> nom::IResult<&str, SimpleOrPhrase> {
 fn single_bang(input: &str, pref: char) -> nom::IResult<&str, Term> {
     let (input, _) = nom::character::complete::char(pref)(input)?;
     let (input, output) = until_space_or_end(input)?;
-    Ok((input, Term::PossibleBang(output.to_string())))
+    Ok((
+        input,
+        Term::PossibleBang {
+            prefix: pref,
+            bang: output.to_string(),
+        },
+    ))
 }
 
 fn bang(input: &str) -> nom::IResult<&str, Term> {
@@ -194,6 +201,14 @@ pub fn parse(query: &str) -> anyhow::Result<Vec<Term>> {
         .map_err(|e| anyhow::anyhow!("Failed to parse query: {:?}", e))
 }
 
+pub fn truncate(terms: Vec<Term>) -> Vec<Term> {
+    terms
+        .into_iter()
+        .take(MAX_TERMS_PER_QUERY)
+        .map(|t| t.truncate())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use proptest::prelude::*;
@@ -201,7 +216,7 @@ mod tests {
     use super::{SimpleOrPhrase, Term};
 
     fn parse(input: &str) -> Vec<Term> {
-        super::parse(input).unwrap()
+        super::truncate(super::parse(input).unwrap())
     }
 
     #[test]
@@ -366,6 +381,18 @@ mod tests {
     fn unicode() {
         let query = "🦀";
         assert_eq!(parse(query).len(), 1);
+    }
+
+    #[test]
+    fn test_truncate() {
+        let q = "test ";
+
+        let terms = parse(q);
+        assert_eq!(terms.len(), 1);
+
+        let q = q.repeat(1024);
+        let terms = parse(&q);
+        assert!(terms.len() < 1020);
     }
 
     proptest! {

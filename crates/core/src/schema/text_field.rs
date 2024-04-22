@@ -90,7 +90,22 @@ pub trait TextField:
         false
     }
 
+    fn is_phrase_searchable(&self) -> bool {
+        self.is_searchable() && self.has_pos()
+    }
+
     fn is_stored(&self) -> bool {
+        false
+    }
+
+    /// Whether or not we should use the field
+    /// to lookup compounds. E.g. "new york times"
+    /// should also match "newyorktimes".
+    ///
+    /// This should only be activated for very few fields
+    /// as the number of queries we have to match against
+    /// the index grows quite substantially.
+    fn is_compound_searchable(&self) -> bool {
         false
     }
 
@@ -285,6 +300,10 @@ impl TextField for Title {
         true
     }
 
+    fn is_compound_searchable(&self) -> bool {
+        true
+    }
+
     fn add_html_tantivy(
         &self,
         _html: &Html,
@@ -431,6 +450,10 @@ impl TextField for AllBody {
         true
     }
 
+    fn is_compound_searchable(&self) -> bool {
+        true
+    }
+
     fn add_html_tantivy(
         &self,
         _html: &Html,
@@ -466,6 +489,10 @@ impl TextField for Url {
     }
 
     fn is_searchable(&self) -> bool {
+        true
+    }
+
+    fn is_compound_searchable(&self) -> bool {
         true
     }
 

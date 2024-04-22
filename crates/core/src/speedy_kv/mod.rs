@@ -580,9 +580,6 @@ mod tests {
         let mut db1 = Db::open_or_create(gen_temp_path()).unwrap();
         let mut db2 = Db::open_or_create(gen_temp_path()).unwrap();
 
-        dbg!(db1.folder());
-        dbg!(db2.folder());
-
         db1.insert(1, 2).unwrap();
         db1.insert(2, 3).unwrap();
 
