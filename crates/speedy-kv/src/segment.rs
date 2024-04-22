@@ -20,6 +20,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use file_store::Peekable;
+
 use super::{
     blob_id_index::{BlobIdIndex, BlobIdIndexWriter},
     blob_index::{BlobIndex, BlobIndexWriter},
@@ -294,45 +296,6 @@ impl<K, V> Segment<K, V> {
         )?;
 
         Ok(())
-    }
-}
-
-struct Peekable<I>
-where
-    I: Iterator,
-{
-    iter: I,
-    peeked: Option<I::Item>,
-}
-
-impl<I> Peekable<I>
-where
-    I: Iterator,
-{
-    fn new(iter: I) -> Self {
-        let mut iter = iter;
-        let peeked = iter.next();
-        Self { iter, peeked }
-    }
-
-    fn peek(&self) -> Option<&I::Item> {
-        self.peeked.as_ref()
-    }
-}
-
-impl<I> Iterator for Peekable<I>
-where
-    I: Iterator,
-{
-    type Item = I::Item;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let peeked = self.peeked.take();
-        if peeked.is_some() {
-            self.peeked = self.iter.next();
-        }
-
-        peeked
     }
 }
 

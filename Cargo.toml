@@ -4,6 +4,7 @@ members = [
     "crates/client-wasm",
     "crates/client-wasm",
     "crates/core",
+    "crates/file-store",
     "crates/kuchiki",
     "crates/optics",
     "crates/speedy-kv",

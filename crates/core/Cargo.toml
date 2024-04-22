@@ -50,6 +50,7 @@ encoding_rs = { workspace = true }
 enum_dispatch = { workspace = true }
 eventsource-stream = { workspace = true }
 fend-core = { workspace = true }
+file_store = { path = "../file-store" }
 flate2 = { workspace = true }
 fnv = { workspace = true }
 fst = { workspace = true }

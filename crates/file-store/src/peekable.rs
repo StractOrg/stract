@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
-// TODO: Remove peekable from speedy_kv::segment and replace it with this
-
 /// An iterator that allows peeking at the next element.
 /// Unlike the standard library's `Peekable`, this implementation
 /// *is not* lazy and will always consume the next element when peeking.

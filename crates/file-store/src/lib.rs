@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
+//! A collection of simple disk-based data structures.
+
+pub type Result<T> = std::result::Result<T, anyhow::Error>;
+
 pub mod iterable;
 pub mod peekable;
 

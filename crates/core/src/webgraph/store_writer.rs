@@ -24,11 +24,8 @@ use std::{
 
 use itertools::Itertools;
 
-use crate::file_store::{
-    self,
-    iterable::{IterableStoreReader, SortedIterableStoreReader},
-};
 use crate::Result;
+use file_store::iterable::{IterableStoreReader, SortedIterableStoreReader};
 
 use super::{store::EdgeStore, Compression, EdgeLabel, InnerEdge, NodeID};
 

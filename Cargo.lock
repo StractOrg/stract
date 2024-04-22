@@ -1539,6 +1539,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a58880ee1c8f961b122908bb1a195e13cd31b81a28ed1136910bf881ce23bbe8"
 
 [[package]]
+name = "file_store"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+]
+
+[[package]]
 name = "filetime"
 version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4621,6 +4629,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "bloom",
+ "file_store",
  "fst",
  "memmap",
  "serde",
@@ -4696,6 +4705,7 @@ dependencies = [
  "enum_dispatch",
  "eventsource-stream",
  "fend-core",
+ "file_store",
  "flate2",
  "fnv",
  "fst",
