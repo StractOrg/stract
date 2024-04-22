@@ -31,6 +31,7 @@ axum-macros = { workspace = true }
 base64 = { workspace = true }
 bincode = { workspace = true }
 bitvec = { workspace = true }
+bloom = { path = "../bloom" }
 bytecount = { workspace = true }
 bytemuck = { workspace = true }
 byteorder = { workspace = true }
@@ -95,6 +96,7 @@ scylla = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_urlencoded = { workspace = true }
+speedy_kv = { path = "../speedy-kv" }
 strum = { workspace = true }
 tantivy = { workspace = true }
 thiserror = { workspace = true }

@@ -19,14 +19,11 @@
 //! derive a centrality measure for the page graph.
 
 use anyhow::Result;
+use bloom::U64BloomFilter;
 use rayon::prelude::*;
 use std::{collections::BTreeMap, path::Path, sync::Mutex};
 
-use crate::{
-    bloom::U64BloomFilter,
-    speedy_kv,
-    webgraph::{NodeID, Webgraph},
-};
+use crate::webgraph::{NodeID, Webgraph};
 
 struct BloomMap {
     map: Vec<Mutex<U64BloomFilter>>,

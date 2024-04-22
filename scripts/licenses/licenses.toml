@@ -16,6 +16,7 @@ accepted = [
     "zlib-acknowledgement",
     "GPL-3.0",              # aglpv3 software can link glpv3 libraries under section 13 of gplv3
     "BSL-1.0",
+    "AGPL-3.0",
 ]
 
 workarounds = ["ring"]

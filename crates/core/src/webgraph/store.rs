@@ -20,9 +20,6 @@ use fst::Automaton;
 use itertools::Itertools;
 use memmap2::Mmap;
 
-use crate::speedy_kv;
-
-pub use super::store_writer::EdgeStoreWriter;
 use super::{Compression, Edge, FullNodeID, InnerEdge, NodeID};
 
 #[derive(
@@ -434,6 +431,8 @@ impl EdgeStore {
 
 #[cfg(test)]
 mod tests {
+    use crate::webgraph::store_writer::EdgeStoreWriter;
+
     use super::*;
 
     #[test]

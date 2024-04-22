@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
+use bloom::U64BloomFilter;
+
 use crate::{
     ampc::prelude::*,
-    bloom::U64BloomFilter,
     config::HarmonicWorkerConfig,
     distributed::{
         cluster::Cluster,

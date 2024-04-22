@@ -1,0 +1,12 @@
+[package]
+name = "bloom"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bincode.workspace = true
+bitvec.workspace = true
+xxhash-rust = "0.8.10"

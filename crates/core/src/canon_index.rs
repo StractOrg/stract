@@ -21,7 +21,7 @@ use std::path::Path;
 
 use url::Url;
 
-use crate::{speedy_kv, webpage::url_ext::UrlExt, Result};
+use crate::{webpage::url_ext::UrlExt, Result};
 
 #[derive(bincode::Decode, bincode::Encode)]
 struct StoredUrl(#[bincode(with_serde)] Url);

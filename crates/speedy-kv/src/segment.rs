@@ -26,7 +26,7 @@ use super::{
     blob_store::{BlobStore, BlobStoreWriter},
     Serialized, SerializedRef,
 };
-use crate::{bloom, Result};
+use crate::Result;
 
 pub struct Writers<K, V, W>
 where

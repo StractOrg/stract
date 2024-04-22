@@ -25,7 +25,6 @@
 // TODO: Handle the case when K is !Sized. I think this would currently crash fst mmap
 // as one cannot mmap an empty file. All lookups should probably just return Ok(None) in this case.
 
-use crate::Result;
 use std::{
     collections::BTreeMap,
     ops::{Range, RangeBounds},
@@ -38,6 +37,8 @@ use self::{
     blob_store::{BlobStore, BlobStoreWriter},
     segment::{Segment, SegmentWriter},
 };
+
+type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
 
 pub mod automaton;
 mod blob_id_index;
@@ -475,7 +476,33 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gen_temp_path;
+
+    // taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
+    fn gen_temp_path() -> PathBuf {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::SystemTime;
+
+        static SALT_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+        let seed = SALT_COUNTER.fetch_add(1, Ordering::SeqCst) as u128;
+
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+            << 48;
+
+        let pid = u128::from(std::process::id());
+
+        let salt = (pid << 16) + now + seed;
+
+        if cfg!(target_os = "linux") {
+            // use shared memory for temporary linux files
+            format!("/dev/shm/pagecache.tmp.{salt}").into()
+        } else {
+            std::env::temp_dir().join(format!("pagecache.tmp.{salt}"))
+        }
+    }
 
     #[test]
     fn test_simple() {

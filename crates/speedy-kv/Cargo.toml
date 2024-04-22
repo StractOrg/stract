@@ -1,0 +1,17 @@
+[package]
+name = "speedy_kv"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow.workspace = true
+bincode.workspace = true
+bloom = { path = "../bloom" }
+fst.workspace = true
+memmap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true

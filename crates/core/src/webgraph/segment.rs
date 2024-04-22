@@ -17,8 +17,7 @@
 use std::path::{Path, PathBuf};
 
 use super::{
-    store::{EdgeStore, EdgeStoreWriter},
-    Compression, Edge, InnerEdge, NodeID,
+    store::EdgeStore, store_writer::EdgeStoreWriter, Compression, Edge, InnerEdge, NodeID,
 };
 
 const ADJACENCY_STORE: &str = "adjacency";

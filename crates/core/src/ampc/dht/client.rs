@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use async_stream::stream;
+use bloom::fast_stable_hash_64;
 use futures::Stream;
 use rand::seq::SliceRandom;
 use std::{
@@ -23,7 +24,7 @@ use std::{
     ops::{Bound, Range},
 };
 
-use crate::{distributed::member::ShardId, fast_stable_hash_64, Result};
+use crate::{distributed::member::ShardId, Result};
 
 use super::{
     network::api,

@@ -540,6 +540,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloom"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "bitvec",
+ "xxhash-rust",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4606,6 +4615,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "speedy_kv"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bloom",
+ "fst",
+ "memmap",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4653,6 +4676,7 @@ dependencies = [
  "base64 0.21.7",
  "bincode",
  "bitvec",
+ "bloom",
  "bytecount",
  "bytemuck",
  "byteorder 1.5.0",
@@ -4722,6 +4746,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
+ "speedy_kv",
  "strum 0.26.2",
  "tantivy",
  "thiserror",

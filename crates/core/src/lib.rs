@@ -40,7 +40,6 @@ mod api;
 pub mod autosuggest;
 pub mod bangs;
 mod bincode_utils;
-pub mod bloom;
 pub mod canon_index;
 mod collector;
 pub mod config;
@@ -78,7 +77,6 @@ pub mod searcher;
 mod simhash;
 pub mod similar_hosts;
 mod snippet;
-pub mod speedy_kv;
 mod stopwords;
 pub mod summarizer;
 mod tokenizer;
@@ -202,14 +200,6 @@ fn floor_char_boundary(str: &str, index: usize) -> usize {
     res
 }
 
-pub fn split_u128(num: u128) -> [u64; 2] {
-    [(num >> 64) as u64, num as u64]
-}
-
-pub fn combine_u64s(nums: [u64; 2]) -> u128 {
-    ((nums[0] as u128) << 64) | (nums[1] as u128)
-}
-
 #[derive(
     Debug, Clone, Copy, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
 )]
@@ -247,18 +237,6 @@ impl Ord for SortableFloat {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn split_combine_u128() {
-        for num in 0..10000_u128 {
-            assert_eq!(combine_u64s(split_u128(num)), num);
-        }
-    }
-}
-
 macro_rules! enum_dispatch_from_discriminant {
     ($discenum:ident => $enum:ident, [$($disc:ident),*$(,)?]) => {
         impl From<$discenum> for $enum {
@@ -274,12 +252,3 @@ macro_rules! enum_dispatch_from_discriminant {
 }
 
 pub(crate) use enum_dispatch_from_discriminant;
-
-const XXH3_SECRET: &[u8] = &xxhash_rust::const_xxh3::const_custom_default_secret(42);
-pub fn fast_stable_hash_64(t: &[u8]) -> u64 {
-    xxhash_rust::xxh3::xxh3_64_with_secret(t, XXH3_SECRET)
-}
-
-pub fn fast_stable_hash_128(t: &[u8]) -> u128 {
-    xxhash_rust::xxh3::xxh3_128_with_secret(t, XXH3_SECRET)
-}

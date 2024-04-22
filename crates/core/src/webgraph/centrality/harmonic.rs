@@ -21,7 +21,7 @@ use std::{
 
 use std::sync::atomic::Ordering;
 
-use crate::bloom::U64BloomFilter;
+use bloom::U64BloomFilter;
 use tracing::info;
 
 use crate::{

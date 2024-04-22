@@ -19,13 +19,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use bloom::U64BloomFilter;
+
 use crate::{
     ampc::{
         dht::{HyperLogLog64Upsert, UpsertAction},
         prelude::*,
         DhtConn,
     },
-    bloom::U64BloomFilter,
     hyperloglog::HyperLogLog,
     webgraph,
 };
