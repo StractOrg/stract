@@ -50,18 +50,8 @@ impl Id2NodeDb {
         self.db.iter()
     }
 
-    pub fn batch_put(&mut self, iter: impl Iterator<Item = (NodeID, Node)>) {
-        for (id, node) in iter {
-            self.put(&id, &node);
-
-            if self.db.uncommitted_inserts() > 10_000_000 {
-                self.flush();
-            }
-        }
-
-        if self.db.uncommitted_inserts() > 10_000_000 {
-            self.flush();
-        }
+    pub fn merge(&mut self, other: Self) {
+        self.db.merge(other.db).unwrap();
     }
 
     pub fn flush(&mut self) {

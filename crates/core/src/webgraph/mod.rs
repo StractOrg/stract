@@ -136,7 +136,8 @@ impl Webgraph {
 
     pub fn merge(&mut self, other: Webgraph) -> io::Result<()> {
         let other_folder = other.path.clone();
-        self.id2node.batch_put(other.id2node.iter());
+        self.id2node.merge(other.id2node);
+        self.id2node.flush();
 
         for segment in other.segments {
             let id = segment.id();
@@ -152,7 +153,6 @@ impl Webgraph {
         fs::remove_dir_all(other_folder)?;
 
         self.save_metadata();
-        self.id2node.flush();
 
         Ok(())
     }
