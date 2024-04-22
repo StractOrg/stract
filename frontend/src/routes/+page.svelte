@@ -11,7 +11,7 @@
   <div class="w-full px-3 md:mx-0 md:max-w-xl">
     <Searchbar autofocus={true} />
   </div>
-  <div class="mt-3 flex space-x-2 px-5 text-sm text-neutral md:text-sm">
+  <div class="noscript:hidden mt-3 flex space-x-2 px-5 text-sm text-neutral md:text-sm">
     <div>
       Customise your search with an{' '}
       <a class="font-medium underline" href="/settings/optics">optic</a>:
