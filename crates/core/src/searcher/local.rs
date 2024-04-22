@@ -33,7 +33,7 @@ use crate::ranking::{self, query_centrality, Ranker, SignalComputer, SignalEnum}
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::DisplayedWebpage;
 use crate::webgraph::Node;
-use crate::{inverted_index, live_index, Error, Result};
+use crate::{inverted_index, live_index, Result};
 
 use super::WebsitesResult;
 use super::{InitialWebsiteResult, SearchQuery};
@@ -169,13 +169,7 @@ where
         guard: &G,
         query: &SearchQuery,
     ) -> Result<Query> {
-        let parsed_query = Query::parse(ctx, query, guard.inverted_index())?;
-
-        if parsed_query.is_empty() {
-            Err(Error::EmptyQuery.into())
-        } else {
-            Ok(parsed_query)
-        }
+        Query::parse(ctx, query, guard.inverted_index())
     }
 
     fn ranker<'a, G: SearchGuard<'a>>(
@@ -186,8 +180,7 @@ where
         de_rank_similar: bool,
         computer: SignalComputer,
     ) -> Result<Ranker> {
-        let query_centrality_coeff =
-            computer.coefficient(&ranking::signal::QueryCentrality.into());
+        let query_centrality_coeff = computer.coefficient(&ranking::signal::QueryCentrality.into());
 
         let mut ranker = Ranker::new(
             computer,
@@ -340,10 +333,6 @@ where
         };
         let query = Query::parse(&ctx, &query, guard.inverted_index())?;
 
-        if query.is_empty() {
-            return Err(Error::EmptyQuery.into());
-        }
-
         guard.inverted_index().retrieve_websites(websites, &query)
     }
 
@@ -404,7 +393,7 @@ where
 
         let mut webpages: Vec<_> = retrieved_sites
             .into_iter()
-            .map(DisplayedWebpage::from)
+            .map(|webpage| DisplayedWebpage::new(webpage, query))
             .collect();
 
         for (webpage, ranking) in webpages.iter_mut().zip(top_websites) {

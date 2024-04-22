@@ -19,14 +19,13 @@ use std::{fs, path::Path};
 use crate::executor::Executor;
 
 use super::{
-    id_node_db::Id2NodeDb, segment::SegmentWriter, store, Compression, FullNodeID, InnerEdge, Meta,
-    Node, NodeID, Webgraph, MAX_LABEL_LENGTH,
+    id_node_db::Id2NodeDb, segment::SegmentWriter, Compression, FullNodeID, InnerEdge, Meta, Node,
+    NodeID, Webgraph, MAX_LABEL_LENGTH,
 };
 
 pub struct WebgraphWriter {
     pub path: String,
     segment: SegmentWriter,
-    insert_batch: Vec<InnerEdge<String>>,
     id2node: Id2NodeDb,
     executor: Executor,
     meta: Meta,
@@ -60,7 +59,6 @@ impl WebgraphWriter {
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
             segment,
             id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
-            insert_batch: Vec::with_capacity(store::MAX_BATCH_SIZE),
             executor,
             meta,
             compression,
@@ -95,20 +93,10 @@ impl WebgraphWriter {
             label: label.chars().take(MAX_LABEL_LENGTH).collect(),
         };
 
-        self.insert_batch.push(edge);
-
-        if self.insert_batch.len() >= store::MAX_BATCH_SIZE {
-            self.commit();
-        }
+        self.segment.insert(edge);
     }
 
     pub fn commit(&mut self) {
-        if !self.insert_batch.is_empty() {
-            self.segment.insert(&self.insert_batch);
-            self.segment.flush();
-            self.insert_batch.clear();
-        }
-
         self.save_metadata();
         self.id2node.flush();
     }

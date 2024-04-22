@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,7 @@ use fst::Automaton;
 use itertools::Itertools;
 use memmap2::Mmap;
 
-use super::{Compression, Edge, EdgeLabel, FullNodeID, InnerEdge, NodeID};
+use super::{Compression, Edge, FullNodeID, InnerEdge, NodeID};
 
 #[derive(
     Debug,
@@ -39,128 +39,6 @@ struct SerializedEdge {
     label: Vec<u8>,
 }
 
-pub const MAX_BATCH_SIZE: usize = 100_000;
-
-pub struct EdgeStoreWriter {
-    reversed: bool,
-    db: speedy_kv::Db<Vec<u8>, Vec<u8>>,
-    compression: Compression,
-}
-
-impl EdgeStoreWriter {
-    pub fn open<P: AsRef<Path>>(path: P, compression: Compression, reversed: bool) -> Self {
-        let db = speedy_kv::Db::open_or_create(path.as_ref().join("writer")).unwrap();
-
-        Self {
-            db,
-            reversed,
-            compression,
-        }
-    }
-
-    pub fn put<'a, L: EdgeLabel + 'a>(&'a mut self, edges: impl Iterator<Item = &'a InnerEdge<L>>) {
-        for edge in edges {
-            let value_bytes = L::to_bytes(&edge.label).unwrap();
-
-            let value_bytes = bincode::encode_to_vec(
-                &SerializedEdge {
-                    from_prefix: edge.from.prefix,
-                    to_prefix: edge.to.prefix,
-                    label: value_bytes.clone(),
-                },
-                bincode::config::standard(),
-            )
-            .unwrap();
-
-            let key_bytes = if self.reversed {
-                [
-                    edge.to.id.as_u64().to_le_bytes(),
-                    edge.from.id.as_u64().to_le_bytes(),
-                ]
-                .concat()
-            } else {
-                [
-                    edge.from.id.as_u64().to_le_bytes(),
-                    edge.to.id.as_u64().to_le_bytes(),
-                ]
-                .concat()
-            };
-
-            self.db.insert_raw(key_bytes, value_bytes);
-
-            if self.db.uncommitted_inserts() > MAX_BATCH_SIZE {
-                self.db.commit().unwrap();
-            }
-        }
-
-        if self.db.uncommitted_inserts() > MAX_BATCH_SIZE {
-            self.db.commit().unwrap();
-        }
-    }
-
-    pub fn iter<L: EdgeLabel>(&self) -> impl Iterator<Item = InnerEdge<L>> + '_ + Send + Sync {
-        self.db.iter_raw().map(|(key, val)| {
-            let (from, to) = if self.reversed {
-                (
-                    u64::from_le_bytes(
-                        key.as_bytes()[u64::BITS as usize / 8..].try_into().unwrap(),
-                    ),
-                    u64::from_le_bytes(
-                        key.as_bytes()[..u64::BITS as usize / 8].try_into().unwrap(),
-                    ),
-                )
-            } else {
-                (
-                    u64::from_le_bytes(
-                        key.as_bytes()[..u64::BITS as usize / 8].try_into().unwrap(),
-                    ),
-                    u64::from_le_bytes(
-                        key.as_bytes()[u64::BITS as usize / 8..].try_into().unwrap(),
-                    ),
-                )
-            };
-
-            let (val, _): (SerializedEdge, _) =
-                bincode::decode_from_slice(val.as_bytes(), bincode::config::standard()).unwrap();
-
-            InnerEdge {
-                from: FullNodeID {
-                    prefix: val.from_prefix,
-                    id: NodeID::from(from),
-                },
-                to: FullNodeID {
-                    prefix: val.to_prefix,
-                    id: NodeID::from(to),
-                },
-                label: L::from_bytes(&val.label).unwrap(),
-            }
-        })
-    }
-
-    pub fn flush(&mut self) {
-        self.db.commit().unwrap();
-        self.db.merge_all_segments().unwrap();
-    }
-
-    pub fn finalize(mut self) -> EdgeStore {
-        self.flush();
-
-        let s = EdgeStore::build(
-            self.db.folder().parent().unwrap(),
-            self.compression,
-            self.reversed,
-            self.iter(),
-        );
-
-        // delete the writer db
-        let p = self.db.folder().to_owned();
-        drop(self.db);
-        std::fs::remove_dir_all(p).unwrap();
-
-        s
-    }
-}
-
 struct PrefixDb {
     db: speedy_kv::Db<Vec<u8>, Vec<u8>>,
 }
@@ -170,6 +48,10 @@ impl PrefixDb {
         let db = speedy_kv::Db::open_or_create(path).unwrap();
 
         Self { db }
+    }
+
+    fn optimize_read(&mut self) {
+        self.db.merge_all_segments().unwrap();
     }
 
     fn insert(&mut self, node: &FullNodeID) {
@@ -216,6 +98,11 @@ impl RangesDb {
         let labels = speedy_kv::Db::open_or_create(path.as_ref().join("labels")).unwrap();
 
         Self { nodes, labels }
+    }
+
+    pub fn optimize_read(&mut self) {
+        self.nodes.merge_all_segments().unwrap();
+        self.labels.merge_all_segments().unwrap();
     }
 }
 
@@ -271,6 +158,11 @@ impl EdgeStore {
             edge_nodes_len,
             compression,
         }
+    }
+
+    pub fn optimize_read(&mut self) {
+        self.ranges.optimize_read();
+        self.prefixes.optimize_read();
     }
 
     /// Insert a batch of edges into the store.
@@ -334,9 +226,11 @@ impl EdgeStore {
         );
     }
 
-    /// Build a new edge store from a set of edges. The edges must be sorted by
+    /// Build a new edge store from a set of edges.
+    ///
+    /// **IMPORTANT** The edges must be sorted by
     /// either the from or to node, depending on the value of `reversed`.
-    fn build<P: AsRef<Path>>(
+    pub fn build<P: AsRef<Path>>(
         path: P,
         compression: Compression,
         reversed: bool,
@@ -357,9 +251,10 @@ impl EdgeStore {
                         |e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id },
                     );
                     batch.dedup_by_key(|e| if reversed { e.from.id } else { e.to.id });
+                    let batch_len = batch.len();
                     s.put(&batch);
                     batch.clear();
-                    inserts_since_last_flush += 1;
+                    inserts_since_last_flush += batch_len;
 
                     if inserts_since_last_flush >= 1_000_000 {
                         s.flush();
@@ -536,11 +431,13 @@ impl EdgeStore {
 
 #[cfg(test)]
 mod tests {
+    use crate::webgraph::store_writer::EdgeStoreWriter;
+
     use super::*;
 
     #[test]
     fn test_insert() {
-        let mut kv: EdgeStoreWriter = EdgeStoreWriter::open(
+        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
             crate::gen_temp_path().join("test-segment"),
             Compression::default(),
             false,
@@ -558,7 +455,7 @@ mod tests {
             label: "test".to_string(),
         };
 
-        kv.put([e.clone()].iter());
+        kv.put(e.clone());
 
         let store = kv.finalize();
 
@@ -574,7 +471,7 @@ mod tests {
 
     #[test]
     fn test_reversed() {
-        let mut kv: EdgeStoreWriter = EdgeStoreWriter::open(
+        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
             crate::gen_temp_path().join("test-segment"),
             Compression::default(),
             true,
@@ -592,7 +489,7 @@ mod tests {
             label: "test".to_string(),
         };
 
-        kv.put([e.clone()].iter());
+        kv.put(e.clone());
 
         let store = kv.finalize();
 

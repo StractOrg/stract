@@ -196,6 +196,7 @@ export type ApiSearchQuery = {
   optic?: string;
   page?: number;
   query: string;
+  returnBody?: ReturnBody;
   returnRankingSignals?: boolean;
   safeSearch?: boolean;
   selectedRegion?: Region;
@@ -262,6 +263,7 @@ export type DisplayedSidebar =
       };
     };
 export type DisplayedWebpage = {
+  body?: string;
   domain: string;
   likelyHasAds: boolean;
   likelyHasPaywall: boolean;
@@ -341,6 +343,14 @@ export type PartOfSpeechMeaning = {
 };
 export type Region = 'All' | 'Denmark' | 'France' | 'Germany' | 'Spain' | 'US';
 export const REGIONS = ['All', 'Denmark', 'France', 'Germany', 'Spain', 'US'] satisfies Region[];
+export type ReturnBody =
+  | {
+      type: 'all';
+    }
+  | {
+      type: 'truncated';
+      value: number;
+    };
 export type RichSnippet = {
   answers: StackOverflowAnswer[];
   question: StackOverflowQuestion;

@@ -14,16 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
-    config::WarcSource,
-    config::{self, WebgraphConstructConfig},
+    canon_index::CanonicalIndex,
+    config::{self, WarcSource, WebgraphConstructConfig},
     entrypoint::download_all_warc_files,
     webgraph::{self, Node, WebgraphWriter},
     webpage::{url_ext::UrlExt, Html},
     Result,
 };
 use itertools::Itertools;
+use url::Url;
 
-use std::{fs, path::Path};
+use std::{path::Path, sync::Arc};
 use tokio::pin;
 use tracing::{info, trace};
 
@@ -81,9 +82,18 @@ pub fn open_page_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWrit
     )
 }
 
+fn canonical_or_self(index: &CanonicalIndex, url: Url) -> Url {
+    if let Some(url) = index.get(&url).unwrap() {
+        url
+    } else {
+        url
+    }
+}
+
 pub struct WebgraphWorker {
     pub host_graph: webgraph::WebgraphWriter,
     pub page_graph: webgraph::WebgraphWriter,
+    pub canonical_index: Option<Arc<CanonicalIndex>>,
 }
 
 impl WebgraphWorker {
@@ -113,8 +123,14 @@ impl WebgraphWorker {
                     .into_iter()
                     .filter(|link| matches!(link.destination.scheme(), "http" | "https"))
                 {
-                    let source = link.source.clone();
-                    let destination = link.destination.clone();
+                    let mut source = link.source.clone();
+                    let mut destination = link.destination.clone();
+
+                    if let Some(index) = &self.canonical_index {
+                        source = canonical_or_self(index, source);
+                        destination = canonical_or_self(index, destination);
+                    }
+
                     link.text = link.text.chars().take(128).collect();
 
                     trace!("inserting link {:?}", link);
@@ -167,6 +183,12 @@ impl Webgraph {
             })
             .collect_vec();
 
+        let canonical_index = if let Some(index_path) = &config.canonical_index_path {
+            Some(Arc::new(CanonicalIndex::open(index_path)?))
+        } else {
+            None
+        };
+
         let num_workers = num_cpus::get();
 
         let mut handlers = Vec::new();
@@ -192,6 +214,7 @@ impl Webgraph {
             let mut worker = WebgraphWorker {
                 host_graph: open_host_graph_writer(host_path),
                 page_graph: open_page_graph_writer(page_path),
+                canonical_index: canonical_index.clone(),
             };
 
             let jobs = jobs.clone();
@@ -216,15 +239,12 @@ impl Webgraph {
         let (mut host_graph, mut page_graph) = graphs.pop().unwrap();
 
         for (other_host, other_page) in graphs {
-            let other_host_path = other_host.path.clone();
-            let other_page_path = other_page.path.clone();
-
-            host_graph.merge(other_host);
-            page_graph.merge(other_page);
-
-            fs::remove_dir_all(other_host_path)?;
-            fs::remove_dir_all(other_page_path)?;
+            host_graph.merge(other_host)?;
+            page_graph.merge(other_page)?;
         }
+
+        host_graph.optimize_read();
+        page_graph.optimize_read();
 
         Ok(())
     }

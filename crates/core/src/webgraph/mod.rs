@@ -13,11 +13,11 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::fs;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
+use std::{fs, io};
 
 use itertools::Itertools;
 use rand::seq::SliceRandom;
@@ -43,6 +43,7 @@ mod node;
 mod segment;
 mod shortest_path;
 mod store;
+mod store_writer;
 mod writer;
 
 type SegmentID = String;
@@ -85,7 +86,7 @@ impl Meta {
 }
 
 pub struct Webgraph {
-    pub path: String,
+    path: String,
     segments: Vec<Segment>,
     executor: Arc<Executor>,
     id2node: Id2NodeDb,
@@ -133,8 +134,10 @@ impl Webgraph {
         }
     }
 
-    pub fn merge(&mut self, other: Webgraph) {
-        self.id2node.batch_put(other.id2node.iter());
+    pub fn merge(&mut self, other: Webgraph) -> io::Result<()> {
+        let other_folder = other.path.clone();
+        self.id2node.merge(other.id2node);
+        self.id2node.flush();
 
         for segment in other.segments {
             let id = segment.id();
@@ -147,8 +150,19 @@ impl Webgraph {
                 .push(Segment::open(new_path, id, self.compression));
         }
 
+        fs::remove_dir_all(other_folder)?;
+
         self.save_metadata();
-        self.id2node.flush();
+
+        Ok(())
+    }
+
+    pub fn optimize_read(&mut self) {
+        self.executor
+            .map(|s| s.optimize_read(), self.segments.iter_mut())
+            .unwrap();
+
+        self.id2node.optimize_read();
     }
 
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
@@ -408,7 +422,7 @@ pub mod tests {
         let mut graph = graphs.pop().unwrap();
 
         for other in graphs {
-            graph.merge(other);
+            graph.merge(other).unwrap();
         }
 
         assert_eq!(
@@ -437,7 +451,7 @@ pub mod tests {
         let mut graph = graphs.pop().unwrap();
 
         for other in graphs {
-            graph.merge(other);
+            graph.merge(other).unwrap();
         }
 
         assert_eq!(

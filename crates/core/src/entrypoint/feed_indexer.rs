@@ -28,9 +28,8 @@ use url::Url;
 
 use crate::{
     config::{FeedIndexingConfig, WarcSource},
-    entrypoint::download_all_warc_files,
     feed::{index::FeedIndex, Feed, FeedKind},
-    warc::PayloadType,
+    warc::{PayloadType, WarcFile},
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
@@ -57,11 +56,7 @@ impl IndexingWorker {
 
         let mut index = FeedIndex::open(Path::new(&job.base_path).join(&name)).unwrap();
 
-        let w = &[job.warc_path.clone()];
-        let warc_files = download_all_warc_files(w, &job.source_config);
-        tokio::pin!(warc_files);
-
-        for file in warc_files.by_ref() {
+        if let Ok(file) = WarcFile::download(&job.source_config, &job.warc_path) {
             for record in
                 file.records()
                     .flatten()
@@ -96,8 +91,8 @@ impl IndexingWorker {
             }
 
             index.commit().unwrap();
+            index.merge_into_max_segments(1).unwrap();
         }
-        index.merge_into_max_segments(1).unwrap();
 
         info!("{} done", name);
 

@@ -46,6 +46,7 @@ use utoipa_swagger_ui::SwaggerUi;
                 search::WidgetQuery,
                 search::SidebarQuery,
                 search::SpellcheckQuery,
+                search::ReturnBody,
                 crate::searcher::WebsitesResult,
                 crate::search_prettifier::HighlightedSpellCorrection,
                 crate::search_prettifier::DisplayedWebpage,

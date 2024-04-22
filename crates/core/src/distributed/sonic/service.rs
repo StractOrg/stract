@@ -139,7 +139,7 @@ macro_rules! sonic_service {
 
             #[derive(Debug, Clone, ::bincode::Decode)]
             pub enum Request {
-                $($req($req),)*
+                $($req(Box<$req>),)*
             }
             #[derive(Debug, Clone, ::bincode::Encode)]
             pub enum RequestRef<'a> {
@@ -147,7 +147,7 @@ macro_rules! sonic_service {
             }
             #[derive(::bincode::Encode, ::bincode::Decode)]
             pub enum Response {
-                $($req(<$req as sonic::service::Message<$service>>::Response),)*
+                $($req(Box<<$req as sonic::service::Message<$service>>::Response>),)*
             }
             $(
                 impl sonic::service::Wrapper<$service> for $req {
@@ -157,7 +157,7 @@ macro_rules! sonic_service {
                     fn unwrap_response(res: <$service as sonic::service::Service>::Response) -> Option<Self::Response> {
                         #[allow(irrefutable_let_patterns)]
                         if let Response::$req(value) = res {
-                            Some(value)
+                            Some(*value)
                         } else {
                             None
                         }
@@ -177,7 +177,7 @@ macro_rules! sonic_service {
                     async move {
                         match req {
                             $(
-                                Request::$req(value) => Response::$req(sonic::service::Message::handle(value, server).await),
+                                Request::$req(value) => Response::$req(Box::new(sonic::service::Message::handle(*value, server).await)),
                             )*
                         }
                     }

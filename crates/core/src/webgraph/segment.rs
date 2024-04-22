@@ -17,8 +17,7 @@
 use std::path::{Path, PathBuf};
 
 use super::{
-    store::{EdgeStore, EdgeStoreWriter},
-    Compression, Edge, InnerEdge, NodeID,
+    store::EdgeStore, store_writer::EdgeStoreWriter, Compression, Edge, InnerEdge, NodeID,
 };
 
 const ADJACENCY_STORE: &str = "adjacency";
@@ -34,12 +33,12 @@ pub struct SegmentWriter {
 impl SegmentWriter {
     pub fn open<P: AsRef<Path>>(folder_path: P, id: String, compression: Compression) -> Self {
         SegmentWriter {
-            adjacency: EdgeStoreWriter::open(
+            adjacency: EdgeStoreWriter::new(
                 folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
                 compression,
                 false,
             ),
-            reversed_adjacency: EdgeStoreWriter::open(
+            reversed_adjacency: EdgeStoreWriter::new(
                 folder_path
                     .as_ref()
                     .join(&id)
@@ -57,9 +56,7 @@ impl SegmentWriter {
         }
     }
 
-    pub fn finalize(mut self) -> Segment {
-        self.flush();
-
+    pub fn finalize(self) -> Segment {
         Segment {
             adjacency: self.adjacency.finalize(),
             reversed_adjacency: self.reversed_adjacency.finalize(),
@@ -68,14 +65,9 @@ impl SegmentWriter {
         }
     }
 
-    pub fn flush(&mut self) {
-        self.adjacency.flush();
-        self.reversed_adjacency.flush();
-    }
-
-    pub fn insert(&mut self, edges: &[InnerEdge<String>]) {
-        self.adjacency.put(edges.iter());
-        self.reversed_adjacency.put(edges.iter());
+    pub fn insert(&mut self, edge: InnerEdge<String>) {
+        self.adjacency.put(edge.clone());
+        self.reversed_adjacency.put(edge);
     }
 }
 
@@ -151,6 +143,11 @@ impl Segment {
     pub fn edges(&self) -> impl Iterator<Item = Edge<()>> + '_ + Send + Sync {
         self.adjacency.iter_without_label()
     }
+
+    pub fn optimize_read(&mut self) {
+        self.adjacency.optimize_read();
+        self.reversed_adjacency.optimize_read();
+    }
 }
 
 #[cfg(test)]
@@ -210,7 +207,9 @@ mod test {
             label: String::new(),
         });
 
-        writer.insert(&edges);
+        for edge in &edges {
+            writer.insert(edge.clone());
+        }
         let segment = writer.finalize();
 
         let mut out: Vec<_> = segment.outgoing_edges(&a.id);

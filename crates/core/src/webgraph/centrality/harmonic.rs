@@ -460,7 +460,8 @@ mod tests {
         other.insert(Node::from("A"), Node::from("B"), "7".to_string());
         other.commit();
 
-        let graph = other.finalize();
+        let mut graph = other.finalize();
+        graph.optimize_read();
 
         let centrality_extra = HarmonicCentrality::calculate(&graph);
 

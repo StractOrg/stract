@@ -371,6 +371,21 @@ impl<K, V> Db<K, V> {
 
         Ok(())
     }
+
+    pub fn merge(&mut self, other: Self) -> Result<()> {
+        let other_folder = other.folder().to_path_buf();
+        for segment in other.segments {
+            segment.move_to(self.folder())?;
+            self.segments.push(segment);
+        }
+
+        self.meta.segments = self.segments.iter().map(|s| s.uuid()).collect();
+        self.save_meta()?;
+
+        std::fs::remove_dir_all(other_folder)?;
+
+        Ok(())
+    }
 }
 
 impl<K, V> Db<K, V>
@@ -585,5 +600,38 @@ mod tests {
         db.commit().unwrap();
 
         assert_eq!(db.len(), 2);
+    }
+
+    #[test]
+    fn test_merge_db() {
+        let mut db1 = Db::open_or_create(gen_temp_path()).unwrap();
+        let mut db2 = Db::open_or_create(gen_temp_path()).unwrap();
+
+        db1.insert(1, 2).unwrap();
+        db1.insert(2, 3).unwrap();
+
+        db1.commit().unwrap();
+
+        db2.insert(3, 4).unwrap();
+        db2.insert(4, 5).unwrap();
+
+        db2.commit().unwrap();
+
+        db1.merge(db2).unwrap();
+
+        assert_eq!(db1.get(&1).unwrap(), Some(2));
+        assert_eq!(db1.get(&2).unwrap(), Some(3));
+        assert_eq!(db1.get(&3).unwrap(), Some(4));
+        assert_eq!(db1.get(&4).unwrap(), Some(5));
+
+        let path = db1.folder().to_path_buf();
+        drop(db1);
+
+        let db = Db::open_or_create(path).unwrap();
+
+        assert_eq!(db.get(&1).unwrap(), Some(2));
+        assert_eq!(db.get(&2).unwrap(), Some(3));
+        assert_eq!(db.get(&3).unwrap(), Some(4));
+        assert_eq!(db.get(&4).unwrap(), Some(5));
     }
 }

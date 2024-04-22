@@ -26,7 +26,7 @@
   ];
 </script>
 
-<div class="m-0 flex h-full flex-col justify-center p-0">
+<div class="noscript:hidden m-0 flex h-full flex-col justify-center p-0">
   <Select
     form="searchbar-form"
     id="optics-selector"

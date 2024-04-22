@@ -216,30 +216,6 @@ mod tests {
             .search(&SearchQuery {
                 query: "test".to_string(),
                 host_rankings: Some(HostRankings {
-                    liked: vec![],
-                    disliked: vec![],
-                    blocked: vec!["www.first.com".to_string()],
-                }),
-                optic: Some(Optic {
-                    rankings: vec![RankingCoeff {
-                        target: RankingTarget::Signal("inbound_similarity".to_string()),
-                        value: 100_000_000.0,
-                    }],
-                    ..Default::default()
-                }),
-                return_ranking_signals: true,
-                ..Default::default()
-            })
-            .expect("Search failed");
-
-        assert_eq!(result.webpages.len(), 2);
-        assert_eq!(result.webpages[0].url, "https://www.third.com/");
-        assert_eq!(result.webpages[1].url, "https://www.second.com/");
-
-        let result = searcher
-            .search(&SearchQuery {
-                query: "test".to_string(),
-                host_rankings: Some(HostRankings {
                     liked: vec!["first.com".to_string()],
                     disliked: vec![],
                     blocked: vec!["abc.first.com".to_string()],

@@ -1,0 +1,6 @@
+output_path = "data/canonical"
+
+[warc_source]
+folder = "./data"
+names = ["sample.warc.gz"]
+type = "Local"

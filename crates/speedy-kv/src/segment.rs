@@ -264,6 +264,37 @@ impl<K, V> Segment<K, V> {
     fn bloom_path(&self) -> PathBuf {
         self.folder.join(Self::bloom_file_name(self.uuid))
     }
+
+    pub fn move_to<P: AsRef<Path>>(&self, new_folder: P) -> Result<()> {
+        if !new_folder.as_ref().exists() {
+            std::fs::create_dir_all(&new_folder)?;
+        }
+
+        std::fs::rename(
+            self.blob_index.path(),
+            new_folder
+                .as_ref()
+                .join(self.blob_index.path().file_name().unwrap()),
+        )?;
+        std::fs::rename(
+            self.id_index.path(),
+            new_folder
+                .as_ref()
+                .join(self.id_index.path().file_name().unwrap()),
+        )?;
+        std::fs::rename(
+            self.store.path(),
+            new_folder
+                .as_ref()
+                .join(self.store.path().file_name().unwrap()),
+        )?;
+        std::fs::rename(
+            self.bloom_path(),
+            new_folder.as_ref().join(Self::bloom_file_name(self.uuid)),
+        )?;
+
+        Ok(())
+    }
 }
 
 struct Peekable<I>
