@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub const MAX_BATCH_SIZE: usize = 5_000_000;
+pub const MAX_BATCH_SIZE: usize = 3_000_000;
 
 use std::{
     collections::BTreeSet,

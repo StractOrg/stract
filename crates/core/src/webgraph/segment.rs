@@ -144,6 +144,11 @@ impl Segment {
     pub fn edges(&self) -> impl Iterator<Item = Edge<()>> + '_ + Send + Sync {
         self.adjacency.iter_without_label()
     }
+
+    pub fn optimize_read(&mut self) {
+        self.adjacency.optimize_read();
+        self.reversed_adjacency.optimize_read();
+    }
 }
 
 #[cfg(test)]

@@ -53,6 +53,10 @@ impl PrefixDb {
         Self { db }
     }
 
+    fn optimize_read(&mut self) {
+        self.db.merge_all_segments().unwrap();
+    }
+
     fn insert(&mut self, node: &FullNodeID) {
         let key = [
             node.prefix.as_u64().to_le_bytes(),
@@ -97,6 +101,11 @@ impl RangesDb {
         let labels = speedy_kv::Db::open_or_create(path.as_ref().join("labels")).unwrap();
 
         Self { nodes, labels }
+    }
+
+    pub fn optimize_read(&mut self) {
+        self.nodes.merge_all_segments().unwrap();
+        self.labels.merge_all_segments().unwrap();
     }
 }
 
@@ -152,6 +161,11 @@ impl EdgeStore {
             edge_nodes_len,
             compression,
         }
+    }
+
+    pub fn optimize_read(&mut self) {
+        self.ranges.optimize_read();
+        self.prefixes.optimize_read();
     }
 
     /// Insert a batch of edges into the store.
@@ -240,9 +254,10 @@ impl EdgeStore {
                         |e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id },
                     );
                     batch.dedup_by_key(|e| if reversed { e.from.id } else { e.to.id });
+                    let batch_len = batch.len();
                     s.put(&batch);
                     batch.clear();
-                    inserts_since_last_flush += 1;
+                    inserts_since_last_flush += batch_len;
 
                     if inserts_since_last_flush >= 1_000_000 {
                         s.flush();

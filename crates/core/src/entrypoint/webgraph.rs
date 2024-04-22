@@ -243,6 +243,9 @@ impl Webgraph {
             page_graph.merge(other_page)?;
         }
 
+        host_graph.optimize_read();
+        page_graph.optimize_read();
+
         Ok(())
     }
 }

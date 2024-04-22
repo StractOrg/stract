@@ -157,6 +157,14 @@ impl Webgraph {
         Ok(())
     }
 
+    pub fn optimize_read(&mut self) {
+        self.executor
+            .map(|s| s.optimize_read(), self.segments.iter_mut())
+            .unwrap();
+
+        self.id2node.optimize_read();
+    }
+
     pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
         let dedup = |edges: &mut Vec<Edge<String>>| {
             edges.sort_by_key(|e| e.from);
