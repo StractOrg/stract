@@ -206,6 +206,7 @@ impl tantivy::query::Query for Query {
 #[cfg(test)]
 mod tests {
     use crate::{index::Index, rand_words, searcher::LocalSearcher, webpage::Webpage};
+    use proptest::prelude::*;
 
     use super::*;
 
@@ -993,5 +994,27 @@ mod tests {
 
         let result = searcher.search(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
+    }
+
+    fn fixture(query: &str) -> Result<(), TestCaseError> {
+        if query.trim().is_empty() {
+            return Ok(());
+        }
+
+        let parsed_terms = parser::truncate(
+            parser::parse(query).map_err(|_| TestCaseError::fail("parse failed"))?,
+        );
+        let plan =
+            plan::initial(parsed_terms).ok_or(TestCaseError::fail("plan should not be empty"))?;
+        let _ = plan.into_query();
+
+        Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn test_query_parse_non_panic(query in ".*") {
+            fixture(&query)?;
+        }
     }
 }
