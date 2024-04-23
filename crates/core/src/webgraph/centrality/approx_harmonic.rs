@@ -69,7 +69,7 @@ impl ApproxHarmonic {
         for (node, centrality) in centralities {
             res.inner.insert(node, centrality as f64).unwrap();
 
-            if res.inner.uncommitted_inserts() >= 1_000_000 {
+            if res.inner.uncommitted_inserts() >= 10_000_000 {
                 res.inner.commit().unwrap();
             }
         }
