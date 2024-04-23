@@ -16,12 +16,11 @@
 
 use itertools::Itertools;
 use tantivy::tokenizer::Tokenizer as _;
+mod node;
 
-use crate::schema::{
-    self,
-    text_field::{self, TextField},
-    TextFieldEnum,
-};
+pub use node::Node;
+
+use crate::schema::{self, text_field::TextField, TextFieldEnum};
 
 use super::parser::{SimpleOrPhrase, SimpleTerm};
 
@@ -34,24 +33,6 @@ pub struct Term {
 impl Term {
     pub fn new(text: SimpleOrPhrase, field: TextFieldEnum) -> Self {
         Term { text, field }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Node {
-    Term(Term),
-    And(Box<Node>, Box<Node>),
-    Or(Box<Node>, Box<Node>),
-    Not(Box<Node>),
-}
-
-impl Node {
-    pub fn and<T: Into<Node>>(self, other: T) -> Node {
-        Node::And(Box::new(self), Box::new(other.into()))
-    }
-
-    pub fn or<T: Into<Node>>(self, other: T) -> Node {
-        Node::Or(Box::new(self), Box::new(other.into()))
     }
 }
 
@@ -223,96 +204,6 @@ fn process_tantivy_term<T: TextField>(
     terms
 }
 
-impl Node {
-    fn into_non_compacted_query(self) -> Query {
-        match self {
-            Node::Term(term) => Query::Term(term),
-            Node::And(left, right) => Query::Boolean {
-                clauses: vec![
-                    (Occur::Must, left.into_non_compacted_query()),
-                    (Occur::Must, right.into_non_compacted_query()),
-                ],
-            },
-            Node::Or(left, right) => Query::Boolean {
-                clauses: vec![
-                    (Occur::Should, left.into_non_compacted_query()),
-                    (Occur::Should, right.into_non_compacted_query()),
-                ],
-            },
-            Node::Not(inner) => Query::Boolean {
-                clauses: vec![(Occur::MustNot, inner.into_non_compacted_query())],
-            },
-        }
-    }
-
-    pub fn into_query(self) -> Query {
-        self.into_non_compacted_query().compact().deduplicate()
-    }
-
-    fn from_term(term: super::Term) -> Self {
-        match term {
-            super::Term::SimpleOrPhrase(s) => match s {
-                super::SimpleOrPhrase::Simple(term) => TextFieldEnum::all()
-                    .filter(|f| f.is_searchable())
-                    .map(|field| {
-                        Node::Term(Term {
-                            text: SimpleOrPhrase::Simple(term.clone()),
-                            field,
-                        })
-                    })
-                    .reduce(|left, right| left.or(right))
-                    .expect("fields should not be empty"),
-                super::SimpleOrPhrase::Phrase(p) => TextFieldEnum::all()
-                    .filter(|f| f.is_searchable())
-                    .filter(|f| f.is_phrase_searchable())
-                    .map(|field| {
-                        Node::Term(Term {
-                            text: SimpleOrPhrase::Phrase(p.clone()),
-                            field,
-                        })
-                    })
-                    .reduce(|left, right| left.or(right))
-                    .expect("fields should not be empty"),
-            },
-            super::Term::Site(s) => Node::Term(Term {
-                text: SimpleOrPhrase::Simple(super::parser::SimpleTerm::from(s)),
-                field: text_field::UrlForSiteOperator.into(),
-            }),
-            super::Term::Title(t) => Node::Term(Term {
-                text: t,
-                field: text_field::Title.into(),
-            }),
-            super::Term::Body(b) => Node::Term(Term {
-                text: b,
-                field: text_field::AllBody.into(),
-            }),
-            super::Term::Url(u) => Node::Term(Term {
-                text: u,
-                field: text_field::Url.into(),
-            }),
-            super::Term::PossibleBang { prefix, bang } => {
-                let mut s = String::new();
-                s.push(prefix);
-                s.push_str(bang.as_str());
-
-                let s = SimpleTerm::from(s);
-
-                TextFieldEnum::all()
-                    .filter(|f| f.is_searchable())
-                    .map(|field| {
-                        Node::Term(Term {
-                            text: SimpleOrPhrase::Simple(s.clone()),
-                            field,
-                        })
-                    })
-                    .reduce(|left, right| left.or(right))
-                    .expect("fields should not be empty")
-            }
-            super::Term::Not(n) => Node::Not(Box::new(Node::from_term(*n))),
-        }
-    }
-}
-
 fn sliding_window(window_size: usize, i: usize) -> impl Iterator<Item = (usize, usize)> {
     (0..=window_size)
         .map(move |offset| {
@@ -389,6 +280,8 @@ pub fn initial(terms: Vec<super::Term>) -> Option<Node> {
 
 #[cfg(test)]
 mod tests {
+    use crate::schema::text_field;
+
     use super::*;
 
     fn parse(query: &str, fields: &[TextFieldEnum]) -> Node {
