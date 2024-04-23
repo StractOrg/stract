@@ -134,10 +134,8 @@ pub trait TextField:
         IndexingOption::Text(opt)
     }
 
-    fn tantivy_field(&self, schema: &tantivy::schema::Schema) -> tantivy::schema::Field {
-        schema
-            .get_field(self.name())
-            .unwrap_or_else(|_| unreachable!("Unknown field: {}", self.name()))
+    fn tantivy_field(&self, schema: &tantivy::schema::Schema) -> Option<tantivy::schema::Field> {
+        schema.get_field(self.name()).ok()
     }
 }
 
@@ -312,7 +310,8 @@ impl TextField for Title {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             cache
                 .pretokenize_title()
                 .as_ref()
@@ -347,7 +346,8 @@ impl TextField for CleanBody {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             cache.pretokenize_clean_text().clone(),
         );
 
@@ -386,7 +386,8 @@ impl TextField for StemmedTitle {
         stem_tokens(&mut tokens, html.lang().copied().unwrap_or(Lang::Eng));
 
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             PreTokenizedString {
                 text: title.text.clone(),
                 tokens,
@@ -428,7 +429,8 @@ impl TextField for StemmedCleanBody {
         stem_tokens(&mut tokens, html.lang().copied().unwrap_or(Lang::Eng));
 
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             PreTokenizedString {
                 text: clean_text.text.clone(),
                 tokens,
@@ -467,7 +469,11 @@ impl TextField for AllBody {
             .cloned()
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-        doc.add_pre_tokenized_text(self.tantivy_field(schema), all_text.clone());
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            all_text.clone(),
+        );
 
         Ok(())
     }
@@ -504,7 +510,11 @@ impl TextField for Url {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         let url = cache.pretokenize_url();
-        doc.add_pre_tokenized_text(self.tantivy_field(schema), url.clone());
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            url.clone(),
+        );
 
         Ok(())
     }
@@ -535,7 +545,8 @@ impl TextField for UrlNoTokenizer {
         let url = html.url().to_string();
 
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             PreTokenizedString {
                 text: url.clone(),
                 tokens: vec![tantivy::tokenizer::Token {
@@ -575,7 +586,8 @@ impl TextField for UrlForSiteOperator {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             cache.pretokenize_url_for_site_operator().clone(),
         );
 
@@ -601,7 +613,11 @@ impl TextField for SiteWithout {
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
-        doc.add_pre_tokenized_text(self.tantivy_field(schema), cache.pretokenize_site().clone());
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            cache.pretokenize_site().clone(),
+        );
         Ok(())
     }
 }
@@ -625,7 +641,8 @@ impl TextField for Domain {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             cache.pretokenize_domain().clone(),
         );
 
@@ -658,7 +675,8 @@ impl TextField for SiteNoTokenizer {
         let site = cache.pretokenize_site();
 
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             PreTokenizedString {
                 text: site.text.clone(),
                 tokens: vec![tantivy::tokenizer::Token {
@@ -700,7 +718,8 @@ impl TextField for DomainNoTokenizer {
         let domain = cache.pretokenize_domain();
 
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             PreTokenizedString {
                 text: domain.text.clone(),
                 tokens: vec![tantivy::tokenizer::Token {
@@ -742,7 +761,8 @@ impl TextField for DomainNameNoTokenizer {
         let domain_name = cache.domain_name();
 
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             PreTokenizedString {
                 text: domain_name.clone(),
                 tokens: vec![tantivy::tokenizer::Token {
@@ -781,7 +801,8 @@ impl TextField for SiteIfHomepageNoTokenizer {
 
         if html.is_homepage() {
             doc.add_pre_tokenized_text(
-                self.tantivy_field(schema),
+                self.tantivy_field(schema)
+                    .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
                 PreTokenizedString {
                     text: site.text.clone(),
                     tokens: vec![tantivy::tokenizer::Token {
@@ -794,7 +815,11 @@ impl TextField for SiteIfHomepageNoTokenizer {
                 },
             );
         } else {
-            doc.add_text(self.tantivy_field(schema), "");
+            doc.add_text(
+                self.tantivy_field(schema)
+                    .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+                "",
+            );
         }
 
         Ok(())
@@ -817,9 +842,17 @@ impl TextField for DomainIfHomepage {
     ) -> Result<()> {
         let domain = cache.pretokenize_domain();
         if html.is_homepage() {
-            doc.add_text(self.tantivy_field(schema), domain.text.clone());
+            doc.add_text(
+                self.tantivy_field(schema)
+                    .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+                domain.text.clone(),
+            );
         } else {
-            doc.add_text(self.tantivy_field(schema), "");
+            doc.add_text(
+                self.tantivy_field(schema)
+                    .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+                "",
+            );
         }
 
         Ok(())
@@ -848,7 +881,8 @@ impl TextField for DomainNameIfHomepageNoTokenizer {
 
         if html.is_homepage() {
             doc.add_pre_tokenized_text(
-                self.tantivy_field(schema),
+                self.tantivy_field(schema)
+                    .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
                 PreTokenizedString {
                     text: domain_name.clone(),
                     tokens: vec![tantivy::tokenizer::Token {
@@ -861,7 +895,11 @@ impl TextField for DomainNameIfHomepageNoTokenizer {
                 },
             );
         } else {
-            doc.add_text(self.tantivy_field(schema), "");
+            doc.add_text(
+                self.tantivy_field(schema)
+                    .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+                "",
+            );
         }
 
         Ok(())
@@ -890,7 +928,8 @@ impl TextField for DomainIfHomepageNoTokenizer {
 
         if html.is_homepage() {
             doc.add_pre_tokenized_text(
-                self.tantivy_field(schema),
+                self.tantivy_field(schema)
+                    .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
                 PreTokenizedString {
                     text: domain.text.clone(),
                     tokens: vec![tantivy::tokenizer::Token {
@@ -903,7 +942,11 @@ impl TextField for DomainIfHomepageNoTokenizer {
                 },
             );
         } else {
-            doc.add_text(self.tantivy_field(schema), "");
+            doc.add_text(
+                self.tantivy_field(schema)
+                    .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+                "",
+            );
         }
 
         Ok(())
@@ -931,9 +974,17 @@ impl TextField for TitleIfHomepage {
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         if html.is_homepage() {
-            doc.add_pre_tokenized_text(self.tantivy_field(schema), title);
+            doc.add_pre_tokenized_text(
+                self.tantivy_field(schema)
+                    .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+                title,
+            );
         } else {
-            doc.add_text(self.tantivy_field(schema), "");
+            doc.add_text(
+                self.tantivy_field(schema)
+                    .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+                "",
+            );
         }
 
         Ok(())
@@ -964,7 +1015,8 @@ impl TextField for BacklinkText {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             webpage.backlink_labels.join("\n"),
         );
 
@@ -999,7 +1051,11 @@ impl TextField for Description {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         let description = cache.pretokenize_description();
-        doc.add_pre_tokenized_text(self.tantivy_field(schema), description.clone());
+        doc.add_pre_tokenized_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            description.clone(),
+        );
 
         Ok(())
     }
@@ -1037,7 +1093,8 @@ impl TextField for DmozDescription {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             webpage.dmoz_description().unwrap_or_default(),
         );
 
@@ -1067,7 +1124,11 @@ impl TextField for SchemaOrgJson {
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
-        doc.add_text(self.tantivy_field(schema), cache.schema_json());
+        doc.add_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            cache.schema_json(),
+        );
 
         Ok(())
     }
@@ -1096,7 +1157,8 @@ impl TextField for FlattenedSchemaOrgJson {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             cache.pretokenized_schema_json().clone(),
         );
 
@@ -1139,7 +1201,8 @@ impl TextField for CleanBodyBigrams {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             html.clean_text().cloned().unwrap_or_default(),
         );
 
@@ -1187,7 +1250,11 @@ impl TextField for TitleBigrams {
             .cloned()
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-        doc.add_text(self.tantivy_field(schema), title.text.clone());
+        doc.add_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            title.text.clone(),
+        );
 
         Ok(())
     }
@@ -1228,7 +1295,8 @@ impl TextField for CleanBodyTrigrams {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             html.clean_text().cloned().unwrap_or_default(),
         );
 
@@ -1276,7 +1344,11 @@ impl TextField for TitleTrigrams {
             .cloned()
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-        doc.add_text(self.tantivy_field(schema), title.text.clone());
+        doc.add_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            title.text.clone(),
+        );
 
         Ok(())
     }
@@ -1301,7 +1373,8 @@ impl TextField for MicroformatTags {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_pre_tokenized_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             cache.pretokenize_microformats().clone(),
         );
 
@@ -1341,7 +1414,11 @@ impl TextField for SafetyClassification {
             .map(|label| label.to_string())
             .unwrap_or_default();
 
-        doc.add_text(self.tantivy_field(schema), safety);
+        doc.add_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            safety,
+        );
 
         Ok(())
     }
@@ -1379,7 +1456,8 @@ impl TextField for InsertionTimestamp {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_date(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             tantivy::DateTime::from_utc(OffsetDateTime::from_unix_timestamp(
                 webpage.inserted_at.timestamp(),
             )?),
@@ -1412,7 +1490,8 @@ impl TextField for RecipeFirstIngredientTagId {
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_text(
-            self.tantivy_field(schema),
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             cache.first_ingredient_tag_id().cloned().unwrap_or_default(),
         );
 
@@ -1447,7 +1526,11 @@ impl TextField for Keywords {
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
-        doc.add_text(self.tantivy_field(schema), webpage.keywords.join("\n"));
+        doc.add_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            webpage.keywords.join("\n"),
+        );
 
         Ok(())
     }

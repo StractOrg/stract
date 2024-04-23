@@ -202,12 +202,13 @@ fn process_tantivy_term<T: TextField>(
     let mut terms: Vec<tantivy::Term> = Vec::new();
     let mut tokenizer = field.query_tokenizer();
     let mut token_stream = tokenizer.token_stream(term);
-    let tantivy_field = field.tantivy_field(schema);
 
-    token_stream.process(&mut |token| {
-        let term = tantivy::Term::from_field_text(tantivy_field, &token.text);
-        terms.push(term);
-    });
+    if let Some(tantivy_field) = field.tantivy_field(schema) {
+        token_stream.process(&mut |token| {
+            let term = tantivy::Term::from_field_text(tantivy_field, &token.text);
+            terms.push(term);
+        });
+    }
 
     terms
 }

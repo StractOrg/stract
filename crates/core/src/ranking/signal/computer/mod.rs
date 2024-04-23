@@ -204,8 +204,10 @@ impl SignalComputer {
         if let Some(query) = &self.query_data {
             if !query.simple_terms.is_empty() {
                 for signal in SignalEnum::all() {
-                    if let Some(text_field) = signal.as_textfield() {
-                        let tv_field = schema.get_field(text_field.name()).unwrap();
+                    if let Some((text_field, tv_field)) = signal
+                        .as_textfield()
+                        .and_then(|f| (f.tantivy_field(schema).map(|tv_field| (f, tv_field))))
+                    {
                         let simple_query = itertools::intersperse(
                             query.simple_terms.iter().map(|s| s.as_str()),
                             " ",
