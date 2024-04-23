@@ -213,7 +213,7 @@ impl SignalComputer {
                         .collect::<String>();
 
                         let mut terms = Vec::new();
-                        let mut tokenizer = text_field.query_tokenizer();
+                        let mut tokenizer = text_field.tokenizer();
                         let mut stream = tokenizer.token_stream(&simple_query);
 
                         while let Some(token) = stream.next() {

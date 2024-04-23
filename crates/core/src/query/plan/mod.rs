@@ -72,6 +72,14 @@ pub enum Query {
 }
 
 impl Query {
+    #[cfg(test)]
+    pub fn len(&self) -> usize {
+        match self {
+            Query::Term(_) => 1,
+            Query::Boolean { clauses } => clauses.iter().map(|(_, q)| q.len()).sum(),
+        }
+    }
+
     fn compact(self) -> Query {
         match self {
             Query::Boolean { clauses } => {

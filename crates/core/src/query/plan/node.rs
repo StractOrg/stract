@@ -14,18 +14,53 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
+use ahash::HashSetExt;
+
 use crate::query::parser::{SimpleOrPhrase, Term as ParserTerm};
 use crate::schema::text_field::{self, TextField as _};
 use crate::{query::parser::SimpleTerm, schema::TextFieldEnum};
 
+type HashSet<T> = std::collections::HashSet<T, ahash::RandomState>;
+
 use super::{Occur, Term};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum Node {
     Term(Term),
     And(Box<Node>, Box<Node>),
     Or(Box<Node>, Box<Node>),
     Not(Box<Node>),
+}
+
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Node::Term(a), Node::Term(b)) => a == b,
+            (Node::And(a, b), Node::And(c, d)) => (a == c && b == d) || (a == d && b == c),
+            (Node::Or(a, b), Node::Or(c, d)) => (a == c && b == d) || (a == d && b == c),
+            (Node::Not(a), Node::Not(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Node {}
+
+impl std::hash::Hash for Node {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Node::Term(term) => term.hash(state),
+            Node::And(left, right) => {
+                left.hash(state);
+                right.hash(state);
+            }
+            Node::Or(left, right) => {
+                left.hash(state);
+                right.hash(state);
+            }
+            Node::Not(inner) => inner.hash(state),
+        }
+    }
 }
 
 impl Node {
@@ -130,8 +165,50 @@ impl Node {
         }
     }
 
+    fn or_children(self) -> HashSet<Node> {
+        match self {
+            Node::Or(left, right) => {
+                let mut left = left.or_children();
+                let right = right.or_children();
+
+                left.extend(right);
+                left
+            }
+            _ => {
+                let mut set = HashSet::new();
+                set.insert(self);
+                set
+            }
+        }
+    }
+
+    fn prune(self, node: &Self) -> Option<Self> {
+        if &self == node {
+            None
+        } else {
+            match self {
+                Node::Term(t) => Some(Node::Term(t)),
+                Node::And(a, b) => match (a.prune(node), b.prune(node)) {
+                    (Some(a), Some(b)) => Some(Node::And(Box::new(a), Box::new(b))),
+                    (Some(a), None) => Some(a),
+                    (None, Some(b)) => Some(b),
+                    (None, None) => None,
+                },
+                Node::Or(a, b) => match (a.prune(node), b.prune(node)) {
+                    (Some(a), Some(b)) => Some(Node::Or(Box::new(a), Box::new(b))),
+                    (Some(a), None) => Some(a),
+                    (None, Some(b)) => Some(b),
+                    (None, None) => None,
+                },
+                Node::Not(t) => Some(Node::Not(Box::new(t.prune(node)?))),
+            }
+        }
+    }
+
     pub fn optimise(self) -> Self {
-        DistributiveLaw.optimise(self)
+        let mut node = self;
+        node = Deduplicate.optimise(node);
+        DistributiveLaw.optimise(node)
     }
 }
 
@@ -158,20 +235,77 @@ impl Optimisation for DistributiveLaw {
 
                 match (left, right) {
                     (Node::Or(left_left, left_right), Node::Or(right_left, right_right)) => {
-                        if left_left == right_left {
-                            left_left.and(left_right.or(*right_right))
-                        } else if left_left == right_right {
-                            left_left.and(left_right.or(*right_left))
-                        } else if left_right == right_left {
-                            left_right.and(left_left.or(*right_right))
-                        } else if left_right == right_right {
-                            left_right.and(left_left.or(*right_left))
+                        let left_children =
+                            Node::Or(left_left.clone(), left_right.clone()).or_children();
+                        let right_children =
+                            Node::Or(right_left.clone(), right_right.clone()).or_children();
+
+                        let common: Vec<_> = left_children
+                            .intersection(&right_children)
+                            .cloned()
+                            .collect();
+
+                        if common.is_empty() {
+                            Node::And(
+                                Box::new(Node::Or(left_left, left_right)),
+                                Box::new(Node::Or(right_left, right_right)),
+                            )
                         } else {
-                            (left_left.or(*left_right)).and(right_left.or(*right_right))
+                            let backup = Node::Or(left_left.clone(), left_right.clone());
+
+                            let mut res = Node::And(
+                                Box::new(Node::Or(left_left, left_right)),
+                                Box::new(Node::Or(right_left, right_right)),
+                            );
+
+                            for c in &common {
+                                match res.prune(c) {
+                                    Some(new) => res = new,
+                                    None => return backup,
+                                }
+                            }
+
+                            let common = common
+                                .into_iter()
+                                .reduce(|left, right| left.or(right))
+                                .unwrap();
+
+                            res.or(common)
                         }
                     }
 
                     (left, right) => Node::And(Box::new(left), Box::new(right)),
+                }
+            }
+        }
+    }
+}
+
+struct Deduplicate;
+
+impl Optimisation for Deduplicate {
+    fn optimise(&self, node: Node) -> Node {
+        match node {
+            Node::Term(term) => Node::Term(term),
+            Node::Not(inner) => Node::Not(Box::new(self.optimise(*inner))),
+            Node::Or(left, right) => {
+                let left = self.optimise(*left);
+                let right = self.optimise(*right);
+
+                if left == right {
+                    left
+                } else {
+                    Node::Or(Box::new(left), Box::new(right))
+                }
+            }
+            Node::And(left, right) => {
+                let left = self.optimise(*left);
+                let right = self.optimise(*right);
+
+                if left == right {
+                    left
+                } else {
+                    Node::And(Box::new(left), Box::new(right))
                 }
             }
         }
@@ -183,7 +317,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_distributive_law() {
+    fn test_optimisation() {
         let a = Node::Term(Term {
             text: SimpleOrPhrase::Simple(SimpleTerm::from("a".to_string())),
             field: text_field::Title.into(),
@@ -204,19 +338,45 @@ mod tests {
             field: text_field::Title.into(),
         });
 
+        let e = Node::Term(Term {
+            text: SimpleOrPhrase::Simple(SimpleTerm::from("e".to_string())),
+            field: text_field::Title.into(),
+        });
+
+        let f = Node::Term(Term {
+            text: SimpleOrPhrase::Simple(SimpleTerm::from("f".to_string())),
+            field: text_field::Title.into(),
+        });
+
         let query = a.clone().or(b.clone()).and(a.clone().or(c.clone()));
 
-        let optimised = DistributiveLaw.optimise(query);
+        let optimised = query.optimise();
 
-        assert_eq!(optimised, a.clone().and(b.clone().or(c.clone())));
+        assert_eq!(optimised, a.clone().or(b.clone().and(c.clone())));
 
         let query = a.clone().or(b.clone()).and(c.clone().or(d.clone()));
 
-        let optimised = DistributiveLaw.optimise(query);
+        let optimised = query.optimise();
 
         assert_eq!(
             optimised,
             a.clone().or(b.clone()).and(c.clone().or(d.clone()))
         );
+
+        let query = (a.clone().or(b.clone()).or(c.clone()).or(d.clone()))
+            .and(e.clone().or(f.clone()).or(c.clone()).or(d.clone()));
+        let optimised = query.optimise();
+
+        assert_eq!(
+            optimised,
+            ((a.clone().or(b.clone())).and(e.clone().or(f.clone()))).or(c.clone().or(d.clone()))
+        );
+
+        let query = (a.clone().or(a.clone()).or(a.clone()).or(a.clone()))
+            .and(a.clone().or(a.clone()).or(a.clone()).or(a.clone()));
+
+        let optimised = query.optimise();
+
+        assert_eq!(optimised, a.clone());
     }
 }

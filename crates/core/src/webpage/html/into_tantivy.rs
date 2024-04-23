@@ -108,7 +108,7 @@ impl Html {
     }
 
     fn pretokenize_string(&self, text: String, field: TextFieldEnum) -> PreTokenizedString {
-        self.pretokenize_string_with(text, field.indexing_tokenizer())
+        self.pretokenize_string_with(text, field.tokenizer())
     }
 
     fn pretokenize_string_with(

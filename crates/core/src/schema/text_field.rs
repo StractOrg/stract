@@ -60,12 +60,12 @@ pub trait TextField:
         Ok(())
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::default()
     }
 
     fn query_tokenizer(&self) -> Tokenizer {
-        self.indexing_tokenizer()
+        self.tokenizer()
     }
 
     fn ngram_size(&self) -> usize {
@@ -118,7 +118,7 @@ pub trait TextField:
     }
 
     fn indexing_option(&self) -> IndexingOption {
-        let tokenizer = self.indexing_tokenizer();
+        let tokenizer = self.tokenizer();
         let option = self.record_option();
 
         let mut opt = TextOptions::default().set_indexing_options(
@@ -362,7 +362,7 @@ impl TextField for StemmedTitle {
         "stemmed_title"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::new_stemmed()
     }
 
@@ -404,7 +404,7 @@ impl TextField for StemmedCleanBody {
         "stemmed_body"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::new_stemmed()
     }
 
@@ -517,7 +517,7 @@ impl TextField for UrlNoTokenizer {
         "url_no_tokenizer"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -563,7 +563,7 @@ impl TextField for UrlForSiteOperator {
         true
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::SiteOperator(SiteOperatorUrlTokenizer)
     }
 
@@ -640,7 +640,7 @@ impl TextField for SiteNoTokenizer {
         "site_no_tokenizer"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -682,7 +682,7 @@ impl TextField for DomainNoTokenizer {
         "domain_no_tokenizer"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -724,7 +724,7 @@ impl TextField for DomainNameNoTokenizer {
         "domain_name_no_tokenizer"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -766,7 +766,7 @@ impl TextField for SiteIfHomepageNoTokenizer {
         "site_if_homepage_no_tokenizer"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -833,7 +833,7 @@ impl TextField for DomainNameIfHomepageNoTokenizer {
         "domain_name_if_homepage_no_tokenizer"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -875,7 +875,7 @@ impl TextField for DomainIfHomepageNoTokenizer {
         "domain_if_homepage_no_tokenizer"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -1052,7 +1052,7 @@ impl TextField for SchemaOrgJson {
         "schema_org_json"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -1084,7 +1084,7 @@ impl TextField for FlattenedSchemaOrgJson {
         true
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Json(JsonField)
     }
 
@@ -1119,7 +1119,7 @@ impl TextField for CleanBodyBigrams {
         CleanBody.into()
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Bigram(BigramTokenizer::default())
     }
 
@@ -1162,7 +1162,7 @@ impl TextField for TitleBigrams {
         Title.into()
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Bigram(BigramTokenizer::default())
     }
 
@@ -1208,7 +1208,7 @@ impl TextField for CleanBodyTrigrams {
         CleanBody.into()
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Trigram(TrigramTokenizer::default())
     }
 
@@ -1251,7 +1251,7 @@ impl TextField for TitleTrigrams {
         Title.into()
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Trigram(TrigramTokenizer::default())
     }
 
@@ -1316,7 +1316,7 @@ impl TextField for SafetyClassification {
         "safety_classification"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -1354,7 +1354,7 @@ impl TextField for InsertionTimestamp {
         "insertion_timestamp"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -1396,7 +1396,7 @@ impl TextField for RecipeFirstIngredientTagId {
         "recipe_first_ingredient_tag_id"
     }
 
-    fn indexing_tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
