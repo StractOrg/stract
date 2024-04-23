@@ -182,26 +182,15 @@ impl Node {
         }
     }
 
-    fn prune(self, node: &Self) -> Option<Self> {
-        if &self == node {
-            None
-        } else {
-            match self {
-                Node::Term(t) => Some(Node::Term(t)),
-                Node::And(a, b) => match (a.prune(node), b.prune(node)) {
-                    (Some(a), Some(b)) => Some(Node::And(Box::new(a), Box::new(b))),
-                    (Some(a), None) => Some(a),
-                    (None, Some(b)) => Some(b),
-                    (None, None) => None,
-                },
-                Node::Or(a, b) => match (a.prune(node), b.prune(node)) {
-                    (Some(a), Some(b)) => Some(Node::Or(Box::new(a), Box::new(b))),
-                    (Some(a), None) => Some(a),
-                    (None, Some(b)) => Some(b),
-                    (None, None) => None,
-                },
-                Node::Not(t) => Some(Node::Not(Box::new(t.prune(node)?))),
-            }
+    fn prune_direct_or_child(self, child: &Self) -> Self {
+        match self {
+            Node::Or(a, b) if *a == *child => *b,
+            Node::Or(a, b) if *b == *child => *a,
+            Node::Or(a, b) => Node::Or(
+                Box::new(a.prune_direct_or_child(child)),
+                Box::new(b.prune_direct_or_child(child)),
+            ),
+            t => t,
         }
     }
 
@@ -251,19 +240,15 @@ impl Optimisation for DistributiveLaw {
                                 Box::new(Node::Or(right_left, right_right)),
                             )
                         } else {
-                            let backup = Node::Or(left_left.clone(), left_right.clone());
-
-                            let mut res = Node::And(
-                                Box::new(Node::Or(left_left, left_right)),
-                                Box::new(Node::Or(right_left, right_right)),
-                            );
+                            let mut left = Node::Or(left_left, left_right);
+                            let mut right = Node::Or(right_left, right_right);
 
                             for c in &common {
-                                match res.prune(c) {
-                                    Some(new) => res = new,
-                                    None => return backup,
-                                }
+                                left = left.prune_direct_or_child(c);
+                                right = right.prune_direct_or_child(c);
                             }
+
+                            let res = Node::And(Box::new(left), Box::new(right));
 
                             let common = common
                                 .into_iter()
@@ -378,5 +363,14 @@ mod tests {
         let optimised = query.optimise();
 
         assert_eq!(optimised, a.clone());
+
+        let query = (a.clone().or(b.clone())).and(a.clone().or(c.clone().and(a.clone())));
+
+        let optimised = query.optimise();
+
+        assert_eq!(
+            optimised,
+            a.clone().or(b.clone().and(c.clone().and(a.clone())))
+        );
     }
 }
