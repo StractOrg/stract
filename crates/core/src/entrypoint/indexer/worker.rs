@@ -15,28 +15,35 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use chrono::Utc;
+use itertools::Itertools;
 use std::path::Path;
+use std::sync::Arc;
 use url::Url;
 
 use tracing::debug;
 
 pub use super::indexable_webpage::IndexableWebpage;
 pub use super::job::{Job, JobSettings};
-use crate::config::{IndexingDualEncoderConfig, IndexingLocalConfig, LiveIndexConfig};
+use crate::config::{
+    IndexingDualEncoderConfig, IndexingGraphConfig, IndexingLocalConfig, LiveIndexConfig,
+    WebgraphGranularity,
+};
+use crate::distributed::cluster::Cluster;
 use crate::models::dual_encoder::DualEncoder as DualEncoderModel;
+use crate::webgraph::remote::RemoteWebgraph;
 use crate::Result;
 
 use crate::human_website_annotations;
 use crate::index::Index;
 use crate::rake::RakeModel;
 use crate::ranking::SignalComputer;
-use crate::webgraph::{Node, NodeID, Webgraph, WebgraphBuilder};
+use crate::webgraph::{self, Edge, Node, NodeID};
 use crate::webpage::{safety_classifier, Html, Webpage};
 
 pub struct Config {
     pub host_centrality_store_path: String,
     pub page_centrality_store_path: Option<String>,
-    pub page_webgraph_path: Option<String>,
+    pub page_webgraph: Option<IndexingGraphConfig>,
     pub topics_path: Option<String>,
     pub safety_classifier_path: Option<String>,
     pub dual_encoder: Option<IndexingDualEncoderConfig>,
@@ -47,7 +54,7 @@ impl From<IndexingLocalConfig> for Config {
         Self {
             host_centrality_store_path: config.host_centrality_store_path,
             page_centrality_store_path: config.page_centrality_store_path,
-            page_webgraph_path: config.page_webgraph_path,
+            page_webgraph: config.page_webgraph,
             topics_path: config.topics_path,
             safety_classifier_path: config.safety_classifier_path,
             dual_encoder: config.dual_encoder,
@@ -60,7 +67,7 @@ impl From<LiveIndexConfig> for Config {
         Self {
             host_centrality_store_path: config.host_centrality_store_path,
             page_centrality_store_path: config.page_centrality_store_path,
-            page_webgraph_path: config.page_webgraph_path,
+            page_webgraph: config.page_webgraph,
             topics_path: None,
             safety_classifier_path: config.safety_classifier_path,
             dual_encoder: None,
@@ -71,6 +78,90 @@ impl From<LiveIndexConfig> for Config {
 struct DualEncoder {
     model: DualEncoderModel,
     page_centrality_rank_threshold: Option<u64>,
+}
+
+pub(super) enum Webgraph {
+    Remote(RemoteWebgraph),
+    Local(webgraph::Webgraph),
+}
+
+impl Webgraph {
+    fn batch_raw_ingoing_edges_with_labels(&self, id: Vec<NodeID>) -> Vec<Vec<String>> {
+        let edges = match self {
+            Self::Remote(webgraph) => {
+                let mut res = Vec::new();
+
+                for id in id {
+                    // todo!("use batch requests");
+                    res.push(
+                        crate::block_on(webgraph.raw_ingoing_edges_with_labels(id))
+                            .unwrap_or_default(),
+                    );
+                }
+
+                res
+            }
+            Self::Local(webgraph) => {
+                let mut res = Vec::new();
+
+                for id in id {
+                    res.push(webgraph.raw_ingoing_edges_with_labels(&id));
+                }
+
+                res
+            }
+        };
+
+        edges
+            .into_iter()
+            .map(|edges| {
+                edges
+                    .into_iter()
+                    .map(|edge| edge.label)
+                    .filter(|label| !label.is_empty())
+                    .filter(|label| {
+                        let label = label.to_lowercase();
+                        let stopwords = [
+                            "click",
+                            "click here",
+                            "here",
+                            "link",
+                            "website",
+                            "webpage",
+                            "page",
+                            "site",
+                            "url",
+                            "web",
+                            "visit",
+                            "more",
+                            "info",
+                            "information",
+                            "read",
+                            "read more",
+                        ];
+
+                        !stopwords.contains(&label.as_str())
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+}
+
+impl Webgraph {
+    fn new(config: &IndexingGraphConfig) -> Self {
+        match config {
+            IndexingGraphConfig::Local { path } => Self::Local(
+                webgraph::WebgraphBuilder::new(path)
+                    .single_threaded()
+                    .open(),
+            ),
+            IndexingGraphConfig::Remote { gossip } => {
+                let cluster = crate::start_gossip_cluster_thread(gossip.clone(), None);
+                Self::Remote(RemoteWebgraph::new(cluster, WebgraphGranularity::Page))
+            }
+        }
+    }
 }
 
 pub struct IndexingWorker {
@@ -108,10 +199,7 @@ impl IndexingWorker {
             page_centrality_rank_store: config.page_centrality_store_path.as_ref().map(|p| {
                 speedy_kv::Db::open_or_create(Path::new(&p).join("approx_harmonic_rank")).unwrap()
             }),
-            page_webgraph: config
-                .page_webgraph_path
-                .as_ref()
-                .map(|path| WebgraphBuilder::new(path).single_threaded().open()),
+            page_webgraph: config.page_webgraph.as_ref().map(|c| Webgraph::new(c)),
             topics: config
                 .topics_path
                 .as_ref()
@@ -233,43 +321,6 @@ impl IndexingWorker {
         Ok(())
     }
 
-    fn backlink_labels(&self, page: &Url) -> Vec<String> {
-        self.page_webgraph
-            .as_ref()
-            .map(|webgraph| {
-                webgraph
-                    .raw_ingoing_edges_with_labels(&Node::from(page).id())
-                    .into_iter()
-                    .map(|edge| edge.label)
-                    .filter(|label| !label.is_empty())
-                    .filter(|label| {
-                        let label = label.to_lowercase();
-                        let stopwords = [
-                            "click",
-                            "click here",
-                            "here",
-                            "link",
-                            "website",
-                            "webpage",
-                            "page",
-                            "site",
-                            "url",
-                            "web",
-                            "visit",
-                            "more",
-                            "info",
-                            "information",
-                            "read",
-                            "read more",
-                        ];
-
-                        !stopwords.contains(&label.as_str())
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
     fn set_page_centralities(&self, page: &mut Webpage) {
         let node = Node::from(page.html.url());
 
@@ -342,6 +393,21 @@ impl IndexingWorker {
         }
     }
 
+    pub fn set_backlink_labels(&self, pages: &mut [Webpage]) {
+        if let Some(graph) = self.page_webgraph() {
+            let ids = pages
+                .iter()
+                .map(|w| Node::from(w.html.url()).id())
+                .collect::<Vec<_>>();
+
+            let backlinks = graph.batch_raw_ingoing_edges_with_labels(ids);
+
+            for (page, backlink) in pages.iter_mut().zip_eq(backlinks) {
+                page.backlink_labels = backlink;
+            }
+        }
+    }
+
     pub fn set_keyword_embeddings(&self, pages: &mut [Webpage]) {
         if let Some(dual_encoder) = self.dual_encoder.as_ref() {
             let (page_indexes, keywords): (Vec<_>, Vec<_>) = pages
@@ -389,8 +455,6 @@ impl IndexingWorker {
                 continue;
             }
 
-            prepared.backlink_labels = self.backlink_labels(prepared.html.url());
-
             self.set_page_centralities(&mut prepared);
             self.set_dmoz_description(&mut prepared);
             self.set_keywords(&mut prepared);
@@ -423,6 +487,7 @@ impl IndexingWorker {
 
         self.set_title_embeddings(&mut res);
         self.set_keyword_embeddings(&mut res);
+        self.set_backlink_labels(&mut res);
 
         res
     }
@@ -438,7 +503,7 @@ mod tests {
         IndexingWorker::new(IndexingLocalConfig {
             host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
             page_centrality_store_path: None,
-            page_webgraph_path: None,
+            page_webgraph: None,
             topics_path: None,
             safety_classifier_path: None,
             dual_encoder: Some(IndexingDualEncoderConfig {

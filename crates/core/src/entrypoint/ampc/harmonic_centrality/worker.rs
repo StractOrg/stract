@@ -18,7 +18,7 @@ use bloom::U64BloomFilter;
 
 use crate::{
     ampc::prelude::*,
-    config::HarmonicWorkerConfig,
+    config::{GossipConfig, HarmonicWorkerConfig},
     distributed::{
         cluster::Cluster,
         member::{Member, Service, ShardId},
@@ -151,42 +151,16 @@ impl RemoteWorker for RemoteCentralityWorker {
     }
 }
 
-fn start_gossip_cluster_thread(config: HarmonicWorkerConfig) {
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-        rt.block_on(async {
-            let _cluster = Cluster::join(
-                Member {
-                    id: config.gossip.cluster_id,
-                    service: Service::HarmonicWorker {
-                        host: config.host,
-                        shard: config.shard,
-                    },
-                },
-                config.gossip.addr,
-                config.gossip.seed_nodes.unwrap_or_default(),
-            )
-            .await;
-
-            // need to keep tokio runtime alive
-            // otherwise the spawned task in Cluster::join will be dropped
-            loop {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            }
-        });
-    });
-}
-
 pub fn run(config: HarmonicWorkerConfig) -> Result<()> {
     let tokio_conf = config.clone();
 
     let graph = Webgraph::builder(config.graph_path).open();
     let worker = CentralityWorker::new(config.shard, graph);
-    start_gossip_cluster_thread(tokio_conf);
+    let service = Service::HarmonicWorker {
+        host: tokio_conf.host,
+        shard: tokio_conf.shard,
+    };
+    crate::start_gossip_cluster_thread(tokio_conf.gossip, Some(service));
 
     worker.run(config.host)?;
 

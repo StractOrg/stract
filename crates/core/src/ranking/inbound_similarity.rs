@@ -205,10 +205,6 @@ impl VecMap {
     fn get(&self, id: &NodeID) -> Option<&bitvec_similarity::BitVec> {
         self.map.get(id)
     }
-
-    fn contains(&self, id: &NodeID) -> bool {
-        self.map.contains_key(id)
-    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default)]

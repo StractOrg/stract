@@ -14,12 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::block_on;
 use std::{collections::BTreeMap, net::SocketAddr, pin::Pin};
 
-use super::{
-    block_on,
-    dht::{self, upsert::UpsertEnum, UpsertAction},
-};
+use super::dht::{self, upsert::UpsertEnum, UpsertAction};
 
 use crate::Result;
 
@@ -51,11 +49,11 @@ macro_rules! impl_dht_tables {
 
             fn cleanup_prev_tables(&self) {
                 $(
-                    let tables = $crate::ampc::block_on(self.$field.client().all_tables()).unwrap();
+                    let tables = $crate::block_on(self.$field.client().all_tables()).unwrap();
 
                     for table in tables {
                         if table.as_str().starts_with(&self.$field.table().prefix()) {
-                            $crate::ampc::block_on(self.$field.client().drop_table(table)).unwrap();
+                            $crate::block_on(self.$field.client().drop_table(table)).unwrap();
                         }
                     }
                 )*

@@ -31,7 +31,7 @@ pub struct IndexingLocalConfig {
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,
     pub warc_source: WarcSource,
-    pub page_webgraph_path: Option<String>,
+    pub page_webgraph: Option<IndexingGraphConfig>,
     pub host_centrality_threshold: Option<f64>,
     pub topics_path: Option<String>,
     pub host_centrality_store_path: String,
@@ -43,6 +43,13 @@ pub struct IndexingLocalConfig {
     pub batch_size: usize,
 
     pub dual_encoder: Option<IndexingDualEncoderConfig>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum IndexingGraphConfig {
+    Local { path: String },
+    Remote { gossip: GossipConfig },
 }
 
 #[derive(Debug, serde::Deserialize, Clone)]
@@ -451,7 +458,7 @@ pub struct LiveIndexConfig {
 
     // indexer
     pub host_centrality_store_path: String,
-    pub page_webgraph_path: Option<String>,
+    pub page_webgraph: Option<IndexingGraphConfig>,
     pub page_centrality_store_path: Option<String>,
     pub safety_classifier_path: Option<String>,
     pub host_centrality_threshold: Option<f64>,

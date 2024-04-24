@@ -28,7 +28,12 @@
 // #![allow(clippy::module_name_repetitions)] // maybe we should remove this later
 // #![allow(clippy::missing_errors_doc)]
 
-use std::path::PathBuf;
+use config::GossipConfig;
+use distributed::{
+    cluster::Cluster,
+    member::{Member, Service},
+};
+use std::{path::PathBuf, sync::Arc};
 use thiserror::Error;
 
 pub mod entrypoint;
@@ -86,6 +91,18 @@ pub mod web_spell;
 pub mod webgraph;
 pub mod webpage;
 mod widgets;
+
+static TOKIO_RUNTIME: once_cell::sync::Lazy<tokio::runtime::Runtime> =
+    once_cell::sync::Lazy::new(|| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    });
+
+pub fn block_on<F: std::future::Future>(f: F) -> F::Output {
+    TOKIO_RUNTIME.block_on(f)
+}
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -147,6 +164,52 @@ pub fn gen_temp_path() -> PathBuf {
     } else {
         std::env::temp_dir().join(format!("pagecache.tmp.{salt}"))
     }
+}
+
+/// Starts a gossip cluster in the background and returns a handle to it.
+/// This is useful for blocking contexts where there is no runtime to spawn the cluster on.
+pub fn start_gossip_cluster_thread(config: GossipConfig, service: Option<Service>) -> Arc<Cluster> {
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            let cluster = match service {
+                Some(service) => Cluster::join(
+                    Member {
+                        id: config.cluster_id,
+                        service,
+                    },
+                    config.addr,
+                    config.seed_nodes.unwrap_or_default(),
+                )
+                .await
+                .unwrap(),
+                None => Cluster::join_as_spectator(
+                    config.cluster_id,
+                    config.addr,
+                    config.seed_nodes.unwrap_or_default(),
+                )
+                .await
+                .unwrap(),
+            };
+
+            let cluster = Arc::new(cluster);
+            tx.send(cluster.clone()).unwrap();
+
+            // need to keep tokio runtime alive
+            // otherwise the spawned task in Cluster::join will be dropped
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            }
+        });
+    });
+
+    rx.recv().unwrap()
 }
 
 #[cfg(test)]

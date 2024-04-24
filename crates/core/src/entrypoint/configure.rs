@@ -20,7 +20,8 @@ use tokio_stream::StreamExt;
 use tracing::{debug, info};
 
 use crate::config::{
-    defaults, IndexingDualEncoderConfig, IndexingLocalConfig, LocalConfig, WebSpellConfig,
+    defaults, IndexingDualEncoderConfig, IndexingGraphConfig, IndexingLocalConfig, LocalConfig,
+    WebSpellConfig,
 };
 use crate::entrypoint::indexer::JobSettings;
 use crate::entrypoint::{dmoz_parser, indexer};
@@ -189,7 +190,9 @@ fn create_inverted_index() -> Result<()> {
     let worker = indexer::IndexingWorker::new(IndexingLocalConfig {
         host_centrality_store_path: centrality_path.to_str().unwrap().to_string(),
         page_centrality_store_path: Some(page_centrality_path.to_str().unwrap().to_string()),
-        page_webgraph_path: Some(webgraph_path.to_str().unwrap().to_string()),
+        page_webgraph: Some(IndexingGraphConfig::Local {
+            path: webgraph_path.to_str().unwrap().to_string(),
+        }),
         topics_path: Some(
             Path::new(DATA_PATH)
                 .join("human_annotations")

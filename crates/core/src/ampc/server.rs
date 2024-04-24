@@ -21,7 +21,8 @@ use tokio::net::ToSocketAddrs;
 use crate::distributed::sonic;
 use crate::Result;
 
-use super::{block_on, CoordReq, CoordResp, JobDht, JobReq, JobResp, Mapper, Req, Resp, Worker};
+use super::{CoordReq, CoordResp, JobDht, JobReq, JobResp, Mapper, Req, Resp, Worker};
+use crate::block_on;
 
 pub struct Server<W>
 where

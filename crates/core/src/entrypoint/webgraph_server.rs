@@ -17,13 +17,10 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use itertools::Itertools;
 use tracing::info;
-use url::Url;
 use utoipa::ToSchema;
 
 use crate::config;
-use crate::config::WebgraphGranularity;
 use crate::distributed::cluster::Cluster;
 use crate::distributed::member::Member;
 use crate::distributed::member::Service;

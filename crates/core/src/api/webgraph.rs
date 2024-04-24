@@ -111,7 +111,7 @@ pub mod host {
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<KnowsHostParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        match state.remote_webgraph_host.knows(params.host).await {
+        match state.host_webgraph.knows(params.host).await {
             Ok(Some(node)) => Ok(Json(KnowsHost::Known {
                 host: node.as_str().to_string(),
             })),
@@ -232,8 +232,8 @@ async fn ingoing_links(
     level: WebgraphGranularity,
 ) -> anyhow::Result<Vec<FullEdge>> {
     let graph = match level {
-        WebgraphGranularity::Host => &state.remote_webgraph_host,
-        WebgraphGranularity::Page => &state.remote_webgraph_page,
+        WebgraphGranularity::Host => &state.host_webgraph,
+        WebgraphGranularity::Page => &state.page_webgraph,
     };
 
     graph.ingoing_edges(node).await
@@ -245,8 +245,8 @@ async fn outgoing_links(
     level: WebgraphGranularity,
 ) -> anyhow::Result<Vec<FullEdge>> {
     let graph = match level {
-        WebgraphGranularity::Host => &state.remote_webgraph_host,
-        WebgraphGranularity::Page => &state.remote_webgraph_page,
+        WebgraphGranularity::Host => &state.host_webgraph,
+        WebgraphGranularity::Page => &state.page_webgraph,
     };
 
     graph.outgoing_edges(node).await

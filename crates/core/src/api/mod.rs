@@ -74,8 +74,8 @@ pub struct Counters {
 pub struct State {
     pub config: ApiConfig,
     pub searcher: ApiSearcher<DistributedSearcher, LiveSearcher>,
-    pub remote_webgraph_page: RemoteWebgraph,
-    pub remote_webgraph_host: RemoteWebgraph,
+    pub page_webgraph: RemoteWebgraph,
+    pub host_webgraph: RemoteWebgraph,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
     pub summarizer: Arc<Summarizer>,
@@ -211,8 +211,8 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             searcher,
             autosuggest,
             counters,
-            remote_webgraph_host,
-            remote_webgraph_page,
+            host_webgraph: remote_webgraph_host,
+            page_webgraph: remote_webgraph_page,
             summarizer: Arc::new(Summarizer::new(
                 &config.summarizer_path,
                 config.llm.api_base.clone(),
