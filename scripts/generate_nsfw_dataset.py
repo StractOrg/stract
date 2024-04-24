@@ -5084,10 +5084,13 @@ def search_nsfw(q):
 def search_sfw(q):
     return search({"query": q})
 
+def snippet_text(snip):
+    return ''.join([frag['text'] for frag in snip['text']['fragments']])
+
 
 def content(search_results):
     return [
-        {"url": result["url"], "text": result["title"] + " " + result["body"]}
+        {"url": result["url"], "text": result["title"] + " " + snippet_text(result["snippet"])}
         for result in search_results["webpages"]
     ]
 
