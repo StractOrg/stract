@@ -185,14 +185,13 @@ struct VecMap {
 
 impl VecMap {
     fn build(graph: &Webgraph) -> Self {
-        let mut map = HashMap::default();
-
         let adjacency: DashMap<NodeID, HashSet<NodeID>> = DashMap::new();
 
         graph.par_edges().for_each(|edge| {
             adjacency.entry(edge.to).or_default().insert(edge.from);
         });
 
+        let mut map = HashMap::default();
         for (node_id, inbound) in adjacency {
             map.insert(
                 node_id,
@@ -328,10 +327,6 @@ impl InboundSimilarity {
             &mut reader,
             bincode::config::standard(),
         )?)
-    }
-
-    pub fn knows_about(&self, node_id: NodeID) -> bool {
-        self.vectors.contains(&node_id)
     }
 }
 

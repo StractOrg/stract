@@ -80,6 +80,7 @@ pub enum Service {
     },
     Webgraph {
         host: SocketAddr,
+        shard: ShardId,
         granularity: WebgraphGranularity,
     },
     Dht {

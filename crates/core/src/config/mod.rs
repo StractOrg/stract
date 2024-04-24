@@ -286,7 +286,7 @@ pub struct SearchServerConfig {
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
-    pub shard_id: ShardId,
+    pub shard: ShardId,
     pub index_path: String,
     pub host_centrality_store_path: Option<String>,
     pub linear_model_path: Option<String>,
@@ -391,16 +391,13 @@ pub enum WebgraphGranularity {
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct WebgraphServerConfig {
     pub host: SocketAddr,
+    pub shard: ShardId,
     pub graph_path: String,
     pub granularity: WebgraphGranularity,
-    pub inbound_similarity_path: Option<String>,
 
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
-
-    #[serde(default = "defaults::WebgraphServer::max_similar_hosts")]
-    pub max_similar_hosts: usize,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]

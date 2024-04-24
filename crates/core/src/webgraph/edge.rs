@@ -48,7 +48,7 @@ impl EdgeLabel for () {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, bincode::Encode, bincode::Decode)]
 pub struct Edge<L>
 where
     L: EdgeLabel,

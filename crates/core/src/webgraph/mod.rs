@@ -40,6 +40,7 @@ mod compression;
 mod edge;
 mod id_node_db;
 mod node;
+pub mod remote;
 mod segment;
 mod shortest_path;
 mod store;
@@ -227,6 +228,15 @@ impl Webgraph {
         };
 
         self.inner_edges(|segment| segment.ingoing_edges_with_label(node), dedup)
+    }
+
+    pub fn raw_outgoing_edges_with_labels(&self, node: &NodeID) -> Vec<Edge<String>> {
+        let dedup = |edges: &mut Vec<Edge<String>>| {
+            edges.sort_by_key(|e| e.from);
+            edges.dedup_by_key(|e| e.from);
+        };
+
+        self.inner_edges(|segment| segment.outgoing_edges_with_label(node), dedup)
     }
 
     pub fn outgoing_edges(&self, node: Node) -> Vec<FullEdge> {

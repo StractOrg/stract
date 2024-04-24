@@ -35,6 +35,7 @@ use crate::{
     models::dual_encoder::DualEncoder,
     ranking::models::lambdamart::LambdaMART,
     searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher},
+    webgraph::remote::RemoteWebgraph,
 };
 
 use crate::{ranking::models::cross_encoder::CrossEncoderModel, summarizer::Summarizer};
@@ -51,8 +52,6 @@ use axum::{
     routing::get,
     routing::post,
 };
-
-use self::webgraph::RemoteWebgraph;
 
 mod autosuggest;
 mod docs;
@@ -75,7 +74,8 @@ pub struct Counters {
 pub struct State {
     pub config: ApiConfig,
     pub searcher: ApiSearcher<DistributedSearcher, LiveSearcher>,
-    pub remote_webgraph: RemoteWebgraph,
+    pub remote_webgraph_page: RemoteWebgraph,
+    pub remote_webgraph_host: RemoteWebgraph,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
     pub summarizer: Arc<Summarizer>,
@@ -180,7 +180,11 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         )
         .await?,
     );
-    let remote_webgraph = RemoteWebgraph::new(cluster.clone());
+
+    let remote_webgraph_host =
+        RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Host);
+    let remote_webgraph_page =
+        RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Page);
 
     let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster));
     let live_searcher = LiveSearcher::new(Arc::clone(&cluster));
@@ -207,7 +211,8 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             searcher,
             autosuggest,
             counters,
-            remote_webgraph,
+            remote_webgraph_host,
+            remote_webgraph_page,
             summarizer: Arc::new(Summarizer::new(
                 &config.summarizer_path,
                 config.llm.api_base.clone(),

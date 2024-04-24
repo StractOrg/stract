@@ -88,7 +88,7 @@ impl SearchService {
                 id: config.cluster_id,
                 service: Service::Searcher {
                     host: config.host,
-                    shard: config.shard_id,
+                    shard: config.shard,
                 },
             },
             config.gossip_addr,

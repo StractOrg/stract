@@ -178,8 +178,4 @@ impl SimilarHostsFinder {
             .take(orig_limit)
             .collect()
     }
-
-    pub fn knows_about(&self, node: &Node) -> bool {
-        self.inbound_similarity.knows_about(node.id())
-    }
 }
