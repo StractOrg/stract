@@ -18,6 +18,8 @@ use std::{sync::Arc, time::Duration};
 
 use tokio::net::ToSocketAddrs;
 
+use crate::OneOrMany;
+
 use super::Result;
 
 pub trait Service: Sized + Send + Sync + 'static {
@@ -41,7 +43,7 @@ pub trait Wrapper<S: Service>: Message<S> {
 }
 
 pub struct Server<S: Service> {
-    inner: super::Server<S::Request, S::Response>,
+    inner: super::Server<OneOrMany<S::Request>, OneOrMany<S::Response>>,
     service: Arc<S>,
 }
 
@@ -57,9 +59,25 @@ impl<S: Service> Server<S> {
 
         let service = Arc::clone(&self.service);
         tokio::spawn(async move {
-            let res = S::handle(req.take_body(), &service).await;
-            if let Err(e) = req.respond(res).await {
-                tracing::error!("failed to respond to request: {}", e);
+            match req.take_body() {
+                OneOrMany::One(body) => {
+                    let res = S::handle(body, &service).await;
+
+                    if let Err(e) = req.respond(OneOrMany::One(res)).await {
+                        tracing::error!("failed to respond to request: {}", e);
+                    }
+                }
+                OneOrMany::Many(bodies) => {
+                    let mut res = Vec::new();
+
+                    for req in bodies {
+                        res.push(S::handle(req, &service).await);
+                    }
+
+                    if let Err(e) = req.respond(OneOrMany::Many(res)).await {
+                        tracing::error!("failed to respond to request: {}", e);
+                    }
+                }
             }
         });
 
@@ -68,18 +86,16 @@ impl<S: Service> Server<S> {
 }
 
 pub struct Connection<'a, S: Service> {
-    inner: super::Connection<S::RequestRef<'a>, S::Response>,
+    inner: super::Connection<OneOrMany<S::RequestRef<'a>>, OneOrMany<S::Response>>,
 }
 
 impl<'a, S: Service> Connection<'a, S> {
-    #[allow(dead_code)]
     pub async fn create(server: impl ToSocketAddrs) -> Result<Connection<'a, S>> {
         Ok(Connection {
             inner: super::Connection::create(server).await?,
         })
     }
 
-    #[allow(dead_code)]
     pub async fn create_with_timeout(
         server: impl ToSocketAddrs,
         timeout: Duration,
@@ -99,19 +115,26 @@ impl<'a, S: Service> Connection<'a, S> {
         })
     }
 
-    #[allow(dead_code)]
     pub async fn send_without_timeout<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
         Ok(R::unwrap_response(
             self.inner
-                .send_without_timeout(&R::wrap_request_ref(request))
-                .await?,
+                .send_without_timeout(&OneOrMany::One(R::wrap_request_ref(request)))
+                .await?
+                .one()
+                .expect("response is missing"),
         )
         .unwrap())
     }
 
-    #[allow(dead_code)]
     pub async fn send<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
-        Ok(R::unwrap_response(self.inner.send(&R::wrap_request_ref(request)).await?).unwrap())
+        Ok(R::unwrap_response(
+            self.inner
+                .send(&OneOrMany::One(R::wrap_request_ref(request)))
+                .await?
+                .one()
+                .expect("response is missing"),
+        )
+        .unwrap())
     }
 
     pub async fn send_with_timeout<R: Wrapper<S>>(
@@ -121,10 +144,35 @@ impl<'a, S: Service> Connection<'a, S> {
     ) -> Result<R::Response> {
         Ok(R::unwrap_response(
             self.inner
-                .send_with_timeout(&R::wrap_request_ref(request), timeout)
-                .await?,
+                .send_with_timeout(&OneOrMany::One(R::wrap_request_ref(request)), timeout)
+                .await?
+                .one()
+                .expect("response is missing"),
         )
         .unwrap())
+    }
+
+    pub async fn batch_send_with_timeout<R: Wrapper<S>>(
+        self,
+        requests: &'a [R],
+        timeout: Duration,
+    ) -> Result<Vec<R::Response>> {
+        Ok(self
+            .inner
+            .send_with_timeout(
+                &OneOrMany::Many(
+                    requests
+                        .iter()
+                        .map(|req| R::wrap_request_ref(req))
+                        .collect::<Vec<_>>(),
+                ),
+                timeout,
+            )
+            .await?
+            .many()
+            .into_iter()
+            .map(|res| R::unwrap_response(res).unwrap())
+            .collect())
     }
 }
 

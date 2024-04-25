@@ -18,11 +18,8 @@ use bloom::U64BloomFilter;
 
 use crate::{
     ampc::prelude::*,
-    config::{GossipConfig, HarmonicWorkerConfig},
-    distributed::{
-        cluster::Cluster,
-        member::{Member, Service, ShardId},
-    },
+    config::HarmonicWorkerConfig,
+    distributed::member::{Service, ShardId},
     webgraph::{self, Webgraph},
     Result,
 };

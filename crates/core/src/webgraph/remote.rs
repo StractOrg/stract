@@ -121,7 +121,7 @@ impl RemoteWebgraph {
 
         Ok(res
             .into_iter()
-            .flat_map(|(_, res)| res.into_iter())
+            .flat_map(|(_, res)| res.into_iter().map(|(_, v)| v))
             .find(|n| n.is_some())
             .flatten()
             .clone())
@@ -142,7 +142,7 @@ impl RemoteWebgraph {
             .into_iter()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|rep| rep.into_iter())
+                reps.into_iter().flat_map(|(_, rep)| rep)
             })
             .collect())
     }
@@ -162,7 +162,7 @@ impl RemoteWebgraph {
             .into_iter()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|rep| rep.into_iter())
+                reps.into_iter().flat_map(|(_, rep)| rep)
             })
             .collect())
     }
@@ -182,9 +182,39 @@ impl RemoteWebgraph {
             .into_iter()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|rep| rep.into_iter())
+                reps.into_iter().flat_map(|(_, rep)| rep)
             })
             .collect())
+    }
+
+    pub async fn batch_raw_ingoing_edges_with_labels(
+        &self,
+        ids: &[NodeID],
+    ) -> Result<Vec<Vec<Edge<String>>>> {
+        let reqs: Vec<_> = ids
+            .iter()
+            .map(|id| RawIngoingEdgesWithLabels { node: *id })
+            .collect();
+
+        let res = self
+            .conn()
+            .await
+            .batch_send(&reqs, &AllShardsSelector, &RandomReplicaSelector)
+            .await?;
+
+        let mut edges = vec![vec![]; ids.len()];
+
+        for (_, res) in res {
+            debug_assert!(res.len() <= 1);
+
+            for (_, res) in res {
+                for (i, rep) in res.into_iter().enumerate() {
+                    edges[i].extend(rep);
+                }
+            }
+        }
+
+        Ok(edges)
     }
 
     pub async fn outgoing_edges(&self, node: Node) -> Result<Vec<FullEdge>> {
@@ -202,7 +232,7 @@ impl RemoteWebgraph {
             .into_iter()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|rep| rep.into_iter())
+                reps.into_iter().flat_map(|(_, rep)| rep)
             })
             .collect())
     }
@@ -222,7 +252,7 @@ impl RemoteWebgraph {
             .into_iter()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|rep| rep.into_iter())
+                reps.into_iter().flat_map(|(_, rep)| rep)
             })
             .collect())
     }
@@ -242,7 +272,7 @@ impl RemoteWebgraph {
             .into_iter()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|rep| rep.into_iter())
+                reps.into_iter().flat_map(|(_, rep)| rep)
             })
             .collect())
     }

@@ -103,7 +103,7 @@ impl LiveSearcher {
         {
             Ok(v) => v
                 .into_iter()
-                .flat_map(|(_, v)| v)
+                .flat_map(|(_, v)| v.into_iter().map(|(_, v)| v))
                 .flatten()
                 .flatten()
                 .zip_eq(idxs)
@@ -130,7 +130,7 @@ impl SearchClient for LiveSearcher {
             .await
         {
             for (shard_id, mut res) in res {
-                if let Some(Some(res)) = res.pop() {
+                if let Some((_, Some(res))) = res.pop() {
                     results.push(InitialSearchResultSplit {
                         local_result: res,
                         split_id: shard_id,

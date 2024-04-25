@@ -19,8 +19,8 @@ use utoipa::ToSchema;
 
 use crate::{
     inverted_index::RetrievedWebpage,
-    webpage::schema_org::{self, Item, OneOrMany, Property},
-    Error,
+    webpage::schema_org::{self, Item, Property},
+    Error, OneOrMany,
 };
 
 use super::DisplayedSidebar;

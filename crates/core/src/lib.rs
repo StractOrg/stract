@@ -314,3 +314,35 @@ macro_rules! enum_dispatch_from_discriminant {
 }
 
 pub(crate) use enum_dispatch_from_discriminant;
+
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
+    Hash,
+)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T> OneOrMany<T> {
+    pub fn one(self) -> Option<T> {
+        match self {
+            OneOrMany::One(one) => Some(one),
+            OneOrMany::Many(many) => many.into_iter().next(),
+        }
+    }
+
+    pub fn many(self) -> Vec<T> {
+        match self {
+            OneOrMany::One(one) => vec![one],
+            OneOrMany::Many(many) => many,
+        }
+    }
+}

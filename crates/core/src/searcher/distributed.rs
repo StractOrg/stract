@@ -133,7 +133,7 @@ impl DistributedSearcher {
         {
             Ok(v) => v
                 .into_iter()
-                .flat_map(|(_, v)| v)
+                .flat_map(|(_, v)| v.into_iter().map(|(_, v)| v))
                 .flatten()
                 .flatten()
                 .zip_eq(idxs)
@@ -160,7 +160,7 @@ impl SearchClient for DistributedSearcher {
             .await
         {
             for (shard_id, mut res) in res {
-                if let Some(Some(res)) = res.pop() {
+                if let Some((_, Some(res))) = res.pop() {
                     results.push(InitialSearchResultShard {
                         local_result: res,
                         shard: shard_id,
@@ -224,7 +224,12 @@ impl SearchClient for DistributedSearcher {
             .await
             .map_err(|_| Error::SearchFailed)?;
 
-        if let Some(res) = res.into_iter().flat_map(|(_, v)| v).flatten().next() {
+        if let Some(res) = res
+            .into_iter()
+            .flat_map(|(_, v)| v.into_iter().map(|(_, v)| v))
+            .flatten()
+            .next()
+        {
             Ok(Some(res))
         } else {
             Err(Error::WebpageNotFound.into())
@@ -247,7 +252,10 @@ impl SearchClient for DistributedSearcher {
         match res {
             Ok(v) => v
                 .into_iter()
-                .flat_map(|(_, v)| v.into_iter().map(|crate::bincode_utils::SerdeCompat(v)| v))
+                .flat_map(|(_, v)| {
+                    v.into_iter()
+                        .map(|(_, crate::bincode_utils::SerdeCompat(v))| v)
+                })
                 .flatten()
                 .collect(),
             _ => HashMap::new(),
@@ -274,6 +282,7 @@ impl SearchClient for DistributedSearcher {
             .await
             .map_err(|_| Error::SearchFailed)?
             .pop()
+            .map(|(_, v)| v)
             .flatten())
     }
 
@@ -290,6 +299,7 @@ impl SearchClient for DistributedSearcher {
             .await
             .ok()?
             .pop()
+            .map(|(_, v)| v)
             .flatten()
     }
 }

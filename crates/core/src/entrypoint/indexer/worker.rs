@@ -17,8 +17,6 @@
 use chrono::Utc;
 use itertools::Itertools;
 use std::path::Path;
-use std::sync::Arc;
-use url::Url;
 
 use tracing::debug;
 
@@ -28,7 +26,6 @@ use crate::config::{
     IndexingDualEncoderConfig, IndexingGraphConfig, IndexingLocalConfig, LiveIndexConfig,
     WebgraphGranularity,
 };
-use crate::distributed::cluster::Cluster;
 use crate::models::dual_encoder::DualEncoder as DualEncoderModel;
 use crate::webgraph::remote::RemoteWebgraph;
 use crate::Result;
@@ -37,7 +34,7 @@ use crate::human_website_annotations;
 use crate::index::Index;
 use crate::rake::RakeModel;
 use crate::ranking::SignalComputer;
-use crate::webgraph::{self, Edge, Node, NodeID};
+use crate::webgraph::{self, Node, NodeID};
 use crate::webpage::{safety_classifier, Html, Webpage};
 
 pub struct Config {
@@ -86,25 +83,16 @@ pub(super) enum Webgraph {
 }
 
 impl Webgraph {
-    fn batch_raw_ingoing_edges_with_labels(&self, id: Vec<NodeID>) -> Vec<Vec<String>> {
+    fn batch_raw_ingoing_edges_with_labels(&self, ids: Vec<NodeID>) -> Vec<Vec<String>> {
         let edges = match self {
             Self::Remote(webgraph) => {
-                let mut res = Vec::new();
-
-                for id in id {
-                    // todo!("use batch requests");
-                    res.push(
-                        crate::block_on(webgraph.raw_ingoing_edges_with_labels(id))
-                            .unwrap_or_default(),
-                    );
-                }
-
-                res
+                crate::block_on(webgraph.batch_raw_ingoing_edges_with_labels(&ids))
+                    .unwrap_or_default()
             }
             Self::Local(webgraph) => {
                 let mut res = Vec::new();
 
-                for id in id {
+                for id in ids {
                     res.push(webgraph.raw_ingoing_edges_with_labels(&id));
                 }
 

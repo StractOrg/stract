@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use kuchiki::NodeRef;
 
 use crate::tokenizer::FlattenedJson;
-use crate::Result;
+use crate::{OneOrMany, Result};
 
 mod json_ld;
 mod microdata;
@@ -207,40 +207,8 @@ impl From<RawItem> for Item {
     Clone,
     Hash,
 )]
-pub enum OneOrMany<T: 'static> {
-    One(T),
-    Many(Vec<T>),
-}
-
-impl<T> OneOrMany<T> {
-    pub fn one(self) -> Option<T> {
-        match self {
-            OneOrMany::One(one) => Some(one),
-            OneOrMany::Many(many) => many.into_iter().next(),
-        }
-    }
-
-    pub fn many(self) -> Vec<T> {
-        match self {
-            OneOrMany::One(one) => vec![one],
-            OneOrMany::Many(many) => many,
-        }
-    }
-}
-
-#[derive(
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-    PartialEq,
-    Eq,
-    Debug,
-    Clone,
-    Hash,
-)]
 #[serde(untagged)]
-enum RawOneOrMany<T: 'static> {
+enum RawOneOrMany<T> {
     One(T),
     Many(Vec<T>),
 }
