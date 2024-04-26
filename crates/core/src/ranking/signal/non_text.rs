@@ -486,12 +486,8 @@ impl Signal for QueryCentrality {
         None
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
-        let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
-        let host_id = host_id(&fastfield_reader);
-
-        host_id.and_then(|host_id| signal_computer.query_centrality(host_id))
+    fn compute(&self, _doc: DocId, _signal_computer: &SignalComputer) -> Option<f64> {
+        unimplemented!()
     }
 }
 

@@ -37,10 +37,10 @@ use tantivy::DocSet;
 use crate::webpage::region::RegionCount;
 
 use crate::ranking::bm25::MultiBm25Weight;
+use crate::ranking::inbound_similarity;
 use crate::ranking::models::linear::LinearRegression;
-use crate::ranking::{inbound_similarity, query_centrality};
 
-use super::{ComputedSignal, Signal, SignalCoefficient, SignalEnum, SignalScore};
+use super::{ComputedSignal, Signal, SignalCoefficient, SignalEnum};
 
 mod order;
 pub use order::SignalComputeOrder;
@@ -96,7 +96,6 @@ pub struct SignalComputer {
     inbound_similarity: Option<RefCell<inbound_similarity::Scorer>>,
     fetch_time_ms_cache: Vec<f64>,
     update_time_cache: Vec<f64>,
-    query_centrality: Option<RefCell<query_centrality::Scorer>>,
     region_count: Option<Arc<RegionCount>>,
     current_timestamp: Option<usize>,
     linear_regression: Option<Arc<LinearRegression>>,
@@ -110,11 +109,6 @@ impl Clone for SignalComputer {
             .as_ref()
             .map(|scorer| RefCell::new(scorer.borrow().clone()));
 
-        let query_centrality = self
-            .query_centrality
-            .as_ref()
-            .map(|scorer| RefCell::new(scorer.borrow().clone()));
-
         Self {
             query_data: self.query_data.clone(),
             query_signal_coefficients: self.query_signal_coefficients.clone(),
@@ -122,7 +116,6 @@ impl Clone for SignalComputer {
             inbound_similarity,
             fetch_time_ms_cache: self.fetch_time_ms_cache.clone(),
             update_time_cache: self.update_time_cache.clone(),
-            query_centrality,
             region_count: self.region_count.clone(),
             current_timestamp: self.current_timestamp,
             linear_regression: self.linear_regression.clone(),
@@ -179,7 +172,6 @@ impl SignalComputer {
             query_signal_coefficients,
             fetch_time_ms_cache,
             update_time_cache,
-            query_centrality: None,
             region_count: None,
             current_timestamp: None,
             linear_regression: None,
@@ -310,10 +302,6 @@ impl SignalComputer {
         Ok(())
     }
 
-    pub fn set_query_centrality(&mut self, query_centrality: query_centrality::Scorer) {
-        self.query_centrality = Some(RefCell::new(query_centrality));
-    }
-
     pub fn set_inbound_similarity(&mut self, scorer: inbound_similarity::Scorer) {
         let mut scorer = scorer;
         scorer.set_default_if_precalculated(true);
@@ -331,12 +319,6 @@ impl SignalComputer {
 
     pub fn set_linear_model(&mut self, linear_model: Arc<LinearRegression>) {
         self.linear_regression = Some(linear_model);
-    }
-
-    pub fn query_centrality(&self, host_id: NodeID) -> Option<f64> {
-        self.query_centrality
-            .as_ref()
-            .map(|scorer| scorer.borrow_mut().score(host_id))
     }
 
     pub fn inbound_similarity(&self, host_id: NodeID) -> f64 {
@@ -390,15 +372,9 @@ impl SignalComputer {
             .filter_map(|signal| {
                 signal
                     .precompute(webpage, self)
-                    .map(|value| ComputedSignal {
-                        signal,
-                        score: SignalScore {
-                            coefficient: self.coefficient(&signal),
-                            value,
-                        },
-                    })
+                    .map(|score| ComputedSignal { signal, score })
             })
-            .map(|computed| computed.score.coefficient * computed.score.value)
+            .map(|computed| self.coefficient(&computed.signal) * computed.score)
             .sum()
     }
 

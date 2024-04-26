@@ -43,8 +43,6 @@ pub struct ScoredHost {
     pub description: Option<String>,
 }
 
-const MAX_HOSTS: usize = 20;
-
 pub struct WebGraphService {
     graph: Arc<Webgraph>,
 }

@@ -82,7 +82,7 @@ impl ScoreSegmentTweaker<Score> for InitialSegmentScoreTweaker {
             .computer
             .compute_signals(doc)
             .flatten()
-            .map(|computed| computed.score.coefficient * computed.score.value)
+            .map(|computed| self.computer.coefficient(&computed.signal) * computed.score)
             .sum();
 
         if let Some(boost) = self.computer.boosts(doc) {

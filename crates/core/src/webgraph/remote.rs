@@ -127,6 +127,32 @@ impl RemoteWebgraph {
             .clone())
     }
 
+    pub async fn batch_get_node(&self, ids: &[NodeID]) -> Result<Vec<Option<Node>>> {
+        let reqs = ids.iter().map(|&id| GetNode { node: id }).collect_vec();
+
+        let res = self
+            .conn()
+            .await
+            .batch_send(&reqs, &AllShardsSelector, &RandomReplicaSelector)
+            .await?;
+
+        let mut nodes = vec![None; ids.len()];
+
+        for (_, rep) in res {
+            debug_assert!(rep.len() <= 1);
+
+            for (_, rep_nodes) in rep {
+                for (i, node) in rep_nodes.into_iter().enumerate() {
+                    if let Some(node) = node {
+                        nodes[i] = Some(node);
+                    }
+                }
+            }
+        }
+
+        Ok(nodes)
+    }
+
     pub async fn ingoing_edges(&self, node: Node) -> Result<Vec<FullEdge>> {
         let res = self
             .conn()
@@ -217,6 +243,30 @@ impl RemoteWebgraph {
         Ok(edges)
     }
 
+    pub async fn batch_raw_ingoing_edges(&self, ids: &[NodeID]) -> Result<Vec<Vec<Edge<()>>>> {
+        let reqs: Vec<_> = ids.iter().map(|id| RawIngoingEdges { node: *id }).collect();
+
+        let res = self
+            .conn()
+            .await
+            .batch_send(&reqs, &AllShardsSelector, &RandomReplicaSelector)
+            .await?;
+
+        let mut edges = vec![vec![]; ids.len()];
+
+        for (_, res) in res {
+            debug_assert!(res.len() <= 1);
+
+            for (_, res) in res {
+                for (i, rep) in res.into_iter().enumerate() {
+                    edges[i].extend(rep);
+                }
+            }
+        }
+
+        Ok(edges)
+    }
+
     pub async fn outgoing_edges(&self, node: Node) -> Result<Vec<FullEdge>> {
         let res = self
             .conn()
@@ -275,5 +325,32 @@ impl RemoteWebgraph {
                 reps.into_iter().flat_map(|(_, rep)| rep)
             })
             .collect())
+    }
+
+    pub async fn batch_raw_outgoing_edges(&self, ids: &[NodeID]) -> Result<Vec<Vec<Edge<()>>>> {
+        let reqs: Vec<_> = ids
+            .iter()
+            .map(|id| RawOutgoingEdges { node: *id })
+            .collect();
+
+        let res = self
+            .conn()
+            .await
+            .batch_send(&reqs, &AllShardsSelector, &RandomReplicaSelector)
+            .await?;
+
+        let mut edges = vec![vec![]; ids.len()];
+
+        for (_, res) in res {
+            debug_assert!(res.len() <= 1);
+
+            for (_, res) in res {
+                for (i, rep) in res.into_iter().enumerate() {
+                    edges[i].extend(rep);
+                }
+            }
+        }
+
+        Ok(edges)
     }
 }

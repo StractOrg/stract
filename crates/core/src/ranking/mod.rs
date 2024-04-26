@@ -21,7 +21,6 @@ pub mod initial;
 pub mod models;
 pub mod optics;
 pub mod pipeline;
-pub mod query_centrality;
 pub mod signal;
 
 use initial::InitialScoreTweaker;
@@ -116,10 +115,6 @@ impl Ranker {
         collector = collector.and_collector_config(self.collector_config.clone());
 
         collector.main_collector(score_tweaker)
-    }
-
-    pub fn set_query_centrality(&mut self, query_centrality: query_centrality::Scorer) {
-        self.computer.set_query_centrality(query_centrality);
     }
 }
 

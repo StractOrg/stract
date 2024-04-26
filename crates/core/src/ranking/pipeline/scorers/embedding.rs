@@ -23,7 +23,7 @@ use crate::{
     ranking::{
         self,
         pipeline::{stages::StoredEmbeddings, RankableWebpage, RecallRankingWebpage},
-        SignalCoefficient, SignalEnum, SignalScore,
+        SignalEnum,
     },
     searcher::{api::ScoredWebpagePointer, SearchQuery},
     Result,
@@ -72,7 +72,6 @@ impl Embedding {
 
 pub struct EmbeddingScorer<W, E: EmbeddingSignal<W>> {
     dual_encoder: Option<Arc<DualEncoder>>,
-    signal_coefficients: Option<SignalCoefficient>,
     query: Option<String>,
     _marker: std::marker::PhantomData<(E, W)>,
 }
@@ -81,7 +80,6 @@ impl<W, E: EmbeddingSignal<W>> EmbeddingScorer<W, E> {
     pub fn new(dual_encoder: Option<Arc<DualEncoder>>) -> Self {
         Self {
             dual_encoder,
-            signal_coefficients: None,
             query: None,
             _marker: std::marker::PhantomData,
         }
@@ -98,15 +96,6 @@ impl<W, E: EmbeddingSignal<W>> EmbeddingScorer<W, E> {
                     .and_then(|d| d.squeeze(0).ok())
                     .map(Embedding)
             })
-        })
-    }
-
-    fn query_emb_and_coefficient(&self, coeff_signal: SignalEnum) -> Option<(Embedding, f64)> {
-        self.query_emb().and_then(|query_emb| {
-            self.signal_coefficients
-                .as_ref()
-                .map(|c| c.get(&coeff_signal))
-                .map(|coefficient| (query_emb, coefficient))
         })
     }
 }
@@ -147,12 +136,12 @@ impl<W: RankableWebpage, E: EmbeddingSignal<W>> Scorer<W> for EmbeddingScorer<W,
             return;
         }
 
-        if let Some((query_emb, coefficient)) = self.query_emb_and_coefficient(E::signal()) {
+        if let Some(query_emb) = self.query_emb() {
             let hidden_size = query_emb.size();
             for webpage in webpages.iter_mut() {
                 if let Some(emb) = E::embedding(webpage, hidden_size) {
                     let sim = query_emb.dot(&emb).unwrap_or_default();
-                    E::insert_signal(webpage, sim, coefficient);
+                    E::insert_signal(webpage, sim);
                 }
             }
         }
@@ -160,7 +149,6 @@ impl<W: RankableWebpage, E: EmbeddingSignal<W>> Scorer<W> for EmbeddingScorer<W,
 
     fn set_query_info(&mut self, query: &SearchQuery) {
         self.query = Some(query.query.clone());
-        self.signal_coefficients = query.optic.as_ref().map(SignalCoefficient::from_optic);
     }
 }
 
@@ -171,7 +159,7 @@ pub trait EmbeddingSignal<W>: Send + Sync {
     fn signal() -> SignalEnum;
     fn has_embedding(webpage: &W) -> bool;
     fn embedding(webpage: &W, hidden_size: usize) -> Option<Embedding>;
-    fn insert_signal(webpage: &mut W, score: f64, coefficient: f64);
+    fn insert_signal(webpage: &mut W, score: f64);
 }
 
 impl EmbeddingSignal<ScoredWebpagePointer> for TitleEmbeddings {
@@ -187,15 +175,9 @@ impl EmbeddingSignal<ScoredWebpagePointer> for TitleEmbeddings {
         webpage.title_emb(hidden_size)
     }
 
-    fn insert_signal(webpage: &mut ScoredWebpagePointer, score: f64, coefficient: f64) {
+    fn insert_signal(webpage: &mut ScoredWebpagePointer, score: f64) {
         let sig = <TitleEmbeddings as EmbeddingSignal<ScoredWebpagePointer>>::signal();
-        webpage.as_ranking_mut().signals.insert(
-            sig,
-            SignalScore {
-                coefficient,
-                value: score,
-            },
-        );
+        webpage.as_ranking_mut().signals.insert(sig, score);
     }
 }
 
@@ -212,16 +194,10 @@ impl EmbeddingSignal<RecallRankingWebpage> for TitleEmbeddings {
         webpage.title_emb(hidden_size)
     }
 
-    fn insert_signal(webpage: &mut RecallRankingWebpage, score: f64, coefficient: f64) {
+    fn insert_signal(webpage: &mut RecallRankingWebpage, score: f64) {
         let sig = <TitleEmbeddings as EmbeddingSignal<RecallRankingWebpage>>::signal();
 
-        webpage.signals.insert(
-            sig,
-            SignalScore {
-                coefficient,
-                value: score,
-            },
-        );
+        webpage.signals.insert(sig, score);
     }
 }
 
@@ -238,15 +214,9 @@ impl EmbeddingSignal<ScoredWebpagePointer> for KeywordEmbeddings {
         webpage.keyword_emb(hidden_size)
     }
 
-    fn insert_signal(webpage: &mut ScoredWebpagePointer, score: f64, coefficient: f64) {
+    fn insert_signal(webpage: &mut ScoredWebpagePointer, score: f64) {
         let sig = <KeywordEmbeddings as EmbeddingSignal<ScoredWebpagePointer>>::signal();
-        webpage.as_ranking_mut().signals.insert(
-            sig,
-            SignalScore {
-                coefficient,
-                value: score,
-            },
-        );
+        webpage.as_ranking_mut().signals.insert(sig, score);
     }
 }
 
@@ -263,15 +233,9 @@ impl EmbeddingSignal<RecallRankingWebpage> for KeywordEmbeddings {
         webpage.keyword_emb(hidden_size)
     }
 
-    fn insert_signal(webpage: &mut RecallRankingWebpage, score: f64, coefficient: f64) {
+    fn insert_signal(webpage: &mut RecallRankingWebpage, score: f64) {
         let sig = <KeywordEmbeddings as EmbeddingSignal<RecallRankingWebpage>>::signal();
-        webpage.signals.insert(
-            sig,
-            SignalScore {
-                coefficient,
-                value: score,
-            },
-        );
+        webpage.signals.insert(sig, score);
     }
 }
 

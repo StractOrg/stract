@@ -19,6 +19,7 @@ use std::sync::Arc;
 use crate::{
     collector,
     config::CollectorConfig,
+    enum_map::EnumMap,
     inverted_index::RetrievedWebpage,
     ranking::{
         models::{cross_encoder::CrossEncoder, lambdamart::LambdaMART},
@@ -26,6 +27,7 @@ use crate::{
             scorers::IdentityScorer, RankableWebpage, RankingPipeline, RankingStage, ReRanker,
             Scorer,
         },
+        SignalEnum,
     },
     searcher::SearchQuery,
     Result,
@@ -57,6 +59,10 @@ impl RankableWebpage for PrecisionRankingWebpage {
     fn boost(&self) -> Option<f64> {
         self.ranking.optic_boost
     }
+
+    fn signals(&self) -> &EnumMap<SignalEnum, f64> {
+        &self.ranking.signals
+    }
 }
 
 impl PrecisionRankingWebpage {
@@ -80,8 +86,9 @@ impl RankingPipeline<PrecisionRankingWebpage> {
         top_n_considered: usize,
     ) -> Result<Self> {
         let scorer = match crossencoder {
-            Some(cross_encoder) => Box::new(ReRanker::new(cross_encoder, lambda))
-                as Box<dyn Scorer<PrecisionRankingWebpage>>,
+            Some(cross_encoder) => {
+                Box::new(ReRanker::new(cross_encoder)) as Box<dyn Scorer<PrecisionRankingWebpage>>
+            }
             None => Box::new(IdentityScorer) as Box<dyn Scorer<PrecisionRankingWebpage>>,
         };
 
@@ -89,6 +96,8 @@ impl RankingPipeline<PrecisionRankingWebpage> {
             scorer,
             stage_top_n: top_n_considered,
             derank_similar: true,
+            model: lambda,
+            coefficients: Default::default(),
         };
 
         Ok(Self {

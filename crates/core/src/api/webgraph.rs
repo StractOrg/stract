@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use axum::{extract, response::IntoResponse, Json};
 use http::StatusCode;
@@ -22,7 +22,6 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     config::WebgraphGranularity,
-    distributed::{retry_strategy::ExponentialBackoff, sonic},
     webgraph::{FullEdge, Node},
 };
 
@@ -63,41 +62,16 @@ pub mod host {
         extract::State(state): extract::State<Arc<State>>,
         extract::Json(params): extract::Json<SimilarHostsParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        Err::<String, _>(http::status::StatusCode::INTERNAL_SERVER_ERROR)
-        // todo!("find similar hosts");
-        // state.counters.explore_counter.inc();
-        // let host = state
-        //     .remote_webgraph_host
-        //     .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+        state.counters.explore_counter.inc();
 
-        // let retry = ExponentialBackoff::from_millis(30)
-        //     .with_limit(Duration::from_millis(200))
-        //     .take(5);
+        let hosts: Vec<_> = params.hosts.into_iter().take(20).collect();
 
-        // let conn = sonic::service::Connection::create_with_timeout_retry(
-        //     host,
-        //     Duration::from_secs(30),
-        //     retry,
-        // )
-        // .await
-        // .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        // match conn
-        //     .send_with_timeout(
-        //         &crate::entrypoint::webgraph_server::SimilarHosts {
-        //             hosts: params.hosts,
-        //             top_n: params.top_n,
-        //         },
-        //         Duration::from_secs(60),
-        //     )
-        //     .await
-        // {
-        //     Ok(nodes) => Ok(Json(nodes)),
-        //     Err(err) => {
-        //         tracing::error!("Failed to send request to webgraph: {}", err);
-        //         Err(StatusCode::INTERNAL_SERVER_ERROR)
-        //     }
-        // }
+        Ok(Json(
+            state
+                .similar_hosts
+                .find_similar_hosts(&hosts, params.top_n)
+                .await,
+        ))
     }
 
     #[utoipa::path(post,

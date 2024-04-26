@@ -18,16 +18,10 @@ pub mod embedding;
 pub mod recall;
 pub mod reranker;
 
-use std::sync::Arc;
-
 pub use recall::Recall;
 pub use reranker::ReRanker;
 
-use crate::{
-    enum_map::EnumMap,
-    ranking::{self, models::lambdamart::LambdaMART, SignalCoefficient, SignalEnum, SignalScore},
-    searcher::SearchQuery,
-};
+use crate::searcher::SearchQuery;
 
 use super::RankableWebpage;
 
@@ -40,32 +34,6 @@ pub struct IdentityScorer;
 
 impl<T: RankableWebpage> Scorer<T> for IdentityScorer {
     fn score(&self, _webpages: &mut [T]) {}
-}
-
-fn calculate_score(
-    model: &Option<Arc<LambdaMART>>,
-    coefficients: SignalCoefficient,
-    signals: &EnumMap<SignalEnum, SignalScore>,
-) -> f64 {
-    let lambda_score = match model {
-        Some(model) => {
-            let coeff = coefficients.get(&ranking::signal::LambdaMart.into());
-            if coeff == 0.0 {
-                signals
-                    .values()
-                    .map(|score| score.coefficient * score.value)
-                    .sum()
-            } else {
-                coeff * model.predict(signals)
-            }
-        }
-        None => signals
-            .values()
-            .map(|score| score.coefficient * score.value)
-            .sum(),
-    };
-
-    lambda_score
 }
 
 pub struct MultiScorer<T: RankableWebpage> {

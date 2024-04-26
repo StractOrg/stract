@@ -26,10 +26,10 @@ use crate::{
     ranking::{
         models::lambdamart::LambdaMART,
         pipeline::{RankableWebpage, RankingPipeline, RankingStage, Recall, Scorer},
-        SignalComputer, SignalEnum, SignalScore,
+        SignalComputer, SignalEnum,
     },
     schema::fast_field,
-    searcher::SearchQuery,
+    searcher::{api::ScoredWebpagePointer, SearchQuery},
 };
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
@@ -44,7 +44,7 @@ impl StoredEmbeddings {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct RecallRankingWebpage {
     pub pointer: WebpagePointer,
-    pub signals: EnumMap<SignalEnum, SignalScore>,
+    pub signals: EnumMap<SignalEnum, f64>,
     pub optic_boost: Option<f64>,
     pub title_embedding: Option<StoredEmbeddings>,
     pub keyword_embedding: Option<StoredEmbeddings>,
@@ -96,6 +96,10 @@ impl RankableWebpage for RecallRankingWebpage {
     fn boost(&self) -> Option<f64> {
         self.optic_boost
     }
+
+    fn signals(&self) -> &EnumMap<SignalEnum, f64> {
+        &self.signals
+    }
 }
 
 impl collector::Doc for RecallRankingWebpage {
@@ -116,12 +120,50 @@ impl RankingPipeline<RecallRankingWebpage> {
         stage_top_n: usize,
     ) -> Self {
         let last_stage = RankingStage {
-            scorer: Box::new(Recall::<RecallRankingWebpage>::new(
-                lambdamart,
-                dual_encoder,
-            )) as Box<dyn Scorer<RecallRankingWebpage>>,
+            scorer: Box::new(Recall::<RecallRankingWebpage>::new(dual_encoder))
+                as Box<dyn Scorer<RecallRankingWebpage>>,
             stage_top_n,
             derank_similar: true,
+            model: lambdamart,
+            coefficients: Default::default(),
+        };
+
+        Self {
+            stage: last_stage,
+            page: 0,
+            top_n: 0,
+            collector_config,
+        }
+    }
+
+    pub fn recall_stage(
+        query: &mut SearchQuery,
+        lambdamart: Option<Arc<LambdaMART>>,
+        dual_encoder: Option<Arc<DualEncoder>>,
+        collector_config: CollectorConfig,
+        top_n_considered: usize,
+    ) -> Self {
+        let mut pipeline =
+            Self::create_recall_stage(lambdamart, dual_encoder, collector_config, top_n_considered);
+        pipeline.set_query_info(query);
+
+        pipeline
+    }
+}
+
+impl RankingPipeline<ScoredWebpagePointer> {
+    fn create_recall_stage(
+        lambdamart: Option<Arc<LambdaMART>>,
+        dual_encoder: Option<Arc<DualEncoder>>,
+        collector_config: CollectorConfig,
+        stage_top_n: usize,
+    ) -> Self {
+        let last_stage = RankingStage {
+            scorer: Box::new(Recall::<ScoredWebpagePointer>::new(dual_encoder)),
+            stage_top_n,
+            derank_similar: true,
+            model: lambdamart,
+            coefficients: Default::default(),
         };
 
         Self {

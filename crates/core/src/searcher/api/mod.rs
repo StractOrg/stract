@@ -27,12 +27,13 @@ use url::Url;
 use crate::bangs::{Bang, BangHit};
 use crate::collector::{self, Doc};
 use crate::config::{ApiConfig, CollectorConfig};
+use crate::enum_map::EnumMap;
 use crate::image_store::Image;
 use crate::inverted_index::RetrievedWebpage;
 use crate::models::dual_encoder::DualEncoder;
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
 use crate::ranking::pipeline::{PrecisionRankingWebpage, RankableWebpage, RecallRankingWebpage};
-use crate::ranking::SignalEnum;
+use crate::ranking::{SignalCoefficient, SignalEnum, SignalScore};
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::web_spell::SpellChecker;
 use crate::widgets::{Widget, Widgets};
@@ -77,6 +78,13 @@ impl RankableWebpage for ScoredWebpagePointer {
 
     fn boost(&self) -> Option<f64> {
         self.as_ranking().boost()
+    }
+
+    fn signals(&self) -> &EnumMap<SignalEnum, f64> {
+        match self {
+            ScoredWebpagePointer::Normal(p) => &p.website.signals,
+            ScoredWebpagePointer::Live(p) => &p.website.signals,
+        }
     }
 }
 
@@ -143,13 +151,24 @@ pub fn combine_results(
 
     (res, has_more)
 }
-pub fn add_ranking_signals(websites: &mut [DisplayedWebpage], pointers: &[ScoredWebpagePointer]) {
+
+pub fn add_ranking_signals(
+    websites: &mut [DisplayedWebpage],
+    pointers: &[ScoredWebpagePointer],
+    coeffs: &SignalCoefficient,
+) {
     for (website, pointer) in websites.iter_mut().zip(pointers.iter()) {
         let mut signals = HashMap::new();
 
         for signal in SignalEnum::all() {
             if let Some(signal_value) = pointer.as_ranking().signals.get(signal) {
-                signals.insert(signal.into(), *signal_value);
+                signals.insert(
+                    signal.into(),
+                    SignalScore {
+                        value: *signal_value,
+                        coefficient: coeffs.get(&signal),
+                    },
+                );
             }
         }
 
@@ -440,7 +459,7 @@ where
         let mut retrieved_webpages: Vec<_> = retrieved_webpages
             .into_iter()
             .map(|webpage| webpage.into_retrieved_webpage())
-            .map(|webpage| DisplayedWebpage::new(webpage, query))
+            .map(|webpage| DisplayedWebpage::new(webpage, &search_query))
             .collect();
 
         if retrieved_webpages.len() != top_websites.len() {
@@ -448,7 +467,11 @@ where
         }
 
         if query.return_ranking_signals {
-            add_ranking_signals(&mut retrieved_webpages, &top_websites);
+            add_ranking_signals(
+                &mut retrieved_webpages,
+                &top_websites,
+                &search_query.signal_coefficients(),
+            );
         }
 
         for (website, pointer) in retrieved_webpages.iter_mut().zip(top_websites.iter()) {

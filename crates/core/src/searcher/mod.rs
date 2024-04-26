@@ -26,8 +26,11 @@ use optics::{HostRankings, Optic};
 use utoipa::ToSchema;
 
 use crate::{
-    api::search::ReturnBody, bangs::BangHit, config::defaults,
-    ranking::pipeline::RecallRankingWebpage, search_prettifier::DisplayedWebpage,
+    api::search::ReturnBody,
+    bangs::BangHit,
+    config::defaults,
+    ranking::{pipeline::RecallRankingWebpage, SignalCoefficient},
+    search_prettifier::DisplayedWebpage,
     webpage::region::Region,
 };
 
@@ -94,5 +97,15 @@ impl Default for SearchQuery {
 impl SearchQuery {
     pub fn is_empty(&self) -> bool {
         self.query.is_empty()
+    }
+
+    pub fn signal_coefficients(&self) -> SignalCoefficient {
+        let mut signal_coefficients = SignalCoefficient::default();
+
+        if let Some(optic) = &self.optic {
+            signal_coefficients.merge_overwrite(SignalCoefficient::from_optic(optic));
+        }
+
+        signal_coefficients
     }
 }

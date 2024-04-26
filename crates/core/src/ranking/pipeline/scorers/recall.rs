@@ -18,35 +18,23 @@ use std::sync::Arc;
 
 use crate::{
     models::dual_encoder::DualEncoder,
-    ranking::{
-        models::lambdamart::LambdaMART,
-        pipeline::{RankableWebpage, RecallRankingWebpage},
-        SignalCoefficient,
-    },
+    ranking::pipeline::{RankableWebpage, RecallRankingWebpage},
     searcher::{api::ScoredWebpagePointer, SearchQuery},
 };
 
 use super::{
-    calculate_score,
     embedding::{EmbeddingScorer, KeywordEmbeddings, TitleEmbeddings},
     MultiScorer, Scorer,
 };
 
 pub struct Recall<T: RankableWebpage> {
-    sub_scorers: MultiScorer<T>,
-    lambdamart: Option<Arc<LambdaMART>>,
-    signal_coefficients: Option<SignalCoefficient>,
+    scorer: MultiScorer<T>,
 }
 
 impl Recall<RecallRankingWebpage> {
-    pub fn new(
-        lambdamart: Option<Arc<LambdaMART>>,
-        dual_encoder: Option<Arc<DualEncoder>>,
-    ) -> Self {
+    pub fn new(dual_encoder: Option<Arc<DualEncoder>>) -> Self {
         Self {
-            lambdamart,
-            signal_coefficients: None,
-            sub_scorers: MultiScorer::new(vec![
+            scorer: MultiScorer::new(vec![
                 Box::new(
                     EmbeddingScorer::<RecallRankingWebpage, TitleEmbeddings>::new(
                         dual_encoder.clone(),
@@ -61,14 +49,9 @@ impl Recall<RecallRankingWebpage> {
 }
 
 impl Recall<ScoredWebpagePointer> {
-    pub fn new(
-        lambdamart: Option<Arc<LambdaMART>>,
-        dual_encoder: Option<Arc<DualEncoder>>,
-    ) -> Self {
+    pub fn new(dual_encoder: Option<Arc<DualEncoder>>) -> Self {
         Self {
-            lambdamart,
-            signal_coefficients: None,
-            sub_scorers: MultiScorer::new(vec![
+            scorer: MultiScorer::new(vec![
                 Box::new(
                     EmbeddingScorer::<ScoredWebpagePointer, TitleEmbeddings>::new(
                         dual_encoder.clone(),
@@ -84,37 +67,16 @@ impl Recall<ScoredWebpagePointer> {
 
 impl Scorer<RecallRankingWebpage> for Recall<RecallRankingWebpage> {
     fn score(&self, webpages: &mut [RecallRankingWebpage]) {
-        self.sub_scorers.score(webpages);
-
-        for webpage in webpages {
-            webpage.set_score(calculate_score(
-                &self.lambdamart,
-                self.signal_coefficients.clone().unwrap_or_default(),
-                &webpage.signals,
-            ));
-        }
+        self.scorer.score(webpages);
     }
 
     fn set_query_info(&mut self, query: &SearchQuery) {
-        self.sub_scorers.set_query_info(query);
-        self.signal_coefficients = query.optic.as_ref().map(SignalCoefficient::from_optic);
+        self.scorer.set_query_info(query);
     }
 }
 
 impl Scorer<ScoredWebpagePointer> for Recall<ScoredWebpagePointer> {
     fn score(&self, webpages: &mut [crate::searcher::api::ScoredWebpagePointer]) {
-        self.sub_scorers.score(webpages);
-
-        for webpage in webpages {
-            webpage.set_score(calculate_score(
-                &self.lambdamart,
-                self.signal_coefficients.clone().unwrap_or_default(),
-                &webpage.as_ranking().signals,
-            ));
-        }
-    }
-
-    fn set_query_info(&mut self, query: &SearchQuery) {
-        self.signal_coefficients = query.optic.as_ref().map(SignalCoefficient::from_optic);
+        self.scorer.score(webpages);
     }
 }

@@ -35,6 +35,7 @@ use crate::{
     models::dual_encoder::DualEncoder,
     ranking::models::lambdamart::LambdaMART,
     searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher},
+    similar_hosts::SimilarHostsFinder,
     webgraph::remote::RemoteWebgraph,
 };
 
@@ -73,14 +74,15 @@ pub struct Counters {
 
 pub struct State {
     pub config: ApiConfig,
-    pub searcher: ApiSearcher<DistributedSearcher, LiveSearcher>,
-    pub page_webgraph: RemoteWebgraph,
-    pub host_webgraph: RemoteWebgraph,
+    pub searcher: Arc<ApiSearcher<DistributedSearcher, LiveSearcher>>,
+    pub page_webgraph: Arc<RemoteWebgraph>,
+    pub host_webgraph: Arc<RemoteWebgraph>,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
     pub summarizer: Arc<Summarizer>,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
     pub cluster: Arc<Cluster>,
+    pub similar_hosts: SimilarHostsFinder,
 }
 
 pub async fn favicon() -> impl IntoResponse {
@@ -181,9 +183,9 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         .await?,
     );
 
-    let remote_webgraph_host =
+    let host_webgraph =
         RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Host);
-    let remote_webgraph_page =
+    let page_webgraph =
         RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Page);
 
     let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster));
@@ -206,13 +208,18 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             config.clone(),
         );
 
+        let host_webgraph = Arc::new(host_webgraph);
+        let page_webgraph = Arc::new(page_webgraph);
+
+        let similar_hosts = SimilarHostsFinder::new(Arc::clone(&host_webgraph), todo!(), todo!());
+
         Arc::new(State {
             config: config.clone(),
-            searcher,
+            searcher: Arc::new(searcher),
             autosuggest,
             counters,
-            host_webgraph: remote_webgraph_host,
-            page_webgraph: remote_webgraph_page,
+            host_webgraph,
+            page_webgraph,
             summarizer: Arc::new(Summarizer::new(
                 &config.summarizer_path,
                 config.llm.api_base.clone(),
@@ -221,6 +228,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             )?),
             improvement_queue: query_store_queue,
             cluster,
+            similar_hosts,
         })
     };
 
