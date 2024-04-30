@@ -789,6 +789,8 @@ mod tests {
             host_centrality_threshold: None,
             minimum_clean_words: None,
             batch_size: 10,
+            autocommit_after_num_inserts:
+                crate::config::defaults::Indexing::autocommit_after_num_inserts(),
         })
     }
 

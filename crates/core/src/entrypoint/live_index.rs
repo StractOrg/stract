@@ -26,7 +26,6 @@ use crate::{
     feed::{self, index::FeedIndex},
     inverted_index,
     live_index::{Index, IndexManager},
-    ranking::inbound_similarity::InboundSimilarity,
     searcher::{InitialWebsiteResult, LocalSearcher},
     webgraph::WebgraphBuilder,
 };
@@ -46,14 +45,8 @@ pub struct SearchService {
 
 impl SearchService {
     async fn new(config: LiveIndexConfig) -> Result<Self> {
-        let inbound_similarity = InboundSimilarity::open(
-            Path::new(&config.host_centrality_store_path).join("inbound_similarity"),
-        )?;
-
         let manager = IndexManager::new(config.clone())?;
-        let mut local_searcher = LocalSearcher::new(manager.index());
-
-        local_searcher.set_inbound_similarity(inbound_similarity);
+        let local_searcher = LocalSearcher::new(manager.index());
 
         tokio::task::spawn(manager.run());
 

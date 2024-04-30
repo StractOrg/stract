@@ -18,12 +18,19 @@ use std::sync::Arc;
 
 use crate::{
     models::dual_encoder::DualEncoder,
-    ranking::pipeline::{RankableWebpage, RecallRankingWebpage},
-    searcher::{api::ScoredWebpagePointer, SearchQuery},
+    ranking::{
+        inbound_similarity,
+        pipeline::{LocalRecallRankingWebpage, RankableWebpage},
+    },
+    searcher::{
+        api::{self},
+        SearchQuery,
+    },
 };
 
 use super::{
     embedding::{EmbeddingScorer, KeywordEmbeddings, TitleEmbeddings},
+    inbound_similarity::InboundScorer,
     MultiScorer, Scorer,
 };
 
@@ -31,52 +38,58 @@ pub struct Recall<T: RankableWebpage> {
     scorer: MultiScorer<T>,
 }
 
-impl Recall<RecallRankingWebpage> {
-    pub fn new(dual_encoder: Option<Arc<DualEncoder>>) -> Self {
+impl Recall<api::ScoredWebpagePointer> {
+    pub fn new(
+        inbound: inbound_similarity::Scorer,
+        dual_encoder: Option<Arc<DualEncoder>>,
+    ) -> Self {
         Self {
             scorer: MultiScorer::new(vec![
                 Box::new(
-                    EmbeddingScorer::<RecallRankingWebpage, TitleEmbeddings>::new(
+                    EmbeddingScorer::<api::ScoredWebpagePointer, TitleEmbeddings>::new(
                         dual_encoder.clone(),
                     ),
                 ),
-                Box::new(
-                    EmbeddingScorer::<RecallRankingWebpage, KeywordEmbeddings>::new(dual_encoder),
-                ),
+                Box::new(EmbeddingScorer::<
+                    api::ScoredWebpagePointer,
+                    KeywordEmbeddings,
+                >::new(dual_encoder)),
+                Box::new(InboundScorer::new(inbound)),
             ]),
         }
     }
 }
 
-impl Recall<ScoredWebpagePointer> {
+impl Scorer<api::ScoredWebpagePointer> for Recall<api::ScoredWebpagePointer> {
+    fn score(&self, webpages: &mut [api::ScoredWebpagePointer]) {
+        self.scorer.score(webpages);
+    }
+}
+
+impl Recall<LocalRecallRankingWebpage> {
     pub fn new(dual_encoder: Option<Arc<DualEncoder>>) -> Self {
         Self {
             scorer: MultiScorer::new(vec![
                 Box::new(
-                    EmbeddingScorer::<ScoredWebpagePointer, TitleEmbeddings>::new(
+                    EmbeddingScorer::<LocalRecallRankingWebpage, TitleEmbeddings>::new(
                         dual_encoder.clone(),
                     ),
                 ),
-                Box::new(
-                    EmbeddingScorer::<ScoredWebpagePointer, KeywordEmbeddings>::new(dual_encoder),
-                ),
+                Box::new(EmbeddingScorer::<
+                    LocalRecallRankingWebpage,
+                    KeywordEmbeddings,
+                >::new(dual_encoder)),
             ]),
         }
     }
 }
 
-impl Scorer<RecallRankingWebpage> for Recall<RecallRankingWebpage> {
-    fn score(&self, webpages: &mut [RecallRankingWebpage]) {
+impl Scorer<LocalRecallRankingWebpage> for Recall<LocalRecallRankingWebpage> {
+    fn score(&self, webpages: &mut [LocalRecallRankingWebpage]) {
         self.scorer.score(webpages);
     }
 
     fn set_query_info(&mut self, query: &SearchQuery) {
         self.scorer.set_query_info(query);
-    }
-}
-
-impl Scorer<ScoredWebpagePointer> for Recall<ScoredWebpagePointer> {
-    fn score(&self, webpages: &mut [crate::searcher::api::ScoredWebpagePointer]) {
-        self.scorer.score(webpages);
     }
 }

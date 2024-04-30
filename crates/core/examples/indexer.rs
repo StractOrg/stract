@@ -52,6 +52,8 @@ fn main() -> anyhow::Result<()> {
         safety_classifier_path: None,
         minimum_clean_words: None,
         batch_size: 512,
+        autocommit_after_num_inserts:
+            stract::config::defaults::Indexing::autocommit_after_num_inserts(),
         dual_encoder: args
             .dual_encoder_path
             .map(|p| stract::config::IndexingDualEncoderConfig {

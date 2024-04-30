@@ -18,9 +18,7 @@ use crate::query::optic::AsSearchableRule;
 use crate::query::Query;
 use crate::schema::text_field::TextField;
 use crate::Result;
-use crate::{
-    enum_map::EnumMap, fastfield_reader, schema::TextFieldEnum, webgraph::NodeID, webpage::Webpage,
-};
+use crate::{enum_map::EnumMap, fastfield_reader, schema::TextFieldEnum, webpage::Webpage};
 
 use std::cell::RefCell;
 
@@ -37,7 +35,6 @@ use tantivy::DocSet;
 use crate::webpage::region::RegionCount;
 
 use crate::ranking::bm25::MultiBm25Weight;
-use crate::ranking::inbound_similarity;
 use crate::ranking::models::linear::LinearRegression;
 
 use super::{ComputedSignal, Signal, SignalCoefficient, SignalEnum};
@@ -93,7 +90,6 @@ pub struct SignalComputer {
     query_data: Option<QueryData>,
     query_signal_coefficients: Option<SignalCoefficient>,
     segment_reader: Option<RefCell<SegmentReader>>,
-    inbound_similarity: Option<RefCell<inbound_similarity::Scorer>>,
     fetch_time_ms_cache: Vec<f64>,
     update_time_cache: Vec<f64>,
     region_count: Option<Arc<RegionCount>>,
@@ -104,16 +100,10 @@ pub struct SignalComputer {
 
 impl Clone for SignalComputer {
     fn clone(&self) -> Self {
-        let inbound_similarity = self
-            .inbound_similarity
-            .as_ref()
-            .map(|scorer| RefCell::new(scorer.borrow().clone()));
-
         Self {
             query_data: self.query_data.clone(),
             query_signal_coefficients: self.query_signal_coefficients.clone(),
             segment_reader: None,
-            inbound_similarity,
             fetch_time_ms_cache: self.fetch_time_ms_cache.clone(),
             update_time_cache: self.update_time_cache.clone(),
             region_count: self.region_count.clone(),
@@ -168,7 +158,6 @@ impl SignalComputer {
 
         let mut s = Self {
             segment_reader: None,
-            inbound_similarity: None,
             query_signal_coefficients,
             fetch_time_ms_cache,
             update_time_cache,
@@ -302,13 +291,6 @@ impl SignalComputer {
         Ok(())
     }
 
-    pub fn set_inbound_similarity(&mut self, scorer: inbound_similarity::Scorer) {
-        let mut scorer = scorer;
-        scorer.set_default_if_precalculated(true);
-
-        self.inbound_similarity = Some(RefCell::new(scorer));
-    }
-
     pub fn set_region_count(&mut self, region_count: RegionCount) {
         self.region_count = Some(Arc::new(region_count));
     }
@@ -319,13 +301,6 @@ impl SignalComputer {
 
     pub fn set_linear_model(&mut self, linear_model: Arc<LinearRegression>) {
         self.linear_regression = Some(linear_model);
-    }
-
-    pub fn inbound_similarity(&self, host_id: NodeID) -> f64 {
-        self.inbound_similarity
-            .as_ref()
-            .map(|scorer| scorer.borrow_mut().score(&host_id))
-            .unwrap_or_default()
     }
 
     /// Computes the scored signals for a given document.

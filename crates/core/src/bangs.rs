@@ -122,6 +122,13 @@ pub struct Bangs {
 }
 
 impl Bangs {
+    #[cfg(test)]
+    pub fn empty() -> Self {
+        Self {
+            bangs: HashMap::new(),
+        }
+    }
+
     pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
         let json = fs::read_to_string(path).unwrap();
 

@@ -29,7 +29,7 @@ use crate::fastfield_reader::FastFieldReader;
 use crate::highlighted::HighlightedFragment;
 use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
-use crate::ranking::pipeline::RecallRankingWebpage;
+use crate::ranking::pipeline::LocalRecallRankingWebpage;
 use crate::ranking::SignalComputer;
 use crate::schema::{fast_field, text_field, FastFieldEnum, Field, TextFieldEnum};
 use crate::search_ctx::Ctx;
@@ -90,8 +90,12 @@ impl InvertedIndex {
         pointers: Vec<WebpagePointer>,
         mut computer: SignalComputer,
         fastfield_reader: &FastFieldReader,
-    ) -> Result<Vec<RecallRankingWebpage>> {
+    ) -> Result<Vec<LocalRecallRankingWebpage>> {
         let mut top_websites = Vec::new();
+
+        // the ranking webpages needs to be constructed in order
+        // of ascending doc_id as they traverse the posting lists from
+        // the index to calculate bm25.
 
         let mut pointers: Vec<_> = pointers.into_iter().enumerate().collect();
         pointers.sort_by(|a, b| {
@@ -118,7 +122,7 @@ impl InvertedIndex {
 
             top_websites.push((
                 orig_index,
-                RecallRankingWebpage::new(
+                LocalRecallRankingWebpage::new(
                     pointer,
                     fastfield_reader.borrow_segment(&segment_reader.segment_id()),
                     &mut computer,

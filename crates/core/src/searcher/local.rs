@@ -25,14 +25,14 @@ use crate::index::Index;
 use crate::inverted_index::{InvertedIndex, RetrievedWebpage};
 use crate::models::dual_encoder::DualEncoder;
 use crate::query::Query;
-use crate::ranking::inbound_similarity::InboundSimilarity;
 use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
-use crate::ranking::pipeline::{PrecisionRankingWebpage, RankingPipeline, RecallRankingWebpage};
+use crate::ranking::pipeline::{
+    LocalRecallRankingWebpage, PrecisionRankingWebpage, RankingPipeline, RecallRankingWebpage,
+};
 use crate::ranking::{Ranker, SignalComputer, SignalEnum, SignalScore};
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::DisplayedWebpage;
-use crate::webgraph::Node;
 use crate::{inverted_index, live_index, Result};
 
 use super::WebsitesResult;
@@ -102,7 +102,6 @@ impl<'a> SearchGuard<'a> for LiveIndexSearchGuard<'a> {
 
 pub struct LocalSearcher<I: SearchableIndex> {
     index: I,
-    inbound_similarity: Option<InboundSimilarity>,
     linear_regression: Option<Arc<LinearRegression>>,
     lambda_model: Option<Arc<LambdaMART>>,
     dual_encoder: Option<Arc<DualEncoder>>,
@@ -119,7 +118,7 @@ where
 }
 
 struct InvertedIndexResult {
-    webpages: Vec<RecallRankingWebpage>,
+    webpages: Vec<LocalRecallRankingWebpage>,
     num_hits: Option<usize>,
     has_more: bool,
 }
@@ -131,16 +130,11 @@ where
     pub fn new(index: I) -> Self {
         LocalSearcher {
             index,
-            inbound_similarity: None,
             linear_regression: None,
             lambda_model: None,
             dual_encoder: None,
             collector_config: CollectorConfig::default(),
         }
-    }
-
-    pub fn set_inbound_similarity(&mut self, inbound: InboundSimilarity) {
-        self.inbound_similarity = Some(inbound);
     }
 
     pub fn set_linear_model(&mut self, model: LinearRegression) {
@@ -204,8 +198,8 @@ where
         de_rank_similar: bool,
     ) -> Result<InvertedIndexResult> {
         let mut query = query.clone();
-        let pipeline: RankingPipeline<RecallRankingWebpage> =
-            RankingPipeline::<RecallRankingWebpage>::recall_stage(
+        let pipeline: RankingPipeline<LocalRecallRankingWebpage> =
+            RankingPipeline::<LocalRecallRankingWebpage>::recall_stage(
                 &mut query,
                 self.lambda_model.clone(),
                 self.dual_encoder.clone(),
@@ -215,27 +209,6 @@ where
         let parsed_query = self.parse_query(ctx, guard, &query)?;
 
         let mut computer = SignalComputer::new(Some(&parsed_query));
-
-        if let Some(inbound_sim) = &self.inbound_similarity {
-            let liked_hosts: Vec<_> = parsed_query
-                .host_rankings()
-                .liked
-                .iter()
-                .map(|site| Node::from(site.clone()).into_host())
-                .map(|node| node.id())
-                .collect();
-
-            let disliked_hosts: Vec<_> = parsed_query
-                .host_rankings()
-                .disliked
-                .iter()
-                .map(|site| Node::from(site.clone()).into_host())
-                .map(|node| node.id())
-                .collect();
-
-            let scorer = inbound_sim.scorer(&liked_hosts, &disliked_hosts, false);
-            computer.set_inbound_similarity(scorer);
-        }
 
         computer.set_region_count(
             guard
@@ -344,14 +317,17 @@ where
         let pointers: Vec<_> = search_result
             .websites
             .iter()
-            .map(|website| website.pointer.clone())
+            .map(|website| website.pointer().clone())
             .collect();
 
         let websites: Vec<_> = self
             .retrieve_websites(&pointers, &query.query)?
             .into_iter()
             .zip_eq(search_result.websites)
-            .map(|(webpage, ranking)| PrecisionRankingWebpage::new(webpage, ranking))
+            .map(|(webpage, ranking)| {
+                let ranking = RecallRankingWebpage::new(ranking, Default::default());
+                PrecisionRankingWebpage::new(webpage, ranking)
+            })
             .collect();
 
         let search_len = websites.len();
@@ -362,7 +338,7 @@ where
 
         let pointers: Vec<_> = top_websites
             .iter()
-            .map(|website| website.ranking.pointer.clone())
+            .map(|website| website.ranking().pointer().clone())
             .collect();
 
         let retrieved_sites = self.retrieve_websites(&pointers, &search_query.query)?;
@@ -378,7 +354,7 @@ where
             let mut ranking_signals = HashMap::new();
 
             for signal in SignalEnum::all() {
-                if let Some(score) = ranking.ranking.signals.get(signal) {
+                if let Some(score) = ranking.ranking().signals().get(signal) {
                     ranking_signals.insert(
                         signal.into(),
                         SignalScore {

@@ -7,9 +7,16 @@ host = "0.0.0.0:3000"
 dual_encoder_model_path = "data/summarizer/dual_encoder"
 prometheus_host = "0.0.0.0:3001"
 queries_csv_path = "data/queries_us.csv"
-spell_checker_path = "data/web_spell/checker"
 bangs_path = "data/bangs.json"
 summarizer_path = "data/summarizer"
+
+[spell_check]
+path = "data/web_spell/checker"
+
+[spell_check.correction_config]
+correction_threshold = 3.0
+lm_prob_weight = 1.0
+
 
 [thresholds]
 entity_sidebar = 0.0
@@ -17,10 +24,6 @@ stackoverflow = 0.0
 
 [widgets]
 thesaurus_paths = ["data/english-wordnet-2022-subset.ttl"]
-
-[correction_config]
-correction_threshold = 3.0
-lm_prob_weight = 1.0
 
 [llm]
 api_base = "http://localhost:4000/v1"

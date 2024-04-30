@@ -143,7 +143,6 @@ fn calculate_centrality() {
 
     if !out_path.exists() {
         Centrality::build_harmonic(&webgraph_path, &out_path);
-        Centrality::build_similarity(&webgraph_path, &out_path);
     }
 
     let webgraph_page = Path::new(DATA_PATH).join("webgraph_page");
@@ -179,6 +178,7 @@ fn create_inverted_index() -> Result<()> {
             host_centrality_threshold: None,
             minimum_clean_words: None,
             batch_size: defaults::Indexing::batch_size(),
+            autocommit_after_num_inserts: defaults::Indexing::autocommit_after_num_inserts(),
         },
     };
 
@@ -208,6 +208,7 @@ fn create_inverted_index() -> Result<()> {
         safety_classifier_path: None,
         minimum_clean_words: None,
         batch_size: defaults::Indexing::batch_size(),
+        autocommit_after_num_inserts: defaults::Indexing::autocommit_after_num_inserts(),
         dual_encoder: Some(IndexingDualEncoderConfig {
             model_path: dual_encoder_path.to_str().unwrap().to_string(),
             page_centrality_rank_threshold: Some(100_000),

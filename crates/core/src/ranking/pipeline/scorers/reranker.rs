@@ -41,8 +41,8 @@ impl<M: CrossEncoder> ReRanker<M> {
         let mut titles = Vec::with_capacity(webpage.len());
 
         for webpage in webpage.iter_mut() {
-            titles.push(webpage.retrieved_webpage.title.clone());
-            snippets.push(webpage.retrieved_webpage.snippet.unhighlighted_string());
+            titles.push(webpage.retrieved_webpage().title.clone());
+            snippets.push(webpage.retrieved_webpage().snippet.unhighlighted_string());
         }
 
         let query = &self.query.as_ref().unwrap().query;
@@ -52,13 +52,13 @@ impl<M: CrossEncoder> ReRanker<M> {
         for ((webpage, snippet), title) in webpage.iter_mut().zip(snippet_scores).zip(title_scores)
         {
             webpage
-                .ranking
-                .signals
+                .ranking_mut()
+                .signals_mut()
                 .insert(ranking::signal::CrossEncoderSnippet.into(), snippet);
 
             webpage
-                .ranking
-                .signals
+                .ranking_mut()
+                .signals_mut()
                 .insert(ranking::signal::CrossEncoderTitle.into(), title);
         }
     }

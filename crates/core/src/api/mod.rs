@@ -74,14 +74,14 @@ pub struct Counters {
 
 pub struct State {
     pub config: ApiConfig,
-    pub searcher: Arc<ApiSearcher<DistributedSearcher, LiveSearcher>>,
+    pub searcher: Arc<ApiSearcher<DistributedSearcher, LiveSearcher, Arc<RemoteWebgraph>>>,
     pub page_webgraph: Arc<RemoteWebgraph>,
     pub host_webgraph: Arc<RemoteWebgraph>,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
     pub summarizer: Arc<Summarizer>,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
-    pub cluster: Arc<Cluster>,
+    pub _cluster: Arc<Cluster>,
     pub similar_hosts: SimilarHostsFinder,
 }
 
@@ -198,20 +198,26 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             cross_encoder = Some(CrossEncoderModel::open(path)?);
         }
 
-        let searcher = ApiSearcher::new(
-            dist_searcher,
-            Some(live_searcher),
-            cross_encoder,
-            lambda_model,
-            dual_encoder_model,
-            bangs,
-            config.clone(),
-        );
+        let mut searcher =
+            ApiSearcher::new(dist_searcher, bangs, config.clone()).with_live(live_searcher);
+
+        if let Some(cross_encoder) = cross_encoder {
+            searcher = searcher.with_cross_encoder(cross_encoder);
+        }
+
+        if let Some(lambda) = lambda_model {
+            searcher = searcher.with_lambda_model(lambda);
+        }
+
+        if let Some(dual_encoder_model) = dual_encoder_model {
+            searcher = searcher.with_dual_encoder(dual_encoder_model);
+        }
 
         let host_webgraph = Arc::new(host_webgraph);
         let page_webgraph = Arc::new(page_webgraph);
 
-        let similar_hosts = SimilarHostsFinder::new(Arc::clone(&host_webgraph), todo!(), todo!());
+        let similar_hosts =
+            SimilarHostsFinder::new(Arc::clone(&host_webgraph), config.max_similar_hosts);
 
         Arc::new(State {
             config: config.clone(),
@@ -227,7 +233,7 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
                 config.llm.api_key.clone(),
             )?),
             improvement_queue: query_store_queue,
-            cluster,
+            _cluster: cluster,
             similar_hosts,
         })
     };

@@ -52,6 +52,10 @@ impl Api {
     pub fn max_concurrent_searches() -> Option<usize> {
         None
     }
+
+    pub fn max_similar_hosts() -> usize {
+        1_000
+    }
 }
 
 pub struct Snippet;
@@ -122,14 +126,6 @@ impl Crawler {
     }
 }
 
-pub struct WebgraphServer;
-
-impl WebgraphServer {
-    pub fn max_similar_hosts() -> usize {
-        1_000
-    }
-}
-
 pub struct SearchQuery;
 
 impl SearchQuery {
@@ -179,5 +175,9 @@ pub struct Indexing;
 impl Indexing {
     pub fn batch_size() -> usize {
         512
+    }
+
+    pub fn autocommit_after_num_inserts() -> usize {
+        25_000
     }
 }

@@ -33,7 +33,7 @@ use distributed::{
     cluster::Cluster,
     member::{Member, Service},
 };
-use std::{path::PathBuf, sync::Arc};
+use std::{cmp::Reverse, path::PathBuf, sync::Arc};
 use thiserror::Error;
 
 pub mod entrypoint;
@@ -345,4 +345,61 @@ impl<T> OneOrMany<T> {
             OneOrMany::Many(many) => many,
         }
     }
+}
+
+pub trait TopKOrderable: Ord {
+    type SortKey: Ord + Copy;
+
+    fn sort_key(&self) -> Self::SortKey;
+}
+
+impl TopKOrderable for (SortableFloat, webgraph::NodeID) {
+    type SortKey = SortableFloat;
+
+    fn sort_key(&self) -> Self::SortKey {
+        self.0
+    }
+}
+
+impl<T> TopKOrderable for Reverse<T>
+where
+    T: TopKOrderable,
+{
+    type SortKey = Reverse<T::SortKey>;
+
+    fn sort_key(&self) -> Self::SortKey {
+        Reverse(self.0.sort_key())
+    }
+}
+
+/// Source (and explanation): [https://quickwit.io/blog/top-k-complexity]
+pub fn sorted_k<T>(mut hits: impl Iterator<Item = T>, k: usize) -> Vec<T>
+where
+    T: TopKOrderable,
+{
+    if k == 0 {
+        return Vec::new();
+    }
+
+    let mut top_k = Vec::with_capacity(2 * k);
+    top_k.extend((&mut hits).take(k));
+
+    let mut threshold = None;
+    for hit in hits {
+        if let Some(threshold) = threshold {
+            if hit.sort_key() <= threshold {
+                continue;
+            }
+        }
+        top_k.push(hit);
+        if top_k.len() == 2 * k {
+            // The standard library does all of the heavy lifting here.
+            let (_, median_el, _) = top_k.select_nth_unstable(k - 1);
+            threshold = Some(median_el.sort_key());
+            top_k.truncate(k);
+        }
+    }
+    top_k.sort_unstable();
+    top_k.truncate(k);
+    top_k
 }

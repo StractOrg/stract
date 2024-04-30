@@ -22,17 +22,19 @@ mod tests {
     };
 
     use crate::{
+        bangs::Bangs,
         gen_temp_path,
         index::Index,
-        ranking::inbound_similarity::InboundSimilarity,
-        searcher::{LocalSearcher, SearchQuery},
+        searcher::{
+            api::ApiSearcher, live::LiveSearcher, LocalSearchClient, LocalSearcher, SearchQuery,
+        },
         webgraph::{Node, WebgraphWriter},
         webpage::{Html, Webpage},
     };
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
-    #[test]
-    fn host_rankings() {
+    #[tokio::test]
+    async fn host_rankings() {
         let mut index = Index::temporary().expect("Unable to open index");
 
         let mut wrt = WebgraphWriter::new(
@@ -160,9 +162,12 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let mut searcher = LocalSearcher::new(index);
-
-        searcher.set_inbound_similarity(InboundSimilarity::build(&graph));
+        let searcher: ApiSearcher<_, LiveSearcher, _> = ApiSearcher::new(
+            LocalSearchClient::from(LocalSearcher::new(index)),
+            Bangs::empty(),
+            crate::searcher::api::Config::default(),
+        )
+        .with_webgraph(graph);
 
         let result = searcher
             .search(&SearchQuery {
@@ -181,7 +186,9 @@ mod tests {
                 }),
                 ..Default::default()
             })
-            .expect("Search failed");
+            .await
+            .expect("Search failed")
+            .into_websites_result();
 
         assert_eq!(result.webpages.len(), 3);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
@@ -206,7 +213,9 @@ mod tests {
                 return_ranking_signals: true,
                 ..Default::default()
             })
-            .expect("Search failed");
+            .await
+            .expect("Search failed")
+            .into_websites_result();
 
         assert_eq!(result.webpages.len(), 2);
         assert_eq!(result.webpages[0].url, "https://www.third.com/");
@@ -230,7 +239,9 @@ mod tests {
                 return_ranking_signals: true,
                 ..Default::default()
             })
-            .expect("Search failed");
+            .await
+            .expect("Search failed")
+            .into_websites_result();
 
         assert_eq!(result.webpages.len(), 3);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");

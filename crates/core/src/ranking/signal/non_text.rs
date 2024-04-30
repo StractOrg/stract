@@ -18,9 +18,7 @@ use tantivy::DocId;
 
 use super::{Signal, SignalComputer};
 use crate::{
-    fastfield_reader::FieldReader,
     schema::{self, Field, FLOAT_SCALING},
-    webgraph::NodeID,
     webpage::Webpage,
 };
 
@@ -85,19 +83,6 @@ fn score_region(webpage_region: crate::webpage::Region, computer: &SignalCompute
             boost + region_count.score(&webpage_region)
         }
         None => 0.0,
-    }
-}
-
-fn host_id(fastfield_reader: &FieldReader<'_>) -> Option<NodeID> {
-    let node_id = fastfield_reader
-        .get(schema::fast_field::HostNodeID.into())
-        .and_then(|n| n.as_u64())
-        .unwrap();
-
-    if node_id == u64::MAX {
-        None
-    } else {
-        Some(node_id.into())
     }
 }
 
@@ -513,12 +498,8 @@ impl Signal for InboundSimilarity {
         None
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
-        let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
-        let host_id = host_id(&fastfield_reader);
-
-        host_id.map(|host_id| signal_computer.inbound_similarity(host_id))
+    fn compute(&self, _doc: DocId, _signal_computer: &SignalComputer) -> Option<f64> {
+        None // computed in later ranking stage
     }
 }
 

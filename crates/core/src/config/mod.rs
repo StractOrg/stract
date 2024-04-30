@@ -42,6 +42,9 @@ pub struct IndexingLocalConfig {
     #[serde(default = "defaults::Indexing::batch_size")]
     pub batch_size: usize,
 
+    #[serde(default = "defaults::Indexing::autocommit_after_num_inserts")]
+    pub autocommit_after_num_inserts: usize,
+
     pub dual_encoder: Option<IndexingDualEncoderConfig>,
 }
 
@@ -216,6 +219,14 @@ pub struct LLMConfig {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct ApiSpellCheck {
+    pub path: String,
+
+    #[serde(default)]
+    pub correction_config: CorrectionConfig,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ApiConfig {
     pub summarizer_path: String,
     pub queries_csv_path: String,
@@ -224,17 +235,18 @@ pub struct ApiConfig {
     pub crossencoder_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
     pub dual_encoder_model_path: Option<String>,
-    pub spell_checker_path: Option<String>,
     pub bangs_path: String,
     pub query_store_db_host: Option<String>,
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
 
-    pub llm: LLMConfig,
+    #[serde(default = "defaults::Api::max_similar_hosts")]
+    pub max_similar_hosts: usize,
 
-    #[serde(default)]
-    pub collector: CollectorConfig,
+    pub spell_check: Option<ApiSpellCheck>,
+
+    pub llm: LLMConfig,
 
     #[serde(default)]
     pub thresholds: ApiThresholds,
@@ -242,7 +254,7 @@ pub struct ApiConfig {
     pub widgets: WidgetsConfig,
 
     #[serde(default)]
-    pub correction_config: CorrectionConfig,
+    pub collector: CollectorConfig,
 
     #[serde(default = "defaults::Api::max_concurrent_searches")]
     pub max_concurrent_searches: Option<usize>,
@@ -295,7 +307,6 @@ pub struct SearchServerConfig {
     pub gossip_addr: SocketAddr,
     pub shard: ShardId,
     pub index_path: String,
-    pub host_centrality_store_path: Option<String>,
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
     pub dual_encoder_model_path: Option<String>,
@@ -413,6 +424,16 @@ pub struct WidgetsConfig {
 
     #[serde(default = "defaults::Widgets::calculator_fetch_currencies_exchange")]
     pub calculator_fetch_currencies_exchange: bool,
+}
+
+impl Default for WidgetsConfig {
+    fn default() -> Self {
+        Self {
+            thesaurus_paths: Vec::new(),
+            calculator_fetch_currencies_exchange:
+                defaults::Widgets::calculator_fetch_currencies_exchange(),
+        }
+    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]

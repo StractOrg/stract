@@ -306,7 +306,6 @@ fn main() -> Result<()> {
                     output_path,
                 } => {
                     entrypoint::Centrality::build_harmonic(&webgraph_path, &output_path);
-                    entrypoint::Centrality::build_similarity(&webgraph_path, &output_path);
                 }
                 CentralityMode::Page {
                     webgraph_path,

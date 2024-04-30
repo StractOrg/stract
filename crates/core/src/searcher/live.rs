@@ -154,7 +154,7 @@ impl SearchClient for LiveSearcher {
             pointers
                 .entry(pointer.split_id.clone())
                 .or_default()
-                .push((*i, pointer.website.pointer.clone()));
+                .push((*i, pointer.website.pointer().clone()));
 
             rankings.insert(*i, pointer.website.clone());
         }

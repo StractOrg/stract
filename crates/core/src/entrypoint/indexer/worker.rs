@@ -187,7 +187,7 @@ impl IndexingWorker {
             page_centrality_rank_store: config.page_centrality_store_path.as_ref().map(|p| {
                 speedy_kv::Db::open_or_create(Path::new(&p).join("approx_harmonic_rank")).unwrap()
             }),
-            page_webgraph: config.page_webgraph.as_ref().map(|c| Webgraph::new(c)),
+            page_webgraph: config.page_webgraph.as_ref().map(Webgraph::new),
             topics: config
                 .topics_path
                 .as_ref()
@@ -508,6 +508,8 @@ mod tests {
             host_centrality_threshold: None,
             minimum_clean_words: None,
             batch_size: 10,
+            autocommit_after_num_inserts:
+                crate::config::defaults::Indexing::autocommit_after_num_inserts(),
         })
     }
 

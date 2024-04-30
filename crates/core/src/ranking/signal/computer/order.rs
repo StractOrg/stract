@@ -79,15 +79,7 @@ impl SignalComputeOrder {
             .chain(
                 self.other_signals
                     .iter()
-                    .filter_map(|signal| {
-                        let coefficient = signal_computer.coefficient(signal);
-
-                        if coefficient > 0.0 {
-                            Some(signal)
-                        } else {
-                            None
-                        }
-                    })
+                    .filter(|signal| signal_computer.coefficient(signal) > 0.0)
                     .map(move |signal| {
                         signal
                             .compute(doc, signal_computer)

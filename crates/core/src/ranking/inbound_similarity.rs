@@ -14,59 +14,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    fs::File,
-    io::{BufReader, BufWriter},
-    path::Path,
-    sync::Arc,
-};
-
-use dashmap::DashMap;
 use fnv::FnvHashMap as HashMap;
-use fnv::FnvHashSet as HashSet;
-use indicatif::ParallelProgressIterator;
-use rayon::prelude::*;
+use itertools::Itertools;
 
-use crate::{
-    webgraph::{NodeID, Webgraph},
-    Result,
-};
+use crate::webgraph::NodeID;
 
 use super::bitvec_similarity;
-
-const PRECALCULATE_TOP_N: usize = 1_000;
-const TOP_CANDIDATES_PER_PRECALCULATION: usize = 1_000;
-
-#[derive(Clone)]
-pub struct Scorer {
-    liked: Vec<NodeScorer>,
-    disliked: Vec<NodeScorer>,
-    vectors: Arc<VecMap>,
-    cache: HashMap<NodeID, f64>,
-    normalized: bool,
-}
 
 #[derive(Clone)]
 struct NodeScorer {
     node: NodeID,
     inbound: bitvec_similarity::BitVec,
-    precalculated: Arc<PreCalculatedSimilarities>,
     self_score: f64,
-    default_if_precalculated: bool,
 }
 
 impl NodeScorer {
-    fn new(
-        node: NodeID,
-        inbound: bitvec_similarity::BitVec,
-        precalculated: Arc<PreCalculatedSimilarities>,
-    ) -> Self {
+    fn new(node: NodeID, inbound: bitvec_similarity::BitVec) -> Self {
         Self {
             node,
             inbound,
-            precalculated,
             self_score: 1.0,
-            default_if_precalculated: false,
         }
     }
 
@@ -74,48 +41,73 @@ impl NodeScorer {
         self.self_score = self_score;
     }
 
-    fn set_default_if_precalculated(&mut self, default_if_precalculated: bool) {
-        self.default_if_precalculated = default_if_precalculated;
-    }
-
     fn sim(&self, other: &NodeID, other_inbound: &bitvec_similarity::BitVec) -> f64 {
         if self.node == *other {
             self.self_score
-        } else if self.default_if_precalculated {
-            self.precalculated
-                .get_or_default_if_precalculated(&self.node, other)
-                .or_else(|| {
-                    self.precalculated
-                        .get_or_default_if_precalculated(other, &self.node)
-                })
-                .unwrap_or_else(|| self.inbound.sim(other_inbound))
         } else {
-            self.precalculated
-                .get(&self.node, other)
-                .or_else(|| self.precalculated.get(other, &self.node))
-                .unwrap_or_else(|| self.inbound.sim(other_inbound))
+            self.inbound.sim(other_inbound)
         }
     }
 }
 
+#[derive(Clone)]
+pub struct Scorer {
+    liked: Vec<NodeScorer>,
+    disliked: Vec<NodeScorer>,
+    cache: HashMap<NodeID, f64>,
+    normalized: bool,
+}
+
 impl Scorer {
-    fn calculate_score(&mut self, node: &NodeID) -> f64 {
-        let s = match self.vectors.get(node) {
-            Some(vec) => {
-                (self.disliked.len() as f64)
-                    + (self
-                        .liked
-                        .iter()
-                        .map(|liked| liked.sim(node, vec))
-                        .sum::<f64>()
-                        - self
-                            .disliked
-                            .iter()
-                            .map(|disliked| disliked.sim(node, vec))
-                            .sum::<f64>())
-            }
-            None => 0.0,
-        };
+    pub fn empty() -> Self {
+        Self {
+            liked: Vec::new(),
+            disliked: Vec::new(),
+            cache: HashMap::default(),
+            normalized: false,
+        }
+    }
+
+    pub async fn new<G: bitvec_similarity::Graph>(
+        graph: &G,
+        liked_hosts: &[NodeID],
+        disliked_hosts: &[NodeID],
+        normalized: bool,
+    ) -> Scorer {
+        let liked = bitvec_similarity::BitVec::batch_new_for(liked_hosts, graph).await;
+        let disliked = bitvec_similarity::BitVec::batch_new_for(disliked_hosts, graph).await;
+
+        let liked: Vec<_> = liked_hosts
+            .iter()
+            .zip_eq(liked)
+            .map(|(node, inbound)| NodeScorer::new(*node, inbound))
+            .collect();
+
+        let disliked: Vec<_> = disliked_hosts
+            .iter()
+            .zip_eq(disliked)
+            .map(|(node, inbound)| NodeScorer::new(*node, inbound))
+            .collect();
+
+        Scorer {
+            liked,
+            disliked,
+            cache: HashMap::default(),
+            normalized,
+        }
+    }
+    fn calculate_score(&self, node: &NodeID, inbound: &bitvec_similarity::BitVec) -> f64 {
+        let s = (self.disliked.len() as f64)
+            + (self
+                .liked
+                .iter()
+                .map(|liked| liked.sim(node, inbound))
+                .sum::<f64>()
+                - self
+                    .disliked
+                    .iter()
+                    .map(|disliked| disliked.sim(node, inbound))
+                    .sum::<f64>());
 
         if self.normalized {
             s / self.liked.len().max(1) as f64
@@ -124,12 +116,12 @@ impl Scorer {
         }
         .max(0.0)
     }
-    pub fn score(&mut self, node: &NodeID) -> f64 {
+    pub fn score(&mut self, node: &NodeID, inbound: &bitvec_similarity::BitVec) -> f64 {
         if let Some(cached) = self.cache.get(node) {
             return *cached;
         }
 
-        let score = self.calculate_score(node);
+        let score = self.calculate_score(node, inbound);
         self.cache.insert(*node, score);
         score
     }
@@ -143,187 +135,6 @@ impl Scorer {
             scorer.set_self_score(self_score);
         }
     }
-
-    /// Speedups calculation when we encounter a node for which we have
-    /// precalculated similarities. This means, the chosen node is a node
-    /// with many inbound links. If we encounter another node for which
-    /// we have no precalcalculated similarities with the chosen node, they
-    /// are most likely not very similar, so we can just assume a similarity
-    /// of 0.0.
-    ///
-    /// Needless to say, this is less accurate than calculating the similarity.
-    pub fn set_default_if_precalculated(&mut self, default_if_precalculated: bool) {
-        for scorer in self.liked.iter_mut() {
-            scorer.set_default_if_precalculated(default_if_precalculated);
-        }
-
-        for scorer in self.disliked.iter_mut() {
-            scorer.set_default_if_precalculated(default_if_precalculated);
-        }
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default)]
-struct PreCalculatedSimilarities {
-    map: HashMap<NodeID, HashMap<NodeID, f64>>,
-}
-
-impl PreCalculatedSimilarities {
-    fn get_or_default_if_precalculated(&self, node: &NodeID, other: &NodeID) -> Option<f64> {
-        Some(self.map.get(node)?.get(other).copied().unwrap_or_default())
-    }
-
-    fn get(&self, node: &NodeID, other: &NodeID) -> Option<f64> {
-        self.map.get(node)?.get(other).copied()
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default)]
-struct VecMap {
-    map: HashMap<NodeID, bitvec_similarity::BitVec>,
-}
-
-impl VecMap {
-    fn build(graph: &Webgraph) -> Self {
-        let adjacency: DashMap<NodeID, HashSet<NodeID>> = DashMap::new();
-
-        graph.par_edges().for_each(|edge| {
-            adjacency.entry(edge.to).or_default().insert(edge.from);
-        });
-
-        let mut map = HashMap::default();
-        for (node_id, inbound) in adjacency {
-            map.insert(
-                node_id,
-                bitvec_similarity::BitVec::new(inbound.into_iter().map(|n| n.as_u64()).collect()),
-            );
-        }
-
-        Self { map }
-    }
-
-    fn get(&self, id: &NodeID) -> Option<&bitvec_similarity::BitVec> {
-        self.map.get(id)
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default)]
-pub struct InboundSimilarity {
-    vectors: Arc<VecMap>,
-    precalculated: Arc<PreCalculatedSimilarities>,
-}
-
-impl InboundSimilarity {
-    pub fn build(graph: &Webgraph) -> Self {
-        let vectors = VecMap::build(graph);
-
-        tracing::info!("precalculating similarities...");
-
-        let mut nodes = vectors
-            .map
-            .iter()
-            .map(|(node, ranks)| (*node, ranks.len()))
-            .collect::<Vec<_>>();
-        nodes.sort_by(|(_, a), (_, b)| b.cmp(a));
-        nodes.truncate(PRECALCULATE_TOP_N);
-
-        let precalculated: HashMap<NodeID, HashMap<NodeID, f64>> = nodes
-            .into_par_iter()
-            .progress()
-            .map(|(node, _)| {
-                let node_vec = vectors.map.get(&node).unwrap();
-
-                let candidates = graph
-                    .raw_ingoing_edges(&node)
-                    .into_iter()
-                    .map(|edge| edge.from)
-                    .flat_map(|c| graph.raw_outgoing_edges(&c).into_iter().map(|edge| edge.to))
-                    .filter(|c| *c != node)
-                    .collect::<HashSet<_>>();
-
-                let mut candidates = candidates
-                    .into_iter()
-                    .filter_map(|c| vectors.map.get(&c).map(|vec| (c, vec)))
-                    .map(|(c, vec)| (c, node_vec.sim(vec)))
-                    .collect::<Vec<_>>();
-                candidates.sort_by(|(_, a), (_, b)| b.total_cmp(a));
-                candidates.truncate(TOP_CANDIDATES_PER_PRECALCULATION);
-
-                let mut map = HashMap::default();
-
-                for (candidate, _) in candidates {
-                    if let Some(candidate_vec) = vectors.map.get(&candidate) {
-                        let score = node_vec.sim(candidate_vec);
-                        map.insert(candidate, score);
-                    }
-                }
-
-                (node, map)
-            })
-            .collect();
-
-        let precalculated = PreCalculatedSimilarities { map: precalculated };
-
-        Self {
-            vectors: Arc::new(vectors),
-            precalculated: Arc::new(precalculated),
-        }
-    }
-
-    pub fn scorer(
-        &self,
-        liked_hosts: &[NodeID],
-        disliked_hosts: &[NodeID],
-        normalized: bool,
-    ) -> Scorer {
-        let liked: Vec<_> = liked_hosts
-            .iter()
-            .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
-            .map(|(node, inbound)| NodeScorer::new(*node, inbound, self.precalculated.clone()))
-            .collect();
-
-        let disliked: Vec<_> = disliked_hosts
-            .iter()
-            .filter_map(|id| self.vectors.get(id).cloned().map(|vec| (id, vec)))
-            .map(|(node, inbound)| NodeScorer::new(*node, inbound, self.precalculated.clone()))
-            .collect();
-
-        Scorer {
-            liked,
-            disliked,
-            vectors: self.vectors.clone(),
-            cache: HashMap::default(),
-            normalized,
-        }
-    }
-
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let mut file = BufWriter::new(
-            File::options()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(path)?,
-        );
-
-        bincode::encode_into_std_write(self, &mut file, bincode::config::standard())?;
-
-        Ok(())
-    }
-
-    pub fn get(&self, node: &NodeID) -> Option<&bitvec_similarity::BitVec> {
-        self.vectors.get(node)
-    }
-
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let file = File::open(path)?;
-        let mut reader = BufReader::new(file);
-
-        Ok(bincode::decode_from_std_read(
-            &mut reader,
-            bincode::config::standard(),
-        )?)
-    }
 }
 
 #[cfg(test)]
@@ -331,18 +142,31 @@ mod tests {
     use optics::HostRankings;
 
     use crate::{
+        bangs::Bangs,
         gen_temp_path,
         index::Index,
         rand_words,
-        searcher::{LocalSearcher, SearchQuery},
-        webgraph::{Node, WebgraphWriter},
+        searcher::{
+            api::ApiSearcher, live::LiveSearcher, LocalSearchClient, LocalSearcher, SearchQuery,
+        },
+        webgraph::{Node, Webgraph, WebgraphWriter},
         webpage::{Html, Webpage},
     };
 
     use super::*;
 
-    #[test]
-    fn it_favors_liked_hosts() {
+    fn inbound(graph: &Webgraph, node: &NodeID) -> bitvec_similarity::BitVec {
+        bitvec_similarity::BitVec::new(
+            graph
+                .raw_ingoing_edges(node)
+                .into_iter()
+                .map(|e| e.from.as_u64())
+                .collect(),
+        )
+    }
+
+    #[tokio::test]
+    async fn it_favors_liked_hosts() {
         let mut wrt = WebgraphWriter::new(
             gen_temp_path(),
             crate::executor::Executor::single_thread(),
@@ -361,17 +185,15 @@ mod tests {
 
         let graph = wrt.finalize();
 
-        let inbound = InboundSimilarity::build(&graph);
-
-        let mut scorer = inbound.scorer(&[Node::from("b.com").id()], &[], false);
+        let mut scorer = Scorer::new(&graph, &[Node::from("b.com").id()], &[], false).await;
         let e = Node::from("e.com").id();
         let d = Node::from("d.com").id();
 
-        assert!(scorer.score(&e) > scorer.score(&d));
+        assert!(scorer.score(&e, &inbound(&graph, &e)) > scorer.score(&d, &inbound(&graph, &d)));
     }
 
-    #[test]
-    fn it_ranks_search_results() {
+    #[tokio::test]
+    async fn it_ranks_search_results() {
         let mut wrt = WebgraphWriter::new(
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
@@ -384,8 +206,6 @@ mod tests {
         wrt.insert(Node::from("c.com"), Node::from("b.com"), String::new());
 
         let graph = wrt.finalize();
-
-        let inbound = InboundSimilarity::build(&graph);
 
         let mut index = Index::temporary().expect("Unable to open index");
 
@@ -441,8 +261,12 @@ mod tests {
 
         index.commit().unwrap();
 
-        let mut searcher = LocalSearcher::new(index);
-        searcher.set_inbound_similarity(inbound);
+        let searcher: ApiSearcher<_, LiveSearcher, _> = ApiSearcher::new(
+            LocalSearchClient::from(LocalSearcher::new(index)),
+            Bangs::empty(),
+            crate::searcher::api::Config::default(),
+        )
+        .with_webgraph(graph);
 
         let res = searcher
             .search(&SearchQuery {
@@ -454,7 +278,9 @@ mod tests {
                 }),
                 ..Default::default()
             })
+            .await
             .unwrap()
+            .into_websites_result()
             .webpages;
 
         assert_eq!(res.len(), 2);

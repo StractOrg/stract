@@ -17,8 +17,7 @@
 use std::sync::Arc;
 
 use tantivy::{
-    fieldnorm::FieldNormReader, postings::SegmentPostings, query::Scorer, DocId, DocSet, Postings,
-    Score, TERMINATED,
+    postings::SegmentPostings, query::Scorer, DocId, DocSet, Postings, Score, TERMINATED,
 };
 
 use crate::{
@@ -179,7 +178,6 @@ impl Scorer for EmptyFieldScorer {
 
 pub struct FastSiteDomainPatternScorer {
     pub posting: SegmentPostings,
-    pub fieldnorm_reader: FieldNormReader,
 }
 
 impl Scorer for FastSiteDomainPatternScorer {

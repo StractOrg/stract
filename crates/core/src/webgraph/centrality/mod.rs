@@ -31,63 +31,6 @@ pub enum TopNodes {
     Fraction(f64),
 }
 
-trait TopKOrderable: Ord {
-    type SortKey: Ord + Copy;
-
-    fn sort_key(&self) -> Self::SortKey;
-}
-
-impl TopKOrderable for (SortableFloat, NodeID) {
-    type SortKey = SortableFloat;
-
-    fn sort_key(&self) -> Self::SortKey {
-        self.0
-    }
-}
-
-impl<T> TopKOrderable for Reverse<T>
-where
-    T: TopKOrderable,
-{
-    type SortKey = Reverse<T::SortKey>;
-
-    fn sort_key(&self) -> Self::SortKey {
-        Reverse(self.0.sort_key())
-    }
-}
-
-/// Source (and explanation): https://quickwit.io/blog/top-k-complexity
-fn top_k<T>(mut hits: impl Iterator<Item = T>, k: usize) -> Vec<T>
-where
-    T: TopKOrderable,
-{
-    if k == 0 {
-        return Vec::new();
-    }
-
-    let mut top_k = Vec::with_capacity(2 * k);
-    top_k.extend((&mut hits).take(k));
-
-    let mut threshold = None;
-    for hit in hits {
-        if let Some(threshold) = threshold {
-            if hit.sort_key() <= threshold {
-                continue;
-            }
-        }
-        top_k.push(hit);
-        if top_k.len() == 2 * k {
-            // The standard library does all of the heavy lifting here.
-            let (_, median_el, _) = top_k.select_nth_unstable(k - 1);
-            threshold = Some(median_el.sort_key());
-            top_k.truncate(k);
-        }
-    }
-    top_k.sort_unstable();
-    top_k.truncate(k);
-    top_k
-}
-
 pub fn top_nodes(
     host_centrality: &speedy_kv::Db<NodeID, f64>,
     top: TopNodes,
@@ -97,7 +40,7 @@ pub fn top_nodes(
         TopNodes::Fraction(frac) => (host_centrality.len() as f64 * frac) as usize,
     };
 
-    top_k(
+    crate::sorted_k(
         host_centrality
             .iter()
             .map(|(id, centrality)| (SortableFloat(centrality), id))
@@ -190,7 +133,7 @@ mod tests {
             (SortableFloat(9.0), NodeID::from(9 as u64)),
         ];
 
-        let top_5 = top_k(hits.iter().copied(), 5);
+        let top_5 = crate::sorted_k(hits.iter().copied(), 5);
         assert_eq!(
             top_5,
             vec![
@@ -202,7 +145,7 @@ mod tests {
             ]
         );
 
-        let top_3 = top_k(hits.iter().copied(), 3);
+        let top_3 = crate::sorted_k(hits.iter().copied(), 3);
         assert_eq!(
             top_3,
             vec![
@@ -212,7 +155,7 @@ mod tests {
             ]
         );
 
-        let top_0 = top_k(hits.iter().copied(), 0);
+        let top_0 = crate::sorted_k(hits.iter().copied(), 0);
         assert_eq!(top_0, Vec::<(SortableFloat, NodeID)>::new());
     }
 
@@ -231,7 +174,7 @@ mod tests {
             (SortableFloat(0.0), NodeID::from(0 as u64)),
         ];
 
-        let top_5 = top_k(hits.iter().copied().map(Reverse), 5)
+        let top_5 = crate::sorted_k(hits.iter().copied().map(Reverse), 5)
             .into_iter()
             .map(|Reverse(x)| x)
             .collect::<Vec<_>>();
@@ -247,7 +190,7 @@ mod tests {
             ]
         );
 
-        let top_3 = top_k(hits.iter().copied().map(Reverse), 3)
+        let top_3 = crate::sorted_k(hits.iter().copied().map(Reverse), 3)
             .into_iter()
             .map(|Reverse(x)| x)
             .collect::<Vec<_>>();

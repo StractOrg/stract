@@ -29,7 +29,7 @@ use crate::{
     api::search::ReturnBody,
     bangs::BangHit,
     config::defaults,
-    ranking::{pipeline::RecallRankingWebpage, SignalCoefficient},
+    ranking::{pipeline::LocalRecallRankingWebpage, SignalCoefficient},
     search_prettifier::DisplayedWebpage,
     webpage::region::Region,
 };
@@ -40,6 +40,17 @@ pub const NUM_RESULTS_PER_PAGE: usize = 20;
 pub enum SearchResult {
     Websites(WebsitesResult),
     Bang(Box<BangHit>),
+}
+
+#[cfg(test)]
+impl SearchResult {
+    /// Panics if the result is not a `WebsitesResult`.
+    pub fn into_websites_result(self) -> WebsitesResult {
+        match self {
+            Self::Websites(result) => result,
+            _ => panic!("Expected WebsitesResult"),
+        }
+    }
 }
 
 #[derive(
@@ -70,7 +81,7 @@ pub struct SearchQuery {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct InitialWebsiteResult {
     pub num_websites: Option<usize>,
-    pub websites: Vec<RecallRankingWebpage>,
+    pub websites: Vec<LocalRecallRankingWebpage>,
     pub has_more: bool,
 }
 
@@ -107,5 +118,19 @@ impl SearchQuery {
         }
 
         signal_coefficients
+    }
+
+    pub fn host_rankings(&self) -> HostRankings {
+        let mut rankings = HostRankings::empty();
+
+        if let Some(host_rankings) = &self.host_rankings {
+            rankings.merge_into(host_rankings.clone());
+        }
+
+        if let Some(optic) = &self.optic {
+            rankings.merge_into(optic.host_rankings.clone());
+        }
+
+        rankings
     }
 }

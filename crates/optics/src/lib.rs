@@ -536,6 +536,14 @@ impl Display for HostRankings {
 }
 
 impl HostRankings {
+    pub fn empty() -> Self {
+        Self {
+            liked: Vec::new(),
+            disliked: Vec::new(),
+            blocked: Vec::new(),
+        }
+    }
+
     #[must_use]
     pub fn rules(&self) -> Rule {
         let matches: Vec<_> = self

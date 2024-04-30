@@ -1261,7 +1261,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(ranking_websites.len(), 2);
-        assert!(ranking_websites[0].title_embedding.is_some());
-        assert!(ranking_websites[1].title_embedding.is_none());
+        assert!(ranking_websites[0].title_embedding().is_some());
+        assert!(ranking_websites[1].title_embedding().is_none());
     }
 }

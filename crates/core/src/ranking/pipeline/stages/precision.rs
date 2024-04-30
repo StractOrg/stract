@@ -37,31 +37,45 @@ use super::RecallRankingWebpage;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct PrecisionRankingWebpage {
-    pub retrieved_webpage: RetrievedWebpage,
-    pub ranking: RecallRankingWebpage,
+    retrieved_webpage: RetrievedWebpage,
+    ranking: RecallRankingWebpage,
+}
+
+impl PrecisionRankingWebpage {
+    pub fn retrieved_webpage(&self) -> &RetrievedWebpage {
+        &self.retrieved_webpage
+    }
+
+    pub fn ranking(&self) -> &RecallRankingWebpage {
+        &self.ranking
+    }
+
+    pub fn ranking_mut(&mut self) -> &mut RecallRankingWebpage {
+        &mut self.ranking
+    }
 }
 
 impl collector::Doc for PrecisionRankingWebpage {
     fn score(&self) -> f64 {
-        self.ranking.score
+        self.ranking.score()
     }
 
     fn hashes(&self) -> collector::Hashes {
-        self.ranking.pointer.hashes
+        self.ranking.pointer().hashes
     }
 }
 
 impl RankableWebpage for PrecisionRankingWebpage {
     fn set_score(&mut self, score: f64) {
-        self.ranking.score = score;
+        self.ranking.set_score(score);
     }
 
     fn boost(&self) -> Option<f64> {
-        self.ranking.optic_boost
+        self.ranking.boost()
     }
 
     fn signals(&self) -> &EnumMap<SignalEnum, f64> {
-        &self.ranking.signals
+        self.ranking.signals()
     }
 }
 

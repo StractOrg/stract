@@ -135,10 +135,6 @@ name = "harmonic_centrality"
 
 [[bench]]
 harness = false
-name = "build_similarity"
-
-[[bench]]
-harness = false
 name = "hyperloglog"
 
 [[bench]]
