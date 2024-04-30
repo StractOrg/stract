@@ -30,6 +30,8 @@ use super::State;
 pub mod host {
     use url::Url;
 
+    use crate::entrypoint::webgraph_server::ScoredHost;
+
     use super::*;
 
     #[derive(serde::Deserialize, ToSchema)]
@@ -64,13 +66,20 @@ pub mod host {
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         state.counters.explore_counter.inc();
 
-        let hosts: Vec<_> = params.hosts.into_iter().take(20).collect();
+        let hosts: Vec<_> = params.hosts.into_iter().take(8).collect();
 
         Ok(Json(
             state
                 .similar_hosts
                 .find_similar_hosts(&hosts, params.top_n)
-                .await,
+                .await
+                .into_iter()
+                .map(|node| ScoredHost {
+                    host: node.node.as_str().to_string(),
+                    score: node.score,
+                    description: None,
+                })
+                .collect::<Vec<_>>(),
         ))
     }
 

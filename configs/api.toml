@@ -1,5 +1,5 @@
 cluster_id = "dev_api"
-crossencoder_model_path = "data/cross_encoder"
+# crossencoder_model_path = "data/cross_encoder"
 gossip_addr = "0.0.0.0:3005"
 gossip_seed_nodes = ["0.0.0.0:3006", "0.0.0.0:3007"]
 host = "0.0.0.0:3000"
