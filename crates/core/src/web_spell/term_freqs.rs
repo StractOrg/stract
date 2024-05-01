@@ -71,13 +71,13 @@ impl DictBuilder {
 }
 
 struct StoredDict {
-    map: fst::Map<memmap::Mmap>,
+    map: fst::Map<memmap2::Mmap>,
     path: PathBuf,
 }
 
 impl StoredDict {
     fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mmap = unsafe { memmap::Mmap::map(&File::open(path.as_ref())?)? };
+        let mmap = unsafe { memmap2::Mmap::map(&File::open(path.as_ref())?)? };
 
         Ok(Self {
             map: fst::Map::new(mmap)?,
@@ -147,7 +147,7 @@ impl StoredDict {
 
         builder.finish()?;
 
-        let mmap = unsafe { memmap::Mmap::map(&File::open(path.as_ref())?)? };
+        let mmap = unsafe { memmap2::Mmap::map(&File::open(path.as_ref())?)? };
 
         Ok(StoredDict {
             map: fst::Map::new(mmap)?,

@@ -27,7 +27,7 @@ use super::{BlobId, Serialized, SerializedRef};
 
 pub struct BlobIdIndex<K> {
     path: PathBuf,
-    fst: fst::Map<memmap::Mmap>,
+    fst: fst::Map<memmap2::Mmap>,
     _marker: std::marker::PhantomData<K>,
 }
 
@@ -36,7 +36,7 @@ impl<K> BlobIdIndex<K> {
     where
         P: AsRef<Path>,
     {
-        let mmap = unsafe { memmap::Mmap::map(&std::fs::File::open(&path)?)? };
+        let mmap = unsafe { memmap2::Mmap::map(&std::fs::File::open(&path)?)? };
 
         Ok(Self {
             path: path.as_ref().to_path_buf(),

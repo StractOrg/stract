@@ -24,7 +24,7 @@ use super::{BlobId, BlobPointer};
 
 pub struct BlobIndex {
     path: PathBuf,
-    bytes: memmap::Mmap,
+    bytes: memmap2::Mmap,
 }
 
 impl BlobIndex {
@@ -32,7 +32,7 @@ impl BlobIndex {
     where
         P: AsRef<Path>,
     {
-        let bytes = unsafe { memmap::Mmap::map(&std::fs::File::open(&path)?)? };
+        let bytes = unsafe { memmap2::Mmap::map(&std::fs::File::open(&path)?)? };
 
         Ok(Self {
             bytes,

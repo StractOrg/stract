@@ -208,18 +208,18 @@ fn merge_streams(
 }
 
 pub struct StupidBackoff {
-    ngrams: fst::Map<memmap::Mmap>,
-    rotated_ngrams: fst::Map<memmap::Mmap>,
+    ngrams: fst::Map<memmap2::Mmap>,
+    rotated_ngrams: fst::Map<memmap2::Mmap>,
     n_counts: Vec<u64>,
 }
 
 impl StupidBackoff {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mmap = unsafe { memmap::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
+        let mmap = unsafe { memmap2::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
         let ngrams = fst::Map::new(mmap)?;
 
         let mmap =
-            unsafe { memmap::Mmap::map(&File::open(path.as_ref().join("rotated_ngrams.bin"))?)? };
+            unsafe { memmap2::Mmap::map(&File::open(path.as_ref().join("rotated_ngrams.bin"))?)? };
         let rotated_ngrams = fst::Map::new(mmap)?;
 
         let file = File::open(path.as_ref().join("n_counts.bin"))?;
@@ -269,7 +269,7 @@ impl StupidBackoff {
 
         merge_streams(builder, streams)?;
 
-        let mmap = unsafe { memmap::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
+        let mmap = unsafe { memmap2::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
         let ngrams = fst::Map::new(mmap)?;
 
         let file = OpenOptions::new()
@@ -285,7 +285,7 @@ impl StupidBackoff {
 
         merge_streams(builder, streams)?;
 
-        let mmap = unsafe { memmap::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
+        let mmap = unsafe { memmap2::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
         let rotated_ngrams = fst::Map::new(mmap)?;
 
         Ok(Self {

@@ -29,7 +29,7 @@ pub struct Blob<'a, K, V> {
 
 pub struct BlobStore<K, V> {
     path: PathBuf,
-    bytes: Option<memmap::Mmap>,
+    bytes: Option<memmap2::Mmap>,
     _marker: std::marker::PhantomData<(K, V)>,
 }
 
@@ -38,7 +38,7 @@ impl<K, V> BlobStore<K, V> {
     where
         P: AsRef<Path>,
     {
-        let bytes = unsafe { memmap::Mmap::map(&std::fs::File::open(path.as_ref())?).ok() };
+        let bytes = unsafe { memmap2::Mmap::map(&std::fs::File::open(path.as_ref())?).ok() };
 
         Ok(Self {
             path: path.as_ref().to_path_buf(),

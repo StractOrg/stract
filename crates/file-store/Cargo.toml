@@ -9,3 +9,5 @@ license = "AGPL-3.0"
 [dependencies]
 anyhow.workspace = true
 bincode.workspace = true
+memmap2.workspace = true
+stable_deref_trait.workspace = true
