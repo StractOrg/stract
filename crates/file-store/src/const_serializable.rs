@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
-// change ConstSerializable to something like this
+// change ConstSerializable to something like the following
 // once generic_const_exprs is stable. See https://github.com/rust-lang/rust/issues/60551
 //
 // pub trait ConstSerializable {
@@ -29,3 +29,36 @@ pub trait ConstSerializable {
     fn serialize(&self, buf: &mut Vec<u8>);
     fn deserialize(buf: &[u8]) -> Self;
 }
+
+macro_rules! impl_const_serializable_num {
+    ($t:ty, $n:expr) => {
+        impl ConstSerializable for $t {
+            const BYTES: usize = $n;
+
+            fn serialize(&self, buf: &mut Vec<u8>) {
+                buf.extend_from_slice(&self.to_le_bytes());
+            }
+
+            fn deserialize(buf: &[u8]) -> Self {
+                let mut bytes = [0; $n];
+                bytes.copy_from_slice(&buf[..$n]);
+                <$t>::from_le_bytes(bytes)
+            }
+        }
+    };
+}
+
+impl_const_serializable_num!(u8, 1);
+impl_const_serializable_num!(u16, 2);
+impl_const_serializable_num!(u32, 4);
+impl_const_serializable_num!(u64, 8);
+impl_const_serializable_num!(u128, 16);
+
+impl_const_serializable_num!(i8, 1);
+impl_const_serializable_num!(i16, 2);
+impl_const_serializable_num!(i32, 4);
+impl_const_serializable_num!(i64, 8);
+impl_const_serializable_num!(i128, 16);
+
+impl_const_serializable_num!(f32, 4);
+impl_const_serializable_num!(f64, 8);

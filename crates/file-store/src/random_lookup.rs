@@ -115,20 +115,6 @@ impl<V> From<OwnedBytes> for RandomLookup<V> {
 mod tests {
     use super::*;
 
-    impl ConstSerializable for u64 {
-        const BYTES: usize = 8;
-
-        fn serialize(&self, buf: &mut Vec<u8>) {
-            buf.extend_from_slice(&self.to_le_bytes());
-        }
-
-        fn deserialize(buf: &[u8]) -> Self {
-            let mut bytes = [0; 8];
-            bytes.copy_from_slice(&buf[..8]);
-            u64::from_le_bytes(bytes)
-        }
-    }
-
     #[test]
     fn test_simple() {
         let mut writer = RandomLookupWriter::new(Vec::new());

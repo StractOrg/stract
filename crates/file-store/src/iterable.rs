@@ -21,8 +21,11 @@
 //! 1. A 64-bit little-endian integer representing the number of bytes in the upcoming item.
 //! 2. The serialized item.
 //! 3. Repeat 1-2 until the end of the file.
+//!
+//! If the item type `T` implements `ConstSerializable`, then the `ConstIterableStoreWriter` can be
+//! used to write items to the file without intermediate headers as the size of the serialied item is known upfront.
 
-use crate::{owned_bytes::OwnedBytes, Result};
+use crate::{owned_bytes::OwnedBytes, ConstSerializable, Result};
 use std::{
     io::{self, Write},
     path::Path,
@@ -147,7 +150,7 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.offset + IterableHeader::serialized_size() >= self.data.len() {
+        if self.offset + IterableHeader::serialized_size() > self.data.len() {
             return None;
         }
 
@@ -250,6 +253,119 @@ where
     }
 }
 
+pub struct ConstIterableStoreWriter<T, W>
+where
+    W: io::Write,
+{
+    writer: io::BufWriter<W>,
+    buf: Vec<u8>,
+    next_start: u64,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T, W> ConstIterableStoreWriter<T, W>
+where
+    T: ConstSerializable,
+    W: io::Write,
+{
+    pub fn new(writer: W) -> Self {
+        Self {
+            writer: io::BufWriter::new(writer),
+            _marker: std::marker::PhantomData,
+            buf: Vec::new(),
+            next_start: 0,
+        }
+    }
+
+    pub fn write(&mut self, item: &T) -> Result<WrittenOffset> {
+        self.buf.clear();
+        item.serialize(&mut self.buf);
+
+        assert_eq!(self.buf.len(), T::BYTES);
+
+        self.writer.write_all(&self.buf)?;
+
+        let start = self.next_start;
+        let bytes_written = T::BYTES as u64;
+
+        self.next_start += bytes_written;
+
+        Ok(WrittenOffset {
+            start,
+            num_bytes: bytes_written,
+        })
+    }
+
+    pub fn finalize(mut self) -> Result<W> {
+        self.writer.flush()?;
+
+        self.writer.into_inner().map_err(|e| anyhow::anyhow!("{e}"))
+    }
+}
+
+pub struct ConstIterableStoreReader<T> {
+    data: OwnedBytes,
+    offset: usize,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> ConstIterableStoreReader<T> {
+    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        let data = OwnedBytes::mmap_from_path(path)?;
+
+        Ok(Self {
+            data,
+            offset: 0,
+            _marker: std::marker::PhantomData,
+        })
+    }
+
+    pub fn from_bytes(data: Vec<u8>) -> Self {
+        Self {
+            data: OwnedBytes::new(data),
+            offset: 0,
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T> Iterator for ConstIterableStoreReader<T>
+where
+    T: ConstSerializable,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.offset + T::BYTES > self.data.len() {
+            return None;
+        }
+
+        let item_bytes = &self.data[self.offset..self.offset + T::BYTES];
+
+        self.offset += T::BYTES;
+
+        Some(T::deserialize(item_bytes))
+    }
+}
+
+impl<T> io::Seek for ConstIterableStoreReader<T> {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        match pos {
+            io::SeekFrom::Start(offset) => {
+                self.offset = offset as usize;
+            }
+            io::SeekFrom::End(offset) => {
+                self.offset = self.data.len() - offset as usize;
+            }
+            io::SeekFrom::Current(offset) => {
+                self.offset += offset as usize;
+            }
+        }
+
+        Ok(self.offset as u64)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -290,5 +406,19 @@ mod tests {
 
         let items: Vec<i32> = reader.map(|item| item.unwrap()).collect();
         assert_eq!(items, vec![1, 2, 3, 4, 5, 6]);
+    }
+
+    #[test]
+    fn test_const_iterable_store() {
+        let mut writer = ConstIterableStoreWriter::new(Vec::new());
+        writer.write(&1).unwrap();
+        writer.write(&2).unwrap();
+        writer.write(&3).unwrap();
+        let writer = writer.finalize().unwrap();
+
+        let reader = ConstIterableStoreReader::<i32>::from_bytes(writer);
+
+        let items: Vec<i32> = reader.collect();
+        assert_eq!(items, vec![1, 2, 3]);
     }
 }
