@@ -14,25 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    path::Path,
+};
 
-use crate::owned_bytes::OwnedBytes;
-
-// change ConstSerializable to something like this
-// once generic_const_exprs is stable. See https://github.com/rust-lang/rust/issues/60551
-//
-// pub trait ConstSerializable {
-//     const BYTES: usize;
-//     fn serialize(&self) -> [u8; Self::BYTES];
-//     fn deserialize(bytes: [u8; Self::BYTES]) -> Self;
-// }
-
-pub trait ConstSerializable {
-    const BYTES: usize;
-
-    fn serialize(&self, buf: &mut Vec<u8>);
-    fn deserialize(buf: &[u8]) -> Self;
-}
+use crate::{owned_bytes::OwnedBytes, ConstSerializable};
 
 pub struct ItemId(u64);
 
@@ -95,10 +82,8 @@ impl<V> RandomLookup<V>
 where
     V: ConstSerializable,
 {
-    pub fn open(path: &std::path::Path) -> io::Result<Self> {
-        let mmap = unsafe { memmap2::Mmap::map(&std::fs::File::open(path)?)? };
-
-        let data = OwnedBytes::new(mmap);
+    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        let data = OwnedBytes::mmap_from_path(path)?;
 
         Ok(RandomLookup {
             data,

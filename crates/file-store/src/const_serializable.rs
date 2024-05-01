@@ -12,17 +12,20 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>
+// along with this program.  If not, see <https://www.gnu.org/licenses/
 
-//! A collection of simple disk-based data structures.
+// change ConstSerializable to something like this
+// once generic_const_exprs is stable. See https://github.com/rust-lang/rust/issues/60551
+//
+// pub trait ConstSerializable {
+//     const BYTES: usize;
+//     fn serialize(&self) -> [u8; Self::BYTES];
+//     fn deserialize(bytes: [u8; Self::BYTES]) -> Self;
+// }
 
-pub type Result<T> = std::result::Result<T, anyhow::Error>;
+pub trait ConstSerializable {
+    const BYTES: usize;
 
-pub mod const_serializable;
-pub mod iterable;
-mod owned_bytes;
-pub mod peekable;
-pub mod random_lookup;
-
-pub use const_serializable::ConstSerializable;
-pub use peekable::Peekable;
+    fn serialize(&self, buf: &mut Vec<u8>);
+    fn deserialize(buf: &[u8]) -> Self;
+}

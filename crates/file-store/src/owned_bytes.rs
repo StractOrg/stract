@@ -14,29 +14,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
-use std::{fmt, io, ops::Deref, sync::Arc};
+//! This is taken from https://docs.rs/ownedbytes/latest/ownedbytes/
+//! to avoid having to pull in another dependency.
 
 use stable_deref_trait::StableDeref;
+use std::{fmt, io, ops::Deref, path::Path, sync::Arc};
 
-// This is taken from https://docs.rs/ownedbytes/latest/ownedbytes/
-// to avoid having to pull in another dependency.
 pub struct OwnedBytes {
     data: &'static [u8],
     box_stable_deref: Arc<dyn Deref<Target = [u8]> + Sync + Send>,
 }
 
 impl OwnedBytes {
-    pub fn empty() -> OwnedBytes {
-        OwnedBytes::new(&[][..])
+    pub fn mmap_from_path<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        let path = path.as_ref();
+        let mmap = unsafe { memmap2::Mmap::map(&std::fs::File::open(path)?)? };
+
+        Ok(Self::new(mmap))
+    }
+
+    pub fn empty() -> Self {
+        Self::new(&[][..])
     }
 
     pub fn new<T: StableDeref + Deref<Target = [u8]> + 'static + Send + Sync>(
         data_holder: T,
-    ) -> OwnedBytes {
+    ) -> Self {
         let box_stable_deref = Arc::new(data_holder);
         let bytes: &[u8] = box_stable_deref.deref();
         let data = unsafe { &*(bytes as *const [u8]) };
-        OwnedBytes {
+        Self {
             data,
             box_stable_deref,
         }
@@ -89,6 +96,12 @@ impl Clone for OwnedBytes {
 impl io::Read for OwnedBytes {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.as_slice().read(buf)
+    }
+}
+
+impl From<Vec<u8>> for OwnedBytes {
+    fn from(vec: Vec<u8>) -> Self {
+        Self::new(vec)
     }
 }
 
