@@ -18,7 +18,7 @@ use tantivy::DocId;
 
 use crate::{
     enum_map::EnumMap,
-    ranking::{ComputedSignal, Signal, SignalEnum, SignalScore},
+    ranking::{ComputedSignal, Signal, SignalEnum},
     schema::{text_field::TextField, TextFieldEnum},
 };
 
@@ -79,21 +79,13 @@ impl SignalComputeOrder {
             .chain(
                 self.other_signals
                     .iter()
-                    .filter_map(|signal| {
-                        let coefficient = signal_computer.coefficient(signal);
-
-                        if coefficient > 0.0 {
-                            Some((signal, coefficient))
-                        } else {
-                            None
-                        }
-                    })
-                    .map(move |(signal, coefficient)| {
+                    .filter(|signal| signal_computer.coefficient(signal) > 0.0)
+                    .map(move |signal| {
                         signal
                             .compute(doc, signal_computer)
-                            .map(|value| ComputedSignal {
+                            .map(|score| ComputedSignal {
                                 signal: *signal,
-                                score: SignalScore { coefficient, value },
+                                score,
                             })
                     }),
             )
@@ -132,18 +124,14 @@ impl NGramComputeOrder {
             .filter_map(move |signal| {
                 signal
                     .compute(doc, signal_computer)
-                    .map(|value| {
-                        let coefficient = signal_computer.coefficient(signal);
-
-                        ComputedSignal {
-                            signal: *signal,
-                            score: SignalScore { coefficient, value },
-                        }
+                    .map(|score| ComputedSignal {
+                        signal: *signal,
+                        score,
                     })
                     .map(|mut c| {
-                        c.score.coefficient *= NGRAM_DAMPENING.powi(hits);
+                        c.score *= NGRAM_DAMPENING.powi(hits);
 
-                        if c.score.value > 0.0 {
+                        if c.score > 0.0 {
                             hits += 1;
                         }
 

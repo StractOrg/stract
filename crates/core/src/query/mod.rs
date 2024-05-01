@@ -174,6 +174,8 @@ impl Query {
     }
 
     pub fn signal_coefficients(&self) -> Option<SignalCoefficient> {
+        // TODO: we should make sure taht `SearchQuery::signal_coefficients`
+        // return the same coefficients as the ones we calculate here
         if self.optics.is_empty() {
             return None;
         }
@@ -183,7 +185,7 @@ impl Query {
                 .iter()
                 .fold(SignalCoefficient::default(), |mut acc, optic| {
                     let coeffs = SignalCoefficient::from_optic(optic);
-                    acc.merge_into(coeffs);
+                    acc.merge_add(coeffs);
                     acc
                 }),
         )

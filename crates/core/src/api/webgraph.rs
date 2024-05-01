@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use axum::{extract, response::IntoResponse, Json};
 use http::StatusCode;
@@ -22,35 +22,15 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     config::WebgraphGranularity,
-    distributed::{cluster::Cluster, member::Service, retry_strategy::ExponentialBackoff, sonic},
     webgraph::{FullEdge, Node},
 };
 
 use super::State;
 
-pub struct RemoteWebgraph {
-    cluster: Arc<Cluster>,
-}
-
-impl RemoteWebgraph {
-    pub fn new(cluster: Arc<Cluster>) -> Self {
-        Self { cluster }
-    }
-
-    async fn host(&self, level: WebgraphGranularity) -> Option<SocketAddr> {
-        self.cluster
-            .members()
-            .await
-            .iter()
-            .find_map(|member| match member.service {
-                Service::Webgraph { host, granularity } if granularity == level => Some(host),
-                _ => None,
-            })
-    }
-}
-
 pub mod host {
     use url::Url;
+
+    use crate::entrypoint::webgraph_server::ScoredHost;
 
     use super::*;
 
@@ -85,40 +65,22 @@ pub mod host {
         extract::Json(params): extract::Json<SimilarHostsParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         state.counters.explore_counter.inc();
-        let host = state
-            .remote_webgraph
-            .host(WebgraphGranularity::Host)
-            .await
-            .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        let retry = ExponentialBackoff::from_millis(30)
-            .with_limit(Duration::from_millis(200))
-            .take(5);
+        let hosts: Vec<_> = params.hosts.into_iter().take(8).collect();
 
-        let conn = sonic::service::Connection::create_with_timeout_retry(
-            host,
-            Duration::from_secs(30),
-            retry,
-        )
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        match conn
-            .send_with_timeout(
-                &crate::entrypoint::webgraph_server::SimilarHosts {
-                    hosts: params.hosts,
-                    top_n: params.top_n,
-                },
-                Duration::from_secs(60),
-            )
-            .await
-        {
-            Ok(nodes) => Ok(Json(nodes)),
-            Err(err) => {
-                tracing::error!("Failed to send request to webgraph: {}", err);
-                Err(StatusCode::INTERNAL_SERVER_ERROR)
-            }
-        }
+        Ok(Json(
+            state
+                .similar_hosts
+                .find_similar_hosts(&hosts, params.top_n)
+                .await
+                .into_iter()
+                .map(|node| ScoredHost {
+                    host: node.node.as_str().to_string(),
+                    score: node.score,
+                    description: None,
+                })
+                .collect::<Vec<_>>(),
+        ))
     }
 
     #[utoipa::path(post,
@@ -132,31 +94,7 @@ pub mod host {
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<KnowsHostParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        let host = state
-            .remote_webgraph
-            .host(WebgraphGranularity::Host)
-            .await
-            .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        let retry = ExponentialBackoff::from_millis(30)
-            .with_limit(Duration::from_millis(200))
-            .take(5);
-
-        let conn = sonic::service::Connection::create_with_timeout_retry(
-            host,
-            Duration::from_secs(30),
-            retry,
-        )
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        match conn
-            .send_with_timeout(
-                &crate::entrypoint::webgraph_server::Knows { host: params.host },
-                Duration::from_secs(60),
-            )
-            .await
-        {
+        match state.host_webgraph.knows(params.host).await {
             Ok(Some(node)) => Ok(Json(KnowsHost::Known {
                 host: node.as_str().to_string(),
             })),
@@ -276,28 +214,12 @@ async fn ingoing_links(
     node: Node,
     level: WebgraphGranularity,
 ) -> anyhow::Result<Vec<FullEdge>> {
-    let host = state
-        .remote_webgraph
-        .host(level)
-        .await
-        .ok_or(anyhow::anyhow!(
-            "no remote webgraph for granularity {level:?}"
-        ))?;
+    let graph = match level {
+        WebgraphGranularity::Host => &state.host_webgraph,
+        WebgraphGranularity::Page => &state.page_webgraph,
+    };
 
-    let retry = ExponentialBackoff::from_millis(30)
-        .with_limit(Duration::from_millis(200))
-        .take(5);
-
-    let conn =
-        sonic::service::Connection::create_with_timeout_retry(host, Duration::from_secs(30), retry)
-            .await?;
-
-    Ok(conn
-        .send_with_timeout(
-            &crate::entrypoint::webgraph_server::IngoingLinks { node },
-            Duration::from_secs(60),
-        )
-        .await?)
+    graph.ingoing_edges(node).await
 }
 
 async fn outgoing_links(
@@ -305,28 +227,12 @@ async fn outgoing_links(
     node: Node,
     level: WebgraphGranularity,
 ) -> anyhow::Result<Vec<FullEdge>> {
-    let host = state
-        .remote_webgraph
-        .host(level)
-        .await
-        .ok_or(anyhow::anyhow!(
-            "no remote webgraph for granularity {level:?}"
-        ))?;
+    let graph = match level {
+        WebgraphGranularity::Host => &state.host_webgraph,
+        WebgraphGranularity::Page => &state.page_webgraph,
+    };
 
-    let retry = ExponentialBackoff::from_millis(30)
-        .with_limit(Duration::from_millis(200))
-        .take(5);
-
-    let conn =
-        sonic::service::Connection::create_with_timeout_retry(host, Duration::from_secs(30), retry)
-            .await?;
-
-    Ok(conn
-        .send_with_timeout(
-            &crate::entrypoint::webgraph_server::OutgoingLinks { node },
-            Duration::from_secs(60),
-        )
-        .await?)
+    graph.outgoing_edges(node).await
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema)]

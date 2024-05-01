@@ -21,7 +21,6 @@ pub mod initial;
 pub mod models;
 pub mod optics;
 pub mod pipeline;
-pub mod query_centrality;
 pub mod signal;
 
 use initial::InitialScoreTweaker;
@@ -116,10 +115,6 @@ impl Ranker {
         collector = collector.and_collector_config(self.collector_config.clone());
 
         collector.main_collector(score_tweaker)
-    }
-
-    pub fn set_query_centrality(&mut self, query_centrality: query_centrality::Scorer) {
-        self.computer.set_query_centrality(query_centrality);
     }
 }
 
@@ -777,7 +772,7 @@ mod tests {
         IndexingWorker::new(IndexingLocalConfig {
             host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
             page_centrality_store_path: None,
-            page_webgraph_path: None,
+            page_webgraph: None,
             topics_path: None,
             safety_classifier_path: None,
             dual_encoder: Some(IndexingDualEncoderConfig {
@@ -794,6 +789,8 @@ mod tests {
             host_centrality_threshold: None,
             minimum_clean_words: None,
             batch_size: 10,
+            autocommit_after_num_inserts:
+                crate::config::defaults::Indexing::autocommit_after_num_inserts(),
         })
     }
 

@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use chitchat::{
-    spawn_chitchat, transport::UdpTransport, ChitchatConfig, ChitchatHandle, FailureDetectorConfig,
-    NodeId,
+    spawn_chitchat, transport::UdpTransport, Chitchat, ChitchatConfig, ChitchatHandle,
+    FailureDetectorConfig, NodeId,
 };
 use std::{collections::HashSet, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tokio_stream::StreamExt;
 use tracing::error;
 
@@ -29,6 +29,57 @@ const GOSSIP_INTERVAL: Duration = Duration::from_secs(1);
 const SERVICE_KEY: &str = "service";
 
 type Result<T> = std::result::Result<T, anyhow::Error>;
+
+fn alive_nodes_updater(chitchat: Arc<Mutex<Chitchat>>) -> Arc<RwLock<HashSet<Member>>> {
+    let alive_nodes = Arc::new(RwLock::new(HashSet::new()));
+    let alive_nodes_ref = alive_nodes.clone();
+
+    tokio::spawn(async move {
+        let mut node_change_receiver = chitchat.lock().await.ready_nodes_watcher();
+
+        while let Some(members_set) = node_change_receiver.next().await {
+            let alive_node_ids: HashSet<_> = alive_nodes_ref
+                .read()
+                .await
+                .iter()
+                .map(|member: &Member| member.id.clone())
+                .collect();
+
+            let member_ids: HashSet<_> =
+                members_set.iter().map(|member| member.id.clone()).collect();
+
+            if alive_node_ids != member_ids {
+                let snapshot = chitchat.lock().await.state_snapshot();
+                let mut new_members = Vec::new();
+                for member in members_set {
+                    if let Some(state) = snapshot.node_states.get(&member.id) {
+                        if let Some(service) = state.get(SERVICE_KEY) {
+                            let service: Service = serde_json::from_str(service).unwrap();
+                            new_members.push(Member {
+                                service,
+                                id: member.id,
+                            });
+                        } else {
+                            error!("failed to get service");
+                        }
+                    } else {
+                        error!("no state found for node")
+                    }
+                }
+
+                tracing::info!("new members: {:#?}", new_members);
+                let mut write = alive_nodes_ref.write().await;
+                write.clear();
+
+                for member in new_members {
+                    write.insert(member);
+                }
+            }
+        }
+    });
+
+    alive_nodes
+}
 
 pub struct Cluster {
     alive_nodes: Arc<RwLock<HashSet<Member>>>,
@@ -42,7 +93,6 @@ impl Cluster {
         gossip_addr: SocketAddr,
         seed_addrs: Vec<SocketAddr>,
     ) -> Result<Self> {
-        let transport = UdpTransport;
         let failure_detector_config = FailureDetectorConfig {
             initial_interval: GOSSIP_INTERVAL,
             ..Default::default()
@@ -54,7 +104,6 @@ impl Cluster {
             id: format!("{}_{}", self_node.id, uuid),
             gossip_public_address: gossip_addr,
         };
-
         let config = ChitchatConfig {
             node_id,
             cluster_id: CLUSTER_ID.to_string(),
@@ -68,63 +117,58 @@ impl Cluster {
             is_ready_predicate: None,
         };
 
-        let chitchat_handle = spawn_chitchat(
+        Self::join_with_config(
             config,
             vec![(
                 SERVICE_KEY.to_string(),
                 serde_json::to_string(&self_node.service)?,
             )],
-            &transport,
         )
-        .await?;
+        .await
+    }
+
+    pub async fn join_as_spectator(
+        cluster_id: String,
+        gossip_addr: SocketAddr,
+        seed_addrs: Vec<SocketAddr>,
+    ) -> Result<Self> {
+        let failure_detector_config = FailureDetectorConfig {
+            initial_interval: GOSSIP_INTERVAL,
+            ..Default::default()
+        };
+
+        let uuid = uuid::Uuid::new_v4().to_string();
+
+        let node_id = NodeId {
+            id: format!("{}_{}", cluster_id, uuid),
+            gossip_public_address: gossip_addr,
+        };
+        let config = ChitchatConfig {
+            node_id,
+            cluster_id: CLUSTER_ID.to_string(),
+            gossip_interval: GOSSIP_INTERVAL,
+            listen_addr: gossip_addr,
+            seed_nodes: seed_addrs
+                .into_iter()
+                .map(|addr| addr.to_string())
+                .collect(),
+            failure_detector_config,
+            is_ready_predicate: None,
+        };
+
+        Self::join_with_config(config, vec![]).await
+    }
+
+    async fn join_with_config(
+        config: ChitchatConfig,
+        key_values: Vec<(String, String)>,
+    ) -> Result<Self> {
+        let transport = UdpTransport;
+
+        let chitchat_handle = spawn_chitchat(config, key_values, &transport).await?;
         let chitchat = chitchat_handle.chitchat();
 
-        let alive_nodes = Arc::new(RwLock::new(HashSet::new()));
-        let alive_nodes_ref = alive_nodes.clone();
-
-        tokio::spawn(async move {
-            let mut node_change_receiver = chitchat.lock().await.ready_nodes_watcher();
-
-            while let Some(members_set) = node_change_receiver.next().await {
-                let alive_node_ids: HashSet<_> = alive_nodes_ref
-                    .read()
-                    .await
-                    .iter()
-                    .map(|member: &Member| member.id.clone())
-                    .collect();
-
-                let member_ids: HashSet<_> =
-                    members_set.iter().map(|member| member.id.clone()).collect();
-
-                if alive_node_ids != member_ids {
-                    let snapshot = chitchat.lock().await.state_snapshot();
-                    let mut new_members = Vec::new();
-                    for member in members_set {
-                        if let Some(state) = snapshot.node_states.get(&member.id) {
-                            if let Some(service) = state.get(SERVICE_KEY) {
-                                let service: Service = serde_json::from_str(service).unwrap();
-                                new_members.push(Member {
-                                    service,
-                                    id: member.id,
-                                });
-                            } else {
-                                error!("failed to get service");
-                            }
-                        } else {
-                            error!("no state found for node")
-                        }
-                    }
-
-                    tracing::info!("new members: {:#?}", new_members);
-                    let mut write = alive_nodes_ref.write().await;
-                    write.clear();
-
-                    for member in new_members {
-                        write.insert(member);
-                    }
-                }
-            }
-        });
+        let alive_nodes = alive_nodes_updater(chitchat);
 
         Ok(Self {
             alive_nodes,

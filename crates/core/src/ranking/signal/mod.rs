@@ -49,9 +49,15 @@ impl FromStr for SignalEnumDiscriminants {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SignalCoefficient {
     map: EnumMap<SignalEnum, f64>,
+}
+
+impl Default for SignalCoefficient {
+    fn default() -> Self {
+        Self::new(SignalEnum::all().map(|signal| (signal, signal.default_coefficient())))
+    }
 }
 
 impl SignalCoefficient {
@@ -82,11 +88,24 @@ impl SignalCoefficient {
         }))
     }
 
-    pub fn merge_into(&mut self, coeffs: SignalCoefficient) {
+    pub fn merge_add(&mut self, coeffs: SignalCoefficient) {
         for signal in SignalEnum::all() {
             if let Some(coeff) = coeffs.map.get(signal).copied() {
                 match self.map.get_mut(signal) {
                     Some(existing_coeff) => *existing_coeff += coeff,
+                    None => {
+                        self.map.insert(signal, coeff);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn merge_overwrite(&mut self, coeffs: SignalCoefficient) {
+        for signal in SignalEnum::all() {
+            if let Some(coeff) = coeffs.map.get(signal).copied() {
+                match self.map.get_mut(signal) {
+                    Some(existing_coeff) => *existing_coeff = coeff,
                     None => {
                         self.map.insert(signal, coeff);
                     }
@@ -99,7 +118,7 @@ impl SignalCoefficient {
 #[derive(Debug, Clone, Copy)]
 pub struct ComputedSignal {
     pub signal: SignalEnum,
-    pub score: SignalScore,
+    pub score: f64,
 }
 
 #[derive(

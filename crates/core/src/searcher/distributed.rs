@@ -29,6 +29,7 @@ use crate::{
         search_server::{self, SearchService},
     },
     image_store::Image,
+    index::Index,
     inverted_index::{RetrievedWebpage, WebpagePointer},
     ranking::pipeline::{PrecisionRankingWebpage, RecallRankingWebpage},
     Result,
@@ -43,7 +44,7 @@ use std::future::Future;
 use thiserror::Error;
 use url::Url;
 
-use super::{InitialWebsiteResult, SearchQuery};
+use super::{InitialWebsiteResult, LocalSearcher, SearchQuery};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -55,6 +56,38 @@ pub enum Error {
 
     #[error("Webpage not found")]
     WebpageNotFound,
+}
+
+pub trait SearchClient {
+    fn search_initial(
+        &self,
+        query: &SearchQuery,
+    ) -> impl Future<Output = Vec<InitialSearchResultShard>> + Send;
+
+    fn retrieve_webpages(
+        &self,
+        top_websites: &[(usize, ScoredWebpagePointer)],
+        query: &str,
+    ) -> impl Future<Output = Vec<(usize, PrecisionRankingWebpage)>> + Send;
+
+    fn search_entity(&self, query: &str) -> impl Future<Output = Option<EntityMatch>> + Send;
+
+    fn get_webpage(
+        &self,
+        url: &str,
+    ) -> impl Future<Output = Result<Option<RetrievedWebpage>>> + Send;
+
+    fn get_homepage_descriptions(
+        &self,
+        urls: &[Url],
+    ) -> impl Future<Output = HashMap<Url, String>> + Send;
+
+    fn get_entity_image(
+        &self,
+        image_id: &str,
+        max_height: Option<u64>,
+        max_width: Option<u64>,
+    ) -> impl Future<Output = Result<Option<Image>>> + Send;
 }
 
 #[derive(Clone, Debug)]
@@ -133,7 +166,7 @@ impl DistributedSearcher {
         {
             Ok(v) => v
                 .into_iter()
-                .flat_map(|(_, v)| v)
+                .flat_map(|(_, v)| v.into_iter().map(|(_, v)| v))
                 .flatten()
                 .flatten()
                 .zip_eq(idxs)
@@ -160,7 +193,7 @@ impl SearchClient for DistributedSearcher {
             .await
         {
             for (shard_id, mut res) in res {
-                if let Some(Some(res)) = res.pop() {
+                if let Some((_, Some(res))) = res.pop() {
                     results.push(InitialSearchResultShard {
                         local_result: res,
                         shard: shard_id,
@@ -184,7 +217,7 @@ impl SearchClient for DistributedSearcher {
             pointers
                 .entry(pointer.shard)
                 .or_default()
-                .push((*i, pointer.website.pointer.clone()));
+                .push((*i, pointer.website.pointer().clone()));
 
             rankings.insert(*i, pointer.website.clone());
         }
@@ -224,7 +257,12 @@ impl SearchClient for DistributedSearcher {
             .await
             .map_err(|_| Error::SearchFailed)?;
 
-        if let Some(res) = res.into_iter().flat_map(|(_, v)| v).flatten().next() {
+        if let Some(res) = res
+            .into_iter()
+            .flat_map(|(_, v)| v.into_iter().map(|(_, v)| v))
+            .flatten()
+            .next()
+        {
             Ok(Some(res))
         } else {
             Err(Error::WebpageNotFound.into())
@@ -247,7 +285,10 @@ impl SearchClient for DistributedSearcher {
         match res {
             Ok(v) => v
                 .into_iter()
-                .flat_map(|(_, v)| v.into_iter().map(|crate::bincode_utils::SerdeCompat(v)| v))
+                .flat_map(|(_, v)| {
+                    v.into_iter()
+                        .map(|(_, crate::bincode_utils::SerdeCompat(v))| v)
+                })
                 .flatten()
                 .collect(),
             _ => HashMap::new(),
@@ -274,7 +315,7 @@ impl SearchClient for DistributedSearcher {
             .await
             .map_err(|_| Error::SearchFailed)?
             .pop()
-            .flatten())
+            .and_then(|(_, v)| v))
     }
 
     async fn search_entity(&self, query: &str) -> Option<EntityMatch> {
@@ -290,38 +331,81 @@ impl SearchClient for DistributedSearcher {
             .await
             .ok()?
             .pop()
-            .flatten()
+            .and_then(|(_, v)| v)
     }
 }
 
-pub trait SearchClient {
-    fn search_initial(
-        &self,
-        query: &SearchQuery,
-    ) -> impl Future<Output = Vec<InitialSearchResultShard>> + Send;
+/// This should only be used for testing and benchmarks.
+pub struct LocalSearchClient(LocalSearcher<Index>);
+impl From<LocalSearcher<Index>> for LocalSearchClient {
+    fn from(searcher: LocalSearcher<Index>) -> Self {
+        Self(searcher)
+    }
+}
 
-    fn retrieve_webpages(
+impl SearchClient for LocalSearchClient {
+    async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultShard> {
+        let res = self.0.search_initial(query, true).unwrap();
+
+        vec![InitialSearchResultShard {
+            local_result: res,
+            shard: ShardId::new(0),
+        }]
+    }
+
+    async fn retrieve_webpages(
         &self,
         top_websites: &[(usize, ScoredWebpagePointer)],
         query: &str,
-    ) -> impl Future<Output = Vec<(usize, PrecisionRankingWebpage)>> + Send;
+    ) -> Vec<(usize, PrecisionRankingWebpage)> {
+        let pointers = top_websites
+            .iter()
+            .map(|(_, p)| p.website.pointer().clone())
+            .collect::<Vec<_>>();
 
-    fn search_entity(&self, query: &str) -> impl Future<Output = Option<EntityMatch>> + Send;
+        let res = self
+            .0
+            .retrieve_websites(&pointers, query)
+            .unwrap()
+            .into_iter()
+            .zip(top_websites.iter().map(|(i, p)| (*i, p.website.clone())))
+            .map(|(ret, (i, ran))| (i, PrecisionRankingWebpage::new(ret, ran)))
+            .collect::<Vec<_>>();
 
-    fn get_webpage(
+        res
+    }
+
+    async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
+        Ok(self.0.get_webpage(url))
+    }
+
+    async fn get_homepage_descriptions(
         &self,
-        url: &str,
-    ) -> impl Future<Output = Result<Option<RetrievedWebpage>>> + Send;
+        urls: &[url::Url],
+    ) -> std::collections::HashMap<url::Url, String> {
+        let mut res = std::collections::HashMap::new();
 
-    fn get_homepage_descriptions(
-        &self,
-        urls: &[Url],
-    ) -> impl Future<Output = HashMap<Url, String>> + Send;
+        for url in urls {
+            if let Some(homepage) = self.0.get_homepage(url) {
+                if let Some(desc) = homepage.description() {
+                    res.insert(url.clone(), desc.clone());
+                }
+            }
+        }
 
-    fn get_entity_image(
+        res
+    }
+
+    async fn get_entity_image(
         &self,
-        image_id: &str,
-        max_height: Option<u64>,
-        max_width: Option<u64>,
-    ) -> impl Future<Output = Result<Option<Image>>> + Send;
+        _image_id: &str,
+        _max_height: Option<u64>,
+        _max_width: Option<u64>,
+    ) -> Result<Option<Image>> {
+        Ok(None)
+    }
+
+    async fn search_entity(&self, _query: &str) -> Option<EntityMatch> {
+        None
+    }
 }

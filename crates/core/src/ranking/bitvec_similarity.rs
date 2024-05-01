@@ -15,6 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use itertools::Itertools;
+use std::future::Future;
+
+use crate::webgraph::NodeID;
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 struct VeryJankyBloomFilter {
@@ -111,7 +114,29 @@ pub struct BitVec {
     sqrt_len: f64,
 }
 
+impl Default for BitVec {
+    fn default() -> Self {
+        Self::new(vec![])
+    }
+}
+
+pub trait Graph {
+    fn batch_ingoing(&self, nodes: &[NodeID]) -> impl Future<Output = Vec<Vec<NodeID>>>;
+}
+
 impl BitVec {
+    pub async fn batch_new_for<G>(nodes: &[NodeID], graph: &G) -> Vec<Self>
+    where
+        G: Graph,
+    {
+        let ingoing = graph.batch_ingoing(nodes).await;
+
+        ingoing
+            .into_iter()
+            .map(|nodes| Self::new(nodes.into_iter().map(|n| n.as_u64()).collect()))
+            .collect()
+    }
+
     pub fn new(mut ranks: Vec<u64>) -> Self {
         ranks.sort();
         ranks.dedup();

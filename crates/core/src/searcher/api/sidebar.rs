@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{config::ApiThresholds, Result};
+use crate::{config::ApiThresholds, ranking::pipeline::RecallRankingWebpage, Result};
 use std::{cmp::Ordering, sync::Arc};
 
 use optics::Optic;
@@ -64,11 +64,14 @@ where
             })
             .collect();
 
-        results.sort_by(|(_, a), (_, b)| a.score.partial_cmp(&b.score).unwrap_or(Ordering::Equal));
+        results
+            .sort_by(|(_, a), (_, b)| a.score().partial_cmp(&b.score()).unwrap_or(Ordering::Equal));
 
         if let Some((shard, website)) = results.pop() {
-            tracing::debug!(?website.score, ?self.thresholds.stackoverflow, "stackoverflow score");
-            if website.score > self.thresholds.stackoverflow {
+            let score = website.score();
+            tracing::debug!(?score, ?self.thresholds.stackoverflow, "stackoverflow score");
+            if website.score() > self.thresholds.stackoverflow {
+                let website = RecallRankingWebpage::new(website, Default::default());
                 let scored_websites =
                     vec![(0, distributed::ScoredWebpagePointer { website, shard })];
                 let mut retrieved = self

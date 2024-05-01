@@ -14,7 +14,7 @@ use crate::enum_dispatch_from_discriminant;
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
-use crate::enum_map::InsertEnumMapKey;
+use crate::enum_map::{GetEnumMapKey, InsertEnumMapKey};
 
 use crate::schema::Field;
 use crate::{
@@ -184,5 +184,14 @@ impl SignalEnum {
 impl InsertEnumMapKey for SignalEnum {
     fn into_usize(self) -> usize {
         SignalEnumDiscriminants::from(self) as usize
+    }
+}
+
+impl GetEnumMapKey for SignalEnum {
+    fn from_usize(value: usize) -> Option<Self> {
+        SignalEnumDiscriminants::VARIANTS
+            .get(value)
+            .copied()
+            .map(SignalEnum::from)
     }
 }

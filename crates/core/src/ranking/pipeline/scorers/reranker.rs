@@ -17,51 +17,23 @@
 use std::sync::Arc;
 
 use crate::{
-    ranking::{
-        self,
-        models::{cross_encoder::CrossEncoder, lambdamart::LambdaMART},
-        Signal, SignalCoefficient, SignalEnum, SignalScore,
-    },
+    ranking::{self, models::cross_encoder::CrossEncoder},
     searcher::SearchQuery,
 };
 
-use crate::ranking::pipeline::{PrecisionRankingWebpage, RankableWebpage, Scorer};
-
-use super::calculate_score;
+use crate::ranking::pipeline::{PrecisionRankingWebpage, Scorer};
 
 pub struct ReRanker<M: CrossEncoder> {
     crossencoder: Arc<M>,
-    lambda_mart: Option<Arc<LambdaMART>>,
     query: Option<SearchQuery>,
-    signal_coefficients: Option<SignalCoefficient>,
 }
 
 impl<M: CrossEncoder> ReRanker<M> {
-    pub fn new(crossencoder: Arc<M>, lambda: Option<Arc<LambdaMART>>) -> Self {
+    pub fn new(crossencoder: Arc<M>) -> Self {
         Self {
             crossencoder,
-            lambda_mart: lambda,
             query: None,
-            signal_coefficients: None,
         }
-    }
-
-    fn crossencoder_snippet_coeff(&self) -> f64 {
-        self.signal_coefficients
-            .as_ref()
-            .map(|coeff| coeff.get(&ranking::signal::CrossEncoderSnippet.into()))
-            .unwrap_or_else(|| {
-                SignalEnum::from(ranking::signal::CrossEncoderSnippet).default_coefficient()
-            })
-    }
-
-    fn crossencoder_title_coeff(&self) -> f64 {
-        self.signal_coefficients
-            .as_ref()
-            .map(|coeff| coeff.get(&ranking::signal::CrossEncoderTitle.into()))
-            .unwrap_or_else(|| {
-                SignalEnum::from(ranking::signal::CrossEncoderTitle).default_coefficient()
-            })
     }
 
     fn crossencoder_score_webpages(&self, webpage: &mut [PrecisionRankingWebpage]) {
@@ -69,8 +41,8 @@ impl<M: CrossEncoder> ReRanker<M> {
         let mut titles = Vec::with_capacity(webpage.len());
 
         for webpage in webpage.iter_mut() {
-            titles.push(webpage.retrieved_webpage.title.clone());
-            snippets.push(webpage.retrieved_webpage.snippet.unhighlighted_string());
+            titles.push(webpage.retrieved_webpage().title.clone());
+            snippets.push(webpage.retrieved_webpage().snippet.unhighlighted_string());
         }
 
         let query = &self.query.as_ref().unwrap().query;
@@ -79,21 +51,15 @@ impl<M: CrossEncoder> ReRanker<M> {
 
         for ((webpage, snippet), title) in webpage.iter_mut().zip(snippet_scores).zip(title_scores)
         {
-            webpage.ranking.signals.insert(
-                ranking::signal::CrossEncoderSnippet.into(),
-                SignalScore {
-                    coefficient: self.crossencoder_snippet_coeff(),
-                    value: snippet,
-                },
-            );
+            webpage
+                .ranking_mut()
+                .signals_mut()
+                .insert(ranking::signal::CrossEncoderSnippet.into(), snippet);
 
-            webpage.ranking.signals.insert(
-                ranking::signal::CrossEncoderTitle.into(),
-                SignalScore {
-                    coefficient: self.crossencoder_title_coeff(),
-                    value: title,
-                },
-            );
+            webpage
+                .ranking_mut()
+                .signals_mut()
+                .insert(ranking::signal::CrossEncoderTitle.into(), title);
         }
     }
 }
@@ -101,18 +67,9 @@ impl<M: CrossEncoder> ReRanker<M> {
 impl<M: CrossEncoder> Scorer<PrecisionRankingWebpage> for ReRanker<M> {
     fn score(&self, webpages: &mut [PrecisionRankingWebpage]) {
         self.crossencoder_score_webpages(webpages);
-
-        for webpage in webpages.iter_mut() {
-            webpage.set_score(calculate_score(
-                &self.lambda_mart,
-                self.signal_coefficients.clone().unwrap_or_default(),
-                &webpage.ranking.signals,
-            ));
-        }
     }
 
     fn set_query_info(&mut self, query: &SearchQuery) {
         self.query = Some(query.clone());
-        self.signal_coefficients = query.optic.as_ref().map(SignalCoefficient::from_optic);
     }
 }

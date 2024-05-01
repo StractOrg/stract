@@ -59,6 +59,7 @@ pub fn run(config: &config::IndexingLocalConfig) -> Result<()> {
                 host_centrality_threshold: config.host_centrality_threshold,
                 minimum_clean_words: config.minimum_clean_words,
                 batch_size: config.batch_size,
+                autocommit_after_num_inserts: config.autocommit_after_num_inserts,
             },
         })
         .map(|job| IndexPointer(job.process(&worker).path))

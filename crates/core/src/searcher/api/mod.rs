@@ -17,31 +17,37 @@
 mod sidebar;
 mod widget;
 
-use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Instant;
 
 use itertools::{intersperse, Itertools};
 use url::Url;
 
+use ahash::AHashMap as HashMap;
+
 use crate::bangs::{Bang, BangHit};
 use crate::collector::{self, Doc};
-use crate::config::{ApiConfig, CollectorConfig};
+use crate::config::{ApiConfig, ApiSpellCheck, ApiThresholds, CollectorConfig, WidgetsConfig};
+use crate::enum_map::EnumMap;
 use crate::image_store::Image;
 use crate::inverted_index::RetrievedWebpage;
 use crate::models::dual_encoder::DualEncoder;
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
 use crate::ranking::pipeline::{PrecisionRankingWebpage, RankableWebpage, RecallRankingWebpage};
-use crate::ranking::SignalEnum;
+use crate::ranking::{
+    bitvec_similarity, inbound_similarity, SignalCoefficient, SignalEnum, SignalScore,
+};
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::web_spell::SpellChecker;
+use crate::webgraph::remote::RemoteWebgraph;
 use crate::widgets::{Widget, Widgets};
 use crate::{
     bangs::Bangs,
     collector::BucketCollector,
     ranking::{models::lambdamart::LambdaMART, pipeline::RankingPipeline},
 };
-use crate::{query, Result};
+use crate::{query, webgraph, Result};
 
 use self::sidebar::SidebarManager;
 use self::widget::WidgetManager;
@@ -78,6 +84,13 @@ impl RankableWebpage for ScoredWebpagePointer {
     fn boost(&self) -> Option<f64> {
         self.as_ranking().boost()
     }
+
+    fn signals(&self) -> &EnumMap<SignalEnum, f64> {
+        match self {
+            ScoredWebpagePointer::Normal(p) => p.website.signals(),
+            ScoredWebpagePointer::Live(p) => p.website.signals(),
+        }
+    }
 }
 
 impl collector::Doc for ScoredWebpagePointer {
@@ -90,66 +103,23 @@ impl collector::Doc for ScoredWebpagePointer {
     }
 }
 
-pub fn combine_results(
-    collector_config: CollectorConfig,
-    initial_results: Vec<distributed::InitialSearchResultShard>,
-    live_results: Vec<live::InitialSearchResultSplit>,
-    pipeline: RankingPipeline<ScoredWebpagePointer>,
-) -> (Vec<ScoredWebpagePointer>, bool) {
-    let mut collector = BucketCollector::new(pipeline.collector_top_n(), collector_config);
-
-    let mut has_more = false;
-    for result in initial_results {
-        if result.local_result.has_more {
-            has_more = true;
-        }
-
-        for website in result.local_result.websites {
-            let pointer = distributed::ScoredWebpagePointer {
-                website,
-                shard: result.shard,
-            };
-
-            let pointer = ScoredWebpagePointer::Normal(pointer);
-
-            collector.insert(pointer);
-        }
-    }
-
-    for result in live_results {
-        if result.local_result.has_more {
-            has_more = true;
-        }
-
-        for website in result.local_result.websites {
-            let pointer = live::ScoredWebpagePointer {
-                website,
-                split_id: result.split_id.clone(),
-            };
-
-            let pointer = ScoredWebpagePointer::Live(pointer);
-
-            collector.insert(pointer);
-        }
-    }
-
-    let top_websites = collector
-        .into_sorted_vec(true)
-        .into_iter()
-        .take(pipeline.collector_top_n())
-        .collect::<Vec<_>>();
-
-    let res = pipeline.apply(top_websites);
-
-    (res, has_more)
-}
-pub fn add_ranking_signals(websites: &mut [DisplayedWebpage], pointers: &[ScoredWebpagePointer]) {
+pub fn add_ranking_signals(
+    websites: &mut [DisplayedWebpage],
+    pointers: &[ScoredWebpagePointer],
+    coeffs: &SignalCoefficient,
+) {
     for (website, pointer) in websites.iter_mut().zip(pointers.iter()) {
-        let mut signals = HashMap::new();
+        let mut signals = std::collections::HashMap::new();
 
         for signal in SignalEnum::all() {
-            if let Some(signal_value) = pointer.as_ranking().signals.get(signal) {
-                signals.insert(signal.into(), *signal_value);
+            if let Some(signal_value) = pointer.as_ranking().signals().get(signal) {
+                signals.insert(
+                    signal.into(),
+                    SignalScore {
+                        value: *signal_value,
+                        coefficient: coeffs.get(&signal),
+                    },
+                );
             }
         }
 
@@ -157,7 +127,72 @@ pub fn add_ranking_signals(websites: &mut [DisplayedWebpage], pointers: &[Scored
     }
 }
 
-pub struct ApiSearcher<S, L> {
+#[derive(Default)]
+pub struct Config {
+    pub thresholds: ApiThresholds,
+    pub widgets: WidgetsConfig,
+    pub collector: CollectorConfig,
+    pub spell_check: Option<ApiSpellCheck>,
+}
+
+impl From<ApiConfig> for Config {
+    fn from(conf: ApiConfig) -> Self {
+        Self {
+            thresholds: conf.thresholds,
+            widgets: conf.widgets,
+            collector: conf.collector,
+            spell_check: conf.spell_check,
+        }
+    }
+}
+
+pub trait Graph {
+    fn batch_raw_ingoing(
+        &self,
+        nodes: &[webgraph::NodeID],
+    ) -> impl Future<Output = Vec<Vec<webgraph::Edge<()>>>>;
+}
+
+impl Graph for RemoteWebgraph {
+    async fn batch_raw_ingoing(&self, nodes: &[webgraph::NodeID]) -> Vec<Vec<webgraph::Edge<()>>> {
+        self.batch_raw_ingoing_edges(nodes)
+            .await
+            .unwrap_or_default()
+    }
+}
+
+impl Graph for webgraph::Webgraph {
+    async fn batch_raw_ingoing(&self, nodes: &[webgraph::NodeID]) -> Vec<Vec<webgraph::Edge<()>>> {
+        nodes.iter().map(|n| self.raw_ingoing_edges(n)).collect()
+    }
+}
+
+impl<T> Graph for Arc<T>
+where
+    T: Graph,
+{
+    fn batch_raw_ingoing(
+        &self,
+        nodes: &[webgraph::NodeID],
+    ) -> impl Future<Output = Vec<Vec<webgraph::Edge<()>>>> {
+        self.as_ref().batch_raw_ingoing(nodes)
+    }
+}
+
+impl<T> bitvec_similarity::Graph for T
+where
+    T: Graph,
+{
+    async fn batch_ingoing(&self, nodes: &[webgraph::NodeID]) -> Vec<Vec<webgraph::NodeID>> {
+        self.batch_raw_ingoing(nodes)
+            .await
+            .into_iter()
+            .map(|edges| edges.into_iter().map(|edge| edge.from).collect())
+            .collect()
+    }
+}
+
+pub struct ApiSearcher<S, L, G> {
     distributed_searcher: Arc<S>,
     sidebar_manager: SidebarManager<S>,
     live_searcher: Option<L>,
@@ -168,45 +203,66 @@ pub struct ApiSearcher<S, L> {
     collector_config: CollectorConfig,
     widget_manager: WidgetManager,
     spell_checker: Option<SpellChecker>,
+    webgraph: Option<G>,
 }
 
-impl<S, L> ApiSearcher<S, L>
+impl<S, L, G> ApiSearcher<S, L, G>
 where
     S: distributed::SearchClient,
     L: live::SearchClient,
+    G: Graph,
 {
-    pub fn new(
-        dist_searcher: S,
-        live_searcher: Option<L>,
-        cross_encoder: Option<CrossEncoderModel>,
-        lambda_model: Option<LambdaMART>,
-        dual_encoder: Option<DualEncoder>,
-        bangs: Bangs,
-        config: ApiConfig,
-    ) -> Self {
+    pub fn new<C>(dist_searcher: S, bangs: Bangs, config: C) -> Self
+    where
+        C: Into<Config>,
+    {
+        let config: Config = config.into();
         let dist_searcher = Arc::new(dist_searcher);
         let sidebar_manager =
             SidebarManager::new(Arc::clone(&dist_searcher), config.thresholds.clone());
-
-        let lambda_model = lambda_model.map(Arc::new);
-        let dual_encoder = dual_encoder.map(Arc::new);
 
         let widget_manager = WidgetManager::new(Widgets::new(config.widgets).unwrap());
 
         Self {
             distributed_searcher: dist_searcher,
             sidebar_manager,
-            live_searcher,
-            cross_encoder: cross_encoder.map(Arc::new),
-            lambda_model,
-            dual_encoder,
+            live_searcher: None,
+            cross_encoder: None,
+            lambda_model: None,
+            dual_encoder: None,
             bangs,
             collector_config: config.collector,
             widget_manager,
             spell_checker: config
-                .spell_checker_path
-                .map(|c| SpellChecker::open(c, config.correction_config).unwrap()),
+                .spell_check
+                .map(|c| SpellChecker::open(c.path, c.correction_config).unwrap()),
+            webgraph: None,
         }
+    }
+
+    pub fn with_live(mut self, live_searcher: L) -> Self {
+        self.live_searcher = Some(live_searcher);
+        self
+    }
+
+    pub fn with_cross_encoder(mut self, cross_encoder: CrossEncoderModel) -> Self {
+        self.cross_encoder = Some(Arc::new(cross_encoder));
+        self
+    }
+
+    pub fn with_dual_encoder(mut self, dual_encoder: DualEncoder) -> Self {
+        self.dual_encoder = Some(Arc::new(dual_encoder));
+        self
+    }
+
+    pub fn with_lambda_model(mut self, lambda_model: LambdaMART) -> Self {
+        self.lambda_model = Some(Arc::new(lambda_model));
+        self
+    }
+
+    pub fn with_webgraph(mut self, webgraph: G) -> Self {
+        self.webgraph = Some(webgraph);
+        self
     }
 
     async fn check_bangs(&self, query: &SearchQuery) -> Result<Option<BangHit>> {
@@ -379,6 +435,124 @@ where
         }
     }
 
+    async fn inbound_vecs(&self, ids: &[webgraph::NodeID]) -> Vec<bitvec_similarity::BitVec> {
+        match self.webgraph.as_ref() {
+            Some(webgraph) => bitvec_similarity::BitVec::batch_new_for(ids, webgraph).await,
+            None => vec![bitvec_similarity::BitVec::default(); ids.len()],
+        }
+    }
+
+    async fn combine_results(
+        &self,
+        collector_config: CollectorConfig,
+        initial_results: Vec<distributed::InitialSearchResultShard>,
+        live_results: Vec<live::InitialSearchResultSplit>,
+        pipeline: RankingPipeline<ScoredWebpagePointer>,
+    ) -> (Vec<ScoredWebpagePointer>, bool) {
+        let mut collector = BucketCollector::new(pipeline.collector_top_n(), collector_config);
+
+        let initial_host_nodes = initial_results
+            .iter()
+            .flat_map(|r| r.local_result.websites.iter())
+            .map(|r| *r.host_id())
+            .collect::<Vec<_>>();
+
+        let live_host_nodes = live_results
+            .iter()
+            .flat_map(|r| r.local_result.websites.iter())
+            .map(|r| *r.host_id())
+            .collect::<Vec<_>>();
+
+        let host_nodes = initial_host_nodes
+            .into_iter()
+            .chain(live_host_nodes)
+            .unique()
+            .collect::<Vec<_>>();
+
+        let host_nodes = self
+            .inbound_vecs(&host_nodes)
+            .await
+            .into_iter()
+            .zip_eq(host_nodes)
+            .map(|(v, n)| (n, v))
+            .collect::<HashMap<_, _>>();
+
+        let mut has_more = false;
+        for result in initial_results {
+            if result.local_result.has_more {
+                has_more = true;
+            }
+
+            for website in result.local_result.websites {
+                let inbound = host_nodes
+                    .get(website.host_id())
+                    .cloned()
+                    .unwrap_or_default();
+                let pointer = distributed::ScoredWebpagePointer {
+                    website: RecallRankingWebpage::new(website, inbound),
+                    shard: result.shard,
+                };
+
+                let pointer = ScoredWebpagePointer::Normal(pointer);
+
+                collector.insert(pointer);
+            }
+        }
+
+        for result in live_results {
+            if result.local_result.has_more {
+                has_more = true;
+            }
+
+            for website in result.local_result.websites {
+                let inbound = host_nodes
+                    .get(website.host_id())
+                    .cloned()
+                    .unwrap_or_default();
+                let pointer = live::ScoredWebpagePointer {
+                    website: RecallRankingWebpage::new(website, inbound),
+                    split_id: result.split_id.clone(),
+                };
+
+                let pointer = ScoredWebpagePointer::Live(pointer);
+
+                collector.insert(pointer);
+            }
+        }
+
+        let top_websites = collector
+            .into_sorted_vec(true)
+            .into_iter()
+            .take(pipeline.collector_top_n())
+            .collect::<Vec<_>>();
+
+        let res = pipeline.apply(top_websites);
+
+        (res, has_more)
+    }
+
+    async fn inbound_scorer(&self, query: &SearchQuery) -> inbound_similarity::Scorer {
+        match self.webgraph.as_ref() {
+            Some(webgraph) => {
+                let host_rankings = query.host_rankings();
+
+                let liked: Vec<_> = host_rankings
+                    .liked
+                    .iter()
+                    .map(|n| webgraph::Node::from(n.clone()).into_host().id())
+                    .collect();
+
+                let disliked: Vec<_> = host_rankings
+                    .disliked
+                    .iter()
+                    .map(|n| webgraph::Node::from(n.clone()).into_host().id())
+                    .collect();
+                inbound_similarity::Scorer::new(webgraph, &liked, &disliked, false).await
+            }
+            None => inbound_similarity::Scorer::empty(),
+        }
+    }
+
     async fn search_websites(&self, query: &SearchQuery) -> Result<WebsitesResult> {
         let start = Instant::now();
 
@@ -387,6 +561,8 @@ where
         }
 
         let mut search_query = query.clone();
+        let inbound_scorer = self.inbound_scorer(&search_query).await;
+
         let top_n = search_query.num_results;
 
         // This pipeline should be created before the first search is performed
@@ -394,6 +570,7 @@ where
         let recall_pipeline: RankingPipeline<ScoredWebpagePointer> =
             RankingPipeline::<ScoredWebpagePointer>::recall_stage(
                 &mut search_query,
+                inbound_scorer,
                 self.lambda_model.clone(),
                 self.dual_encoder.clone(),
                 self.collector_config.clone(),
@@ -410,12 +587,14 @@ where
             .map(|result| result.local_result.num_websites)
             .sum();
 
-        let (top_websites, has_more_results) = combine_results(
-            self.collector_config.clone(),
-            initial_results,
-            live_results.unwrap_or_default(),
-            recall_pipeline,
-        );
+        let (top_websites, has_more_results) = self
+            .combine_results(
+                self.collector_config.clone(),
+                initial_results,
+                live_results.unwrap_or_default(),
+                recall_pipeline,
+            )
+            .await;
 
         let retrieved_webpages = self
             .retrieve_webpages(&search_query.query, &top_websites)
@@ -440,7 +619,7 @@ where
         let mut retrieved_webpages: Vec<_> = retrieved_webpages
             .into_iter()
             .map(|webpage| webpage.into_retrieved_webpage())
-            .map(|webpage| DisplayedWebpage::new(webpage, query))
+            .map(|webpage| DisplayedWebpage::new(webpage, &search_query))
             .collect();
 
         if retrieved_webpages.len() != top_websites.len() {
@@ -448,7 +627,11 @@ where
         }
 
         if query.return_ranking_signals {
-            add_ranking_signals(&mut retrieved_webpages, &top_websites);
+            add_ranking_signals(
+                &mut retrieved_webpages,
+                &top_websites,
+                &search_query.signal_coefficients(),
+            );
         }
 
         for (website, pointer) in retrieved_webpages.iter_mut().zip(top_websites.iter()) {

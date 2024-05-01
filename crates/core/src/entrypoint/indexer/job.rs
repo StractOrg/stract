@@ -43,6 +43,7 @@ pub struct JobSettings {
     pub host_centrality_threshold: Option<f64>,
     pub minimum_clean_words: Option<usize>,
     pub batch_size: usize,
+    pub autocommit_after_num_inserts: usize,
 }
 
 impl Job {
@@ -61,6 +62,8 @@ impl Job {
         let paths = vec![self.warc_path.clone()];
         let warc_files = download_all_warc_files(&paths, &self.source_config);
         pin!(warc_files);
+
+        let mut num_inserts_since_commit = 0;
 
         for file in warc_files.by_ref() {
             let mut batch = Vec::with_capacity(self.settings.batch_size);
@@ -102,11 +105,17 @@ impl Job {
                         warn!("{:?}", err);
                         panic!();
                     }
+
+                    num_inserts_since_commit += 1;
+                }
+
+                if num_inserts_since_commit >= self.settings.autocommit_after_num_inserts {
+                    index.commit().unwrap();
+                    num_inserts_since_commit = 0;
                 }
             }
-
-            index.commit().unwrap();
         }
+        index.commit().unwrap();
 
         if !has_host_centrality {
             warn!("no host centrality values found in {}", name);

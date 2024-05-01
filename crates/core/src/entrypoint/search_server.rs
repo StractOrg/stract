@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 
 use tracing::info;
 use url::Url;
@@ -30,10 +30,7 @@ use crate::{
     index::Index,
     inverted_index::{self, RetrievedWebpage},
     models::dual_encoder::DualEncoder,
-    ranking::{
-        inbound_similarity::InboundSimilarity,
-        models::{lambdamart::LambdaMART, linear::LinearRegression},
-    },
+    ranking::models::{lambdamart::LambdaMART, linear::LinearRegression},
     searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
     Result,
 };
@@ -57,16 +54,9 @@ pub struct SearchService {
 
 impl SearchService {
     async fn new(config: config::SearchServerConfig) -> Result<Self> {
-        let centrality_store = config
-            .host_centrality_store_path
-            .map(|p| InboundSimilarity::open(Path::new(&p).join("inbound_similarity")).unwrap());
         let search_index = Index::open(config.index_path)?;
 
         let mut local_searcher = LocalSearcher::new(search_index);
-
-        if let Some(centrality_store) = centrality_store {
-            local_searcher.set_inbound_similarity(centrality_store);
-        }
 
         if let Some(model_path) = config.linear_model_path {
             local_searcher.set_linear_model(LinearRegression::open(model_path)?);
@@ -88,7 +78,7 @@ impl SearchService {
                 id: config.cluster_id,
                 service: Service::Searcher {
                     host: config.host,
-                    shard: config.shard_id,
+                    shard: config.shard,
                 },
             },
             config.gossip_addr,

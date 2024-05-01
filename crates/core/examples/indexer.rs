@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use clap::Parser;
-use stract::config::IndexingLocalConfig;
+use stract::config::{IndexingGraphConfig, IndexingLocalConfig};
 
 #[derive(Parser)]
 struct Args {
@@ -32,13 +32,13 @@ fn main() -> anyhow::Result<()> {
                 .unwrap()
                 .to_string()],
         }),
-        page_webgraph_path: Some(
-            data_path
+        page_webgraph: Some(IndexingGraphConfig::Local {
+            path: data_path
                 .join("webgraph_page")
                 .to_str()
                 .unwrap()
                 .to_string(),
-        ),
+        }),
         host_centrality_threshold: None,
         topics_path: None,
         host_centrality_store_path: data_path.join("centrality/").to_str().unwrap().to_string(),
@@ -52,6 +52,8 @@ fn main() -> anyhow::Result<()> {
         safety_classifier_path: None,
         minimum_clean_words: None,
         batch_size: 512,
+        autocommit_after_num_inserts:
+            stract::config::defaults::Indexing::autocommit_after_num_inserts(),
         dual_encoder: args
             .dual_encoder_path
             .map(|p| stract::config::IndexingDualEncoderConfig {

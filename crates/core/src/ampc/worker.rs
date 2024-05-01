@@ -16,9 +16,8 @@
 
 use std::net::SocketAddr;
 
-use super::{
-    block_on, CoordReq, CoordResp, DhtConn, Job, JobConn, JobReq, JobResp, Req, Resp, Server,
-};
+use super::{CoordReq, CoordResp, DhtConn, Job, JobConn, JobReq, JobResp, Req, Resp, Server};
+use crate::block_on;
 use crate::Result;
 use anyhow::anyhow;
 use tokio::net::ToSocketAddrs;

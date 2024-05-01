@@ -346,6 +346,7 @@ mod tests {
         search_ctx::Ctx,
         searcher::SearchQuery,
         webpage::{Html, Webpage},
+        OneOrMany,
     };
 
     use super::*;
@@ -987,25 +988,25 @@ mod tests {
 
         assert_eq!(
             schema[0].itemtype,
-            Some(schema_org::OneOrMany::One("LiveBlogPosting".to_string()))
+            Some(OneOrMany::One("LiveBlogPosting".to_string()))
         );
         assert_eq!(
             schema[0].properties.get("coverageStartTime"),
-            Some(&schema_org::OneOrMany::One(schema_org::Property::String(
+            Some(&OneOrMany::One(schema_org::Property::String(
                 "2022-11-14T23:45:00+00:00".to_string()
             )))
         );
         assert_eq!(
             schema[1].itemtype,
-            Some(schema_org::OneOrMany::One("NewsArticle".to_string()))
+            Some(OneOrMany::One("NewsArticle".to_string()))
         );
         assert_eq!(
             schema[1].properties.get("publisher"),
-            Some(&schema_org::OneOrMany::One(schema_org::Property::Item(
+            Some(&OneOrMany::One(schema_org::Property::Item(
                 schema_org::Item {
-                    itemtype: Some(schema_org::OneOrMany::One("Organization".to_string())),
+                    itemtype: Some(OneOrMany::One("Organization".to_string())),
                     properties: hashmap! {
-                        "name".to_string() => schema_org::OneOrMany::One(schema_org::Property::String("DR".to_string()))
+                        "name".to_string() => OneOrMany::One(schema_org::Property::String("DR".to_string()))
                     }
                 }
             )))
@@ -1260,7 +1261,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(ranking_websites.len(), 2);
-        assert!(ranking_websites[0].title_embedding.is_some());
-        assert!(ranking_websites[1].title_embedding.is_none());
+        assert!(ranking_websites[0].title_embedding().is_some());
+        assert!(ranking_websites[1].title_embedding().is_none());
     }
 }

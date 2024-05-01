@@ -28,7 +28,12 @@
 // #![allow(clippy::module_name_repetitions)] // maybe we should remove this later
 // #![allow(clippy::missing_errors_doc)]
 
-use std::path::PathBuf;
+use config::GossipConfig;
+use distributed::{
+    cluster::Cluster,
+    member::{Member, Service},
+};
+use std::{cmp::Reverse, path::PathBuf, sync::Arc};
 use thiserror::Error;
 
 pub mod entrypoint;
@@ -86,6 +91,18 @@ pub mod web_spell;
 pub mod webgraph;
 pub mod webpage;
 mod widgets;
+
+static TOKIO_RUNTIME: once_cell::sync::Lazy<tokio::runtime::Runtime> =
+    once_cell::sync::Lazy::new(|| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    });
+
+pub fn block_on<F: std::future::Future>(f: F) -> F::Output {
+    TOKIO_RUNTIME.block_on(f)
+}
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -147,6 +164,52 @@ pub fn gen_temp_path() -> PathBuf {
     } else {
         std::env::temp_dir().join(format!("pagecache.tmp.{salt}"))
     }
+}
+
+/// Starts a gossip cluster in the background and returns a handle to it.
+/// This is useful for blocking contexts where there is no runtime to spawn the cluster on.
+pub fn start_gossip_cluster_thread(config: GossipConfig, service: Option<Service>) -> Arc<Cluster> {
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            let cluster = match service {
+                Some(service) => Cluster::join(
+                    Member {
+                        id: config.cluster_id,
+                        service,
+                    },
+                    config.addr,
+                    config.seed_nodes.unwrap_or_default(),
+                )
+                .await
+                .unwrap(),
+                None => Cluster::join_as_spectator(
+                    config.cluster_id,
+                    config.addr,
+                    config.seed_nodes.unwrap_or_default(),
+                )
+                .await
+                .unwrap(),
+            };
+
+            let cluster = Arc::new(cluster);
+            tx.send(cluster.clone()).unwrap();
+
+            // need to keep tokio runtime alive
+            // otherwise the spawned task in Cluster::join will be dropped
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            }
+        });
+    });
+
+    rx.recv().unwrap()
 }
 
 #[cfg(test)]
@@ -251,3 +314,92 @@ macro_rules! enum_dispatch_from_discriminant {
 }
 
 pub(crate) use enum_dispatch_from_discriminant;
+
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
+    Hash,
+)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T> OneOrMany<T> {
+    pub fn one(self) -> Option<T> {
+        match self {
+            OneOrMany::One(one) => Some(one),
+            OneOrMany::Many(many) => many.into_iter().next(),
+        }
+    }
+
+    pub fn many(self) -> Vec<T> {
+        match self {
+            OneOrMany::One(one) => vec![one],
+            OneOrMany::Many(many) => many,
+        }
+    }
+}
+
+pub trait TopKOrderable: Ord {
+    type SortKey: Ord + Copy;
+
+    fn sort_key(&self) -> Self::SortKey;
+}
+
+impl TopKOrderable for (SortableFloat, webgraph::NodeID) {
+    type SortKey = SortableFloat;
+
+    fn sort_key(&self) -> Self::SortKey {
+        self.0
+    }
+}
+
+impl<T> TopKOrderable for Reverse<T>
+where
+    T: TopKOrderable,
+{
+    type SortKey = Reverse<T::SortKey>;
+
+    fn sort_key(&self) -> Self::SortKey {
+        Reverse(self.0.sort_key())
+    }
+}
+
+/// Source (and explanation): [https://quickwit.io/blog/top-k-complexity]
+pub fn sorted_k<T>(mut hits: impl Iterator<Item = T>, k: usize) -> Vec<T>
+where
+    T: TopKOrderable,
+{
+    if k == 0 {
+        return Vec::new();
+    }
+
+    let mut top_k = Vec::with_capacity(2 * k);
+    top_k.extend((&mut hits).take(k));
+
+    let mut threshold = None;
+    for hit in hits {
+        if let Some(threshold) = threshold {
+            if hit.sort_key() <= threshold {
+                continue;
+            }
+        }
+        top_k.push(hit);
+        if top_k.len() == 2 * k {
+            // The standard library does all of the heavy lifting here.
+            let (_, median_el, _) = top_k.select_nth_unstable(k - 1);
+            threshold = Some(median_el.sort_key());
+            top_k.truncate(k);
+        }
+    }
+    top_k.sort_unstable();
+    top_k.truncate(k);
+    top_k
+}

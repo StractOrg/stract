@@ -29,9 +29,9 @@
   $: chosenHostString = chosenHosts.join(',');
 
   $: {
-    api
-      .webgraphHostSimilar({ hosts: chosenHosts, topN: limit })
-      .data.then((res) => (similarHosts = res));
+    api.webgraphHostSimilar({ hosts: chosenHosts, topN: limit }).data.then((res) => {
+      similarHosts = res;
+    });
   }
 
   $: {

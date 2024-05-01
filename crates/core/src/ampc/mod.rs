@@ -36,18 +36,6 @@ pub use dht_conn::{DefaultDhtTable, DhtConn, DhtTable, DhtTables, Table};
 pub use server::Server;
 pub use worker::{Message, RequestWrapper, Worker};
 
-static TOKIO_RUNTIME: once_cell::sync::Lazy<tokio::runtime::Runtime> =
-    once_cell::sync::Lazy::new(|| {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-    });
-
-pub fn block_on<F: std::future::Future>(f: F) -> F::Output {
-    TOKIO_RUNTIME.block_on(f)
-}
-
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub enum CoordReq<J, M, T> {
     CurrentJob,

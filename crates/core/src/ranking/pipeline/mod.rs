@@ -19,24 +19,25 @@ use std::sync::Arc;
 use crate::{
     collector::{self, BucketCollector},
     config::CollectorConfig,
-    models::dual_encoder::DualEncoder,
+    enum_map::EnumMap,
     searcher::SearchQuery,
 };
 
 use super::{
     models::lambdamart::{self, LambdaMART},
-    SignalScore,
+    SignalCoefficient, SignalEnum, SignalScore,
 };
 
 mod scorers;
 mod stages;
 
 pub use scorers::{ReRanker, Recall, Scorer};
-pub use stages::{PrecisionRankingWebpage, RecallRankingWebpage};
+pub use stages::{LocalRecallRankingWebpage, PrecisionRankingWebpage, RecallRankingWebpage};
 
 pub trait RankableWebpage: collector::Doc + Send + Sync {
     fn set_score(&mut self, score: f64);
     fn boost(&self) -> Option<f64>;
+    fn signals(&self) -> &EnumMap<SignalEnum, f64>;
 
     fn boost_score(&mut self) {
         if let Some(boost) = self.boost() {
@@ -58,6 +59,8 @@ struct RankingStage<T> {
     scorer: Box<dyn Scorer<T>>,
     stage_top_n: usize,
     derank_similar: bool,
+    model: Option<Arc<LambdaMART>>,
+    coefficients: SignalCoefficient,
 }
 
 impl<T: RankableWebpage> RankingStage<T> {
@@ -80,6 +83,7 @@ impl<T: RankableWebpage> RankingStage<T> {
             BucketCollector::new(self.stage_top_n.max(top_n) + offset, collector_config);
 
         for mut website in websites {
+            website.set_score(self.calculate_score(website.signals()));
             website.boost_score();
             collector.insert(website);
         }
@@ -91,8 +95,30 @@ impl<T: RankableWebpage> RankingStage<T> {
             .collect()
     }
 
+    fn calculate_score(&self, signals: &EnumMap<SignalEnum, f64>) -> f64 {
+        match self.model.as_ref() {
+            Some(model) => {
+                let coeff = self.coefficients.get(&super::signal::LambdaMart.into());
+                if coeff == 0.0 {
+                    signals
+                        .iter()
+                        .map(|(signal, score)| self.coefficients.get(&signal) * score)
+                        .sum()
+                } else {
+                    coeff * model.predict(signals)
+                }
+            }
+            None => signals
+                .iter()
+                .map(|(signal, score)| self.coefficients.get(&signal) * score)
+                .sum(),
+        }
+    }
+
     fn set_query_info(&mut self, query: &SearchQuery) {
         self.scorer.set_query_info(query);
+
+        self.coefficients = query.signal_coefficients();
     }
 }
 
@@ -101,45 +127,6 @@ pub struct RankingPipeline<T> {
     page: usize,
     pub top_n: usize,
     collector_config: CollectorConfig,
-}
-
-impl RankingPipeline<crate::searcher::api::ScoredWebpagePointer> {
-    fn create_recall_stage(
-        lambdamart: Option<Arc<LambdaMART>>,
-        dual_encoder: Option<Arc<DualEncoder>>,
-        collector_config: CollectorConfig,
-        stage_top_n: usize,
-    ) -> Self {
-        let last_stage = RankingStage {
-            scorer: Box::new(Recall::<crate::searcher::api::ScoredWebpagePointer>::new(
-                lambdamart,
-                dual_encoder,
-            )),
-            stage_top_n,
-            derank_similar: true,
-        };
-
-        Self {
-            stage: last_stage,
-            page: 0,
-            top_n: 0,
-            collector_config,
-        }
-    }
-
-    pub fn recall_stage(
-        query: &mut SearchQuery,
-        lambdamart: Option<Arc<LambdaMART>>,
-        dual_encoder: Option<Arc<DualEncoder>>,
-        collector_config: CollectorConfig,
-        top_n_considered: usize,
-    ) -> Self {
-        let mut pipeline =
-            Self::create_recall_stage(lambdamart, dual_encoder, collector_config, top_n_considered);
-        pipeline.set_query_info(query);
-
-        pipeline
-    }
 }
 
 impl<T: RankableWebpage> RankingPipeline<T> {
@@ -184,7 +171,6 @@ mod tests {
 
     use crate::{
         collector::Hashes,
-        enum_map::EnumMap,
         inverted_index::{DocAddress, WebpagePointer},
         prehashed::Prehashed,
         ranking::{self, initial::Score},
@@ -192,45 +178,34 @@ mod tests {
 
     use super::*;
 
-    fn sample_websites(n: usize) -> Vec<RecallRankingWebpage> {
+    fn sample_websites(n: usize) -> Vec<LocalRecallRankingWebpage> {
         (0..n)
-            .map(|i| -> RecallRankingWebpage {
+            .map(|i| -> LocalRecallRankingWebpage {
+                let pointer = WebpagePointer {
+                    score: Score { total: 0.0 },
+                    hashes: Hashes {
+                        site: Prehashed(0),
+                        title: Prehashed(0),
+                        url: Prehashed(0),
+                        url_without_tld: Prehashed(0),
+                        simhash: 0,
+                    },
+                    address: DocAddress {
+                        segment: 0,
+                        doc_id: i as u32,
+                    },
+                };
+
                 let mut signals = EnumMap::new();
-                signals.insert(
-                    ranking::signal::HostCentrality.into(),
-                    SignalScore {
-                        coefficient: 1.0,
-                        value: 1.0 / i as f64,
-                    },
-                );
-                RecallRankingWebpage {
-                    pointer: WebpagePointer {
-                        score: Score { total: 0.0 },
-                        hashes: Hashes {
-                            site: Prehashed(0),
-                            title: Prehashed(0),
-                            url: Prehashed(0),
-                            url_without_tld: Prehashed(0),
-                            simhash: 0,
-                        },
-                        address: DocAddress {
-                            segment: 0,
-                            doc_id: i as u32,
-                        },
-                    },
-                    signals,
-                    optic_boost: None,
-                    title_embedding: None,
-                    keyword_embedding: None,
-                    score: 1.0 / i as f64,
-                }
+                signals.insert(ranking::signal::HostCentrality.into(), 1.0 / i as f64);
+                LocalRecallRankingWebpage::new_testing(pointer, signals, 1.0 / i as f64)
             })
             .collect()
     }
 
     #[test]
     fn simple() {
-        let pipeline = RankingPipeline::<RecallRankingWebpage>::recall_stage(
+        let pipeline = RankingPipeline::<LocalRecallRankingWebpage>::recall_stage(
             &mut SearchQuery {
                 ..Default::default()
             },
@@ -245,13 +220,13 @@ mod tests {
         let res: Vec<_> = pipeline
             .apply(sample)
             .into_iter()
-            .map(|w| w.pointer.address)
+            .map(|w| w.pointer().address)
             .collect();
 
         let expected: Vec<_> = sample_websites(100)
             .into_iter()
             .take(20)
-            .map(|w| w.pointer.address)
+            .map(|w| w.pointer().address)
             .collect();
 
         assert_eq!(res, expected);
@@ -260,7 +235,7 @@ mod tests {
     #[test]
     fn top_n() {
         let num_results = 100;
-        let pipeline = RankingPipeline::<RecallRankingWebpage>::recall_stage(
+        let pipeline = RankingPipeline::<LocalRecallRankingWebpage>::recall_stage(
             &mut SearchQuery {
                 num_results,
                 ..Default::default()
@@ -277,13 +252,13 @@ mod tests {
             .clone()
             .into_iter()
             .take(num_results)
-            .map(|w| w.pointer.address)
+            .map(|w| w.pointer().address)
             .collect();
 
         let res = pipeline
             .apply(sample)
             .into_iter()
-            .map(|w| w.pointer.address)
+            .map(|w| w.pointer().address)
             .collect_vec();
 
         assert_eq!(res.len(), num_results);
@@ -293,7 +268,7 @@ mod tests {
     #[test]
     fn offsets() {
         let num_results = 20;
-        let pipeline = RankingPipeline::<RecallRankingWebpage>::recall_stage(
+        let pipeline = RankingPipeline::<LocalRecallRankingWebpage>::recall_stage(
             &mut SearchQuery {
                 page: 0,
                 num_results,
@@ -308,7 +283,7 @@ mod tests {
         let sample: Vec<_> = sample_websites(pipeline.collector_top_n());
         let mut prev: Vec<_> = pipeline.apply(sample);
         for p in 1..1_000 {
-            let pipeline = RankingPipeline::<RecallRankingWebpage>::recall_stage(
+            let pipeline = RankingPipeline::<LocalRecallRankingWebpage>::recall_stage(
                 &mut SearchQuery {
                     page: p,
                     ..Default::default()
@@ -331,7 +306,7 @@ mod tests {
             assert!(!prev
                 .iter()
                 .zip_eq(res.iter())
-                .any(|(p, r)| p.pointer.address.doc_id == r.pointer.address.doc_id));
+                .any(|(p, r)| p.pointer().address.doc_id == r.pointer().address.doc_id));
 
             prev = res;
         }

@@ -26,8 +26,11 @@ use optics::{HostRankings, Optic};
 use utoipa::ToSchema;
 
 use crate::{
-    api::search::ReturnBody, bangs::BangHit, config::defaults,
-    ranking::pipeline::RecallRankingWebpage, search_prettifier::DisplayedWebpage,
+    api::search::ReturnBody,
+    bangs::BangHit,
+    config::defaults,
+    ranking::{pipeline::LocalRecallRankingWebpage, SignalCoefficient},
+    search_prettifier::DisplayedWebpage,
     webpage::region::Region,
 };
 
@@ -37,6 +40,17 @@ pub const NUM_RESULTS_PER_PAGE: usize = 20;
 pub enum SearchResult {
     Websites(WebsitesResult),
     Bang(Box<BangHit>),
+}
+
+#[cfg(test)]
+impl SearchResult {
+    /// Panics if the result is not a `WebsitesResult`.
+    pub fn into_websites_result(self) -> WebsitesResult {
+        match self {
+            Self::Websites(result) => result,
+            _ => panic!("Expected WebsitesResult"),
+        }
+    }
 }
 
 #[derive(
@@ -67,7 +81,7 @@ pub struct SearchQuery {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct InitialWebsiteResult {
     pub num_websites: Option<usize>,
-    pub websites: Vec<RecallRankingWebpage>,
+    pub websites: Vec<LocalRecallRankingWebpage>,
     pub has_more: bool,
 }
 
@@ -94,5 +108,29 @@ impl Default for SearchQuery {
 impl SearchQuery {
     pub fn is_empty(&self) -> bool {
         self.query.is_empty()
+    }
+
+    pub fn signal_coefficients(&self) -> SignalCoefficient {
+        let mut signal_coefficients = SignalCoefficient::default();
+
+        if let Some(optic) = &self.optic {
+            signal_coefficients.merge_overwrite(SignalCoefficient::from_optic(optic));
+        }
+
+        signal_coefficients
+    }
+
+    pub fn host_rankings(&self) -> HostRankings {
+        let mut rankings = HostRankings::empty();
+
+        if let Some(host_rankings) = &self.host_rankings {
+            rankings.merge_into(host_rankings.clone());
+        }
+
+        if let Some(optic) = &self.optic {
+            rankings.merge_into(optic.host_rankings.clone());
+        }
+
+        rankings
     }
 }

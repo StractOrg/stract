@@ -17,25 +17,20 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use itertools::Itertools;
 use tracing::info;
-use url::Url;
 use utoipa::ToSchema;
 
 use crate::config;
-use crate::config::WebgraphGranularity;
 use crate::distributed::cluster::Cluster;
 use crate::distributed::member::Member;
 use crate::distributed::member::Service;
 use crate::distributed::sonic::service::sonic_service;
 use crate::distributed::sonic::service::Message;
-use crate::ranking::inbound_similarity::InboundSimilarity;
-use crate::searcher::DistributedSearcher;
-use crate::searcher::SearchClient;
-use crate::similar_hosts::SimilarHostsFinder;
 use crate::webgraph::Compression;
+use crate::webgraph::Edge;
 use crate::webgraph::FullEdge;
 use crate::webgraph::Node;
+use crate::webgraph::NodeID;
 use crate::webgraph::Webgraph;
 use crate::webgraph::WebgraphBuilder;
 use crate::Result;
@@ -48,136 +43,111 @@ pub struct ScoredHost {
     pub description: Option<String>,
 }
 
-const MAX_HOSTS: usize = 20;
-
 pub struct WebGraphService {
-    granularity: WebgraphGranularity,
-    searcher: DistributedSearcher,
-    similar_hosts_finder: Option<SimilarHostsFinder>,
     graph: Arc<Webgraph>,
 }
 
 sonic_service!(
     WebGraphService,
-    [SimilarHosts, Knows, IngoingLinks, OutgoingLinks]
+    [
+        GetNode,
+        IngoingEdges,
+        OutgoingEdges,
+        RawIngoingEdges,
+        RawOutgoingEdges,
+        RawIngoingEdgesWithLabels,
+        RawOutgoingEdgesWithLabels
+    ]
 );
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
-pub struct SimilarHosts {
-    pub hosts: Vec<String>,
-    pub top_n: usize,
+pub struct GetNode {
+    pub node: NodeID,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
-pub struct Knows {
-    pub host: String,
-}
-
-impl Message<WebGraphService> for SimilarHosts {
-    type Response = Vec<ScoredHost>;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        if server.similar_hosts_finder.is_none() {
-            return vec![];
-        }
-
-        let sites = &self.hosts[..std::cmp::min(self.hosts.len(), MAX_HOSTS)];
-        let similar_hosts = server
-            .similar_hosts_finder
-            .as_ref()
-            .unwrap()
-            .find_similar_hosts(sites, self.top_n);
-
-        let urls = similar_hosts
-            .iter()
-            .filter_map(|s| Url::parse(&("http://".to_string() + s.node.as_str())).ok())
-            .collect_vec();
-
-        let descriptions = server.searcher.get_homepage_descriptions(&urls).await;
-
-        let similar_hosts = similar_hosts
-            .into_iter()
-            .map(|site| {
-                let description = Url::parse(&("http://".to_string() + site.node.as_str()))
-                    .ok()
-                    .and_then(|url| descriptions.get(&url).cloned());
-
-                ScoredHost {
-                    host: site.node.as_str().to_string(),
-                    score: site.score,
-                    description,
-                }
-            })
-            .collect_vec();
-
-        similar_hosts
-    }
-}
-
-impl Message<WebGraphService> for Knows {
+impl Message<WebGraphService> for GetNode {
     type Response = Option<Node>;
 
-    async fn handle(mut self, server: &WebGraphService) -> Self::Response {
-        if let Some(suf) = self.host.strip_prefix("http://") {
-            self.host = suf.to_string();
-        }
-
-        if let Some(suf) = self.host.strip_prefix("https://") {
-            self.host = suf.to_string();
-        }
-
-        let url = Url::parse(&("http://".to_string() + self.host.as_str())).ok()?;
-
-        let node = Node::from(url).into_host();
-
-        if server
-            .similar_hosts_finder
-            .as_ref()
-            .map(|finder| finder.knows_about(&node))
-            .unwrap_or(false)
-        {
-            Some(node)
-        } else {
-            None
-        }
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        server.graph.id2node(&self.node)
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
-pub struct IngoingLinks {
+pub struct IngoingEdges {
     pub node: Node,
 }
 
-impl Message<WebGraphService> for IngoingLinks {
+impl Message<WebGraphService> for IngoingEdges {
     type Response = Vec<FullEdge>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
-        match server.granularity {
-            WebgraphGranularity::Host => {
-                let node = self.node.into_host();
-                server.graph.ingoing_edges(node)
-            }
-            WebgraphGranularity::Page => server.graph.ingoing_edges(self.node),
-        }
+        server.graph.ingoing_edges(self.node)
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
-pub struct OutgoingLinks {
+pub struct OutgoingEdges {
     pub node: Node,
 }
 
-impl Message<WebGraphService> for OutgoingLinks {
+impl Message<WebGraphService> for OutgoingEdges {
     type Response = Vec<FullEdge>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
-        match server.granularity {
-            WebgraphGranularity::Host => {
-                let node = self.node.into_host();
-                server.graph.outgoing_edges(node)
-            }
-            WebgraphGranularity::Page => server.graph.outgoing_edges(self.node),
-        }
+        server.graph.outgoing_edges(self.node)
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+pub struct RawIngoingEdges {
+    pub node: NodeID,
+}
+
+impl Message<WebGraphService> for RawIngoingEdges {
+    type Response = Vec<Edge<()>>;
+
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        server.graph.raw_ingoing_edges(&self.node)
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+pub struct RawOutgoingEdges {
+    pub node: NodeID,
+}
+
+impl Message<WebGraphService> for RawOutgoingEdges {
+    type Response = Vec<Edge<()>>;
+
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        server.graph.raw_outgoing_edges(&self.node)
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+pub struct RawIngoingEdgesWithLabels {
+    pub node: NodeID,
+}
+
+impl Message<WebGraphService> for RawIngoingEdgesWithLabels {
+    type Response = Vec<Edge<String>>;
+
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        server.graph.raw_ingoing_edges_with_labels(&self.node)
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+pub struct RawOutgoingEdgesWithLabels {
+    pub node: NodeID,
+}
+
+impl Message<WebGraphService> for RawOutgoingEdgesWithLabels {
+    type Response = Vec<Edge<String>>;
+
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        server.graph.raw_outgoing_edges_with_labels(&self.node)
     }
 }
 
@@ -185,13 +155,14 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
 
     // dropping the handle leaves the cluster
-    let cluster = Arc::new(
+    let _cluster = Arc::new(
         Cluster::join(
             Member {
                 id: config.cluster_id,
                 service: Service::Webgraph {
                     host: addr,
                     granularity: config.granularity,
+                    shard: config.shard,
                 },
             },
             config.gossip_addr,
@@ -199,7 +170,6 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
         )
         .await?,
     );
-    let searcher = DistributedSearcher::new(cluster);
 
     let graph = Arc::new(
         WebgraphBuilder::new(config.graph_path)
@@ -207,24 +177,7 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
             .open(),
     );
 
-    let similar_hosts_finder = config.inbound_similarity_path.map(|path| {
-        let inbound_similarity = InboundSimilarity::open(path).unwrap();
-        SimilarHostsFinder::new(
-            Arc::clone(&graph),
-            inbound_similarity,
-            config.max_similar_hosts,
-        )
-    });
-
-    let server = WebGraphService {
-        graph,
-        searcher,
-        similar_hosts_finder,
-        granularity: config.granularity,
-    }
-    .bind(addr)
-    .await
-    .unwrap();
+    let server = WebGraphService { graph }.bind(addr).await.unwrap();
 
     info!("webgraph server is ready to accept requests on {}", addr);
 

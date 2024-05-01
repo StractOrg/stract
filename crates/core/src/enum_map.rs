@@ -106,6 +106,14 @@ where
             .enumerate()
             .filter_map(|(key, value)| value.as_ref().and_then(|_| K::from_usize(key)))
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (K, &V)> + '_ {
+        self.inner.iter().enumerate().filter_map(|(key, value)| {
+            value
+                .as_ref()
+                .map(|value| (K::from_usize(key).unwrap(), value))
+        })
+    }
 }
 
 impl<K, V> FromIterator<(K, V)> for EnumMap<K, V>

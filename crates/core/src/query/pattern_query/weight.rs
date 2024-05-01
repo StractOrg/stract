@@ -16,7 +16,6 @@
 
 use optics::PatternPart;
 use tantivy::{
-    fieldnorm::FieldNormReader,
     query::{EmptyScorer, Explanation, Scorer},
     schema::IndexRecordOption,
     DocSet, TantivyError,
@@ -42,19 +41,10 @@ pub struct FastSiteDomainPatternWeight {
 }
 
 impl FastSiteDomainPatternWeight {
-    fn fieldnorm_reader(
-        &self,
-        reader: &tantivy::SegmentReader,
-    ) -> tantivy::Result<FieldNormReader> {
-        Ok(FieldNormReader::constant(reader.max_doc(), 1))
-    }
-
     fn pattern_scorer(
         &self,
         reader: &tantivy::SegmentReader,
     ) -> tantivy::Result<Option<FastSiteDomainPatternScorer>> {
-        let fieldnorm_reader = self.fieldnorm_reader(reader)?;
-
         let field_no_tokenizer = match Field::get(self.field.field_id() as usize) {
             Some(Field::Text(TextFieldEnum::UrlForSiteOperator(_))) => {
                 Field::Text(text_field::SiteNoTokenizer.into())
@@ -79,10 +69,7 @@ impl FastSiteDomainPatternWeight {
             .inverted_index(tv_field)?
             .read_postings(&self.term, opt)?
         {
-            Some(posting) => Ok(Some(FastSiteDomainPatternScorer {
-                posting,
-                fieldnorm_reader,
-            })),
+            Some(posting) => Ok(Some(FastSiteDomainPatternScorer { posting })),
             None => Ok(None),
         }
     }

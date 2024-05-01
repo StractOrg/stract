@@ -19,7 +19,6 @@ use std::{cmp::Reverse, path::Path};
 
 use crate::{
     external_sort::ExternalSorter,
-    ranking::inbound_similarity::InboundSimilarity,
     webgraph::{
         centrality::{
             approx_harmonic::ApproxHarmonic, harmonic::HarmonicCentrality, store_csv,
@@ -52,19 +51,6 @@ impl Centrality {
                 .collect();
 
         store_csv(top_harmonics, base_output.as_ref().join("harmonic.csv"));
-    }
-
-    pub fn build_similarity<P: AsRef<Path>>(webgraph_path: P, base_output: P) {
-        tracing::info!(
-            "Building inbound similarity for {}",
-            webgraph_path.as_ref().to_str().unwrap()
-        );
-        let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
-
-        let sim = InboundSimilarity::build(&graph);
-
-        sim.save(base_output.as_ref().join("inbound_similarity"))
-            .unwrap();
     }
 
     pub fn build_approx_harmonic<P: AsRef<Path>>(webgraph_path: P, base_output: P) -> Result<()> {

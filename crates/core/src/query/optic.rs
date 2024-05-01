@@ -268,10 +268,14 @@ mod tests {
     };
 
     use crate::{
+        bangs::Bangs,
         gen_temp_path,
         index::Index,
-        ranking::inbound_similarity::InboundSimilarity,
-        searcher::{LocalSearcher, SearchQuery},
+        searcher::{
+            api::{ApiSearcher, Config},
+            live::LiveSearcher,
+            LocalSearchClient, LocalSearcher, SearchQuery,
+        },
         webgraph::{Node, WebgraphWriter},
         webpage::{Html, Webpage},
     };
@@ -612,8 +616,8 @@ mod tests {
         assert_eq!(res[0].url, "https://www.a.com/this/is/a/pattern");
     }
 
-    #[test]
-    fn liked_hosts() {
+    #[tokio::test]
+    async fn liked_hosts() {
         let mut index = Index::temporary().expect("Unable to open index");
 
         let mut writer = WebgraphWriter::new(
@@ -729,9 +733,12 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let mut searcher = LocalSearcher::from(index);
-
-        searcher.set_inbound_similarity(InboundSimilarity::build(&graph));
+        let searcher: ApiSearcher<_, LiveSearcher, _> = ApiSearcher::new(
+            LocalSearchClient::from(LocalSearcher::from(index)),
+            Bangs::empty(),
+            Config::default(),
+        )
+        .with_webgraph(graph);
 
         let res = searcher
             .search(&SearchQuery {
@@ -750,7 +757,9 @@ mod tests {
                 }),
                 ..Default::default()
             })
+            .await
             .unwrap()
+            .into_websites_result()
             .webpages;
 
         assert_eq!(res.len(), 3);

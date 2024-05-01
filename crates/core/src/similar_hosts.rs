@@ -14,16 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{cmp::Reverse, collections::BinaryHeap, sync::Arc};
+use std::{cmp::Reverse, sync::Arc};
 
-use fnv::{FnvHashMap, FnvHashSet};
 use hashbrown::HashSet;
+use itertools::Itertools;
 use url::Url;
 
 use crate::{
-    ranking::inbound_similarity::InboundSimilarity,
-    webgraph::{Node, NodeID, Webgraph},
+    ranking::{bitvec_similarity, inbound_similarity},
+    webgraph::{remote::RemoteWebgraph, Node, NodeID},
     webpage::url_ext::UrlExt,
+    SortableFloat,
 };
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug)]
@@ -32,51 +33,24 @@ pub struct ScoredNode {
     pub score: f64,
 }
 
-struct ScoredNodeID {
-    node_id: NodeID,
-    score: f64,
-}
-
-impl PartialOrd for ScoredNodeID {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for ScoredNodeID {
-    fn eq(&self, other: &Self) -> bool {
-        self.score == other.score
-    }
-}
-
-impl Ord for ScoredNodeID {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.score.total_cmp(&other.score)
-    }
-}
-
-impl Eq for ScoredNodeID {}
-
 pub struct SimilarHostsFinder {
-    webgraph: Arc<Webgraph>,
-    inbound_similarity: InboundSimilarity,
+    webgraph: Arc<RemoteWebgraph>,
     max_similar_hosts: usize,
 }
 
 impl SimilarHostsFinder {
-    pub fn new(
-        webgraph: Arc<Webgraph>,
-        inbound_similarity: InboundSimilarity,
-        max_similar_hosts: usize,
-    ) -> Self {
+    pub fn new(webgraph: Arc<RemoteWebgraph>, max_similar_hosts: usize) -> Self {
         Self {
             webgraph,
-            inbound_similarity,
             max_similar_hosts,
         }
     }
 
-    pub fn find_similar_hosts(&self, nodes: &[String], limit: usize) -> Vec<ScoredNode> {
+    async fn scorer(&self, liked: &[NodeID]) -> inbound_similarity::Scorer {
+        inbound_similarity::Scorer::new(&self.webgraph, liked, &[], true).await
+    }
+
+    pub async fn find_similar_hosts(&self, nodes: &[String], limit: usize) -> Vec<ScoredNode> {
         const DEAD_LINKS_BUFFER: usize = 30;
         let orig_limit = limit.min(self.max_similar_hosts);
         let limit = orig_limit + nodes.len() + DEAD_LINKS_BUFFER;
@@ -97,70 +71,81 @@ impl SimilarHostsFinder {
 
         let nodes = nodes.into_iter().map(|node| node.id()).collect::<Vec<_>>();
 
-        let mut scorer = self.inbound_similarity.scorer(&nodes, &[], true);
+        let mut scorer = self.scorer(&nodes).await;
 
-        let mut backlinks = FnvHashMap::default();
+        let in_edges = self
+            .webgraph
+            .batch_raw_ingoing_edges(&nodes)
+            .await
+            .unwrap_or_default();
 
-        for node in &nodes {
-            for edge in self.webgraph.raw_ingoing_edges(node) {
-                backlinks
-                    .entry(edge.from)
-                    .or_insert_with(|| scorer.score(&edge.from));
-            }
-        }
+        let backlink_nodes = in_edges
+            .iter()
+            .flatten()
+            .map(|e| e.from)
+            .unique()
+            .collect::<Vec<_>>();
 
-        let mut top_backlink_nodes: Vec<_> = backlinks
-            .into_iter()
-            .filter(|(_, score)| score.is_finite())
+        let outgoing_edges = self
+            .webgraph
+            .batch_raw_outgoing_edges(&backlink_nodes)
+            .await
+            .unwrap_or_default();
+
+        let potential_nodes: Vec<_> = outgoing_edges
+            .iter()
+            .flatten()
+            .map(|e| e.to)
+            .unique()
+            .filter(|n| !nodes.contains(n))
             .collect();
 
-        top_backlink_nodes
-            .sort_unstable_by(|(_, score_a), (_, score_b)| score_a.total_cmp(score_b));
-        top_backlink_nodes.reverse();
-
-        let mut scored_nodes = BinaryHeap::with_capacity(limit);
-        let mut checked_nodes = FnvHashSet::default();
-
-        for (backlink_node, _) in top_backlink_nodes.into_iter().take(limit) {
-            for edge in self.webgraph.raw_outgoing_edges(&backlink_node) {
-                let potential_node = edge.to;
-
-                if checked_nodes.contains(&potential_node) {
-                    continue;
-                }
-
-                checked_nodes.insert(potential_node);
-
-                let score = scorer.score(&potential_node);
-                let scored_node_id = ScoredNodeID {
-                    node_id: potential_node,
-                    score,
-                };
-
-                if scored_nodes.len() < limit {
-                    scored_nodes.push(Reverse(scored_node_id));
-                } else {
-                    let mut min_scored_node = scored_nodes.peek_mut().unwrap();
-
-                    if scored_node_id > min_scored_node.0 {
-                        *min_scored_node = Reverse(scored_node_id);
-                    }
-                }
-            }
-        }
-
-        let mut scored_nodes: Vec<_> = scored_nodes.into_iter().take(limit).map(|n| n.0).collect();
-        scored_nodes.sort_unstable();
-        scored_nodes.reverse();
-
-        scored_nodes
+        let inbounds = bitvec_similarity::BitVec::batch_new_for(&potential_nodes, &self.webgraph)
+            .await
             .into_iter()
-            .filter(|ScoredNodeID { node_id, score: _ }| {
-                // remove dead links (nodes without outgoing edges might be dead links)
-                !self.webgraph.raw_outgoing_edges(node_id).is_empty()
-            })
-            .filter_map(|ScoredNodeID { node_id, score }| {
-                let node = self.webgraph.id2node(&node_id).unwrap();
+            .zip_eq(potential_nodes.into_iter())
+            .map(|(b, n)| (n, b));
+
+        let scored_nodes: Vec<_> = crate::sorted_k(
+            inbounds.map(|(n, b)| {
+                let score = scorer.score(&n, &b);
+                Reverse((SortableFloat(score), n))
+            }),
+            limit,
+        )
+        .into_iter()
+        .map(|Reverse((score, n))| (n, score))
+        .collect();
+
+        let potential_nodes = scored_nodes
+            .iter()
+            .map(|(node_id, _)| *node_id)
+            .collect::<Vec<_>>();
+
+        // remove dead links (nodes without outgoing edges might be dead links)
+        let known_nodes = self
+            .webgraph
+            .batch_raw_ingoing_edges(&potential_nodes)
+            .await
+            .unwrap_or_default();
+
+        let (potential_nodes, scores): (Vec<_>, Vec<_>) = scored_nodes
+            .into_iter()
+            .zip_eq(known_nodes)
+            .filter_map(|(s, e)| if e.is_empty() { None } else { Some(s) })
+            .unzip();
+
+        let nodes = self
+            .webgraph
+            .batch_get_node(&potential_nodes)
+            .await
+            .unwrap_or_default();
+
+        nodes
+            .into_iter()
+            .zip_eq(scores)
+            .filter_map(|(node, SortableFloat(score))| {
+                let node = node.unwrap();
                 match Url::parse(&format!("http://{}", &node.as_str()))
                     .ok()
                     .and_then(|url| url.root_domain().map(|s| s.to_string()))
@@ -177,9 +162,5 @@ impl SimilarHostsFinder {
             })
             .take(orig_limit)
             .collect()
-    }
-
-    pub fn knows_about(&self, node: &Node) -> bool {
-        self.inbound_similarity.knows_about(node.id())
     }
 }
