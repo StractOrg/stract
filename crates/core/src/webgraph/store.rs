@@ -23,7 +23,7 @@ use file_store::{
 use fst::Automaton;
 use itertools::Itertools;
 
-use super::{Compression, Edge, FullNodeID, NodeID};
+use super::{Compression, Edge, EdgeLimit, FullNodeID, NodeID};
 
 #[derive(
     Debug,
@@ -217,7 +217,7 @@ impl EdgeStore {
         self.prefixes.optimize_read();
     }
 
-    pub fn get_with_label(&self, node: &NodeID) -> Vec<Edge<String>> {
+    pub fn get_with_label(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<Edge<String>> {
         let node_bytes = node.as_u64().to_le_bytes();
 
         match (
@@ -240,10 +240,19 @@ impl EdgeStore {
                     .edge_labels
                     .slice(edge_range)
                     .map(|r| r.unwrap().decompress())
-                    .flat_map(|block| block.labels.into_iter())
-                    .collect::<Vec<_>>();
+                    .flat_map(|block| block.labels.into_iter());
 
-                let edge_nodes = self.edge_nodes.slice(node_range).collect::<Vec<_>>();
+                let edge_labels: Vec<_> = match limit {
+                    EdgeLimit::Unlimited => edge_labels.collect(),
+                    EdgeLimit::Limit(limit) => edge_labels.take(*limit).collect(),
+                };
+
+                let edge_nodes = self.edge_nodes.slice(node_range);
+
+                let edge_nodes: Vec<_> = match limit {
+                    EdgeLimit::Unlimited => edge_nodes.collect(),
+                    EdgeLimit::Limit(limit) => edge_nodes.take(*limit).collect(),
+                };
 
                 edge_labels
                     .into_iter()
@@ -269,7 +278,7 @@ impl EdgeStore {
         }
     }
 
-    pub fn get_without_label(&self, node: &NodeID) -> Vec<Edge<()>> {
+    pub fn get_without_label(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<Edge<()>> {
         let node_bytes = node.as_u64().to_le_bytes();
 
         match self.ranges.nodes.get_raw(&node_bytes) {
@@ -280,7 +289,12 @@ impl EdgeStore {
                 )
                 .unwrap();
 
-                let edge_nodes = self.edge_nodes.slice(node_range).collect::<Vec<_>>();
+                let edge_nodes = self.edge_nodes.slice(node_range);
+
+                let edge_nodes: Vec<_> = match limit {
+                    EdgeLimit::Unlimited => edge_nodes.collect(),
+                    EdgeLimit::Limit(limit) => edge_nodes.take(*limit).collect(),
+                };
 
                 edge_nodes
                     .into_iter()
@@ -371,12 +385,12 @@ mod tests {
 
         let store = kv.finalize();
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64), &EdgeLimit::Unlimited);
 
         assert_eq!(edges.len(), 1);
         assert_eq!(&edges[0], &Edge::from(e.clone()));
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64), &EdgeLimit::Unlimited);
 
         assert_eq!(edges.len(), 0);
     }
@@ -405,11 +419,41 @@ mod tests {
 
         let store = kv.finalize();
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64), &EdgeLimit::Unlimited);
         assert_eq!(edges.len(), 0);
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64), &EdgeLimit::Unlimited);
         assert_eq!(edges.len(), 1);
         assert_eq!(&edges[0], &Edge::from(e.clone()));
+    }
+
+    #[test]
+    fn test_limit() {
+        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
+            crate::gen_temp_path().join("test-segment"),
+            Compression::default(),
+            true,
+        );
+
+        for i in 0..10 {
+            let e = InnerEdge {
+                from: FullNodeID {
+                    id: NodeID::from(i as u64),
+                    prefix: NodeID::from(0 as u64),
+                },
+                to: FullNodeID {
+                    id: NodeID::from(1 as u64),
+                    prefix: NodeID::from(0 as u64),
+                },
+                label: "test".to_string(),
+            };
+
+            kv.put(e.clone());
+        }
+
+        let store = kv.finalize();
+
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64), &EdgeLimit::Limit(5));
+        assert_eq!(edges.len(), 5);
     }
 }

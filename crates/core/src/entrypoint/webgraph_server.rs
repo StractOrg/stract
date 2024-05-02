@@ -27,6 +27,7 @@ use crate::distributed::member::Service;
 use crate::distributed::sonic::service::sonic_service;
 use crate::distributed::sonic::service::Message;
 use crate::webgraph::Edge;
+use crate::webgraph::EdgeLimit;
 use crate::webgraph::FullEdge;
 use crate::webgraph::Node;
 use crate::webgraph::NodeID;
@@ -75,78 +76,88 @@ impl Message<WebGraphService> for GetNode {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct IngoingEdges {
     pub node: Node,
+    pub limit: EdgeLimit,
 }
 
 impl Message<WebGraphService> for IngoingEdges {
     type Response = Vec<FullEdge>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.ingoing_edges(self.node)
+        server.graph.ingoing_edges(self.node, self.limit)
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct OutgoingEdges {
     pub node: Node,
+    pub limit: EdgeLimit,
 }
 
 impl Message<WebGraphService> for OutgoingEdges {
     type Response = Vec<FullEdge>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.outgoing_edges(self.node)
+        server.graph.outgoing_edges(self.node, self.limit)
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct RawIngoingEdges {
     pub node: NodeID,
+    pub limit: EdgeLimit,
 }
 
 impl Message<WebGraphService> for RawIngoingEdges {
     type Response = Vec<Edge<()>>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.raw_ingoing_edges(&self.node)
+        server.graph.raw_ingoing_edges(&self.node, self.limit)
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct RawOutgoingEdges {
     pub node: NodeID,
+    pub limit: EdgeLimit,
 }
 
 impl Message<WebGraphService> for RawOutgoingEdges {
     type Response = Vec<Edge<()>>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.raw_outgoing_edges(&self.node)
+        server.graph.raw_outgoing_edges(&self.node, self.limit)
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct RawIngoingEdgesWithLabels {
     pub node: NodeID,
+    pub limit: EdgeLimit,
 }
 
 impl Message<WebGraphService> for RawIngoingEdgesWithLabels {
     type Response = Vec<Edge<String>>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.raw_ingoing_edges_with_labels(&self.node)
+        server
+            .graph
+            .raw_ingoing_edges_with_labels(&self.node, self.limit)
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct RawOutgoingEdgesWithLabels {
     pub node: NodeID,
+    pub limit: EdgeLimit,
 }
 
 impl Message<WebGraphService> for RawOutgoingEdgesWithLabels {
     type Response = Vec<Edge<String>>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.raw_outgoing_edges_with_labels(&self.node)
+        server
+            .graph
+            .raw_outgoing_edges_with_labels(&self.node, self.limit)
     }
 }
 

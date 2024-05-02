@@ -34,7 +34,7 @@ use crate::human_website_annotations;
 use crate::index::Index;
 use crate::rake::RakeModel;
 use crate::ranking::SignalComputer;
-use crate::webgraph::{self, Node, NodeID};
+use crate::webgraph::{self, EdgeLimit, Node, NodeID};
 use crate::webpage::{safety_classifier, Html, Webpage};
 
 pub struct Config {
@@ -83,17 +83,21 @@ pub(super) enum Webgraph {
 }
 
 impl Webgraph {
-    fn batch_raw_ingoing_edges_with_labels(&self, ids: Vec<NodeID>) -> Vec<Vec<String>> {
+    fn batch_raw_ingoing_edges_with_labels(
+        &self,
+        ids: Vec<NodeID>,
+        limit: EdgeLimit,
+    ) -> Vec<Vec<String>> {
         let edges = match self {
             Self::Remote(webgraph) => {
-                crate::block_on(webgraph.batch_raw_ingoing_edges_with_labels(&ids))
+                crate::block_on(webgraph.batch_raw_ingoing_edges_with_labels(&ids, limit))
                     .unwrap_or_default()
             }
             Self::Local(webgraph) => {
                 let mut res = Vec::new();
 
                 for id in ids {
-                    res.push(webgraph.raw_ingoing_edges_with_labels(&id));
+                    res.push(webgraph.raw_ingoing_edges_with_labels(&id, limit));
                 }
 
                 res
@@ -388,7 +392,7 @@ impl IndexingWorker {
                 .map(|w| Node::from(w.html.url()).id())
                 .collect::<Vec<_>>();
 
-            let backlinks = graph.batch_raw_ingoing_edges_with_labels(ids);
+            let backlinks = graph.batch_raw_ingoing_edges_with_labels(ids, EdgeLimit::Limit(256));
 
             for (page, backlink) in pages.iter_mut().zip_eq(backlinks) {
                 page.backlink_labels = backlink;

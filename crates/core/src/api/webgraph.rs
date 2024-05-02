@@ -22,7 +22,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     config::WebgraphGranularity,
-    webgraph::{FullEdge, Node},
+    webgraph::{EdgeLimit, FullEdge, Node},
 };
 
 use super::State;
@@ -219,7 +219,7 @@ async fn ingoing_links(
         WebgraphGranularity::Page => &state.page_webgraph,
     };
 
-    graph.ingoing_edges(node).await
+    graph.ingoing_edges(node, EdgeLimit::Limit(1024)).await
 }
 
 async fn outgoing_links(
@@ -232,7 +232,7 @@ async fn outgoing_links(
         WebgraphGranularity::Page => &state.page_webgraph,
     };
 
-    graph.outgoing_edges(node).await
+    graph.outgoing_edges(node, EdgeLimit::Limit(1024)).await
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema)]

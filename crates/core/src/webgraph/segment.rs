@@ -17,7 +17,8 @@
 use std::path::{Path, PathBuf};
 
 use super::{
-    store::EdgeStore, store_writer::EdgeStoreWriter, Compression, Edge, InnerEdge, NodeID,
+    store::EdgeStore, store_writer::EdgeStoreWriter, Compression, Edge, EdgeLimit, InnerEdge,
+    NodeID,
 };
 
 const ADJACENCY_STORE: &str = "adjacency";
@@ -99,28 +100,20 @@ impl Segment {
         }
     }
 
-    pub fn outgoing_edges_with_label(&self, node: &NodeID) -> Vec<Edge<String>> {
-        self.adjacency.get_with_label(node)
+    pub fn outgoing_edges_with_label(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<Edge<String>> {
+        self.adjacency.get_with_label(node, limit)
     }
 
-    pub fn outgoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
-        self.adjacency.get_without_label(node)
+    pub fn outgoing_edges(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<Edge<()>> {
+        self.adjacency.get_without_label(node, limit)
     }
 
-    pub fn ingoing_edges_with_label(&self, node: &NodeID) -> Vec<Edge<String>> {
-        self.reversed_adjacency.get_with_label(node)
+    pub fn ingoing_edges_with_label(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<Edge<String>> {
+        self.reversed_adjacency.get_with_label(node, limit)
     }
 
-    pub fn ingoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
-        self.reversed_adjacency.get_without_label(node)
-    }
-
-    pub fn ingoing_edges_by_host(&self, host_node: &NodeID) -> Vec<Edge<()>> {
-        self.reversed_adjacency
-            .nodes_by_prefix(host_node)
-            .into_iter()
-            .flat_map(|node| self.ingoing_edges(&node))
-            .collect()
+    pub fn ingoing_edges(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<Edge<()>> {
+        self.reversed_adjacency.get_without_label(node, limit)
     }
 
     pub fn pages_by_host(&self, host_node: &NodeID) -> Vec<NodeID> {
@@ -207,7 +200,7 @@ mod test {
         }
         let segment = writer.finalize();
 
-        let mut out: Vec<_> = segment.outgoing_edges(&a.id);
+        let mut out: Vec<_> = segment.outgoing_edges(&a.id, &EdgeLimit::Unlimited);
 
         out.sort_by(|a, b| a.to.cmp(&b.to));
 
@@ -227,7 +220,7 @@ mod test {
             ]
         );
 
-        let mut out: Vec<_> = segment.outgoing_edges(&b.id);
+        let mut out: Vec<_> = segment.outgoing_edges(&b.id, &EdgeLimit::Unlimited);
         out.sort_by(|a, b| a.to.cmp(&b.to));
         assert_eq!(
             out,
@@ -238,7 +231,7 @@ mod test {
             },]
         );
 
-        let mut out: Vec<_> = segment.outgoing_edges(&c.id);
+        let mut out: Vec<_> = segment.outgoing_edges(&c.id, &EdgeLimit::Unlimited);
         out.sort_by(|a, b| a.to.cmp(&b.to));
         assert_eq!(
             out,
@@ -249,7 +242,7 @@ mod test {
             },]
         );
 
-        let out: Vec<_> = segment.ingoing_edges(&a.id);
+        let out: Vec<_> = segment.ingoing_edges(&a.id, &EdgeLimit::Unlimited);
         assert_eq!(
             out,
             vec![Edge {
@@ -259,7 +252,7 @@ mod test {
             },]
         );
 
-        let out: Vec<_> = segment.ingoing_edges(&b.id);
+        let out: Vec<_> = segment.ingoing_edges(&b.id, &EdgeLimit::Unlimited);
         assert_eq!(
             out,
             vec![Edge {
@@ -269,7 +262,7 @@ mod test {
             },]
         );
 
-        let mut out: Vec<_> = segment.ingoing_edges(&c.id);
+        let mut out: Vec<_> = segment.ingoing_edges(&c.id, &EdgeLimit::Unlimited);
         out.sort_by(|a, b| a.from.cmp(&b.from));
         assert_eq!(
             out,

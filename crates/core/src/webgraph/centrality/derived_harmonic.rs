@@ -23,7 +23,7 @@ use bloom::U64BloomFilter;
 use rayon::prelude::*;
 use std::{collections::BTreeMap, path::Path, sync::Mutex};
 
-use crate::webgraph::{NodeID, Webgraph};
+use crate::webgraph::{EdgeLimit, NodeID, Webgraph};
 
 struct BloomMap {
     map: Vec<Mutex<U64BloomFilter>>,
@@ -101,7 +101,7 @@ impl DerivedCentrality {
 
                 if let Some(harmonic) = host_harmonic.get(&host_node).unwrap() {
                     let mut ingoing: Vec<_> = page_graph
-                        .raw_ingoing_edges(&id)
+                        .raw_ingoing_edges(&id, EdgeLimit::Limit(128))
                         .into_iter()
                         .filter_map(|e| page_graph.id2node(&e.from))
                         .map(|n| n.into_host())

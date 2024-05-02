@@ -27,7 +27,7 @@ use tracing::info;
 use crate::{
     hyperloglog::HyperLogLog,
     kahan_sum::KahanSum,
-    webgraph::{NodeID, Webgraph},
+    webgraph::{EdgeLimit, NodeID, Webgraph},
 };
 
 const HYPERLOGLOG_COUNTERS: usize = 64;
@@ -66,7 +66,7 @@ fn update_changed_counters(
     let has_changes = AtomicBool::new(false);
 
     exact_changed_nodes.iter().for_each(|changed_node| {
-        for edge in graph.raw_outgoing_edges(changed_node) {
+        for edge in graph.raw_outgoing_edges(changed_node, EdgeLimit::Unlimited) {
             if let (Some(counter_to), Some(counter_from)) =
                 (counters.new.get_mut(&edge.to), counters.old.get(&edge.from))
             {
