@@ -14,11 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fs::File, ops::Range, path::Path};
+use std::{ops::Range, path::Path};
 
+use file_store::{
+    iterable::{ConstIterableStoreReader, IterableStoreReader},
+    ConstSerializable,
+};
 use fst::Automaton;
 use itertools::Itertools;
-use memmap2::Mmap;
 
 use super::{Compression, Edge, FullNodeID, NodeID};
 
@@ -133,15 +136,28 @@ impl RangesDb {
     }
 }
 
+impl ConstSerializable for NodeID {
+    const BYTES: usize = std::mem::size_of::<NodeID>();
+
+    fn serialize(&self, buf: &mut [u8]) {
+        self.as_u64().serialize(buf);
+    }
+
+    fn deserialize(buf: &[u8]) -> Self {
+        let id = u64::deserialize(buf);
+        NodeID::from(id)
+    }
+}
+
 pub struct EdgeStore {
     reversed: bool,
     ranges: RangesDb,
     prefixes: PrefixDb,
 
-    edge_labels: Mmap,
+    edge_labels: IterableStoreReader<String>,
+    edge_nodes: ConstIterableStoreReader<NodeID>,
 
-    edge_nodes: Mmap,
-
+    #[allow(dead_code)]
     compression: Compression,
 }
 
@@ -149,17 +165,9 @@ impl EdgeStore {
     pub fn open<P: AsRef<Path>>(path: P, reversed: bool, compression: Compression) -> Self {
         let ranges = RangesDb::open(path.as_ref().join("ranges"));
 
-        let edge_labels_file = File::options()
-            .read(true)
-            .open(path.as_ref().join("labels"))
-            .unwrap();
-        let edge_labels = unsafe { Mmap::map(&edge_labels_file).unwrap() };
+        let edge_labels = IterableStoreReader::open(path.as_ref().join("labels")).unwrap();
 
-        let edge_nodes_file = File::options()
-            .read(true)
-            .open(path.as_ref().join("nodes"))
-            .unwrap();
-        let edge_nodes = unsafe { Mmap::map(&edge_nodes_file).unwrap() };
+        let edge_nodes = ConstIterableStoreReader::open(path.as_ref().join("nodes")).unwrap();
 
         Self {
             ranges,
@@ -195,15 +203,13 @@ impl EdgeStore {
                 )
                 .unwrap();
 
-                let edge_labels = &self.edge_labels[edge_range];
-                let edge_labels = self.compression.decompress(edge_labels);
-                let (edge_labels, _): (Vec<_>, _) =
-                    bincode::decode_from_slice(&edge_labels, bincode::config::standard()).unwrap();
+                let edge_labels = self
+                    .edge_labels
+                    .slice(edge_range)
+                    .collect::<crate::Result<Vec<_>>>()
+                    .unwrap();
 
-                let edge_nodes = &self.edge_nodes[node_range];
-                let edge_nodes = self.compression.decompress(edge_nodes);
-                let (edge_nodes, _): (Vec<_>, _) =
-                    bincode::decode_from_slice(&edge_nodes, bincode::config::standard()).unwrap();
+                let edge_nodes = self.edge_nodes.slice(node_range).collect::<Vec<_>>();
 
                 edge_labels
                     .into_iter()
@@ -240,10 +246,7 @@ impl EdgeStore {
                 )
                 .unwrap();
 
-                let edge_nodes = &self.edge_nodes[node_range];
-                let edge_nodes = self.compression.decompress(edge_nodes);
-                let (edge_nodes, _): (Vec<_>, _) =
-                    bincode::decode_from_slice(&edge_nodes, bincode::config::standard()).unwrap();
+                let edge_nodes = self.edge_nodes.slice(node_range).collect::<Vec<_>>();
 
                 edge_nodes
                     .into_iter()
@@ -282,10 +285,8 @@ impl EdgeStore {
                 bincode::config::standard(),
             )
             .unwrap();
-            let edge_nodes = &self.edge_nodes[node_range];
-            let edge_nodes = self.compression.decompress(edge_nodes);
-            let (edge_nodes, _): (Vec<_>, _) =
-                bincode::decode_from_slice(&edge_nodes, bincode::config::standard()).unwrap();
+
+            let edge_nodes = self.edge_nodes.slice(node_range).collect::<Vec<_>>();
 
             edge_nodes.into_iter().map(move |other| {
                 if self.reversed {

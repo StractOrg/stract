@@ -28,6 +28,7 @@
 use crate::{owned_bytes::OwnedBytes, ConstSerializable, Result};
 use std::{
     io::{self, Write},
+    ops::Range,
     path::Path,
 };
 
@@ -64,9 +65,16 @@ impl IterableHeader {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct WrittenOffset {
     pub start: u64,
     pub num_bytes: u64,
+}
+
+impl WrittenOffset {
+    pub fn range(&self) -> Range<u64> {
+        self.start..self.start + self.num_bytes
+    }
 }
 
 pub struct IterableStoreWriter<T, W>
@@ -115,6 +123,10 @@ where
 
         self.writer.into_inner().map_err(|e| anyhow::anyhow!("{e}"))
     }
+
+    pub fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
 }
 
 pub struct IterableStoreReader<T> {
@@ -137,6 +149,14 @@ impl<T> IterableStoreReader<T> {
     pub fn from_bytes(data: Vec<u8>) -> Self {
         Self {
             data: OwnedBytes::new(data),
+            offset: 0,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    pub fn slice(&self, range: Range<usize>) -> IterableStoreReader<T> {
+        IterableStoreReader {
+            data: self.data.slice(range),
             offset: 0,
             _marker: std::marker::PhantomData,
         }
@@ -278,7 +298,7 @@ where
     }
 
     pub fn write(&mut self, item: &T) -> Result<WrittenOffset> {
-        self.buf.clear();
+        self.buf.resize(T::BYTES, 0);
         item.serialize(&mut self.buf);
 
         assert_eq!(self.buf.len(), T::BYTES);
@@ -300,6 +320,10 @@ where
         self.writer.flush()?;
 
         self.writer.into_inner().map_err(|e| anyhow::anyhow!("{e}"))
+    }
+
+    pub fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
     }
 }
 
@@ -323,6 +347,14 @@ impl<T> ConstIterableStoreReader<T> {
     pub fn from_bytes(data: Vec<u8>) -> Self {
         Self {
             data: OwnedBytes::new(data),
+            offset: 0,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    pub fn slice(&self, range: Range<usize>) -> ConstIterableStoreReader<T> {
+        ConstIterableStoreReader {
+            data: self.data.slice(range),
             offset: 0,
             _marker: std::marker::PhantomData,
         }

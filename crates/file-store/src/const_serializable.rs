@@ -26,7 +26,7 @@
 pub trait ConstSerializable {
     const BYTES: usize;
 
-    fn serialize(&self, buf: &mut Vec<u8>);
+    fn serialize(&self, buf: &mut [u8]);
     fn deserialize(buf: &[u8]) -> Self;
 }
 
@@ -35,8 +35,8 @@ macro_rules! impl_const_serializable_num {
         impl ConstSerializable for $t {
             const BYTES: usize = $n;
 
-            fn serialize(&self, buf: &mut Vec<u8>) {
-                buf.extend_from_slice(&self.to_le_bytes());
+            fn serialize(&self, buf: &mut [u8]) {
+                buf.copy_from_slice(&self.to_le_bytes());
             }
 
             fn deserialize(buf: &[u8]) -> Self {

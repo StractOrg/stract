@@ -19,15 +19,16 @@ pub const MAX_BATCH_SIZE: usize = 3_000_000;
 use std::{
     collections::BTreeSet,
     fs::File,
-    io::Write,
+    ops::Range,
     path::{Path, PathBuf},
 };
 
 use itertools::Itertools;
-use memmap2::Mmap;
 
 use crate::Result;
-use file_store::iterable::{IterableStoreReader, SortedIterableStoreReader};
+use file_store::iterable::{
+    ConstIterableStoreWriter, IterableStoreReader, IterableStoreWriter, SortedIterableStoreReader,
+};
 
 use super::{
     store::{EdgeStore, PrefixDb, RangesDb},
@@ -197,13 +198,8 @@ struct FinalEdgeStoreWriter {
     ranges: RangesDb,
     prefixes: PrefixDb,
 
-    edge_labels_file: File,
-    edge_labels_len: usize,
-    edge_labels: Mmap,
-
-    edge_nodes_file: File,
-    edge_nodes_len: usize,
-    edge_nodes: Mmap,
+    edge_labels: IterableStoreWriter<String, File>,
+    edge_nodes: ConstIterableStoreWriter<NodeID, File>,
 
     compression: Compression,
     reversed: bool,
@@ -222,8 +218,7 @@ impl FinalEdgeStoreWriter {
             .write(true)
             .open(path.as_ref().join("labels"))
             .unwrap();
-        let edge_labels = unsafe { Mmap::map(&edge_labels_file).unwrap() };
-        let edge_labels_len = edge_labels.len();
+        let edge_labels = IterableStoreWriter::new(edge_labels_file);
 
         let edge_nodes_file = File::options()
             .read(true)
@@ -232,18 +227,13 @@ impl FinalEdgeStoreWriter {
             .write(true)
             .open(path.as_ref().join("nodes"))
             .unwrap();
-        let edge_nodes = unsafe { Mmap::map(&edge_nodes_file).unwrap() };
-        let edge_nodes_len = edge_nodes.len();
+        let edge_nodes = ConstIterableStoreWriter::new(edge_nodes_file);
 
         Self {
             ranges,
             prefixes: PrefixDb::open(path.as_ref().join("prefixes")),
             edge_labels,
-            edge_labels_len,
-            edge_labels_file,
             edge_nodes,
-            edge_nodes_file,
-            edge_nodes_len,
             reversed,
             compression,
             path: path.as_ref().to_path_buf(),
@@ -282,22 +272,40 @@ impl FinalEdgeStoreWriter {
             });
         }
 
-        let edge_labels_bytes =
-            bincode::encode_to_vec(&edge_labels, bincode::config::standard()).unwrap();
-        let edge_nodes_bytes =
-            bincode::encode_to_vec(&edge_nodes, bincode::config::standard()).unwrap();
+        let mut first_label_offset = None;
+        let mut last_label_offset = None;
+        let mut first_node_offset = None;
+        let mut last_node_offset = None;
 
-        let edge_labels_bytes = self.compression.compress(&edge_labels_bytes);
-        let edge_nodes_bytes = self.compression.compress(&edge_nodes_bytes);
+        for label in &edge_labels {
+            let offset = self.edge_labels.write(label).unwrap();
 
-        let label_range = self.edge_labels_len..(self.edge_labels_len + edge_labels_bytes.len());
-        let node_range = self.edge_nodes_len..(self.edge_nodes_len + edge_nodes_bytes.len());
+            if first_label_offset.is_none() {
+                first_label_offset = Some(offset);
+            }
 
-        self.edge_labels_len += edge_labels_bytes.len();
-        self.edge_nodes_len += edge_nodes_bytes.len();
+            last_label_offset = Some(offset);
+        }
 
-        self.edge_labels_file.write_all(&edge_labels_bytes).unwrap();
-        self.edge_nodes_file.write_all(&edge_nodes_bytes).unwrap();
+        for node in &edge_nodes {
+            let offset = self.edge_nodes.write(node).unwrap();
+
+            if first_node_offset.is_none() {
+                first_node_offset = Some(offset);
+            }
+
+            last_node_offset = Some(offset);
+        }
+
+        let label_range = Range {
+            start: first_label_offset.unwrap().start,
+            end: last_label_offset.unwrap().start + last_label_offset.unwrap().num_bytes,
+        };
+
+        let node_range = Range {
+            start: first_node_offset.unwrap().start,
+            end: last_node_offset.unwrap().start + last_node_offset.unwrap().num_bytes,
+        };
 
         self.ranges.insert_raw_node(
             node_bytes.to_vec(),
@@ -367,13 +375,7 @@ impl FinalEdgeStoreWriter {
 
         self.ranges.commit();
 
-        self.edge_nodes_file.flush().unwrap();
-        self.edge_labels_file.flush().unwrap();
-
-        self.edge_nodes = unsafe { Mmap::map(&self.edge_nodes_file).unwrap() };
-        self.edge_labels = unsafe { Mmap::map(&self.edge_labels_file).unwrap() };
-
-        self.edge_nodes_len = self.edge_nodes.len();
-        self.edge_labels_len = self.edge_labels.len();
+        self.edge_nodes.flush().unwrap();
+        self.edge_labels.flush().unwrap();
     }
 }

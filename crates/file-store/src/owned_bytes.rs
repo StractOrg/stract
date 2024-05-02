@@ -18,7 +18,12 @@
 //! to avoid having to pull in another dependency.
 
 use stable_deref_trait::StableDeref;
-use std::{fmt, io, ops::Deref, path::Path, sync::Arc};
+use std::{
+    fmt, io,
+    ops::{Deref, Range},
+    path::Path,
+    sync::Arc,
+};
 
 pub struct OwnedBytes {
     data: &'static [u8],
@@ -51,6 +56,15 @@ impl OwnedBytes {
 
     pub fn as_slice(&self) -> &[u8] {
         self.data
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn slice(&self, range: Range<usize>) -> Self {
+        Self {
+            data: &self.data[range],
+            box_stable_deref: self.box_stable_deref.clone(),
+        }
     }
 }
 

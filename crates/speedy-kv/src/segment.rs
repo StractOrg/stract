@@ -63,9 +63,9 @@ where
     W: Write,
 {
     fn insert(&mut self, key: SerializedRef<'_, K>, value: SerializedRef<'_, V>) -> Result<()> {
-        let _id = self.writers.id_index.insert(key.as_bytes())?;
         let ptr = self.writers.store.write(key, value)?;
-        self.writers.blob_index.write(&ptr)?;
+        let id = self.writers.blob_index.write(&ptr)?;
+        self.writers.id_index.insert(key.as_bytes(), &id)?;
 
         self.bloom.insert_raw(key.as_bytes());
 

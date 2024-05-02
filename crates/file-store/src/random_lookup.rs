@@ -21,7 +21,18 @@ use std::{
 
 use crate::{owned_bytes::OwnedBytes, ConstSerializable};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ItemId(u64);
+
+impl ItemId {
+    pub fn into_inner(self) -> u64 {
+        self.0
+    }
+
+    pub fn from_inner(inner: u64) -> Self {
+        ItemId(inner)
+    }
+}
 
 pub struct RandomLookupWriter<V, W>
 where
@@ -48,12 +59,7 @@ where
     }
 
     pub fn write(&mut self, item: &V) -> io::Result<ItemId> {
-        if self.buf.capacity() < V::BYTES {
-            self.buf.reserve(V::BYTES - self.buf.capacity());
-        }
-
-        self.buf.clear();
-
+        self.buf.resize(V::BYTES, 0);
         item.serialize(&mut self.buf);
 
         assert_eq!(self.buf.len(), V::BYTES);
@@ -100,6 +106,14 @@ where
 
         V::deserialize(&self.data[start..start + V::BYTES])
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (ItemId, V)> + '_ {
+        RandomLookupIter {
+            data: &self.data,
+            next_id: 0,
+            _phantom: std::marker::PhantomData,
+        }
+    }
 }
 
 impl<V> From<OwnedBytes> for RandomLookup<V> {
@@ -108,6 +122,36 @@ impl<V> From<OwnedBytes> for RandomLookup<V> {
             data,
             _phantom: std::marker::PhantomData,
         }
+    }
+}
+
+pub struct RandomLookupIter<'a, V> {
+    data: &'a OwnedBytes,
+    next_id: u64,
+    _phantom: std::marker::PhantomData<V>,
+}
+
+impl<'a, V> Iterator for RandomLookupIter<'a, V>
+where
+    V: ConstSerializable,
+{
+    type Item = (ItemId, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item_size: usize = V::BYTES;
+        let start = self.next_id as usize * item_size;
+
+        if start >= self.data.len() {
+            return None;
+        }
+
+        let id = ItemId::from_inner(self.next_id);
+
+        self.next_id += 1;
+
+        let val = V::deserialize(&self.data[start..start + V::BYTES]);
+
+        Some((id, val))
     }
 }
 
@@ -129,5 +173,24 @@ mod tests {
         let value2 = store.get(id);
 
         assert_eq!(value, value2);
+    }
+
+    #[test]
+    fn test_iter() {
+        let mut writer = RandomLookupWriter::new(Vec::new());
+
+        let items = vec![1u64, 2, 3, 4, 5];
+
+        for item in &items {
+            writer.write(item).unwrap();
+        }
+
+        let bytes = writer.finish().unwrap();
+
+        let store = RandomLookup::<u64>::from(OwnedBytes::new(bytes));
+
+        let res = store.iter().map(|(_, val)| val).collect::<Vec<_>>();
+
+        assert_eq!(items, res);
     }
 }

@@ -47,6 +47,7 @@ mod blob_store;
 mod segment;
 mod serialized;
 
+use file_store::ConstSerializable;
 pub use serialized::{Serialized, SerializedRef};
 
 struct BlobPointer {
@@ -93,8 +94,20 @@ impl BlobPointer {
     }
 }
 
+impl ConstSerializable for BlobPointer {
+    const BYTES: usize = Self::size();
+
+    fn serialize(&self, buf: &mut [u8]) {
+        buf.copy_from_slice(&self.as_bytes());
+    }
+
+    fn deserialize(buf: &[u8]) -> Self {
+        Self::from_bytes(buf.try_into().unwrap())
+    }
+}
+
 #[derive(Clone, Copy)]
-struct BlobId(u64);
+struct BlobId(file_store::random_lookup::ItemId);
 
 #[derive(Debug)]
 struct LiveSegment<K, V> {
