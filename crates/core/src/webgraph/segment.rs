@@ -79,20 +79,15 @@ pub struct Segment {
 }
 
 impl Segment {
-    pub fn open<P: AsRef<Path>>(folder_path: P, id: String, compression: Compression) -> Self {
+    pub fn open<P: AsRef<Path>>(folder_path: P, id: String) -> Self {
         Segment {
-            adjacency: EdgeStore::open(
-                folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
-                false,
-                compression,
-            ),
+            adjacency: EdgeStore::open(folder_path.as_ref().join(&id).join(ADJACENCY_STORE), false),
             reversed_adjacency: EdgeStore::open(
                 folder_path
                     .as_ref()
                     .join(&id)
                     .join(REVERSED_ADJACENCY_STORE),
                 true,
-                compression,
             ),
             folder_path: folder_path
                 .as_ref()

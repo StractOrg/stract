@@ -29,7 +29,6 @@ pub struct WebgraphWriter {
     id2node: Id2NodeDb,
     executor: Executor,
     meta: Meta,
-    compression: Compression,
 }
 
 impl WebgraphWriter {
@@ -61,7 +60,6 @@ impl WebgraphWriter {
             id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
             executor,
             meta,
-            compression,
         }
     }
 
@@ -110,7 +108,6 @@ impl WebgraphWriter {
             executor: self.executor.into(),
             id2node: self.id2node,
             meta: self.meta,
-            compression: self.compression,
         }
     }
 }

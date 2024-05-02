@@ -92,7 +92,6 @@ pub struct Webgraph {
     executor: Arc<Executor>,
     id2node: Id2NodeDb,
     meta: Meta,
-    compression: Compression,
 }
 
 impl Webgraph {
@@ -110,7 +109,7 @@ impl Webgraph {
         self.meta.save(path);
     }
 
-    fn open<P: AsRef<Path>>(path: P, executor: Executor, compression: Compression) -> Self {
+    fn open<P: AsRef<Path>>(path: P, executor: Executor) -> Self {
         fs::create_dir_all(&path).unwrap();
         let meta = Self::meta(&path);
 
@@ -121,7 +120,6 @@ impl Webgraph {
             segments.push(Segment::open(
                 path.as_ref().join("segments"),
                 segment.clone(),
-                compression,
             ));
         }
 
@@ -131,7 +129,6 @@ impl Webgraph {
             executor: Arc::new(executor),
             id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
             meta,
-            compression,
         }
     }
 
@@ -147,8 +144,7 @@ impl Webgraph {
 
             self.meta.comitted_segments.push(segment.id());
             drop(segment);
-            self.segments
-                .push(Segment::open(new_path, id, self.compression));
+            self.segments.push(Segment::open(new_path, id));
         }
 
         fs::remove_dir_all(other_folder)?;

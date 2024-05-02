@@ -149,20 +149,54 @@ impl ConstSerializable for NodeID {
     }
 }
 
+pub const NUM_LABELS_PER_BLOCK: usize = 128;
+
+#[derive(bincode::Encode, bincode::Decode)]
+pub struct LabelBlock {
+    labels: Vec<String>,
+}
+
+impl LabelBlock {
+    pub fn new(labels: Vec<String>) -> Self {
+        Self { labels }
+    }
+
+    pub fn compress(&self, compression: Compression) -> CompressedLabelBlock {
+        let bytes = bincode::encode_to_vec(self, bincode::config::standard()).unwrap();
+        let compressed = compression.compress(&bytes);
+
+        CompressedLabelBlock {
+            compressions: compression,
+            data: compressed,
+        }
+    }
+}
+
+#[derive(bincode::Encode, bincode::Decode)]
+pub struct CompressedLabelBlock {
+    compressions: Compression,
+    data: Vec<u8>,
+}
+
+impl CompressedLabelBlock {
+    pub fn decompress(&self) -> LabelBlock {
+        let bytes = self.compressions.decompress(&self.data);
+        let (res, _) = bincode::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+        res
+    }
+}
+
 pub struct EdgeStore {
     reversed: bool,
     ranges: RangesDb,
     prefixes: PrefixDb,
 
-    edge_labels: IterableStoreReader<String>,
+    edge_labels: IterableStoreReader<CompressedLabelBlock>,
     edge_nodes: ConstIterableStoreReader<NodeID>,
-
-    #[allow(dead_code)]
-    compression: Compression,
 }
 
 impl EdgeStore {
-    pub fn open<P: AsRef<Path>>(path: P, reversed: bool, compression: Compression) -> Self {
+    pub fn open<P: AsRef<Path>>(path: P, reversed: bool) -> Self {
         let ranges = RangesDb::open(path.as_ref().join("ranges"));
 
         let edge_labels = IterableStoreReader::open(path.as_ref().join("labels")).unwrap();
@@ -175,7 +209,6 @@ impl EdgeStore {
             edge_labels,
             edge_nodes,
             reversed,
-            compression,
         }
     }
 
@@ -206,8 +239,9 @@ impl EdgeStore {
                 let edge_labels = self
                     .edge_labels
                     .slice(edge_range)
-                    .collect::<crate::Result<Vec<_>>>()
-                    .unwrap();
+                    .map(|r| r.unwrap().decompress())
+                    .flat_map(|block| block.labels.into_iter())
+                    .collect::<Vec<_>>();
 
                 let edge_nodes = self.edge_nodes.slice(node_range).collect::<Vec<_>>();
 

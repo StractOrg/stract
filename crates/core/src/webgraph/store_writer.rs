@@ -25,13 +25,13 @@ use std::{
 
 use itertools::Itertools;
 
-use crate::Result;
+use crate::{webgraph::store::NUM_LABELS_PER_BLOCK, Result};
 use file_store::iterable::{
     ConstIterableStoreWriter, IterableStoreReader, IterableStoreWriter, SortedIterableStoreReader,
 };
 
 use super::{
-    store::{EdgeStore, PrefixDb, RangesDb},
+    store::{CompressedLabelBlock, EdgeStore, LabelBlock, PrefixDb, RangesDb},
     Compression, EdgeLabel, InnerEdge, NodeID,
 };
 
@@ -198,7 +198,7 @@ struct FinalEdgeStoreWriter {
     ranges: RangesDb,
     prefixes: PrefixDb,
 
-    edge_labels: IterableStoreWriter<String, File>,
+    edge_labels: IterableStoreWriter<CompressedLabelBlock, File>,
     edge_nodes: ConstIterableStoreWriter<NodeID, File>,
 
     compression: Compression,
@@ -272,13 +272,20 @@ impl FinalEdgeStoreWriter {
             });
         }
 
+        let edge_labels: Vec<_> = edge_labels
+            .into_iter()
+            .chunks(NUM_LABELS_PER_BLOCK)
+            .into_iter()
+            .map(|chunk| LabelBlock::new(chunk.collect()).compress(self.compression))
+            .collect();
+
         let mut first_label_offset = None;
         let mut last_label_offset = None;
         let mut first_node_offset = None;
         let mut last_node_offset = None;
 
-        for label in &edge_labels {
-            let offset = self.edge_labels.write(label).unwrap();
+        for block in &edge_labels {
+            let offset = self.edge_labels.write(block).unwrap();
 
             if first_label_offset.is_none() {
                 first_label_offset = Some(offset);
@@ -367,7 +374,7 @@ impl FinalEdgeStoreWriter {
 
         self.flush();
 
-        EdgeStore::open(&self.path, self.reversed, self.compression)
+        EdgeStore::open(&self.path, self.reversed)
     }
 
     fn flush(&mut self) {

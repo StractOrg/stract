@@ -26,7 +26,6 @@ use crate::distributed::member::Member;
 use crate::distributed::member::Service;
 use crate::distributed::sonic::service::sonic_service;
 use crate::distributed::sonic::service::Message;
-use crate::webgraph::Compression;
 use crate::webgraph::Edge;
 use crate::webgraph::FullEdge;
 use crate::webgraph::Node;
@@ -171,11 +170,7 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
         .await?,
     );
 
-    let graph = Arc::new(
-        WebgraphBuilder::new(config.graph_path)
-            .compression(Compression::Lz4)
-            .open(),
-    );
+    let graph = Arc::new(WebgraphBuilder::new(config.graph_path).open());
 
     let server = WebGraphService { graph }.bind(addr).await.unwrap();
 
