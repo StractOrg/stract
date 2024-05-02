@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use super::{
     store::EdgeStore, store_writer::EdgeStoreWriter, Compression, Edge, EdgeLimit, InnerEdge,
@@ -32,12 +35,18 @@ pub struct SegmentWriter {
 }
 
 impl SegmentWriter {
-    pub fn open<P: AsRef<Path>>(folder_path: P, id: String, compression: Compression) -> Self {
+    pub fn open<P: AsRef<Path>>(
+        folder_path: P,
+        id: String,
+        compression: Compression,
+        host_centrality_rank_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
+    ) -> Self {
         SegmentWriter {
             adjacency: EdgeStoreWriter::new(
                 folder_path.as_ref().join(&id).join(ADJACENCY_STORE),
                 compression,
                 false,
+                host_centrality_rank_store.clone(),
             ),
             reversed_adjacency: EdgeStoreWriter::new(
                 folder_path
@@ -46,6 +55,7 @@ impl SegmentWriter {
                     .join(REVERSED_ADJACENCY_STORE),
                 compression,
                 true,
+                host_centrality_rank_store.clone(),
             ),
             folder_path: folder_path
                 .as_ref()
@@ -117,7 +127,7 @@ impl Segment {
     }
 
     pub fn pages_by_host(&self, host_node: &NodeID) -> Vec<NodeID> {
-        self.reversed_adjacency.nodes_by_prefix(host_node)
+        self.reversed_adjacency.nodes_by_host(host_node)
     }
 
     pub fn id(&self) -> String {
@@ -157,21 +167,22 @@ mod test {
             crate::gen_temp_path(),
             "test".to_string(),
             Compression::default(),
+            None,
         );
 
         let mut edges = Vec::new();
 
         let a = FullNodeID {
             id: NodeID::from(0 as u64),
-            prefix: NodeID::from(0 as u64),
+            host: NodeID::from(0 as u64),
         };
         let b = FullNodeID {
             id: NodeID::from(1 as u64),
-            prefix: NodeID::from(0 as u64),
+            host: NodeID::from(0 as u64),
         };
         let c = FullNodeID {
             id: NodeID::from(2 as u64),
-            prefix: NodeID::from(0 as u64),
+            host: NodeID::from(0 as u64),
         };
 
         edges.push(InnerEdge {

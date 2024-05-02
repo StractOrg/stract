@@ -21,6 +21,7 @@ use std::{
     fs::File,
     ops::Range,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use itertools::Itertools;
@@ -31,7 +32,7 @@ use file_store::iterable::{
 };
 
 use super::{
-    store::{CompressedLabelBlock, EdgeStore, LabelBlock, PrefixDb, RangesDb},
+    store::{CompressedLabelBlock, EdgeStore, HostDb, LabelBlock, RangesDb},
     Compression, EdgeLabel, InnerEdge, NodeID,
 };
 
@@ -103,10 +104,16 @@ pub struct EdgeStoreWriter {
     edges: BTreeSet<SortableEdge<String>>,
     stored_writers: Vec<PathBuf>,
     compression: Compression,
+    host_centrality_rank_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
 }
 
 impl EdgeStoreWriter {
-    pub fn new<P: AsRef<Path>>(path: P, compression: Compression, reversed: bool) -> Self {
+    pub fn new<P: AsRef<Path>>(
+        path: P,
+        compression: Compression,
+        reversed: bool,
+        host_centrality_rank_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
+    ) -> Self {
         let writer_path = path.as_ref().join("writer");
 
         if !writer_path.exists() {
@@ -119,6 +126,7 @@ impl EdgeStoreWriter {
             path: path.as_ref().to_path_buf(),
             compression,
             stored_writers: Vec::new(),
+            host_centrality_rank_store,
         }
     }
 
@@ -178,8 +186,12 @@ impl EdgeStoreWriter {
     }
 
     pub fn finalize(self) -> EdgeStore {
-        let mut final_writer =
-            FinalEdgeStoreWriter::open(self.compression, self.reversed, &self.path);
+        let mut final_writer = FinalEdgeStoreWriter::open(
+            self.compression,
+            self.reversed,
+            self.host_centrality_rank_store.clone(),
+            &self.path,
+        );
 
         let mut store = final_writer.build_store(self.sorted_edges().dedup().map(|e| e.edge));
         store.optimize_read();
@@ -196,10 +208,12 @@ impl Drop for EdgeStoreWriter {
 
 struct FinalEdgeStoreWriter {
     ranges: RangesDb,
-    prefixes: PrefixDb,
+    hosts: HostDb,
 
     edge_labels: IterableStoreWriter<CompressedLabelBlock, File>,
     edge_nodes: ConstIterableStoreWriter<NodeID, File>,
+
+    host_centrality_rank_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
 
     compression: Compression,
     reversed: bool,
@@ -208,7 +222,12 @@ struct FinalEdgeStoreWriter {
 }
 
 impl FinalEdgeStoreWriter {
-    fn open<P: AsRef<Path>>(compression: Compression, reversed: bool, path: P) -> Self {
+    fn open<P: AsRef<Path>>(
+        compression: Compression,
+        reversed: bool,
+        host_centrality_rank_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
+        path: P,
+    ) -> Self {
         let ranges = RangesDb::open(path.as_ref().join("ranges"));
 
         let edge_labels_file = File::options()
@@ -231,19 +250,20 @@ impl FinalEdgeStoreWriter {
 
         Self {
             ranges,
-            prefixes: PrefixDb::open(path.as_ref().join("prefixes")),
+            hosts: HostDb::open(path.as_ref().join("hosts")),
             edge_labels,
             edge_nodes,
             reversed,
             compression,
             path: path.as_ref().to_path_buf(),
+            host_centrality_rank_store,
         }
     }
     /// Insert a batch of edges into the store.
     /// The edges *must* have been de-duplicated by their from/to node.
     /// I.e. if the store is not reversed, there should only ever be a single
     /// put for each from node, and vice versa.
-    fn put_store(&mut self, edges: &[InnerEdge<String>]) {
+    fn put_store(&mut self, edges: &mut [InnerEdge<String>]) {
         if edges.is_empty() {
             return;
         }
@@ -254,7 +274,18 @@ impl FinalEdgeStoreWriter {
             edges[0].from.clone()
         };
 
-        self.prefixes.insert(&node);
+        // order edges by centrality rank of the other node host
+        if let Some(rank_store) = &self.host_centrality_rank_store {
+            edges.sort_by_cached_key(|e| {
+                if self.reversed {
+                    rank_store.get(&e.from.host).unwrap().unwrap_or(u64::MAX)
+                } else {
+                    rank_store.get(&e.to.host).unwrap().unwrap_or(u64::MAX)
+                }
+            });
+        }
+
+        self.hosts.insert(&node);
         let node_bytes = node.id.as_u64().to_le_bytes();
 
         debug_assert!(self.ranges.nodes_get_raw(&node_bytes).is_none());
@@ -345,7 +376,7 @@ impl FinalEdgeStoreWriter {
                     );
                     batch.dedup_by_key(|e| if self.reversed { e.from.id } else { e.to.id });
                     let batch_len = batch.len();
-                    self.put_store(&batch);
+                    self.put_store(&mut batch);
                     batch.clear();
                     inserts_since_last_flush += batch_len;
 
@@ -369,7 +400,7 @@ impl FinalEdgeStoreWriter {
                 |e: &InnerEdge<_>| if self.reversed { e.from.id } else { e.to.id },
             );
             batch.dedup_by_key(|e| if self.reversed { e.from.id } else { e.to.id });
-            self.put_store(&batch);
+            self.put_store(&mut batch);
         }
 
         self.flush();
@@ -378,7 +409,7 @@ impl FinalEdgeStoreWriter {
     }
 
     fn flush(&mut self) {
-        self.prefixes.flush();
+        self.hosts.flush();
 
         self.ranges.commit();
 

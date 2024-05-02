@@ -123,8 +123,8 @@ fn create_webgraph() -> Result<()> {
     };
 
     let mut worker = webgraph::WebgraphWorker {
-        host_graph: webgraph::open_host_graph_writer(&out_path_host),
-        page_graph: webgraph::open_page_graph_writer(&out_path_page),
+        host_graph: webgraph::open_host_graph_writer(&out_path_host, None),
+        page_graph: webgraph::open_page_graph_writer(&out_path_page, None),
         canonical_index: None,
     };
 

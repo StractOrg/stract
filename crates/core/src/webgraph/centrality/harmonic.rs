@@ -316,6 +316,7 @@ mod tests {
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
+            None,
         );
 
         for (from, to, label) in test_edges() {
@@ -331,6 +332,7 @@ mod tests {
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
+            None,
         );
 
         writer.insert(
@@ -439,6 +441,7 @@ mod tests {
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
+            None,
         );
 
         for (from, to, label) in test_edges() {

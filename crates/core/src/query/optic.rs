@@ -624,6 +624,7 @@ mod tests {
             gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
+            None,
         );
 
         writer.insert(

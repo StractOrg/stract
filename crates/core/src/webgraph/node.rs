@@ -66,16 +66,16 @@ impl From<u64> for NodeID {
     bincode::Decode,
 )]
 pub struct FullNodeID {
-    pub prefix: NodeID,
+    pub host: NodeID,
     pub id: NodeID,
 }
 
 impl From<Node> for FullNodeID {
     fn from(value: Node) -> Self {
         let id = value.id();
-        let prefix = value.into_host().id();
+        let host = value.into_host().id();
 
-        FullNodeID { prefix, id }
+        FullNodeID { host, id }
     }
 }
 

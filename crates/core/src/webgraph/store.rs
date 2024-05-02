@@ -37,16 +37,16 @@ use super::{Compression, Edge, EdgeLimit, FullNodeID, NodeID};
     bincode::Decode,
 )]
 struct SerializedEdge {
-    from_prefix: NodeID,
-    to_prefix: NodeID,
+    from_host: NodeID,
+    to_host: NodeID,
     label: Vec<u8>,
 }
 
-pub struct PrefixDb {
+pub struct HostDb {
     db: speedy_kv::Db<Vec<u8>, Vec<u8>>,
 }
 
-impl PrefixDb {
+impl HostDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
         let db = speedy_kv::Db::open_or_create(path).unwrap();
 
@@ -59,7 +59,7 @@ impl PrefixDb {
 
     pub fn insert(&mut self, node: &FullNodeID) {
         let key = [
-            node.prefix.as_u64().to_le_bytes(),
+            node.host.as_u64().to_le_bytes(),
             node.id.as_u64().to_le_bytes(),
         ]
         .concat();
@@ -68,10 +68,10 @@ impl PrefixDb {
         self.db.insert_raw(key, value);
     }
 
-    fn get(&self, prefix: &NodeID) -> Vec<NodeID> {
-        let prefix = prefix.as_u64().to_le_bytes().to_vec();
+    fn get(&self, host: &NodeID) -> Vec<NodeID> {
+        let host = host.as_u64().to_le_bytes().to_vec();
 
-        let query = speedy_kv::automaton::ExactMatch(&prefix).starts_with();
+        let query = speedy_kv::automaton::ExactMatch(&host).starts_with();
 
         self.db
             .search_raw(query)
@@ -189,7 +189,7 @@ impl CompressedLabelBlock {
 pub struct EdgeStore {
     reversed: bool,
     ranges: RangesDb,
-    prefixes: PrefixDb,
+    hosts: HostDb,
 
     edge_labels: IterableStoreReader<CompressedLabelBlock>,
     edge_nodes: ConstIterableStoreReader<NodeID>,
@@ -205,7 +205,7 @@ impl EdgeStore {
 
         Self {
             ranges,
-            prefixes: PrefixDb::open(path.as_ref().join("prefixes")),
+            hosts: HostDb::open(path.as_ref().join("hosts")),
             edge_labels,
             edge_nodes,
             reversed,
@@ -214,7 +214,7 @@ impl EdgeStore {
 
     pub fn optimize_read(&mut self) {
         self.ranges.optimize_read();
-        self.prefixes.optimize_read();
+        self.hosts.optimize_read();
     }
 
     pub fn get_with_label(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<Edge<String>> {
@@ -319,8 +319,8 @@ impl EdgeStore {
         }
     }
 
-    pub fn nodes_by_prefix(&self, prefix: &NodeID) -> Vec<NodeID> {
-        self.prefixes.get(prefix)
+    pub fn nodes_by_host(&self, host: &NodeID) -> Vec<NodeID> {
+        self.hosts.get(host)
     }
 
     pub fn iter_without_label(&self) -> impl Iterator<Item = Edge<()>> + '_ + Send + Sync {
@@ -357,6 +357,8 @@ impl EdgeStore {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::webgraph::{store_writer::EdgeStoreWriter, InnerEdge};
 
     use super::*;
@@ -367,16 +369,17 @@ mod tests {
             crate::gen_temp_path().join("test-segment"),
             Compression::default(),
             false,
+            None,
         );
 
         let e = InnerEdge {
             from: FullNodeID {
                 id: NodeID::from(0 as u64),
-                prefix: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
             },
             to: FullNodeID {
                 id: NodeID::from(1 as u64),
-                prefix: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
             },
             label: "test".to_string(),
         };
@@ -401,16 +404,17 @@ mod tests {
             crate::gen_temp_path().join("test-segment"),
             Compression::default(),
             true,
+            None,
         );
 
         let e = InnerEdge {
             from: FullNodeID {
                 id: NodeID::from(0 as u64),
-                prefix: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
             },
             to: FullNodeID {
                 id: NodeID::from(1 as u64),
-                prefix: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
             },
             label: "test".to_string(),
         };
@@ -433,17 +437,18 @@ mod tests {
             crate::gen_temp_path().join("test-segment"),
             Compression::default(),
             true,
+            None,
         );
 
         for i in 0..10 {
             let e = InnerEdge {
                 from: FullNodeID {
                     id: NodeID::from(i as u64),
-                    prefix: NodeID::from(0 as u64),
+                    host: NodeID::from(0 as u64),
                 },
                 to: FullNodeID {
                     id: NodeID::from(1 as u64),
-                    prefix: NodeID::from(0 as u64),
+                    host: NodeID::from(0 as u64),
                 },
                 label: "test".to_string(),
             };
@@ -455,5 +460,74 @@ mod tests {
 
         let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64), &EdgeLimit::Limit(5));
         assert_eq!(edges.len(), 5);
+    }
+
+    #[test]
+    fn test_edge_ordering() {
+        let mut rank_store =
+            speedy_kv::Db::open_or_create(crate::gen_temp_path().join("test-rank-store")).unwrap();
+
+        rank_store.insert(NodeID::from(2 as u64), 1).unwrap();
+        rank_store.insert(NodeID::from(3 as u64), 2).unwrap();
+        rank_store.insert(NodeID::from(1 as u64), 3).unwrap();
+
+        rank_store.commit().unwrap();
+
+        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
+            crate::gen_temp_path().join("test-segment"),
+            Compression::default(),
+            true,
+            Some(Arc::new(rank_store)),
+        );
+
+        let e1 = InnerEdge {
+            from: FullNodeID {
+                id: NodeID::from(1 as u64),
+                host: NodeID::from(1 as u64),
+            },
+            to: FullNodeID {
+                id: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
+            },
+            label: "1".to_string(),
+        };
+
+        let e2 = InnerEdge {
+            from: FullNodeID {
+                id: NodeID::from(2 as u64),
+                host: NodeID::from(2 as u64),
+            },
+            to: FullNodeID {
+                id: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
+            },
+            label: "2".to_string(),
+        };
+
+        let e3 = InnerEdge {
+            from: FullNodeID {
+                id: NodeID::from(3 as u64),
+                host: NodeID::from(3 as u64),
+            },
+            to: FullNodeID {
+                id: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
+            },
+            label: "3".to_string(),
+        };
+
+        kv.put(e1.clone());
+        kv.put(e2.clone());
+        kv.put(e3.clone());
+
+        let store = kv.finalize();
+
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64), &EdgeLimit::Unlimited);
+
+        assert_eq!(edges.len(), 3);
+
+        assert_eq!(&edges[0], &Edge::from(e2.clone()));
+        assert_eq!(&edges[1], &Edge::from(e3.clone()));
+        assert_eq!(&edges[2], &Edge::from(e1.clone()));
     }
 }

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses
 
-use std::{fs, path::Path};
+use std::{fs, path::Path, sync::Arc};
 
 use crate::executor::Executor;
 
@@ -42,7 +42,12 @@ impl WebgraphWriter {
         self.meta.save(path);
     }
 
-    pub fn new<P: AsRef<Path>>(path: P, executor: Executor, compression: Compression) -> Self {
+    pub fn new<P: AsRef<Path>>(
+        path: P,
+        executor: Executor,
+        compression: Compression,
+        host_centrality_rank_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
+    ) -> Self {
         fs::create_dir_all(&path).unwrap();
         let mut meta = Self::meta(&path);
         meta.comitted_segments.clear();
@@ -50,7 +55,12 @@ impl WebgraphWriter {
         fs::create_dir_all(path.as_ref().join("segments")).unwrap();
 
         let id = uuid::Uuid::new_v4().to_string();
-        let segment = SegmentWriter::open(path.as_ref().join("segments"), id.clone(), compression);
+        let segment = SegmentWriter::open(
+            path.as_ref().join("segments"),
+            id.clone(),
+            compression,
+            host_centrality_rank_store,
+        );
 
         meta.comitted_segments.push(id);
 

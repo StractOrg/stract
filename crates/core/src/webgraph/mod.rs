@@ -371,6 +371,7 @@ pub mod tests {
             crate::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
+            None,
         );
 
         for (from, to, label) in test_edges() {
@@ -433,6 +434,7 @@ pub mod tests {
                 crate::gen_temp_path(),
                 Executor::single_thread(),
                 Compression::default(),
+                None,
             );
             wrt.insert(from.clone(), to.clone(), label.clone());
             graphs.push(wrt.finalize());
@@ -462,6 +464,7 @@ pub mod tests {
                 crate::gen_temp_path(),
                 Executor::single_thread(),
                 Compression::default(),
+                None,
             );
             wrt.insert(from.clone(), to.clone(), label.clone());
             graphs.push(wrt.finalize());
@@ -504,6 +507,7 @@ pub mod tests {
             crate::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
+            None,
         );
 
         writer.insert(

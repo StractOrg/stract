@@ -174,6 +174,7 @@ mod tests {
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
+            None,
         );
 
         for i in 0..n - 1 {

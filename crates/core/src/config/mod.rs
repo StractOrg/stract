@@ -73,6 +73,7 @@ pub struct WebgraphConstructConfig {
     pub skip_warc_files: Option<usize>,
     pub batch_size: Option<usize>,
     pub canonical_index_path: Option<String>,
+    pub host_centrality_rank_store_path: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]

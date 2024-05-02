@@ -532,6 +532,7 @@ mod tests {
             crate::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
+            None,
         );
 
         for (from, to, label) in edges {

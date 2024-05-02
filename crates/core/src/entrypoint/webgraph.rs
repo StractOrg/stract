@@ -17,7 +17,7 @@ use crate::{
     canon_index::CanonicalIndex,
     config::{self, WarcSource, WebgraphConstructConfig},
     entrypoint::download_all_warc_files,
-    webgraph::{self, Node, WebgraphWriter},
+    webgraph::{self, Node, NodeID, WebgraphWriter},
     webpage::{url_ext::UrlExt, Html},
     Result,
 };
@@ -66,19 +66,27 @@ pub struct Job {
     pub warc_paths: Vec<String>,
 }
 
-pub fn open_host_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWriter {
+pub fn open_host_graph_writer<P: AsRef<Path>>(
+    path: P,
+    host_centrality_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
+) -> webgraph::WebgraphWriter {
     WebgraphWriter::new(
         path,
         crate::executor::Executor::single_thread(),
         webgraph::Compression::Lz4,
+        host_centrality_store,
     )
 }
 
-pub fn open_page_graph_writer<P: AsRef<Path>>(path: P) -> webgraph::WebgraphWriter {
+pub fn open_page_graph_writer<P: AsRef<Path>>(
+    path: P,
+    host_centrality_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
+) -> webgraph::WebgraphWriter {
     WebgraphWriter::new(
         path,
         crate::executor::Executor::single_thread(),
         webgraph::Compression::Lz4,
+        host_centrality_store,
     )
 }
 
@@ -189,6 +197,13 @@ impl Webgraph {
             None
         };
 
+        let host_centrality_rank_store = if let Some(path) = &config.host_centrality_rank_store_path
+        {
+            Some(Arc::new(speedy_kv::Db::open_or_create(path)?))
+        } else {
+            None
+        };
+
         let num_workers = num_cpus::get();
 
         let mut handlers = Vec::new();
@@ -212,8 +227,8 @@ impl Webgraph {
             let page_path = page_path.join(format!("worker_{i}"));
 
             let mut worker = WebgraphWorker {
-                host_graph: open_host_graph_writer(host_path),
-                page_graph: open_page_graph_writer(page_path),
+                host_graph: open_host_graph_writer(host_path, host_centrality_rank_store.clone()),
+                page_graph: open_page_graph_writer(page_path, host_centrality_rank_store.clone()),
                 canonical_index: canonical_index.clone(),
             };
 
