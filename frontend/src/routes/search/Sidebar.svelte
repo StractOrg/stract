@@ -6,8 +6,8 @@
   export let sidebar: DisplayedSidebar;
 </script>
 
-{#if sidebar.type == 'entity'}
+{#if sidebar._type == 'entity'}
   <Entity entity={sidebar.value} />
-{:else if sidebar.type == 'stackOverflow'}
+{:else if sidebar._type == 'stackOverflow'}
   <StackOverflow {...sidebar.value} />
 {/if}

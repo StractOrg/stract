@@ -33,7 +33,7 @@ export const load: PageLoad = async (req) => {
     });
   }
 
-  if (results && results.type == 'bang') {
+  if (results && results._type == 'bang') {
     redirect(301, results.redirectTo);
   }
 

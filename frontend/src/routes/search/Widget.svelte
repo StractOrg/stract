@@ -5,7 +5,7 @@
   export let widget: Widget;
 </script>
 
-{#if widget.type == 'calculator'}
+{#if widget._type == 'calculator'}
   <div class="rounded-xl border p-5">
     <div class="flex flex-col items-end">
       <div class="flex w-fit text-xs text-neutral">
@@ -16,6 +16,6 @@
       </div>
     </div>
   </div>
-{:else if widget.type == 'thesaurus'}
+{:else if widget._type == 'thesaurus'}
   <ThesaurusWidget widget={widget.value} />
 {/if}

@@ -43,7 +43,7 @@ use axum::{extract, response::IntoResponse};
     bincode::Decode,
     ToSchema,
 )]
-#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+#[serde(tag = "_type", content = "value", rename_all = "camelCase")]
 pub enum ReturnBody {
     All,
     Truncated(usize),
@@ -72,6 +72,9 @@ pub struct ApiSearchQuery {
     #[serde(default = "defaults::SearchQuery::count_results")]
     pub count_results: bool,
 
+    #[serde(default = "defaults::SearchQuery::return_structured_data")]
+    pub return_structured_data: bool,
+
     pub return_body: Option<ReturnBody>,
 }
 
@@ -98,6 +101,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             safe_search: api.safe_search.unwrap_or(default.safe_search),
             count_results: api.count_results,
             return_body: api.return_body,
+            return_structured_data: api.return_structured_data,
         })
     }
 }
@@ -105,7 +109,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
 )]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "_type", rename_all = "camelCase")]
 pub enum ApiSearchResult {
     Websites(WebsitesResult),
     Bang(Box<BangHit>),

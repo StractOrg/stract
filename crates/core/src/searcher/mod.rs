@@ -76,6 +76,7 @@ pub struct SearchQuery {
     pub safe_search: bool,
     pub count_results: bool,
     pub return_body: Option<ReturnBody>,
+    pub return_structured_data: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
@@ -101,6 +102,7 @@ impl Default for SearchQuery {
             safe_search: defaults::SearchQuery::safe_search(),
             count_results: defaults::SearchQuery::count_results(),
             return_body: None,
+            return_structured_data: defaults::SearchQuery::return_structured_data(),
         }
     }
 }

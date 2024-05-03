@@ -24,14 +24,14 @@ export type SearchParams = {
 
 export type SearchResults =
   | (WebsitesResult & {
-      type: 'websites';
+      _type: 'websites';
       spellCorrection?: HighlightedSpellCorrection;
       widget?: Widget;
       sidebar?: DisplayedSidebar;
       discussions?: DisplayedWebpage[];
     })
   | (BangHit & {
-      type: 'bang';
+      _type: 'bang';
     });
 
 export const extractSearchParams = (searchParams: URLSearchParams | FormData): SearchParams => {
@@ -156,10 +156,10 @@ export const search = async (params: SearchParams, options: ApiOptions) => {
     discussionsReq,
     spellcheckReq,
   ]);
-  const discussions = discussionsRes?.type == 'websites' ? discussionsRes.webpages : undefined;
+  const discussions = discussionsRes?._type == 'websites' ? discussionsRes.webpages : undefined;
 
   const results: SearchResults =
-    websites.type == 'websites'
+    websites._type == 'websites'
       ? {
           ...websites,
           widget,

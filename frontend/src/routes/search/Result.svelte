@@ -68,7 +68,7 @@
   <div class="snippet text-sm font-normal text-neutral-focus [&>b]:font-bold">
     {#if $summary}
       <Summary url={webpage.url} on:hide={() => clearSummary(webpage)} />
-    {:else if webpage.richSnippet && webpage.richSnippet.type == 'stackOverflowQA'}
+    {:else if webpage.richSnippet && webpage.richSnippet._type == 'stackOverflowQA'}
       <StackOverflowSnippet
         question={webpage.richSnippet.question}
         answers={webpage.richSnippet.answers}

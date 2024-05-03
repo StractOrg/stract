@@ -49,7 +49,7 @@ pub struct StackOverflowQuestion {
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone, ToSchema,
 )]
-#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+#[serde(tag = "_type", content = "value", rename_all = "camelCase")]
 pub enum CodeOrText {
     Code(String),
     Text(String),

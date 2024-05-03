@@ -49,7 +49,7 @@ pub struct IndexingLocalConfig {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
-#[serde(tag = "type")]
+#[serde(tag = "_type")]
 pub enum IndexingGraphConfig {
     Local { path: String },
     Remote { gossip: GossipConfig },
@@ -77,7 +77,7 @@ pub struct WebgraphConstructConfig {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
-#[serde(tag = "type")]
+#[serde(tag = "_type")]
 pub enum WarcSource {
     HTTP(HttpConfig),
     Local(LocalConfig),
@@ -382,7 +382,7 @@ pub struct CrawlRouterConfig {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
-#[serde(tag = "type", content = "args", rename_all = "snake_case")]
+#[serde(tag = "_type", content = "args", rename_all = "snake_case")]
 pub enum AcceleratorDevice {
     Cpu,
     Cuda(usize),

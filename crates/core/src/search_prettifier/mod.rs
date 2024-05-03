@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod entity;
+mod schema_org;
 mod stack_overflow;
 
 use std::collections::HashMap;
@@ -37,6 +38,7 @@ use crate::{
 
 pub use self::stack_overflow::{create_stackoverflow_sidebar, CodeOrText};
 pub use entity::DisplayedEntity;
+pub use schema_org::{OneOrManyProperty, OneOrManyString, Property, StructuredData};
 
 pub use self::stack_overflow::{stackoverflow_snippet, StackOverflowAnswer, StackOverflowQuestion};
 
@@ -52,7 +54,7 @@ pub struct Snippet {
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone, ToSchema,
 )]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "_type", rename_all = "camelCase")]
 pub enum RichSnippet {
     StackOverflowQA {
         question: StackOverflowQuestion,
@@ -191,6 +193,7 @@ pub struct DisplayedWebpage {
     pub body: Option<String>,
     pub rich_snippet: Option<RichSnippet>,
     pub ranking_signals: Option<HashMap<SignalEnumDiscriminants, SignalScore>>,
+    pub structured_data: Option<Vec<StructuredData>>,
     pub score: Option<f64>,
     pub likely_has_ads: bool,
     pub likely_has_paywall: bool,
@@ -222,6 +225,18 @@ impl DisplayedWebpage {
             ReturnBody::Truncated(n) => webpage.body.chars().take(n).collect::<String>(),
         });
 
+        let structured_data = if query.return_structured_data {
+            Some(
+                webpage
+                    .schema_org
+                    .into_iter()
+                    .map(StructuredData::from)
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
         Self {
             title: webpage.title,
             site: url.normalized_host().unwrap_or_default().to_string(),
@@ -235,6 +250,7 @@ impl DisplayedWebpage {
             likely_has_ads: webpage.likely_has_ads,
             likely_has_paywall: webpage.likely_has_paywall,
             rich_snippet,
+            structured_data,
         }
     }
 }
@@ -242,7 +258,7 @@ impl DisplayedWebpage {
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone, ToSchema,
 )]
-#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+#[serde(tag = "_type", content = "value", rename_all = "camelCase")]
 pub enum DisplayedSidebar {
     Entity(DisplayedEntity),
     StackOverflow {

@@ -12,7 +12,7 @@
 
 <div class="line-clamp-2">
   {#each question.body as passage}
-    {#if passage.type == 'text'}
+    {#if passage._type == 'text'}
       {passage.value}
     {/if}
   {/each}
@@ -44,9 +44,9 @@
         </div>
         <div>
           {#each answer.body as passage}
-            {#if passage.type == 'text'}
+            {#if passage._type == 'text'}
               <StackOverflowText text={passage.value} />
-            {:else if passage.type == 'code'}
+            {:else if passage._type == 'code'}
               <Code code={passage.value} transparentBackground={true} />
             {/if}
           {/each}

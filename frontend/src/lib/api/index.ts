@@ -198,15 +198,16 @@ export type ApiSearchQuery = {
   query: string;
   returnBody?: ReturnBody;
   returnRankingSignals?: boolean;
+  returnStructuredData?: boolean;
   safeSearch?: boolean;
   selectedRegion?: Region;
 };
 export type ApiSearchResult =
   | (WebsitesResult & {
-      type: 'websites';
+      _type: 'websites';
     })
   | (BangHit & {
-      type: 'bang';
+      _type: 'bang';
     });
 export type Bang = {
   c?: string;
@@ -227,11 +228,11 @@ export type Calculation = {
 };
 export type CodeOrText =
   | {
-      type: 'code';
+      _type: 'code';
       value: string;
     }
   | {
-      type: 'text';
+      _type: 'text';
       value: string;
     };
 export type Definition = string;
@@ -252,11 +253,11 @@ export type DisplayedEntity = {
 };
 export type DisplayedSidebar =
   | {
-      type: 'entity';
+      _type: 'entity';
       value: DisplayedEntity;
     }
   | {
-      type: 'stackOverflow';
+      _type: 'stackOverflow';
       value: {
         answer: StackOverflowAnswer;
         title: string;
@@ -273,6 +274,7 @@ export type DisplayedWebpage = {
   score?: number;
   site: string;
   snippet: Snippet;
+  structuredData?: StructuredData[];
   title: string;
   url: string;
 };
@@ -319,16 +321,18 @@ export type HostsExportOpticParams = {
 };
 export type KnowsHost =
   | {
+      _type: 'known';
       host: string;
-      type: 'known';
     }
   | {
-      type: 'unknown';
+      _type: 'unknown';
     };
 export type Lemma = string;
 export type Node = {
   name: string;
 };
+export type OneOrManyProperty = Property | Property[];
+export type OneOrManyString = string | string[];
 export type PartOfSpeech = 'noun' | 'verb' | 'adjective' | 'adjectiveSatellite' | 'adverb';
 export const PART_OF_SPEECHES = [
   'noun',
@@ -341,20 +345,21 @@ export type PartOfSpeechMeaning = {
   meanings: WordMeaning[];
   pos: PartOfSpeech;
 };
+export type Property = string | StructuredData;
 export type Region = 'All' | 'Denmark' | 'France' | 'Germany' | 'Spain' | 'US';
 export const REGIONS = ['All', 'Denmark', 'France', 'Germany', 'Spain', 'US'] satisfies Region[];
 export type ReturnBody =
   | {
-      type: 'all';
+      _type: 'all';
     }
   | {
-      type: 'truncated';
+      _type: 'truncated';
       value: number;
     };
 export type RichSnippet = {
+  _type: 'stackOverflowQA';
   answers: StackOverflowAnswer[];
   question: StackOverflowQuestion;
-  type: 'stackOverflowQA';
 };
 export type ScoredHost = {
   description?: string;
@@ -389,6 +394,9 @@ export type StackOverflowAnswer = {
 export type StackOverflowQuestion = {
   body: CodeOrText[];
 };
+export type StructuredData = {
+  _type?: OneOrManyString;
+};
 export type Suggestion = {
   highlighted: HighlightedFragment[];
   raw: string;
@@ -409,11 +417,11 @@ export type WebsitesResult = {
 };
 export type Widget =
   | {
-      type: 'calculator';
+      _type: 'calculator';
       value: Calculation;
     }
   | {
-      type: 'thesaurus';
+      _type: 'thesaurus';
       value: ThesaurusWidget;
     };
 export type WidgetQuery = {

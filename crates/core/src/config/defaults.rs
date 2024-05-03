@@ -144,6 +144,10 @@ impl SearchQuery {
     pub fn count_results() -> bool {
         false
     }
+
+    pub fn return_structured_data() -> bool {
+        false
+    }
 }
 
 pub struct Correction;

@@ -36,9 +36,9 @@
   <hr class="border-stone-700" />
   <div class="inline-block max-h-96 overflow-y-scroll text-sm">
     {#each answer.body as part}
-      {#if part.type == 'code'}
+      {#if part._type == 'code'}
         <Code code={part.value} />
-      {:else if part.type == 'text'}
+      {:else if part._type == 'text'}
         <StackOverflowText text={part.value} />
       {/if}
     {/each}

@@ -11,38 +11,38 @@
     {
       title: 'Safe Search',
       description: 'Remove explicit content from search results',
-      type: 'safe-search',
+      _type: 'safe-search',
     },
     {
       title: 'Theme',
       description: 'Pick a color scheme',
-      type: 'theme',
+      _type: 'theme',
     },
     {
       title: 'POST Search Requests',
       description: 'Send search queries using POST instead of GET',
-      type: 'post',
+      _type: 'post',
     },
     {
       title: 'Mark results that contains ads',
       description: 'Add a marker to search results where it is likely that the page contains ads',
-      type: 'mark-pages-with-ads',
+      _type: 'mark-pages-with-ads',
     },
     {
       title: 'Mark results that contains paywall',
       description:
         'Add a marker to search results where it is likely that the page contains a paywall',
-      type: 'mark-pages-with-paywall',
+      _type: 'mark-pages-with-paywall',
     },
     {
       title: 'Open results in a new tab',
       description: 'Keep the search results window open and have links open in new tabs',
-      type: 'results-in-new-tabs',
+      _type: 'results-in-new-tabs',
     },
     {
       title: 'Keyboard shortcuts',
       description: 'Enables the use of keyboard shortcuts on the site',
-      type: 'use-keeb-shortcuts',
+      _type: 'use-keeb-shortcuts',
     },
   ] as const;
 </script>
@@ -59,19 +59,19 @@
           </div>
           <div class="flex flex-col pr-5 sm:flex-row sm:justify-between sm:space-y-0">
             <div>
-              {#if setting.type == 'safe-search'}
+              {#if setting._type == 'safe-search'}
                 <SafeSearchSelect />
-              {:else if setting.type == 'theme'}
+              {:else if setting._type == 'theme'}
                 <ThemeSelect />
-              {:else if setting.type == 'post'}
+              {:else if setting._type == 'post'}
                 <PostSearchSelect />
-              {:else if setting.type == 'mark-pages-with-ads'}
+              {:else if setting._type == 'mark-pages-with-ads'}
                 <MarkPagesWithAdsSelect />
-              {:else if setting.type == 'mark-pages-with-paywall'}
+              {:else if setting._type == 'mark-pages-with-paywall'}
                 <MarkPagesWithPaywallSelect />
-              {:else if setting.type == 'results-in-new-tabs'}
+              {:else if setting._type == 'results-in-new-tabs'}
                 <ResultsInNewTabs />
-              {:else if setting.type == 'use-keeb-shortcuts'}
+              {:else if setting._type == 'use-keeb-shortcuts'}
                 <UseKeyboardShortcuts />
               {/if}
             </div>

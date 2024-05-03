@@ -19,10 +19,10 @@ export const load: PageLoad = async (req) => {
     const res = await api.webgraphHostKnows({ host }).data;
 
     match(res)
-      .with({ type: 'unknown' }, () => {
+      .with({ _type: 'unknown' }, () => {
         errorMessage = true;
       })
-      .with({ type: 'known' }, async ({ host }) => {
+      .with({ _type: 'known' }, async ({ host }) => {
         if (host.length > 0 && !chosenHosts.includes(host)) chosenHosts = [...chosenHosts, host];
       })
       .exhaustive();

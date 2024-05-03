@@ -93,6 +93,11 @@ use utoipa_swagger_ui::SwaggerUi;
 
                 crate::webgraph::Node,
                 crate::webgraph::FullEdge,
+
+                crate::search_prettifier::StructuredData,
+                crate::search_prettifier::OneOrManyString,
+                crate::search_prettifier::OneOrManyProperty,
+                crate::search_prettifier::Property,
             ),
         ),
         modifiers(&ApiModifier),

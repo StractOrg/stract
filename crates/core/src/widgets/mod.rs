@@ -83,7 +83,7 @@ impl Widgets {
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
 )]
-#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+#[serde(tag = "_type", content = "value", rename_all = "camelCase")]
 pub enum Widget {
     Calculator(Calculation),
     Thesaurus(ThesaurusWidget),

@@ -29,7 +29,7 @@
       prevPageSearchParams = null;
     }
 
-    if (results && results.type == 'websites' && results.hasMoreResults) {
+    if (results && results._type == 'websites' && results.hasMoreResults) {
       const newParams = new URLSearchParams($page.url.searchParams);
       newParams.set('p', (data.params.currentPage + 1).toString());
       nextPageSearchParams = newParams;
@@ -45,7 +45,7 @@
 
     const res = await search(data.params, { fetch: fetch });
 
-    if (res.type == 'bang') {
+    if (res._type == 'bang') {
       window.location.replace(res.redirectTo);
       return null;
     }
@@ -63,7 +63,7 @@
   let encodedQueryForRedirect = paramsForRedirect.toString();
 
   $: {
-    if (browser && results && results.type == 'websites')
+    if (browser && results && results._type == 'websites')
       updateQueryId({ query, webpages: results.webpages });
   }
 

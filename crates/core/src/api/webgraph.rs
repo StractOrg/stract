@@ -236,7 +236,7 @@ async fn outgoing_links(
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "_type", rename_all = "camelCase")]
 pub enum KnowsHost {
     Known { host: String },
     Unknown,

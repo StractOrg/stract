@@ -66,7 +66,7 @@
   <Modal {query} {modal} />
 {/if}
 
-{#if results.type == 'websites'}
+{#if results._type == 'websites'}
   <div class="col-start-1 flex min-w-0 max-w-2xl flex-col space-y-5">
     {#if results.spellCorrection}
       <SpellCorrection spellCorrection={results.spellCorrection} bind:this={spellCorrectElem} />

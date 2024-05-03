@@ -72,10 +72,10 @@
 
     const result = await api.webgraphHostKnows({ host }).data;
     match(result)
-      .with({ type: 'unknown' }, () => {
+      .with({ _type: 'unknown' }, () => {
         errorMessage = true;
       })
-      .with({ type: 'known' }, async ({ host }) => {
+      .with({ _type: 'known' }, async ({ host }) => {
         if (clear) inputWebsite = '';
         if (!chosenHosts.includes(host)) chosenHosts = [...chosenHosts, host];
         updateBrowserState();
