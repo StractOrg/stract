@@ -5,17 +5,17 @@ authors = ["Simon Sapin <simon.sapin@exyr.org>"]
 license = "MIT"
 description = "(朽木) HTML/XML tree manipulation library"
 repository = "https://github.com/kuchiki-rs/kuchiki"
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "kuchiki"
 doctest = false
 
 [dependencies]
-cssparser = "0.27"
+cssparser = "0.31"
 matches = "0.1.4"
 html5ever = "0.26.0"
-selectors = "0.22"
+selectors = "0.25"
 indexmap = "1.6.0"
 thiserror = { workspace = true }
 
