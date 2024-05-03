@@ -14,13 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fs::File, io::Write, ops::Range, path::Path};
+use std::{ops::Range, path::Path};
 
+use file_store::{
+    iterable::{ConstIterableStoreReader, IterableStoreReader},
+    ConstSerializable,
+};
 use fst::Automaton;
 use itertools::Itertools;
-use memmap2::Mmap;
 
-use super::{Compression, Edge, FullNodeID, InnerEdge, NodeID};
+use super::{Compression, Edge, EdgeLimit, FullNodeID, NodeID};
 
 #[derive(
     Debug,
@@ -34,17 +37,17 @@ use super::{Compression, Edge, FullNodeID, InnerEdge, NodeID};
     bincode::Decode,
 )]
 struct SerializedEdge {
-    from_prefix: NodeID,
-    to_prefix: NodeID,
+    from_host: NodeID,
+    to_host: NodeID,
     label: Vec<u8>,
 }
 
-struct PrefixDb {
+pub struct HostDb {
     db: speedy_kv::Db<Vec<u8>, Vec<u8>>,
 }
 
-impl PrefixDb {
-    fn open<P: AsRef<Path>>(path: P) -> Self {
+impl HostDb {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
         let db = speedy_kv::Db::open_or_create(path).unwrap();
 
         Self { db }
@@ -54,9 +57,9 @@ impl PrefixDb {
         self.db.merge_all_segments().unwrap();
     }
 
-    fn insert(&mut self, node: &FullNodeID) {
+    pub fn insert(&mut self, node: &FullNodeID) {
         let key = [
-            node.prefix.as_u64().to_le_bytes(),
+            node.host.as_u64().to_le_bytes(),
             node.id.as_u64().to_le_bytes(),
         ]
         .concat();
@@ -65,10 +68,10 @@ impl PrefixDb {
         self.db.insert_raw(key, value);
     }
 
-    fn get(&self, prefix: &NodeID) -> Vec<NodeID> {
-        let prefix = prefix.as_u64().to_le_bytes().to_vec();
+    fn get(&self, host: &NodeID) -> Vec<NodeID> {
+        let host = host.as_u64().to_le_bytes().to_vec();
 
-        let query = speedy_kv::automaton::ExactMatch(&prefix).starts_with();
+        let query = speedy_kv::automaton::ExactMatch(&host).starts_with();
 
         self.db
             .search_raw(query)
@@ -81,19 +84,19 @@ impl PrefixDb {
             .collect()
     }
 
-    fn flush(&mut self) {
+    pub fn flush(&mut self) {
         self.db.commit().unwrap();
         self.db.merge_all_segments().unwrap();
     }
 }
 
-struct RangesDb {
+pub struct RangesDb {
     nodes: speedy_kv::Db<NodeID, std::ops::Range<u64>>,
     labels: speedy_kv::Db<NodeID, std::ops::Range<u64>>,
 }
 
 impl RangesDb {
-    fn open<P: AsRef<Path>>(path: P) -> Self {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
         let nodes = speedy_kv::Db::open_or_create(path.as_ref().join("nodes")).unwrap();
         let labels = speedy_kv::Db::open_or_create(path.as_ref().join("labels")).unwrap();
 
@@ -104,202 +107,117 @@ impl RangesDb {
         self.nodes.merge_all_segments().unwrap();
         self.labels.merge_all_segments().unwrap();
     }
+
+    pub fn commit(&mut self) {
+        self.nodes.commit().unwrap();
+        self.labels.commit().unwrap();
+    }
+
+    pub fn nodes_get_raw<'a>(
+        &'a self,
+        key: &'a [u8],
+    ) -> Option<speedy_kv::SerializedRef<'a, Range<u64>>> {
+        self.nodes.get_raw(key)
+    }
+
+    pub fn labels_get_raw<'a>(
+        &'a self,
+        key: &'a [u8],
+    ) -> Option<speedy_kv::SerializedRef<'a, Range<u64>>> {
+        self.labels.get_raw(key)
+    }
+
+    pub fn insert_raw_node(&mut self, node: Vec<u8>, range: Vec<u8>) {
+        self.nodes.insert_raw(node, range);
+    }
+
+    pub fn insert_raw_label(&mut self, node: Vec<u8>, range: Vec<u8>) {
+        self.labels.insert_raw(node, range);
+    }
+}
+
+impl ConstSerializable for NodeID {
+    const BYTES: usize = std::mem::size_of::<NodeID>();
+
+    fn serialize(&self, buf: &mut [u8]) {
+        self.as_u64().serialize(buf);
+    }
+
+    fn deserialize(buf: &[u8]) -> Self {
+        let id = u64::deserialize(buf);
+        NodeID::from(id)
+    }
+}
+
+pub const NUM_LABELS_PER_BLOCK: usize = 128;
+
+#[derive(bincode::Encode, bincode::Decode)]
+pub struct LabelBlock {
+    labels: Vec<String>,
+}
+
+impl LabelBlock {
+    pub fn new(labels: Vec<String>) -> Self {
+        Self { labels }
+    }
+
+    pub fn compress(&self, compression: Compression) -> CompressedLabelBlock {
+        let bytes = bincode::encode_to_vec(self, bincode::config::standard()).unwrap();
+        let compressed = compression.compress(&bytes);
+
+        CompressedLabelBlock {
+            compressions: compression,
+            data: compressed,
+        }
+    }
+}
+
+#[derive(bincode::Encode, bincode::Decode)]
+pub struct CompressedLabelBlock {
+    compressions: Compression,
+    data: Vec<u8>,
+}
+
+impl CompressedLabelBlock {
+    pub fn decompress(&self) -> LabelBlock {
+        let bytes = self.compressions.decompress(&self.data);
+        let (res, _) = bincode::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+        res
+    }
 }
 
 pub struct EdgeStore {
     reversed: bool,
     ranges: RangesDb,
-    prefixes: PrefixDb,
+    hosts: HostDb,
 
-    edge_labels_file: File,
-    edge_labels_len: usize,
-    edge_labels: Mmap,
-
-    edge_nodes_file: File,
-    edge_nodes_len: usize,
-    edge_nodes: Mmap,
-
-    compression: Compression,
+    edge_labels: IterableStoreReader<CompressedLabelBlock>,
+    edge_nodes: ConstIterableStoreReader<NodeID>,
 }
 
 impl EdgeStore {
-    pub fn open<P: AsRef<Path>>(path: P, reversed: bool, compression: Compression) -> Self {
+    pub fn open<P: AsRef<Path>>(path: P, reversed: bool) -> Self {
         let ranges = RangesDb::open(path.as_ref().join("ranges"));
 
-        let edge_labels_file = File::options()
-            .read(true)
-            .create(true)
-            .truncate(false)
-            .write(true)
-            .open(path.as_ref().join("labels"))
-            .unwrap();
-        let edge_labels = unsafe { Mmap::map(&edge_labels_file).unwrap() };
-        let edge_labels_len = edge_labels.len();
+        let edge_labels = IterableStoreReader::open(path.as_ref().join("labels")).unwrap();
 
-        let edge_nodes_file = File::options()
-            .read(true)
-            .create(true)
-            .truncate(false)
-            .write(true)
-            .open(path.as_ref().join("nodes"))
-            .unwrap();
-        let edge_nodes = unsafe { Mmap::map(&edge_nodes_file).unwrap() };
-        let edge_nodes_len = edge_nodes.len();
+        let edge_nodes = ConstIterableStoreReader::open(path.as_ref().join("nodes")).unwrap();
 
         Self {
-            reversed,
             ranges,
-            prefixes: PrefixDb::open(path.as_ref().join("prefixes")),
+            hosts: HostDb::open(path.as_ref().join("hosts")),
             edge_labels,
-            edge_labels_len,
-            edge_labels_file,
             edge_nodes,
-            edge_nodes_file,
-            edge_nodes_len,
-            compression,
+            reversed,
         }
     }
 
     pub fn optimize_read(&mut self) {
         self.ranges.optimize_read();
-        self.prefixes.optimize_read();
+        self.hosts.optimize_read();
     }
 
-    /// Insert a batch of edges into the store.
-    /// The edges *must* have been de-duplicated by their from/to node.
-    /// I.e. if the store is not reversed, there should only ever be a single
-    /// put for each from node, and vice versa.
-    fn put(&mut self, edges: &[InnerEdge<String>]) {
-        if edges.is_empty() {
-            return;
-        }
-
-        let node = if self.reversed {
-            edges[0].to.clone()
-        } else {
-            edges[0].from.clone()
-        };
-
-        self.prefixes.insert(&node);
-        let node_bytes = node.id.as_u64().to_le_bytes();
-
-        debug_assert!(self.ranges.nodes.get_raw(&node_bytes).is_none());
-        debug_assert!(self.ranges.labels.get_raw(&node_bytes).is_none());
-
-        let mut edge_labels = Vec::new();
-        let mut edge_nodes = Vec::new();
-
-        for edge in edges {
-            edge_labels.push(edge.label.clone());
-            edge_nodes.push(if self.reversed {
-                edge.from.id
-            } else {
-                edge.to.id
-            });
-        }
-
-        let edge_labels_bytes =
-            bincode::encode_to_vec(&edge_labels, bincode::config::standard()).unwrap();
-        let edge_nodes_bytes =
-            bincode::encode_to_vec(&edge_nodes, bincode::config::standard()).unwrap();
-
-        let edge_labels_bytes = self.compression.compress(&edge_labels_bytes);
-        let edge_nodes_bytes = self.compression.compress(&edge_nodes_bytes);
-
-        let label_range = self.edge_labels_len..(self.edge_labels_len + edge_labels_bytes.len());
-        let node_range = self.edge_nodes_len..(self.edge_nodes_len + edge_nodes_bytes.len());
-
-        self.edge_labels_len += edge_labels_bytes.len();
-        self.edge_nodes_len += edge_nodes_bytes.len();
-
-        self.edge_labels_file.write_all(&edge_labels_bytes).unwrap();
-        self.edge_nodes_file.write_all(&edge_nodes_bytes).unwrap();
-
-        self.ranges.nodes.insert_raw(
-            node_bytes.to_vec(),
-            bincode::encode_to_vec(node_range, bincode::config::standard()).unwrap(),
-        );
-
-        self.ranges.labels.insert_raw(
-            node_bytes.to_vec(),
-            bincode::encode_to_vec(label_range, bincode::config::standard()).unwrap(),
-        );
-    }
-
-    /// Build a new edge store from a set of edges.
-    ///
-    /// **IMPORTANT** The edges must be sorted by
-    /// either the from or to node, depending on the value of `reversed`.
-    pub fn build<P: AsRef<Path>>(
-        path: P,
-        compression: Compression,
-        reversed: bool,
-        edges: impl Iterator<Item = InnerEdge<String>>,
-    ) -> Self {
-        let mut s = Self::open(path, reversed, compression);
-
-        let mut inserts_since_last_flush = 0;
-
-        // create batches of consecutive edges with the same from/to node
-        let mut batch = Vec::new();
-        let mut last_node = None;
-        for edge in edges {
-            if let Some(last_node) = last_node {
-                if (reversed && edge.to.id != last_node) || (!reversed && edge.from.id != last_node)
-                {
-                    batch.sort_unstable_by_key(
-                        |e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id },
-                    );
-                    batch.dedup_by_key(|e| if reversed { e.from.id } else { e.to.id });
-                    let batch_len = batch.len();
-                    s.put(&batch);
-                    batch.clear();
-                    inserts_since_last_flush += batch_len;
-
-                    if inserts_since_last_flush >= 1_000_000 {
-                        s.flush();
-                        inserts_since_last_flush = 0;
-                    }
-                }
-            }
-
-            last_node = Some(if reversed { edge.to.id } else { edge.from.id });
-            batch.push(edge);
-        }
-
-        if !batch.is_empty() {
-            batch.sort_unstable_by_key(
-                |e: &InnerEdge<_>| if reversed { e.from.id } else { e.to.id },
-            );
-            batch.dedup_by_key(|e| if reversed { e.from.id } else { e.to.id });
-            s.put(&batch);
-        }
-
-        s.flush();
-
-        s
-    }
-
-    fn flush(&mut self) {
-        self.prefixes.flush();
-
-        self.ranges.labels.commit().unwrap();
-        self.ranges.labels.merge_all_segments().unwrap();
-
-        self.ranges.nodes.commit().unwrap();
-        self.ranges.nodes.merge_all_segments().unwrap();
-
-        self.edge_nodes_file.flush().unwrap();
-        self.edge_labels_file.flush().unwrap();
-
-        self.edge_nodes = unsafe { Mmap::map(&self.edge_nodes_file).unwrap() };
-        self.edge_labels = unsafe { Mmap::map(&self.edge_labels_file).unwrap() };
-
-        self.edge_nodes_len = self.edge_nodes.len();
-        self.edge_labels_len = self.edge_labels.len();
-    }
-
-    pub fn get_with_label(&self, node: &NodeID) -> Vec<Edge<String>> {
+    pub fn get_with_label(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<Edge<String>> {
         let node_bytes = node.as_u64().to_le_bytes();
 
         match (
@@ -318,15 +236,23 @@ impl EdgeStore {
                 )
                 .unwrap();
 
-                let edge_labels = &self.edge_labels[edge_range];
-                let edge_labels = self.compression.decompress(edge_labels);
-                let (edge_labels, _): (Vec<_>, _) =
-                    bincode::decode_from_slice(&edge_labels, bincode::config::standard()).unwrap();
+                let edge_labels = self
+                    .edge_labels
+                    .slice(edge_range)
+                    .map(|r| r.unwrap().decompress())
+                    .flat_map(|block| block.labels.into_iter());
 
-                let edge_nodes = &self.edge_nodes[node_range];
-                let edge_nodes = self.compression.decompress(edge_nodes);
-                let (edge_nodes, _): (Vec<_>, _) =
-                    bincode::decode_from_slice(&edge_nodes, bincode::config::standard()).unwrap();
+                let edge_labels: Vec<_> = match limit {
+                    EdgeLimit::Unlimited => edge_labels.collect(),
+                    EdgeLimit::Limit(limit) => edge_labels.take(*limit).collect(),
+                };
+
+                let edge_nodes = self.edge_nodes.slice(node_range);
+
+                let edge_nodes: Vec<_> = match limit {
+                    EdgeLimit::Unlimited => edge_nodes.collect(),
+                    EdgeLimit::Limit(limit) => edge_nodes.take(*limit).collect(),
+                };
 
                 edge_labels
                     .into_iter()
@@ -352,7 +278,7 @@ impl EdgeStore {
         }
     }
 
-    pub fn get_without_label(&self, node: &NodeID) -> Vec<Edge<()>> {
+    pub fn get_without_label(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<Edge<()>> {
         let node_bytes = node.as_u64().to_le_bytes();
 
         match self.ranges.nodes.get_raw(&node_bytes) {
@@ -363,10 +289,12 @@ impl EdgeStore {
                 )
                 .unwrap();
 
-                let edge_nodes = &self.edge_nodes[node_range];
-                let edge_nodes = self.compression.decompress(edge_nodes);
-                let (edge_nodes, _): (Vec<_>, _) =
-                    bincode::decode_from_slice(&edge_nodes, bincode::config::standard()).unwrap();
+                let edge_nodes = self.edge_nodes.slice(node_range);
+
+                let edge_nodes: Vec<_> = match limit {
+                    EdgeLimit::Unlimited => edge_nodes.collect(),
+                    EdgeLimit::Limit(limit) => edge_nodes.take(*limit).collect(),
+                };
 
                 edge_nodes
                     .into_iter()
@@ -391,8 +319,8 @@ impl EdgeStore {
         }
     }
 
-    pub fn nodes_by_prefix(&self, prefix: &NodeID) -> Vec<NodeID> {
-        self.prefixes.get(prefix)
+    pub fn nodes_by_host(&self, host: &NodeID) -> Vec<NodeID> {
+        self.hosts.get(host)
     }
 
     pub fn iter_without_label(&self) -> impl Iterator<Item = Edge<()>> + '_ + Send + Sync {
@@ -405,10 +333,8 @@ impl EdgeStore {
                 bincode::config::standard(),
             )
             .unwrap();
-            let edge_nodes = &self.edge_nodes[node_range];
-            let edge_nodes = self.compression.decompress(edge_nodes);
-            let (edge_nodes, _): (Vec<_>, _) =
-                bincode::decode_from_slice(&edge_nodes, bincode::config::standard()).unwrap();
+
+            let edge_nodes = self.edge_nodes.slice(node_range).collect::<Vec<_>>();
 
             edge_nodes.into_iter().map(move |other| {
                 if self.reversed {
@@ -431,7 +357,9 @@ impl EdgeStore {
 
 #[cfg(test)]
 mod tests {
-    use crate::webgraph::store_writer::EdgeStoreWriter;
+    use std::sync::Arc;
+
+    use crate::webgraph::{store_writer::EdgeStoreWriter, InnerEdge};
 
     use super::*;
 
@@ -441,16 +369,17 @@ mod tests {
             crate::gen_temp_path().join("test-segment"),
             Compression::default(),
             false,
+            None,
         );
 
         let e = InnerEdge {
             from: FullNodeID {
                 id: NodeID::from(0 as u64),
-                prefix: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
             },
             to: FullNodeID {
                 id: NodeID::from(1 as u64),
-                prefix: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
             },
             label: "test".to_string(),
         };
@@ -459,12 +388,12 @@ mod tests {
 
         let store = kv.finalize();
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64), &EdgeLimit::Unlimited);
 
         assert_eq!(edges.len(), 1);
         assert_eq!(&edges[0], &Edge::from(e.clone()));
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64), &EdgeLimit::Unlimited);
 
         assert_eq!(edges.len(), 0);
     }
@@ -475,16 +404,17 @@ mod tests {
             crate::gen_temp_path().join("test-segment"),
             Compression::default(),
             true,
+            None,
         );
 
         let e = InnerEdge {
             from: FullNodeID {
                 id: NodeID::from(0 as u64),
-                prefix: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
             },
             to: FullNodeID {
                 id: NodeID::from(1 as u64),
-                prefix: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
             },
             label: "test".to_string(),
         };
@@ -493,11 +423,111 @@ mod tests {
 
         let store = kv.finalize();
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64), &EdgeLimit::Unlimited);
         assert_eq!(edges.len(), 0);
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64), &EdgeLimit::Unlimited);
         assert_eq!(edges.len(), 1);
         assert_eq!(&edges[0], &Edge::from(e.clone()));
+    }
+
+    #[test]
+    fn test_limit() {
+        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
+            crate::gen_temp_path().join("test-segment"),
+            Compression::default(),
+            true,
+            None,
+        );
+
+        for i in 0..10 {
+            let e = InnerEdge {
+                from: FullNodeID {
+                    id: NodeID::from(i as u64),
+                    host: NodeID::from(0 as u64),
+                },
+                to: FullNodeID {
+                    id: NodeID::from(1 as u64),
+                    host: NodeID::from(0 as u64),
+                },
+                label: "test".to_string(),
+            };
+
+            kv.put(e.clone());
+        }
+
+        let store = kv.finalize();
+
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64), &EdgeLimit::Limit(5));
+        assert_eq!(edges.len(), 5);
+    }
+
+    #[test]
+    fn test_edge_ordering() {
+        let mut rank_store =
+            speedy_kv::Db::open_or_create(crate::gen_temp_path().join("test-rank-store")).unwrap();
+
+        rank_store.insert(NodeID::from(2 as u64), 1).unwrap();
+        rank_store.insert(NodeID::from(3 as u64), 2).unwrap();
+        rank_store.insert(NodeID::from(1 as u64), 3).unwrap();
+
+        rank_store.commit().unwrap();
+
+        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
+            crate::gen_temp_path().join("test-segment"),
+            Compression::default(),
+            true,
+            Some(Arc::new(rank_store)),
+        );
+
+        let e1 = InnerEdge {
+            from: FullNodeID {
+                id: NodeID::from(1 as u64),
+                host: NodeID::from(1 as u64),
+            },
+            to: FullNodeID {
+                id: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
+            },
+            label: "1".to_string(),
+        };
+
+        let e2 = InnerEdge {
+            from: FullNodeID {
+                id: NodeID::from(2 as u64),
+                host: NodeID::from(2 as u64),
+            },
+            to: FullNodeID {
+                id: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
+            },
+            label: "2".to_string(),
+        };
+
+        let e3 = InnerEdge {
+            from: FullNodeID {
+                id: NodeID::from(3 as u64),
+                host: NodeID::from(3 as u64),
+            },
+            to: FullNodeID {
+                id: NodeID::from(0 as u64),
+                host: NodeID::from(0 as u64),
+            },
+            label: "3".to_string(),
+        };
+
+        kv.put(e1.clone());
+        kv.put(e2.clone());
+        kv.put(e3.clone());
+
+        let store = kv.finalize();
+
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64), &EdgeLimit::Unlimited);
+
+        assert_eq!(edges.len(), 3);
+
+        assert_eq!(&edges[0], &Edge::from(e2.clone()));
+        assert_eq!(&edges[1], &Edge::from(e3.clone()));
+        assert_eq!(&edges[2], &Edge::from(e1.clone()));
     }
 }

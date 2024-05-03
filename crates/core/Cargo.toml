@@ -68,7 +68,6 @@ logos = { workspace = true }
 lz-str = { workspace = true }
 lz4_flex = { workspace = true }
 md5 = { workspace = true }
-memmap = { workspace = true }
 memmap2 = { workspace = true }
 mime = { workspace = true }
 min-max-heap = { workspace = true }

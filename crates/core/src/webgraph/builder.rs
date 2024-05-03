@@ -18,12 +18,11 @@ use std::path::Path;
 
 use crate::executor::Executor;
 
-use super::{Compression, Webgraph};
+use super::Webgraph;
 
 pub struct WebgraphBuilder {
     path: Box<Path>,
     executor: Executor,
-    compression: Compression,
 }
 
 impl WebgraphBuilder {
@@ -31,7 +30,6 @@ impl WebgraphBuilder {
         Self {
             path: path.as_ref().into(),
             executor: Executor::multi_thread("webgraph").unwrap(),
-            compression: Compression::default(),
         }
     }
 
@@ -40,12 +38,7 @@ impl WebgraphBuilder {
         self
     }
 
-    pub fn compression(mut self, compression: Compression) -> Self {
-        self.compression = compression;
-        self
-    }
-
     pub fn open(self) -> Webgraph {
-        Webgraph::open(self.path, self.executor, self.compression)
+        Webgraph::open(self.path, self.executor)
     }
 }

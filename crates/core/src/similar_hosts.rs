@@ -22,7 +22,7 @@ use url::Url;
 
 use crate::{
     ranking::{bitvec_similarity, inbound_similarity},
-    webgraph::{remote::RemoteWebgraph, Node, NodeID},
+    webgraph::{remote::RemoteWebgraph, EdgeLimit, Node, NodeID},
     webpage::url_ext::UrlExt,
     SortableFloat,
 };
@@ -75,7 +75,7 @@ impl SimilarHostsFinder {
 
         let in_edges = self
             .webgraph
-            .batch_raw_ingoing_edges(&nodes)
+            .batch_raw_ingoing_edges(&nodes, EdgeLimit::Limit(128))
             .await
             .unwrap_or_default();
 
@@ -88,7 +88,7 @@ impl SimilarHostsFinder {
 
         let outgoing_edges = self
             .webgraph
-            .batch_raw_outgoing_edges(&backlink_nodes)
+            .batch_raw_outgoing_edges(&backlink_nodes, EdgeLimit::Limit(4096))
             .await
             .unwrap_or_default();
 
@@ -125,7 +125,7 @@ impl SimilarHostsFinder {
         // remove dead links (nodes without outgoing edges might be dead links)
         let known_nodes = self
             .webgraph
-            .batch_raw_ingoing_edges(&potential_nodes)
+            .batch_raw_ingoing_edges(&potential_nodes, EdgeLimit::Limit(1))
             .await
             .unwrap_or_default();
 

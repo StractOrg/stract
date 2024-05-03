@@ -41,6 +41,7 @@ use crate::ranking::{
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::web_spell::SpellChecker;
 use crate::webgraph::remote::RemoteWebgraph;
+use crate::webgraph::EdgeLimit;
 use crate::widgets::{Widget, Widgets};
 use crate::{
     bangs::Bangs,
@@ -150,20 +151,32 @@ pub trait Graph {
     fn batch_raw_ingoing(
         &self,
         nodes: &[webgraph::NodeID],
+        limit: EdgeLimit,
     ) -> impl Future<Output = Vec<Vec<webgraph::Edge<()>>>>;
 }
 
 impl Graph for RemoteWebgraph {
-    async fn batch_raw_ingoing(&self, nodes: &[webgraph::NodeID]) -> Vec<Vec<webgraph::Edge<()>>> {
-        self.batch_raw_ingoing_edges(nodes)
+    async fn batch_raw_ingoing(
+        &self,
+        nodes: &[webgraph::NodeID],
+        limit: EdgeLimit,
+    ) -> Vec<Vec<webgraph::Edge<()>>> {
+        self.batch_raw_ingoing_edges(nodes, limit)
             .await
             .unwrap_or_default()
     }
 }
 
 impl Graph for webgraph::Webgraph {
-    async fn batch_raw_ingoing(&self, nodes: &[webgraph::NodeID]) -> Vec<Vec<webgraph::Edge<()>>> {
-        nodes.iter().map(|n| self.raw_ingoing_edges(n)).collect()
+    async fn batch_raw_ingoing(
+        &self,
+        nodes: &[webgraph::NodeID],
+        limit: EdgeLimit,
+    ) -> Vec<Vec<webgraph::Edge<()>>> {
+        nodes
+            .iter()
+            .map(|n| self.raw_ingoing_edges(n, limit))
+            .collect()
     }
 }
 
@@ -174,8 +187,9 @@ where
     fn batch_raw_ingoing(
         &self,
         nodes: &[webgraph::NodeID],
+        limit: EdgeLimit,
     ) -> impl Future<Output = Vec<Vec<webgraph::Edge<()>>>> {
-        self.as_ref().batch_raw_ingoing(nodes)
+        self.as_ref().batch_raw_ingoing(nodes, limit)
     }
 }
 
@@ -184,7 +198,7 @@ where
     T: Graph,
 {
     async fn batch_ingoing(&self, nodes: &[webgraph::NodeID]) -> Vec<Vec<webgraph::NodeID>> {
-        self.batch_raw_ingoing(nodes)
+        self.batch_raw_ingoing(nodes, EdgeLimit::Limit(128))
             .await
             .into_iter()
             .map(|edges| edges.into_iter().map(|edge| edge.from).collect())

@@ -21,9 +21,16 @@
 //! 1. A 64-bit little-endian integer representing the number of bytes in the upcoming item.
 //! 2. The serialized item.
 //! 3. Repeat 1-2 until the end of the file.
+//!
+//! If the item type `T` implements `ConstSerializable`, then the `ConstIterableStoreWriter` can be
+//! used to write items to the file without intermediate headers as the size of the serialied item is known upfront.
 
-use crate::Result;
-use std::io::{self, Read, Write};
+use crate::{owned_bytes::OwnedBytes, ConstSerializable, Result};
+use std::{
+    io::{self, Write},
+    ops::Range,
+    path::Path,
+};
 
 use super::Peekable;
 
@@ -32,6 +39,11 @@ struct IterableHeader {
 }
 
 impl IterableHeader {
+    #[inline]
+    const fn serialized_size() -> usize {
+        std::mem::size_of::<u64>()
+    }
+
     fn serialize<W>(&self, writer: &mut W) -> io::Result<()>
     where
         W: io::Write,
@@ -39,15 +51,29 @@ impl IterableHeader {
         writer.write_all(&self.num_upcoming_bytes.to_le_bytes())
     }
 
-    fn deserialize<R>(reader: &mut R) -> io::Result<Self>
-    where
-        R: io::Read,
-    {
-        let mut num_upcoming_bytes = [0; 8];
-        reader.read_exact(&mut num_upcoming_bytes)?;
+    fn deserialize(bytes: &[u8]) -> io::Result<Self> {
+        if bytes.len() != Self::serialized_size() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid number of bytes for IterableHeader",
+            ));
+        }
+
         Ok(IterableHeader {
-            num_upcoming_bytes: u64::from_le_bytes(num_upcoming_bytes),
+            num_upcoming_bytes: u64::from_le_bytes(bytes[..8].try_into().unwrap()),
         })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct WrittenOffset {
+    pub start: u64,
+    pub num_bytes: u64,
+}
+
+impl WrittenOffset {
+    pub fn range(&self) -> Range<u64> {
+        self.start..self.start + self.num_bytes
     }
 }
 
@@ -56,6 +82,7 @@ where
     W: io::Write,
 {
     writer: io::BufWriter<W>,
+    next_start: u64,
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -68,17 +95,27 @@ where
         Self {
             writer: io::BufWriter::new(writer),
             _marker: std::marker::PhantomData,
+            next_start: 0,
         }
     }
 
-    pub fn write(&mut self, item: &T) -> Result<()> {
+    pub fn write(&mut self, item: &T) -> Result<WrittenOffset> {
         let serialized = bincode::encode_to_vec(item, bincode::config::standard())?;
         let header = IterableHeader {
             num_upcoming_bytes: serialized.len() as u64,
         };
         header.serialize(&mut self.writer)?;
         self.writer.write_all(&serialized)?;
-        Ok(())
+
+        let start = self.next_start;
+        let bytes_written = IterableHeader::serialized_size() as u64 + serialized.len() as u64;
+
+        self.next_start += bytes_written;
+
+        Ok(WrittenOffset {
+            start,
+            num_bytes: bytes_written,
+        })
     }
 
     pub fn finalize(mut self) -> Result<W> {
@@ -86,46 +123,71 @@ where
 
         self.writer.into_inner().map_err(|e| anyhow::anyhow!("{e}"))
     }
+
+    pub fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
 }
 
-pub struct IterableStoreReader<T, R> {
-    reader: io::BufReader<R>,
+pub struct IterableStoreReader<T> {
+    data: OwnedBytes,
+    offset: usize,
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T, R> IterableStoreReader<T, R>
-where
-    R: io::Read,
-{
-    pub fn new(reader: R) -> Self {
+impl<T> IterableStoreReader<T> {
+    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        let data = OwnedBytes::mmap_from_path(path)?;
+
+        Ok(Self {
+            data,
+            offset: 0,
+            _marker: std::marker::PhantomData,
+        })
+    }
+
+    pub fn from_bytes(data: Vec<u8>) -> Self {
         Self {
-            reader: io::BufReader::new(reader),
+            data: OwnedBytes::new(data),
+            offset: 0,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    pub fn slice(&self, range: Range<usize>) -> IterableStoreReader<T> {
+        IterableStoreReader {
+            data: self.data.slice(range),
+            offset: 0,
             _marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<T, R> Iterator for IterableStoreReader<T, R>
+impl<T> Iterator for IterableStoreReader<T>
 where
     T: bincode::Decode,
-    R: io::Read,
 {
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let header = match IterableHeader::deserialize(&mut self.reader) {
+        if self.offset + IterableHeader::serialized_size() > self.data.len() {
+            return None;
+        }
+
+        let header_bytes = &self.data[self.offset..self.offset + IterableHeader::serialized_size()];
+
+        let header = match IterableHeader::deserialize(header_bytes) {
             Ok(header) => header,
             Err(_err) => return None,
         };
 
-        let mut serialized = vec![0; header.num_upcoming_bytes as usize];
-        match self.reader.read_exact(&mut serialized) {
-            Ok(()) => (),
-            Err(err) => return Some(Err(err.into())),
-        }
+        self.offset += IterableHeader::serialized_size();
+        let serialized = &self.data[self.offset..self.offset + header.num_upcoming_bytes as usize];
+
+        self.offset += header.num_upcoming_bytes as usize;
 
         Some(
-            match bincode::decode_from_slice(&serialized, bincode::config::standard()) {
+            match bincode::decode_from_slice(serialized, bincode::config::standard()) {
                 Ok((item, _)) => Ok(item),
                 Err(err) => Err(err.into()),
             },
@@ -133,30 +195,45 @@ where
     }
 }
 
-pub struct SortedIterableStoreReader<T, R>
-where
-    R: io::Read,
-    T: bincode::Decode,
-{
-    readers: Vec<Peekable<IterableStoreReader<T, R>>>,
+impl<T> io::Seek for IterableStoreReader<T> {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        match pos {
+            io::SeekFrom::Start(offset) => {
+                self.offset = offset as usize;
+            }
+            io::SeekFrom::End(offset) => {
+                self.offset = self.data.len() - offset as usize;
+            }
+            io::SeekFrom::Current(offset) => {
+                self.offset += offset as usize;
+            }
+        }
+
+        Ok(self.offset as u64)
+    }
 }
 
-impl<T, R> SortedIterableStoreReader<T, R>
+pub struct SortedIterableStoreReader<T>
+where
+    T: bincode::Decode,
+{
+    readers: Vec<Peekable<IterableStoreReader<T>>>,
+}
+
+impl<T> SortedIterableStoreReader<T>
 where
     T: Ord + bincode::Decode,
-    R: io::Read,
 {
-    pub fn new(readers: Vec<IterableStoreReader<T, R>>) -> Self {
+    pub fn new(readers: Vec<IterableStoreReader<T>>) -> Self {
         let readers = readers.into_iter().map(Peekable::new).collect::<Vec<_>>();
 
         Self { readers }
     }
 }
 
-impl<T, R> Iterator for SortedIterableStoreReader<T, R>
+impl<T> Iterator for SortedIterableStoreReader<T>
 where
     T: Ord + bincode::Decode,
-    R: io::Read,
 {
     type Item = Result<T>;
 
@@ -170,7 +247,7 @@ where
                 match item {
                     Ok(item) => match min_index {
                         Some(cur_min) => {
-                            let cur_min_reader: &Peekable<IterableStoreReader<T, R>> =
+                            let cur_min_reader: &Peekable<IterableStoreReader<T>> =
                                 &self.readers[cur_min];
 
                             match cur_min_reader.peek().unwrap().as_ref() {
@@ -196,6 +273,131 @@ where
     }
 }
 
+pub struct ConstIterableStoreWriter<T, W>
+where
+    W: io::Write,
+{
+    writer: io::BufWriter<W>,
+    buf: Vec<u8>,
+    next_start: u64,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T, W> ConstIterableStoreWriter<T, W>
+where
+    T: ConstSerializable,
+    W: io::Write,
+{
+    pub fn new(writer: W) -> Self {
+        Self {
+            writer: io::BufWriter::new(writer),
+            _marker: std::marker::PhantomData,
+            buf: Vec::new(),
+            next_start: 0,
+        }
+    }
+
+    pub fn write(&mut self, item: &T) -> Result<WrittenOffset> {
+        self.buf.resize(T::BYTES, 0);
+        item.serialize(&mut self.buf);
+
+        assert_eq!(self.buf.len(), T::BYTES);
+
+        self.writer.write_all(&self.buf)?;
+
+        let start = self.next_start;
+        let bytes_written = T::BYTES as u64;
+
+        self.next_start += bytes_written;
+
+        Ok(WrittenOffset {
+            start,
+            num_bytes: bytes_written,
+        })
+    }
+
+    pub fn finalize(mut self) -> Result<W> {
+        self.writer.flush()?;
+
+        self.writer.into_inner().map_err(|e| anyhow::anyhow!("{e}"))
+    }
+
+    pub fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
+}
+
+pub struct ConstIterableStoreReader<T> {
+    data: OwnedBytes,
+    offset: usize,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> ConstIterableStoreReader<T> {
+    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        let data = OwnedBytes::mmap_from_path(path)?;
+
+        Ok(Self {
+            data,
+            offset: 0,
+            _marker: std::marker::PhantomData,
+        })
+    }
+
+    pub fn from_bytes(data: Vec<u8>) -> Self {
+        Self {
+            data: OwnedBytes::new(data),
+            offset: 0,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    pub fn slice(&self, range: Range<usize>) -> ConstIterableStoreReader<T> {
+        ConstIterableStoreReader {
+            data: self.data.slice(range),
+            offset: 0,
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T> Iterator for ConstIterableStoreReader<T>
+where
+    T: ConstSerializable,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.offset + T::BYTES > self.data.len() {
+            return None;
+        }
+
+        let item_bytes = &self.data[self.offset..self.offset + T::BYTES];
+
+        self.offset += T::BYTES;
+
+        Some(T::deserialize(item_bytes))
+    }
+}
+
+impl<T> io::Seek for ConstIterableStoreReader<T> {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        match pos {
+            io::SeekFrom::Start(offset) => {
+                self.offset = offset as usize;
+            }
+            io::SeekFrom::End(offset) => {
+                self.offset = self.data.len() - offset as usize;
+            }
+            io::SeekFrom::Current(offset) => {
+                self.offset += offset as usize;
+            }
+        }
+
+        Ok(self.offset as u64)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,7 +410,7 @@ mod tests {
         writer.write(&3).unwrap();
         let writer = writer.finalize().unwrap();
 
-        let reader = IterableStoreReader::new(writer.as_slice());
+        let reader = IterableStoreReader::from_bytes(writer);
 
         let items: Vec<i32> = reader.map(|item| item.unwrap()).collect();
         assert_eq!(items, vec![1, 2, 3]);
@@ -228,13 +430,27 @@ mod tests {
         writer2.write(&6).unwrap();
         let writer2 = writer2.finalize().unwrap();
 
-        let reader1 = IterableStoreReader::new(writer1.as_slice());
+        let reader1 = IterableStoreReader::from_bytes(writer1);
 
-        let reader2 = IterableStoreReader::new(writer2.as_slice());
+        let reader2 = IterableStoreReader::from_bytes(writer2);
 
         let reader = SortedIterableStoreReader::new(vec![reader1, reader2]);
 
         let items: Vec<i32> = reader.map(|item| item.unwrap()).collect();
         assert_eq!(items, vec![1, 2, 3, 4, 5, 6]);
+    }
+
+    #[test]
+    fn test_const_iterable_store() {
+        let mut writer = ConstIterableStoreWriter::new(Vec::new());
+        writer.write(&1).unwrap();
+        writer.write(&2).unwrap();
+        writer.write(&3).unwrap();
+        let writer = writer.finalize().unwrap();
+
+        let reader = ConstIterableStoreReader::<i32>::from_bytes(writer);
+
+        let items: Vec<i32> = reader.collect();
+        assert_eq!(items, vec![1, 2, 3]);
     }
 }

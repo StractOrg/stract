@@ -18,7 +18,11 @@
 
 pub type Result<T> = std::result::Result<T, anyhow::Error>;
 
+pub mod const_serializable;
 pub mod iterable;
+mod owned_bytes;
 pub mod peekable;
+pub mod random_lookup;
 
+pub use const_serializable::ConstSerializable;
 pub use peekable::Peekable;

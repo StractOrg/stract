@@ -86,13 +86,20 @@ impl Meta {
     }
 }
 
+#[derive(
+    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
+)]
+pub enum EdgeLimit {
+    Unlimited,
+    Limit(usize),
+}
+
 pub struct Webgraph {
     path: String,
     segments: Vec<Segment>,
     executor: Arc<Executor>,
     id2node: Id2NodeDb,
     meta: Meta,
-    compression: Compression,
 }
 
 impl Webgraph {
@@ -110,7 +117,7 @@ impl Webgraph {
         self.meta.save(path);
     }
 
-    fn open<P: AsRef<Path>>(path: P, executor: Executor, compression: Compression) -> Self {
+    fn open<P: AsRef<Path>>(path: P, executor: Executor) -> Self {
         fs::create_dir_all(&path).unwrap();
         let meta = Self::meta(&path);
 
@@ -121,7 +128,6 @@ impl Webgraph {
             segments.push(Segment::open(
                 path.as_ref().join("segments"),
                 segment.clone(),
-                compression,
             ));
         }
 
@@ -131,7 +137,6 @@ impl Webgraph {
             executor: Arc::new(executor),
             id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
             meta,
-            compression,
         }
     }
 
@@ -147,8 +152,7 @@ impl Webgraph {
 
             self.meta.comitted_segments.push(segment.id());
             drop(segment);
-            self.segments
-                .push(Segment::open(new_path, id, self.compression));
+            self.segments.push(Segment::open(new_path, id));
         }
 
         fs::remove_dir_all(other_folder)?;
@@ -166,14 +170,14 @@ impl Webgraph {
         self.id2node.optimize_read();
     }
 
-    pub fn ingoing_edges(&self, node: Node) -> Vec<FullEdge> {
+    pub fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<FullEdge> {
         let dedup = |edges: &mut Vec<Edge<String>>| {
             edges.sort_by_key(|e| e.from);
             edges.dedup_by_key(|e| e.from);
         };
 
         self.inner_edges(
-            |segment| segment.ingoing_edges_with_label(&node.id()),
+            |segment| segment.ingoing_edges_with_label(&node.id(), &limit),
             dedup,
         )
         .into_iter()
@@ -183,15 +187,6 @@ impl Webgraph {
             label: e.label,
         })
         .collect()
-    }
-
-    pub fn raw_ingoing_edges_by_host(&self, host_node: &NodeID) -> Vec<Edge<()>> {
-        let dedup = |edges: &mut Vec<Edge<()>>| {
-            edges.sort_by_key(|e| e.from);
-            edges.dedup_by_key(|e| e.from);
-        };
-
-        self.inner_edges(|segment| segment.ingoing_edges_by_host(host_node), dedup)
     }
 
     pub fn pages_by_host(&self, host_node: &NodeID) -> Vec<NodeID> {
@@ -212,41 +207,55 @@ impl Webgraph {
         pages
     }
 
-    pub fn raw_ingoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
+    pub fn raw_ingoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<Edge<()>> {
         let dedup = |edges: &mut Vec<Edge<()>>| {
             edges.sort_by_key(|e| e.from);
             edges.dedup_by_key(|e| e.from);
         };
 
-        self.inner_edges(|segment| segment.ingoing_edges(node), dedup)
+        self.inner_edges(|segment| segment.ingoing_edges(node, &limit), dedup)
     }
 
-    pub fn raw_ingoing_edges_with_labels(&self, node: &NodeID) -> Vec<Edge<String>> {
+    pub fn raw_ingoing_edges_with_labels(
+        &self,
+        node: &NodeID,
+        limit: EdgeLimit,
+    ) -> Vec<Edge<String>> {
         let dedup = |edges: &mut Vec<Edge<String>>| {
             edges.sort_by_key(|e| e.from);
             edges.dedup_by_key(|e| e.from);
         };
 
-        self.inner_edges(|segment| segment.ingoing_edges_with_label(node), dedup)
+        self.inner_edges(
+            |segment| segment.ingoing_edges_with_label(node, &limit),
+            dedup,
+        )
     }
 
-    pub fn raw_outgoing_edges_with_labels(&self, node: &NodeID) -> Vec<Edge<String>> {
+    pub fn raw_outgoing_edges_with_labels(
+        &self,
+        node: &NodeID,
+        limit: EdgeLimit,
+    ) -> Vec<Edge<String>> {
         let dedup = |edges: &mut Vec<Edge<String>>| {
             edges.sort_by_key(|e| e.from);
             edges.dedup_by_key(|e| e.from);
         };
 
-        self.inner_edges(|segment| segment.outgoing_edges_with_label(node), dedup)
+        self.inner_edges(
+            |segment| segment.outgoing_edges_with_label(node, &limit),
+            dedup,
+        )
     }
 
-    pub fn outgoing_edges(&self, node: Node) -> Vec<FullEdge> {
+    pub fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<FullEdge> {
         let dedup = |edges: &mut Vec<Edge<String>>| {
             edges.sort_by_key(|e| e.to);
             edges.dedup_by_key(|e| e.to);
         };
 
         self.inner_edges(
-            |segment| segment.outgoing_edges_with_label(&node.id()),
+            |segment| segment.outgoing_edges_with_label(&node.id(), &limit),
             dedup,
         )
         .into_iter()
@@ -258,13 +267,13 @@ impl Webgraph {
         .collect()
     }
 
-    pub fn raw_outgoing_edges(&self, node: &NodeID) -> Vec<Edge<()>> {
+    pub fn raw_outgoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<Edge<()>> {
         let dedup = |edges: &mut Vec<Edge<()>>| {
             edges.sort_by_key(|e| e.to);
             edges.dedup_by_key(|e| e.to);
         };
 
-        self.inner_edges(|segment| segment.outgoing_edges(node), dedup)
+        self.inner_edges(|segment| segment.outgoing_edges(node, &limit), dedup)
     }
 
     fn inner_edges<F1, F2, L>(&self, loader: F1, dedup: F2) -> Vec<Edge<L>>
@@ -362,6 +371,7 @@ pub mod tests {
             crate::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
+            None,
         );
 
         for (from, to, label) in test_edges() {
@@ -424,6 +434,7 @@ pub mod tests {
                 crate::gen_temp_path(),
                 Executor::single_thread(),
                 Compression::default(),
+                None,
             );
             wrt.insert(from.clone(), to.clone(), label.clone());
             graphs.push(wrt.finalize());
@@ -453,6 +464,7 @@ pub mod tests {
                 crate::gen_temp_path(),
                 Executor::single_thread(),
                 Compression::default(),
+                None,
             );
             wrt.insert(from.clone(), to.clone(), label.clone());
             graphs.push(wrt.finalize());
@@ -495,6 +507,7 @@ pub mod tests {
             crate::gen_temp_path(),
             Executor::single_thread(),
             Compression::default(),
+            None,
         );
 
         writer.insert(
@@ -507,46 +520,27 @@ pub mod tests {
 
         assert_eq!(graph.segments.len(), 1);
         assert_eq!(
-            graph.outgoing_edges(Node::from("A"))[0].label,
+            graph.outgoing_edges(Node::from("A"), EdgeLimit::Unlimited)[0].label,
             "a".repeat(MAX_LABEL_LENGTH)
         );
     }
 
     #[test]
-    fn edges_by_host() {
-        let mut writer = WebgraphWriter::new(
-            crate::gen_temp_path(),
-            Executor::single_thread(),
-            Compression::default(),
-        );
-
-        writer.insert(
-            Node::from("http://a.com/first"),
-            Node::from("http://b.com/first"),
-            String::new(),
-        );
-        writer.insert(
-            Node::from("http://c.com/first"),
-            Node::from("http://b.com/second"),
-            String::new(),
-        );
-
-        let graph = writer.finalize();
-
-        let mut res = graph
-            .raw_ingoing_edges_by_host(&Node::from("b.com").id())
-            .into_iter()
-            .map(|e| e.to)
-            .map(|id| graph.id2node(&id).unwrap())
-            .collect::<Vec<_>>();
-        res.sort();
+    fn test_edge_limits() {
+        let graph = test_graph();
 
         assert_eq!(
-            res,
-            vec![
-                Node::from("http://b.com/first"),
-                Node::from("http://b.com/second")
-            ]
+            graph
+                .outgoing_edges(Node::from("A"), EdgeLimit::Unlimited)
+                .len(),
+            2
+        );
+
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("A"), EdgeLimit::Limit(1))
+                .len(),
+            1
         );
     }
 

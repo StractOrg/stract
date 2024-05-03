@@ -16,7 +16,7 @@
 
 use crate::Result;
 use std::{
-    io::{BufWriter, Write},
+    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -24,7 +24,7 @@ use super::{BlobId, BlobPointer};
 
 pub struct BlobIndex {
     path: PathBuf,
-    bytes: memmap::Mmap,
+    data: file_store::random_lookup::RandomLookup<BlobPointer>,
 }
 
 impl BlobIndex {
@@ -32,10 +32,10 @@ impl BlobIndex {
     where
         P: AsRef<Path>,
     {
-        let bytes = unsafe { memmap::Mmap::map(&std::fs::File::open(&path)?)? };
+        let data = file_store::random_lookup::RandomLookup::open(&path)?;
 
         Ok(Self {
-            bytes,
+            data,
             path: path.as_ref().to_path_buf(),
         })
     }
@@ -45,14 +45,11 @@ impl BlobIndex {
     }
 
     pub fn get(&self, id: BlobId) -> BlobPointer {
-        let offset = id.0 as usize * BlobPointer::size();
-        let bytes = self.bytes.as_ref();
-        let bytes = &bytes[offset..offset + BlobPointer::size()];
-        BlobPointer::from_bytes(bytes.try_into().unwrap())
+        self.data.get(id.0)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = BlobPointer> + '_ {
-        BlobIndexIter::new(self.bytes.as_ref())
+        self.data.iter().map(|(_, v)| v)
     }
 
     pub fn path(&self) -> &Path {
@@ -60,42 +57,11 @@ impl BlobIndex {
     }
 }
 
-struct BlobIndexIter<'a> {
-    bytes: &'a [u8],
-    offset: usize,
-}
-
-impl<'a> BlobIndexIter<'a> {
-    fn new(bytes: &'a [u8]) -> Self {
-        Self { bytes, offset: 0 }
-    }
-}
-
-impl<'a> Iterator for BlobIndexIter<'a> {
-    type Item = BlobPointer;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.offset >= self.bytes.len() {
-            return None;
-        }
-
-        let ptr = BlobPointer::from_bytes(
-            self.bytes[self.offset..self.offset + BlobPointer::size()]
-                .try_into()
-                .unwrap(),
-        );
-        self.offset += BlobPointer::size();
-
-        Some(ptr)
-    }
-}
-
 pub struct BlobIndexWriter<W>
 where
     W: Write,
 {
-    wrt: BufWriter<W>,
-    _marker: std::marker::PhantomData<W>,
+    wrt: file_store::random_lookup::RandomLookupWriter<BlobPointer, W>,
 }
 
 impl<W> BlobIndexWriter<W>
@@ -104,18 +70,17 @@ where
 {
     pub fn new(wrt: W) -> Self {
         Self {
-            wrt: BufWriter::new(wrt),
-            _marker: std::marker::PhantomData,
+            wrt: file_store::random_lookup::RandomLookupWriter::new(wrt),
         }
     }
 
-    pub fn write(&mut self, ptr: &BlobPointer) -> Result<()> {
-        self.wrt.write_all(&ptr.as_bytes())?;
-        Ok(())
+    pub fn write(&mut self, ptr: &BlobPointer) -> Result<BlobId> {
+        let id = self.wrt.write(ptr)?;
+        Ok(BlobId(id))
     }
 
-    pub fn finish(mut self) -> Result<()> {
-        self.wrt.flush()?;
+    pub fn finish(self) -> Result<()> {
+        self.wrt.finish()?;
         Ok(())
     }
 }

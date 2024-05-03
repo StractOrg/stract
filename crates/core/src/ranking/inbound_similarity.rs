@@ -149,7 +149,7 @@ mod tests {
         searcher::{
             api::ApiSearcher, live::LiveSearcher, LocalSearchClient, LocalSearcher, SearchQuery,
         },
-        webgraph::{Node, Webgraph, WebgraphWriter},
+        webgraph::{EdgeLimit, Node, Webgraph, WebgraphWriter},
         webpage::{Html, Webpage},
     };
 
@@ -158,7 +158,7 @@ mod tests {
     fn inbound(graph: &Webgraph, node: &NodeID) -> bitvec_similarity::BitVec {
         bitvec_similarity::BitVec::new(
             graph
-                .raw_ingoing_edges(node)
+                .raw_ingoing_edges(node, EdgeLimit::Unlimited)
                 .into_iter()
                 .map(|e| e.from.as_u64())
                 .collect(),
@@ -171,6 +171,7 @@ mod tests {
             gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
+            None,
         );
 
         wrt.insert(Node::from("a.com"), Node::from("b.com"), String::new());
@@ -198,6 +199,7 @@ mod tests {
             crate::gen_temp_path(),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
+            None,
         );
 
         wrt.insert(Node::from("b.com"), Node::from("a.com"), String::new());

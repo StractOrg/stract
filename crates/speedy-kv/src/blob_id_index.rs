@@ -27,7 +27,7 @@ use super::{BlobId, Serialized, SerializedRef};
 
 pub struct BlobIdIndex<K> {
     path: PathBuf,
-    fst: fst::Map<memmap::Mmap>,
+    fst: fst::Map<memmap2::Mmap>,
     _marker: std::marker::PhantomData<K>,
 }
 
@@ -36,7 +36,7 @@ impl<K> BlobIdIndex<K> {
     where
         P: AsRef<Path>,
     {
-        let mmap = unsafe { memmap::Mmap::map(&std::fs::File::open(&path)?)? };
+        let mmap = unsafe { memmap2::Mmap::map(&std::fs::File::open(&path)?)? };
 
         Ok(Self {
             path: path.as_ref().to_path_buf(),
@@ -55,9 +55,9 @@ impl<K> BlobIdIndex<K> {
             .search(super::automaton::ExactMatch(key))
             .into_stream();
 
-        // let mut stream = self.fst.range().ge(key).le(key).into_stream();
-
-        stream.next().map(|(_, v)| BlobId(v))
+        stream
+            .next()
+            .map(|(_, v)| BlobId(file_store::random_lookup::ItemId::from_inner(v)))
     }
 
     pub fn search<'a, A>(
@@ -131,9 +131,12 @@ where
     type Item = (Serialized<K>, BlobId);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.stream
-            .next()
-            .map(|(k, v)| (k.to_vec().into(), BlobId(v)))
+        self.stream.next().map(|(k, v)| {
+            (
+                k.to_vec().into(),
+                BlobId(file_store::random_lookup::ItemId::from_inner(v)),
+            )
+        })
     }
 }
 
@@ -142,7 +145,6 @@ where
     W: Write,
 {
     fst_builder: fst::MapBuilder<BufWriter<W>>,
-    next_blob_id: u64,
     _marker: std::marker::PhantomData<K>,
 }
 
@@ -155,18 +157,14 @@ where
 
         Ok(Self {
             fst_builder,
-            next_blob_id: 0,
             _marker: std::marker::PhantomData,
         })
     }
 
-    pub fn insert(&mut self, key: &[u8]) -> Result<BlobId> {
-        let id = BlobId(self.next_blob_id);
-        self.next_blob_id += 1;
+    pub fn insert(&mut self, key: &[u8], id: &BlobId) -> Result<()> {
+        self.fst_builder.insert(key, id.0.into_inner())?;
 
-        self.fst_builder.insert(key, id.0)?;
-
-        Ok(id)
+        Ok(())
     }
 
     pub fn finish(self) -> Result<()> {

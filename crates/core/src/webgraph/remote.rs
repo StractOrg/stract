@@ -38,7 +38,7 @@ use crate::{
     Result,
 };
 
-use super::{Edge, FullEdge, Node, NodeID};
+use super::{Edge, EdgeLimit, FullEdge, Node, NodeID};
 
 pub struct RemoteWebgraph {
     granularity: WebgraphGranularity,
@@ -99,7 +99,7 @@ impl RemoteWebgraph {
         let url = Url::parse(&("http://".to_string() + host.as_str()))?;
         let node = Node::from(url).into_host();
         let id = node.id();
-        let edges = self.raw_ingoing_edges(id).await?;
+        let edges = self.raw_ingoing_edges(id, EdgeLimit::Limit(1)).await?;
 
         if !edges.is_empty() {
             Ok(Some(node))
@@ -153,12 +153,12 @@ impl RemoteWebgraph {
         Ok(nodes)
     }
 
-    pub async fn ingoing_edges(&self, node: Node) -> Result<Vec<FullEdge>> {
+    pub async fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<FullEdge>> {
         let res = self
             .conn()
             .await
             .send(
-                &IngoingEdges { node },
+                &IngoingEdges { node, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -173,12 +173,12 @@ impl RemoteWebgraph {
             .collect())
     }
 
-    pub async fn raw_ingoing_edges(&self, id: NodeID) -> Result<Vec<Edge<()>>> {
+    pub async fn raw_ingoing_edges(&self, id: NodeID, limit: EdgeLimit) -> Result<Vec<Edge<()>>> {
         let res = self
             .conn()
             .await
             .send(
-                &RawIngoingEdges { node: id },
+                &RawIngoingEdges { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -193,12 +193,16 @@ impl RemoteWebgraph {
             .collect())
     }
 
-    pub async fn raw_ingoing_edges_with_labels(&self, id: NodeID) -> Result<Vec<Edge<String>>> {
+    pub async fn raw_ingoing_edges_with_labels(
+        &self,
+        id: NodeID,
+        limit: EdgeLimit,
+    ) -> Result<Vec<Edge<String>>> {
         let res = self
             .conn()
             .await
             .send(
-                &RawIngoingEdgesWithLabels { node: id },
+                &RawIngoingEdgesWithLabels { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -216,10 +220,11 @@ impl RemoteWebgraph {
     pub async fn batch_raw_ingoing_edges_with_labels(
         &self,
         ids: &[NodeID],
+        limit: EdgeLimit,
     ) -> Result<Vec<Vec<Edge<String>>>> {
         let reqs: Vec<_> = ids
             .iter()
-            .map(|id| RawIngoingEdgesWithLabels { node: *id })
+            .map(|id| RawIngoingEdgesWithLabels { node: *id, limit })
             .collect();
 
         let res = self
@@ -243,8 +248,15 @@ impl RemoteWebgraph {
         Ok(edges)
     }
 
-    pub async fn batch_raw_ingoing_edges(&self, ids: &[NodeID]) -> Result<Vec<Vec<Edge<()>>>> {
-        let reqs: Vec<_> = ids.iter().map(|id| RawIngoingEdges { node: *id }).collect();
+    pub async fn batch_raw_ingoing_edges(
+        &self,
+        ids: &[NodeID],
+        limit: EdgeLimit,
+    ) -> Result<Vec<Vec<Edge<()>>>> {
+        let reqs: Vec<_> = ids
+            .iter()
+            .map(|id| RawIngoingEdges { node: *id, limit })
+            .collect();
 
         let res = self
             .conn()
@@ -267,12 +279,12 @@ impl RemoteWebgraph {
         Ok(edges)
     }
 
-    pub async fn outgoing_edges(&self, node: Node) -> Result<Vec<FullEdge>> {
+    pub async fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<FullEdge>> {
         let res = self
             .conn()
             .await
             .send(
-                &OutgoingEdges { node },
+                &OutgoingEdges { node, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -287,12 +299,12 @@ impl RemoteWebgraph {
             .collect())
     }
 
-    pub async fn raw_outgoing_edges(&self, id: NodeID) -> Result<Vec<Edge<()>>> {
+    pub async fn raw_outgoing_edges(&self, id: NodeID, limit: EdgeLimit) -> Result<Vec<Edge<()>>> {
         let res = self
             .conn()
             .await
             .send(
-                &RawOutgoingEdges { node: id },
+                &RawOutgoingEdges { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -307,12 +319,16 @@ impl RemoteWebgraph {
             .collect())
     }
 
-    pub async fn raw_outgoing_edges_with_labels(&self, id: NodeID) -> Result<Vec<Edge<String>>> {
+    pub async fn raw_outgoing_edges_with_labels(
+        &self,
+        id: NodeID,
+        limit: EdgeLimit,
+    ) -> Result<Vec<Edge<String>>> {
         let res = self
             .conn()
             .await
             .send(
-                &RawOutgoingEdgesWithLabels { node: id },
+                &RawOutgoingEdgesWithLabels { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -327,10 +343,14 @@ impl RemoteWebgraph {
             .collect())
     }
 
-    pub async fn batch_raw_outgoing_edges(&self, ids: &[NodeID]) -> Result<Vec<Vec<Edge<()>>>> {
+    pub async fn batch_raw_outgoing_edges(
+        &self,
+        ids: &[NodeID],
+        limit: EdgeLimit,
+    ) -> Result<Vec<Vec<Edge<()>>>> {
         let reqs: Vec<_> = ids
             .iter()
-            .map(|id| RawOutgoingEdges { node: *id })
+            .map(|id| RawOutgoingEdges { node: *id, limit })
             .collect();
 
         let res = self
