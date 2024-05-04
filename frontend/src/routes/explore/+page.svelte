@@ -142,7 +142,7 @@
         </div>
       {/if}
       <div class="flex flex-wrap justify-center gap-x-5 gap-y-3" id="sites-list">
-        {#each chosenHosts as site (site)}
+        {#each chosenHosts as site (`${site}`)}
           <div transition:slide={{ duration: 100 }} animate:flip={{ duration: 200 }}>
             <Site href="http://{site}" on:delete={() => removeWebsite(site)}>
               {site}
@@ -170,7 +170,7 @@
           <Button _class="noscript:hidden" on:click={exportAsOptic}>Export as optic</Button>
         </div>
         <div class="grid items-center gap-y-2">
-          {#each similarHosts as host (host.host)}
+          {#each similarHosts as host (`${host.host}`)}
             <div
               class="col-span-full grid grid-cols-[auto_auto_minmax(auto,66%)] items-center gap-x-3"
               transition:fade={{ duration: 200 }}

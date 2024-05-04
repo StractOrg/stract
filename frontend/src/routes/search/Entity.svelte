@@ -57,7 +57,7 @@
       <div class="mt-5 flex w-full flex-col text-neutral">
         <div class="font-light">Related Searches</div>
         <div class="flex overflow-auto">
-          {#each entity.relatedEntities as related (related.title)}
+          {#each entity.relatedEntities as related, index (`${index}-${related.title}`)}
             <div class="flex flex-col items-center p-4">
               {#if related.imageId != null}
                 <ResultLink href="/search?q={encodeURIComponent(related.title)}">

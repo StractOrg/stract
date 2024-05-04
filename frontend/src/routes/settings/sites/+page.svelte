@@ -106,7 +106,7 @@
       <h1 class="text-2xl font-medium">{title}</h1>
       <div class="text-sm">{description}</div>
       <div class="flex flex-wrap gap-x-5 gap-y-3" id="sites-list">
-        {#each $ranked[section] as site (site)}
+        {#each $ranked[section] as site, index (`${index}-${site}`)}
           <div animate:flip={{ duration: 150 }}>
             <Site href="http://{site}" on:delete={unrankSite(site)}>
               {site}
