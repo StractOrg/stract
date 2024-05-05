@@ -1530,9 +1530,9 @@ dependencies = [
 
 [[package]]
 name = "fend-core"
-version = "1.4.4"
+version = "1.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a58880ee1c8f961b122908bb1a195e13cd31b81a28ed1136910bf881ce23bbe8"
+checksum = "5a96524d35dc3f6fd060a191562a5ae82f69425bb8c1ec94da1709a8865388d4"
 
 [[package]]
 name = "file_store"
