@@ -237,9 +237,9 @@ fn free_socket_addr() -> std::net::SocketAddr {
     use std::net::{Ipv4Addr, TcpListener};
 
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
-    let addr = listener.local_addr().unwrap();
+    
 
-    addr
+    listener.local_addr().unwrap()
 }
 
 fn ceil_char_boundary(str: &str, index: usize) -> usize {

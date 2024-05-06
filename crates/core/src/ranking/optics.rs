@@ -34,6 +34,7 @@ mod tests {
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
     #[tokio::test]
+    #[allow(clippy::too_many_lines)]
     async fn host_rankings() {
         let mut index = Index::temporary().expect("Unable to open index");
 

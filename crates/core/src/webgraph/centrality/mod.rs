@@ -120,28 +120,26 @@ mod tests {
 
     #[test]
     fn test_top_k() {
-        let hits = vec![
-            (SortableFloat(0.0), NodeID::from(0 as u64)),
-            (SortableFloat(1.0), NodeID::from(1 as u64)),
-            (SortableFloat(2.0), NodeID::from(2 as u64)),
-            (SortableFloat(3.0), NodeID::from(3 as u64)),
-            (SortableFloat(4.0), NodeID::from(4 as u64)),
-            (SortableFloat(5.0), NodeID::from(5 as u64)),
-            (SortableFloat(6.0), NodeID::from(6 as u64)),
-            (SortableFloat(7.0), NodeID::from(7 as u64)),
-            (SortableFloat(8.0), NodeID::from(8 as u64)),
-            (SortableFloat(9.0), NodeID::from(9 as u64)),
-        ];
+        let hits = [(SortableFloat(0.0), NodeID::from(0_u64)),
+            (SortableFloat(1.0), NodeID::from(1_u64)),
+            (SortableFloat(2.0), NodeID::from(2_u64)),
+            (SortableFloat(3.0), NodeID::from(3_u64)),
+            (SortableFloat(4.0), NodeID::from(4_u64)),
+            (SortableFloat(5.0), NodeID::from(5_u64)),
+            (SortableFloat(6.0), NodeID::from(6_u64)),
+            (SortableFloat(7.0), NodeID::from(7_u64)),
+            (SortableFloat(8.0), NodeID::from(8_u64)),
+            (SortableFloat(9.0), NodeID::from(9_u64))];
 
         let top_5 = crate::sorted_k(hits.iter().copied(), 5);
         assert_eq!(
             top_5,
             vec![
-                (SortableFloat(0.0), NodeID::from(0 as u64)),
-                (SortableFloat(1.0), NodeID::from(1 as u64)),
-                (SortableFloat(2.0), NodeID::from(2 as u64)),
-                (SortableFloat(3.0), NodeID::from(3 as u64)),
-                (SortableFloat(4.0), NodeID::from(4 as u64))
+                (SortableFloat(0.0), NodeID::from(0_u64)),
+                (SortableFloat(1.0), NodeID::from(1_u64)),
+                (SortableFloat(2.0), NodeID::from(2_u64)),
+                (SortableFloat(3.0), NodeID::from(3_u64)),
+                (SortableFloat(4.0), NodeID::from(4_u64))
             ]
         );
 
@@ -149,9 +147,9 @@ mod tests {
         assert_eq!(
             top_3,
             vec![
-                (SortableFloat(0.0), NodeID::from(0 as u64)),
-                (SortableFloat(1.0), NodeID::from(1 as u64)),
-                (SortableFloat(2.0), NodeID::from(2 as u64))
+                (SortableFloat(0.0), NodeID::from(0_u64)),
+                (SortableFloat(1.0), NodeID::from(1_u64)),
+                (SortableFloat(2.0), NodeID::from(2_u64))
             ]
         );
 
@@ -161,18 +159,16 @@ mod tests {
 
     #[test]
     fn test_top_k_reversed() {
-        let hits = vec![
-            (SortableFloat(9.0), NodeID::from(9 as u64)),
-            (SortableFloat(8.0), NodeID::from(8 as u64)),
-            (SortableFloat(7.0), NodeID::from(7 as u64)),
-            (SortableFloat(6.0), NodeID::from(6 as u64)),
-            (SortableFloat(5.0), NodeID::from(5 as u64)),
-            (SortableFloat(4.0), NodeID::from(4 as u64)),
-            (SortableFloat(3.0), NodeID::from(3 as u64)),
-            (SortableFloat(2.0), NodeID::from(2 as u64)),
-            (SortableFloat(1.0), NodeID::from(1 as u64)),
-            (SortableFloat(0.0), NodeID::from(0 as u64)),
-        ];
+        let hits = [(SortableFloat(9.0), NodeID::from(9_u64)),
+            (SortableFloat(8.0), NodeID::from(8_u64)),
+            (SortableFloat(7.0), NodeID::from(7_u64)),
+            (SortableFloat(6.0), NodeID::from(6_u64)),
+            (SortableFloat(5.0), NodeID::from(5_u64)),
+            (SortableFloat(4.0), NodeID::from(4_u64)),
+            (SortableFloat(3.0), NodeID::from(3_u64)),
+            (SortableFloat(2.0), NodeID::from(2_u64)),
+            (SortableFloat(1.0), NodeID::from(1_u64)),
+            (SortableFloat(0.0), NodeID::from(0_u64))];
 
         let top_5 = crate::sorted_k(hits.iter().copied().map(Reverse), 5)
             .into_iter()
@@ -182,11 +178,11 @@ mod tests {
         assert_eq!(
             top_5,
             vec![
-                (SortableFloat(9.0), NodeID::from(9 as u64)),
-                (SortableFloat(8.0), NodeID::from(8 as u64)),
-                (SortableFloat(7.0), NodeID::from(7 as u64)),
-                (SortableFloat(6.0), NodeID::from(6 as u64)),
-                (SortableFloat(5.0), NodeID::from(5 as u64))
+                (SortableFloat(9.0), NodeID::from(9_u64)),
+                (SortableFloat(8.0), NodeID::from(8_u64)),
+                (SortableFloat(7.0), NodeID::from(7_u64)),
+                (SortableFloat(6.0), NodeID::from(6_u64)),
+                (SortableFloat(5.0), NodeID::from(5_u64))
             ]
         );
 
@@ -198,9 +194,9 @@ mod tests {
         assert_eq!(
             top_3,
             vec![
-                (SortableFloat(9.0), NodeID::from(9 as u64)),
-                (SortableFloat(8.0), NodeID::from(8 as u64)),
-                (SortableFloat(7.0), NodeID::from(7 as u64))
+                (SortableFloat(9.0), NodeID::from(9_u64)),
+                (SortableFloat(8.0), NodeID::from(8_u64)),
+                (SortableFloat(7.0), NodeID::from(7_u64))
             ]
         );
     }

@@ -390,7 +390,6 @@ pub mod tests {
             .batch_set(
                 table.clone(),
                 (0..N)
-                    .into_iter()
                     .map(|i| {
                         (
                             i.to_be_bytes().as_ref().into(),
@@ -413,9 +412,9 @@ pub mod tests {
         res.sort_by_key(|(k, _)| k.clone());
         assert_eq!(res.len(), N as usize);
 
-        for i in 0..N as usize {
+        for (i, r) in res.into_iter().enumerate() {
             assert_eq!(
-                res[i],
+                r,
                 (
                     i.to_be_bytes().as_ref().into(),
                     i.to_be_bytes().as_ref().into(),

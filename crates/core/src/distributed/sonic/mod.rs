@@ -293,7 +293,7 @@ mod tests {
             .unwrap()
             .block_on(async move {
                 let addr = free_socket_addr();
-                let server = Server::bind(addr.clone()).await.unwrap();
+                let server = Server::bind(addr).await.unwrap();
                 let connection = Connection::create(addr).await.unwrap();
 
                 let svr_task = tokio::spawn(async move { svr_fn(server).await });

@@ -438,6 +438,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn entire_website() {
         let root = kuchiki::parse_html()
             .one(

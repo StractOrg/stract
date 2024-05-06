@@ -374,12 +374,12 @@ mod tests {
 
         let e = InnerEdge {
             from: FullNodeID {
-                id: NodeID::from(0 as u64),
-                host: NodeID::from(0 as u64),
+                id: NodeID::from(0_u64),
+                host: NodeID::from(0_u64),
             },
             to: FullNodeID {
-                id: NodeID::from(1 as u64),
-                host: NodeID::from(0 as u64),
+                id: NodeID::from(1_u64),
+                host: NodeID::from(0_u64),
             },
             label: "test".to_string(),
         };
@@ -388,12 +388,12 @@ mod tests {
 
         let store = kv.finalize();
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64), &EdgeLimit::Unlimited);
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0_u64), &EdgeLimit::Unlimited);
 
         assert_eq!(edges.len(), 1);
         assert_eq!(&edges[0], &Edge::from(e.clone()));
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64), &EdgeLimit::Unlimited);
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1_u64), &EdgeLimit::Unlimited);
 
         assert_eq!(edges.len(), 0);
     }
@@ -409,12 +409,12 @@ mod tests {
 
         let e = InnerEdge {
             from: FullNodeID {
-                id: NodeID::from(0 as u64),
-                host: NodeID::from(0 as u64),
+                id: NodeID::from(0_u64),
+                host: NodeID::from(0_u64),
             },
             to: FullNodeID {
-                id: NodeID::from(1 as u64),
-                host: NodeID::from(0 as u64),
+                id: NodeID::from(1_u64),
+                host: NodeID::from(0_u64),
             },
             label: "test".to_string(),
         };
@@ -423,10 +423,10 @@ mod tests {
 
         let store = kv.finalize();
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64), &EdgeLimit::Unlimited);
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0_u64), &EdgeLimit::Unlimited);
         assert_eq!(edges.len(), 0);
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64), &EdgeLimit::Unlimited);
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1_u64), &EdgeLimit::Unlimited);
         assert_eq!(edges.len(), 1);
         assert_eq!(&edges[0], &Edge::from(e.clone()));
     }
@@ -444,11 +444,11 @@ mod tests {
             let e = InnerEdge {
                 from: FullNodeID {
                     id: NodeID::from(i as u64),
-                    host: NodeID::from(0 as u64),
+                    host: NodeID::from(0_u64),
                 },
                 to: FullNodeID {
-                    id: NodeID::from(1 as u64),
-                    host: NodeID::from(0 as u64),
+                    id: NodeID::from(1_u64),
+                    host: NodeID::from(0_u64),
                 },
                 label: "test".to_string(),
             };
@@ -458,7 +458,7 @@ mod tests {
 
         let store = kv.finalize();
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(1 as u64), &EdgeLimit::Limit(5));
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(1_u64), &EdgeLimit::Limit(5));
         assert_eq!(edges.len(), 5);
     }
 
@@ -467,9 +467,9 @@ mod tests {
         let mut rank_store =
             speedy_kv::Db::open_or_create(crate::gen_temp_path().join("test-rank-store")).unwrap();
 
-        rank_store.insert(NodeID::from(2 as u64), 1).unwrap();
-        rank_store.insert(NodeID::from(3 as u64), 2).unwrap();
-        rank_store.insert(NodeID::from(1 as u64), 3).unwrap();
+        rank_store.insert(NodeID::from(2_u64), 1).unwrap();
+        rank_store.insert(NodeID::from(3_u64), 2).unwrap();
+        rank_store.insert(NodeID::from(1_u64), 3).unwrap();
 
         rank_store.commit().unwrap();
 
@@ -482,36 +482,36 @@ mod tests {
 
         let e1 = InnerEdge {
             from: FullNodeID {
-                id: NodeID::from(1 as u64),
-                host: NodeID::from(1 as u64),
+                id: NodeID::from(1_u64),
+                host: NodeID::from(1_u64),
             },
             to: FullNodeID {
-                id: NodeID::from(0 as u64),
-                host: NodeID::from(0 as u64),
+                id: NodeID::from(0_u64),
+                host: NodeID::from(0_u64),
             },
             label: "1".to_string(),
         };
 
         let e2 = InnerEdge {
             from: FullNodeID {
-                id: NodeID::from(2 as u64),
-                host: NodeID::from(2 as u64),
+                id: NodeID::from(2_u64),
+                host: NodeID::from(2_u64),
             },
             to: FullNodeID {
-                id: NodeID::from(0 as u64),
-                host: NodeID::from(0 as u64),
+                id: NodeID::from(0_u64),
+                host: NodeID::from(0_u64),
             },
             label: "2".to_string(),
         };
 
         let e3 = InnerEdge {
             from: FullNodeID {
-                id: NodeID::from(3 as u64),
-                host: NodeID::from(3 as u64),
+                id: NodeID::from(3_u64),
+                host: NodeID::from(3_u64),
             },
             to: FullNodeID {
-                id: NodeID::from(0 as u64),
-                host: NodeID::from(0 as u64),
+                id: NodeID::from(0_u64),
+                host: NodeID::from(0_u64),
             },
             label: "3".to_string(),
         };
@@ -522,7 +522,7 @@ mod tests {
 
         let store = kv.finalize();
 
-        let edges: Vec<_> = store.get_with_label(&NodeID::from(0 as u64), &EdgeLimit::Unlimited);
+        let edges: Vec<_> = store.get_with_label(&NodeID::from(0_u64), &EdgeLimit::Unlimited);
 
         assert_eq!(edges.len(), 3);
 

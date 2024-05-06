@@ -283,6 +283,7 @@ mod tests {
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn discard_and_boost_hosts() {
         let mut index = Index::temporary().expect("Unable to open index");
 
@@ -505,6 +506,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn empty_discard() {
         let mut index = Index::temporary().expect("Unable to open index");
 
@@ -617,6 +619,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::too_many_lines)]
     async fn liked_hosts() {
         let mut index = Index::temporary().expect("Unable to open index");
 
@@ -770,6 +773,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn schema_org_search() {
         let mut index = Index::temporary().expect("Unable to open index");
 
@@ -1101,6 +1105,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn special_pattern_syntax() {
         let mut index = Index::temporary().expect("Unable to open index");
 
@@ -1380,6 +1385,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn wildcard_edge_cases() {
         let mut index = Index::temporary().expect("Unable to open index");
 

@@ -497,7 +497,7 @@ mod tests {
             .batch_set(vec![(Id(1), Counter(0)), (Id(2), Counter(0))]);
 
         let mut res = tables.id.batch_get(vec![Id(1), Id(2)]);
-        res.sort_by(|(a, _), (b, _)| a.cmp(&b));
+        res.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         assert_eq!(res, vec![(Id(1), Counter(0)), (Id(2), Counter(0))]);
 
@@ -510,7 +510,7 @@ mod tests {
         );
 
         let mut res = tables.id.batch_get(vec![Id(0), Id(1), Id(2)]);
-        res.sort_by(|(a, _), (b, _)| a.cmp(&b));
+        res.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         assert_eq!(
             res,

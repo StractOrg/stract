@@ -72,7 +72,7 @@ mod tests {
         let mut db = Id2NodeDb::open(gen_temp_path());
 
         let a_node = Node::from("a".to_string());
-        let a_id = NodeID::from(0 as u64);
+        let a_id = NodeID::from(0_u64);
 
         db.put(&a_id, &a_node);
         db.flush();
@@ -80,7 +80,7 @@ mod tests {
         assert_eq!(db.get(&a_id), Some(a_node.clone()));
 
         let b_node = Node::from("b".to_string());
-        let b_id = NodeID::from(1 as u64);
+        let b_id = NodeID::from(1_u64);
 
         assert_eq!(db.get(&b_id), None);
 

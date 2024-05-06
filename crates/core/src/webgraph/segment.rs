@@ -155,6 +155,7 @@ mod test {
     use super::*;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn simple_triangle_graph() {
         //     ┌────┐
         //     │    │
@@ -173,16 +174,16 @@ mod test {
         let mut edges = Vec::new();
 
         let a = FullNodeID {
-            id: NodeID::from(0 as u64),
-            host: NodeID::from(0 as u64),
+            id: NodeID::from(0_u64),
+            host: NodeID::from(0_u64),
         };
         let b = FullNodeID {
-            id: NodeID::from(1 as u64),
-            host: NodeID::from(0 as u64),
+            id: NodeID::from(1_u64),
+            host: NodeID::from(0_u64),
         };
         let c = FullNodeID {
-            id: NodeID::from(2 as u64),
-            host: NodeID::from(0 as u64),
+            id: NodeID::from(2_u64),
+            host: NodeID::from(0_u64),
         };
 
         edges.push(InnerEdge {
