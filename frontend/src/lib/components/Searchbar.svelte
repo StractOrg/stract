@@ -111,6 +111,8 @@
       hasFocus && suggestions.length > 0 && 'rounded-b-none',
       hasFocus && 'shadow',
     )}
+    aria-autocomplete="list"
+    aria-expanded={suggestions.length > 0 && hasFocus}
   >
     <MagnifyingGlass class="w-5 text-base-content" />
     <!-- svelte-ignore a11y-autofocus -->

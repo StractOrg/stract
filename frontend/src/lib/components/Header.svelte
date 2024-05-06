@@ -43,7 +43,7 @@
 
   <div class="flex items-center justify-center">
     {#if showLogo}
-      <a href="/" class="w-20">
+      <a href="/" class="w-20" title="Go to Stract's frontpage">
         <BiglogoBeta />
       </a>
     {/if}

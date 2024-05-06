@@ -35,81 +35,87 @@
   export const clearFocus = () => mainResultLink?.clearFocus();
 </script>
 
-<div class="flex min-w-0 grow flex-col space-y-0.5" bind:this={mainDiv}>
-  <div class="flex min-w-0">
-    <div class="flex min-w-0 grow flex-col space-y-0.5">
-      <div class="flex items-center text-sm">
-        <ResultLink
-          _class="url max-w-[calc(100%-100px)] truncate text-neutral-focus"
-          href={webpage.url}
-          {resultIndex}
-        >
-          {webpage.prettyUrl}
-        </ResultLink>
+<span>
+  <div class="flex min-w-0 grow flex-col space-y-0.5" bind:this={mainDiv}>
+    <div class="flex min-w-0">
+      <div class="flex min-w-0 grow flex-col space-y-0.5">
+        <span class="flex flex-col-reverse">
+          <h3>
+            <ResultLink
+              _class="title max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
+              title={webpage.title}
+              href={webpage.url}
+              {resultIndex}
+              bind:this={mainResultLink}
+            >
+              {webpage.title}
+            </ResultLink>
+          </h3>
+          <div class="flex items-center text-sm">
+            <ResultLink
+              _class="url max-w-[calc(100%-100px)] truncate text-neutral-focus"
+              href={webpage.url}
+              {resultIndex}
+            >
+              {webpage.prettyUrl}
+            </ResultLink>
+          </div>
+        </span>
       </div>
-      <ResultLink
-        _class="title max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
-        title={webpage.title}
-        href={webpage.url}
-        {resultIndex}
-        bind:this={mainResultLink}
+      <button
+        class="noscript:hidden flex w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus"
+        bind:this={button}
+        on:click|stopPropagation={() => dispatch('modal', button)}
       >
-        {webpage.title}
-      </ResultLink>
+        <AdjustVertical class="text-md" />
+      </button>
     </div>
-    <button
-      class="noscript:hidden flex w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus"
-      bind:this={button}
-      on:click|stopPropagation={() => dispatch('modal', button)}
-    >
-      <AdjustVertical class="text-md" />
-    </button>
-  </div>
-  <div class="snippet text-sm font-normal text-neutral-focus [&>b]:font-bold">
-    {#if $summary}
-      <Summary url={webpage.url} on:hide={() => clearSummary(webpage)} />
-    {:else if webpage.richSnippet && webpage.richSnippet._type == 'stackOverflowQA'}
-      <StackOverflowSnippet
-        question={webpage.richSnippet.question}
-        answers={webpage.richSnippet.answers}
-      />
-    {:else}
-      <div class="line-clamp-3">
-        <div class="inline">
-          <span id="snippet-text" class="snippet-text">
-            {#if webpage.likelyHasAds && $markPagesWithAdsStore && webpage.likelyHasPaywall && $markPagesWithPaywallStore}
-              <span
-                class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
-                title="page likely has ads and paywall"
-              >
-                has ads + paywall
+    <div class="snippet text-sm font-normal text-neutral-focus [&>b]:font-bold">
+      {#if $summary}
+        <Summary url={webpage.url} on:hide={() => clearSummary(webpage)} />
+      {:else if webpage.richSnippet && webpage.richSnippet._type == 'stackOverflowQA'}
+        <StackOverflowSnippet
+          question={webpage.richSnippet.question}
+          answers={webpage.richSnippet.answers}
+        />
+      {:else}
+        <div class="line-clamp-3">
+          <div class="inline">
+            <span id="snippet-text" class="snippet-text">
+              {#if webpage.likelyHasAds && $markPagesWithAdsStore && webpage.likelyHasPaywall && $markPagesWithPaywallStore}
+                <span
+                  class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
+                  title="page likely has ads and paywall"
+                >
+                  has ads + paywall
+                </span>
+              {:else if webpage.likelyHasAds && $markPagesWithAdsStore}
+                <span
+                  class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
+                  title="page likely has ads"
+                >
+                  has ads
+                </span>
+              {:else if webpage.likelyHasPaywall && $markPagesWithPaywallStore}
+                <span
+                  class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
+                  title="page likely has paywall"
+                >
+                  paywall
+                </span>
+              {/if}
+              {#if webpage.snippet.date}
+                <span class="text-neutral">
+                  {webpage.snippet.date}
+                </span> -
+              {/if}
+              <span>
+                <TextSnippet snippet={webpage.snippet.text} />
               </span>
-            {:else if webpage.likelyHasAds && $markPagesWithAdsStore}
-              <span
-                class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
-                title="page likely has ads"
-              >
-                has ads
-              </span>
-            {:else if webpage.likelyHasPaywall && $markPagesWithPaywallStore}
-              <span
-                class="rounded border border-primary p-0.5 text-center text-xs text-neutral"
-                title="page likely has paywall"
-              >
-                paywall
-              </span>
-            {/if}
-            {#if webpage.snippet.date}
-              <span class="text-neutral">
-                {webpage.snippet.date}
-              </span> -
-            {/if}
-            <span>
-              <TextSnippet snippet={webpage.snippet.text} />
             </span>
-          </span>
+          </div>
         </div>
-      </div>
-    {/if}
+      {/if}
+    </div>
   </div>
-</div>
+</span>
