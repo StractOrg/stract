@@ -189,7 +189,7 @@ export const api = {
 };
 
 export type ApiSearchQuery = {
-  countResults?: boolean;
+  countResultsExact?: boolean;
   flattenResponse?: boolean;
   hostRankings?: HostRankings;
   numResults?: number;
@@ -234,6 +234,15 @@ export type CodeOrText =
   | {
       _type: 'text';
       value: string;
+    };
+export type Count =
+  | {
+      _type: 'exact';
+      value: number;
+    }
+  | {
+      _type: 'approximate';
+      value: number;
     };
 export type Definition = string;
 export type DisplayedAnswer = {
@@ -411,7 +420,7 @@ export type ThesaurusWidget = {
 export type UrlWrapper = string;
 export type WebsitesResult = {
   hasMoreResults: boolean;
-  numHits?: number;
+  numHits: Count;
   searchDurationMs: number;
   webpages: DisplayedWebpage[];
 };

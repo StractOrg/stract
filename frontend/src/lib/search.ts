@@ -106,7 +106,6 @@ export const search = async (params: SearchParams, options: ApiOptions) => {
       optic: params.optic && (await fetchRemoteOptic({ opticUrl: params.optic, fetch })),
       selectedRegion: params.selectedRegion,
       hostRankings: params.host_rankings,
-      countResults: true,
     },
     options,
   );
@@ -141,7 +140,6 @@ export const search = async (params: SearchParams, options: ApiOptions) => {
             safeSearch: params.safeSearch,
             selectedRegion: params.selectedRegion,
             hostRankings: params.host_rankings,
-            countResults: false,
           },
           options,
         )

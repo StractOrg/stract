@@ -23,7 +23,8 @@ use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 use url::Url;
 
-use crate::collector::MainCollector;
+use crate::collector::approx_count::ApproxCount;
+use crate::collector::{approx_count, MainCollector};
 
 use crate::fastfield_reader::FastFieldReader;
 use crate::highlighted::HighlightedFragment;
@@ -47,29 +48,40 @@ impl InvertedIndex {
         ctx: &Ctx,
         collector: MainCollector,
     ) -> Result<InitialSearchResult> {
-        if !query.count_results() {
-            let mut query: Box<dyn tantivy::query::Query> = Box::new(query.clone());
-
-            if let Some(limit) = collector.top_docs().max_docs() {
-                let docs_per_segment = limit.total_docs / limit.segments;
-                query = Box::new(ShortCircuitQuery::new(query, docs_per_segment as u64));
-            }
-
-            let pointers = ctx.tv_searcher.search(&query, &collector)?;
+        if query.count_results_exact() {
+            let collector = (Count, collector);
+            let (count, pointers) = ctx.tv_searcher.search(query, &collector)?;
 
             return Ok(InitialSearchResult {
-                num_websites: None,
+                num_websites: approx_count::Count::Exact(count as u64),
                 top_websites: pointers,
             });
         }
 
-        let collector = (Count, collector);
-        let (count, pointers) = ctx.tv_searcher.search(query, &collector)?;
+        let simple_terms = query.simple_terms().to_vec();
+        let mut query: Box<dyn tantivy::query::Query> = Box::new(query.clone());
 
-        Ok(InitialSearchResult {
-            num_websites: Some(count),
-            top_websites: pointers,
-        })
+        if let Some(limit) = collector.top_docs().max_docs().cloned() {
+            let docs_per_segment = (limit.total_docs / limit.segments) as u64;
+            query = Box::new(ShortCircuitQuery::new(query, docs_per_segment));
+
+            let (count, pointers) = ctx.tv_searcher.search(
+                &query,
+                &(ApproxCount::new(docs_per_segment, simple_terms), collector),
+            )?;
+
+            Ok(InitialSearchResult {
+                num_websites: count,
+                top_websites: pointers,
+            })
+        } else {
+            let (count, pointers) = ctx.tv_searcher.search(&query, &(Count, collector))?;
+
+            Ok(InitialSearchResult {
+                num_websites: approx_count::Count::Approximate(count as u64),
+                top_websites: pointers,
+            })
+        }
     }
 
     pub fn local_search_ctx(&self) -> Ctx {

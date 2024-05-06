@@ -12,7 +12,7 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/licenses/>
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -34,36 +34,7 @@ use crate::{
     simhash,
 };
 
-pub type MainCollector = TweakedScoreTopCollector<InitialScoreTweaker>;
-
-#[derive(Clone, Debug)]
-pub struct MaxDocsConsidered {
-    pub total_docs: usize,
-    pub segments: usize,
-}
-
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-    PartialEq,
-)]
-pub struct Hashes {
-    pub site: Prehashed,
-    pub title: Prehashed,
-    pub url: Prehashed,
-    pub url_without_tld: Prehashed,
-    pub simhash: simhash::HashType,
-}
-
-pub trait Doc: Clone {
-    fn score(&self) -> f64;
-    fn hashes(&self) -> Hashes;
-}
+use super::{Doc, Hashes, MainCollector, MaxDocsConsidered};
 
 pub struct TopDocs {
     top_n: usize,
@@ -111,7 +82,7 @@ impl TopDocs {
     }
 
     pub fn main_collector(self, score_tweaker: InitialScoreTweaker) -> MainCollector {
-        TweakedScoreTopCollector::new(score_tweaker, self)
+        MainCollector::new(score_tweaker, self)
     }
 }
 

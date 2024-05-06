@@ -28,6 +28,7 @@ use utoipa::ToSchema;
 use crate::{
     api::search::ReturnBody,
     bangs::BangHit,
+    collector::approx_count::Count,
     config::defaults,
     ranking::{pipeline::LocalRecallRankingWebpage, SignalCoefficient},
     search_prettifier::DisplayedWebpage,
@@ -59,7 +60,7 @@ impl SearchResult {
 #[serde(rename_all = "camelCase")]
 pub struct WebsitesResult {
     pub webpages: Vec<DisplayedWebpage>,
-    pub num_hits: Option<usize>,
+    pub num_hits: Count,
     pub search_duration_ms: u128,
     pub has_more_results: bool,
 }
@@ -74,14 +75,14 @@ pub struct SearchQuery {
     pub host_rankings: Option<HostRankings>,
     pub return_ranking_signals: bool,
     pub safe_search: bool,
-    pub count_results: bool,
+    pub count_results_exact: bool,
     pub return_body: Option<ReturnBody>,
     pub return_structured_data: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct InitialWebsiteResult {
-    pub num_websites: Option<usize>,
+    pub num_websites: Count,
     pub websites: Vec<LocalRecallRankingWebpage>,
     pub has_more: bool,
 }
@@ -100,7 +101,7 @@ impl Default for SearchQuery {
             host_rankings: Default::default(),
             return_ranking_signals: defaults::SearchQuery::return_ranking_signals(),
             safe_search: defaults::SearchQuery::safe_search(),
-            count_results: defaults::SearchQuery::count_results(),
+            count_results_exact: defaults::SearchQuery::count_results_exact(),
             return_body: None,
             return_structured_data: defaults::SearchQuery::return_structured_data(),
         }

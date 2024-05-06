@@ -1,14 +1,17 @@
 cluster_id = "dev_search"
+dual_encoder_model_path = "data/summarizer/dual_encoder"
 entity_index_path = "data/entity"
 gossip_addr = "0.0.0.0:3006"
 gossip_seed_nodes = ["0.0.0.0:3005"]
 host = "0.0.0.0:3002"
 index_path = "data/index"
 shard = 0
-dual_encoder_model_path = "data/summarizer/dual_encoder"
 # linear_model_path = "data/linear_model.json"
 # lambda_model_path = "data/lambdamart.txt"
 
 [snippet]
 max_considered_words = 10_000
 num_words_for_lang_detection = 1_000
+
+[collector]
+max_docs_considered = 1000

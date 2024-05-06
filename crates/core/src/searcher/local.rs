@@ -20,6 +20,7 @@ use std::sync::{Arc, RwLockReadGuard};
 use itertools::Itertools;
 use url::Url;
 
+use crate::collector::approx_count;
 use crate::config::{CollectorConfig, SnippetConfig};
 use crate::index::Index;
 use crate::inverted_index::{InvertedIndex, RetrievedWebpage};
@@ -119,7 +120,7 @@ where
 
 struct InvertedIndexResult {
     webpages: Vec<LocalRecallRankingWebpage>,
-    num_hits: Option<usize>,
+    num_hits: approx_count::Count,
     has_more: bool,
 }
 

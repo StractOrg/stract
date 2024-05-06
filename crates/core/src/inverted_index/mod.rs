@@ -39,7 +39,7 @@ use tantivy::schema::{Schema, Value};
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{IndexReader, IndexWriter, TantivyDocument};
 
-use crate::collector::Hashes;
+use crate::collector::{approx_count, Hashes};
 use crate::config::SnippetConfig;
 use crate::fastfield_reader::FastFieldReader;
 
@@ -62,7 +62,7 @@ use std::sync::Arc;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct InitialSearchResult {
-    pub num_websites: Option<usize>,
+    pub num_websites: approx_count::Count,
     pub top_websites: Vec<WebpagePointer>,
 }
 
@@ -214,7 +214,7 @@ impl InvertedIndex {
 
 #[derive(Debug, serde::Serialize, bincode::Encode)]
 pub struct SearchResult {
-    pub num_docs: Option<usize>,
+    pub num_docs: approx_count::Count,
     pub documents: Vec<RetrievedWebpage>,
 }
 
@@ -1263,5 +1263,63 @@ mod tests {
         assert_eq!(ranking_websites.len(), 2);
         assert!(ranking_websites[0].title_embedding().is_some());
         assert!(ranking_websites[1].title_embedding().is_none());
+    }
+
+    #[test]
+    fn test_approximate_count() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        let webpage = Webpage::test_parse(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>Test website</title>
+                    </head>
+                    <body>
+                        {CONTENT} test
+                    </body>
+                </html>
+            "#,
+                CONTENT = crate::rand_words(100)
+            ),
+            "https://www.a.com",
+        )
+        .unwrap();
+
+        for _ in 0..1_000 {
+            index.insert(&webpage).unwrap();
+        }
+
+        index.commit().expect("failed to commit index");
+
+        let ctx = index.local_search_ctx();
+
+        let query = Query::parse(
+            &ctx,
+            &SearchQuery {
+                query: "test".to_string(),
+                ..Default::default()
+            },
+            &index,
+        )
+        .expect("Failed to parse query");
+
+        let collector_config = CollectorConfig {
+            max_docs_considered: 100,
+            ..Default::default()
+        };
+
+        let ranker = Ranker::new(
+            SignalComputer::new(Some(&query)),
+            ctx.fastfield_reader.clone(),
+            collector_config,
+        );
+
+        let res = index
+            .search_initial(&query, &ctx, ranker.collector(ctx.clone()))
+            .unwrap();
+
+        assert_eq!(res.num_websites, approx_count::Count::Approximate(1_000));
     }
 }

@@ -27,7 +27,7 @@ use url::Url;
 use ahash::AHashMap as HashMap;
 
 use crate::bangs::{Bang, BangHit};
-use crate::collector::{self, Doc};
+use crate::collector::{self, approx_count, Doc};
 use crate::config::{ApiConfig, ApiSpellCheck, ApiThresholds, CollectorConfig, WidgetsConfig};
 use crate::enum_map::EnumMap;
 use crate::image_store::Image;
@@ -599,7 +599,7 @@ where
         let num_docs = initial_results
             .iter()
             .map(|result| result.local_result.num_websites)
-            .sum();
+            .fold(approx_count::Count::Exact(0), |acc, count| acc + count);
 
         let (top_websites, has_more_results) = self
             .combine_results(

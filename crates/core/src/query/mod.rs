@@ -52,7 +52,7 @@ pub struct Query {
     region: Option<Region>,
     optics: Vec<Optic>,
     top_n: usize,
-    count_results: bool,
+    count_results_exact: bool,
 }
 
 impl Clone for Query {
@@ -65,7 +65,7 @@ impl Clone for Query {
             region: self.region,
             optics: self.optics.clone(),
             top_n: self.top_n,
-            count_results: self.count_results,
+            count_results_exact: self.count_results_exact,
         }
     }
 }
@@ -142,12 +142,12 @@ impl Query {
             offset: query.num_results * query.page,
             region: query.selected_region,
             top_n: query.num_results,
-            count_results: query.count_results,
+            count_results_exact: query.count_results_exact,
         })
     }
 
-    pub fn count_results(&self) -> bool {
-        self.count_results
+    pub fn count_results_exact(&self) -> bool {
+        self.count_results_exact
     }
 
     pub fn simple_terms(&self) -> &[String] {

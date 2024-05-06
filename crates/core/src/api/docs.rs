@@ -98,6 +98,8 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::search_prettifier::OneOrManyString,
                 crate::search_prettifier::OneOrManyProperty,
                 crate::search_prettifier::Property,
+
+                crate::collector::approx_count::Count,
             ),
         ),
         modifiers(&ApiModifier),

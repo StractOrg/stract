@@ -141,7 +141,7 @@ impl SearchQuery {
         false
     }
 
-    pub fn count_results() -> bool {
+    pub fn count_results_exact() -> bool {
         false
     }
 

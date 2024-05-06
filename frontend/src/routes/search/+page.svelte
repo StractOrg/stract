@@ -12,6 +12,8 @@
   import { search } from '$lib/search';
   import { Keybind, searchCb, type Refs } from '$lib/keybind';
   import SpellCorrection from './SpellCorrection.svelte';
+  import type { Count } from '$lib/api';
+  import { match } from 'ts-pattern';
 
   export let data: PageData;
   $: results = data.results;
@@ -101,6 +103,17 @@
       keybind.onKeyDown(event, $useKeyboardShortcuts, context);
     }
   };
+
+  const prettyprintCount = (count: Count): string => {
+    return match(count)
+      .with({ _type: 'exact' }, () => {
+        return count.value.toLocaleString();
+      })
+      .with({ _type: 'approximate' }, () => {
+        return `~${count.value.toLocaleString()}`;
+      })
+      .exhaustive();
+  };
 </script>
 
 <svelte:window on:keydown={onKeyDown} />
@@ -127,13 +140,9 @@
     <div class="mx-auto flex w-full justify-end sm:justify-between">
       <div class="hidden h-full flex-col space-x-2 text-xs text-neutral sm:flex">
         <p class="h-fit">
-          {#if results && results.numHits != null}
-            Found <span class="font-medium">{results.numHits.toLocaleString()}</span> results in
+          {#if results}
+            Found <span class="font-medium">{prettyprintCount(results.numHits)}</span> results in
             <span class="font-medium">{((results.searchDurationMs ?? 0) / 1000).toFixed(2)}s</span>
-          {:else if results}
-            Search took <span class="font-medium"
-              >{((results.searchDurationMs ?? 0) / 1000).toFixed(2)}s</span
-            >
           {/if}
         </p>
       </div>

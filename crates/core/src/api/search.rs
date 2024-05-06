@@ -69,8 +69,8 @@ pub struct ApiSearchQuery {
     #[serde(default = "defaults::SearchQuery::flatten_response")]
     pub flatten_response: bool,
 
-    #[serde(default = "defaults::SearchQuery::count_results")]
-    pub count_results: bool,
+    #[serde(default = "defaults::SearchQuery::count_results_exact")]
+    pub count_results_exact: bool,
 
     #[serde(default = "defaults::SearchQuery::return_structured_data")]
     pub return_structured_data: bool,
@@ -99,7 +99,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             host_rankings: api.host_rankings,
             return_ranking_signals: api.return_ranking_signals,
             safe_search: api.safe_search.unwrap_or(default.safe_search),
-            count_results: api.count_results,
+            count_results_exact: api.count_results_exact,
             return_body: api.return_body,
             return_structured_data: api.return_structured_data,
         })
