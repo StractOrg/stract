@@ -148,18 +148,7 @@ impl Query {
                         let term = terms.remove(0);
                         Some(Box::new(tantivy::query::TermQuery::new(term, option)))
                     } else {
-                        Some(Box::new(tantivy::query::BooleanQuery::new(
-                            terms
-                                .into_iter()
-                                .map(|term| {
-                                    (
-                                        tantivy::query::Occur::Must,
-                                        Box::new(tantivy::query::TermQuery::new(term, option))
-                                            as Box<dyn tantivy::query::Query + 'static>,
-                                    )
-                                })
-                                .collect(),
-                        )))
+                        Some(Box::new(tantivy::query::PhraseQuery::new(terms)))
                     }
                 }
                 SimpleOrPhrase::Phrase(p) => {

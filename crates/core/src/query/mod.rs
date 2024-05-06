@@ -431,6 +431,24 @@ mod tests {
                 .unwrap(),
             )
             .expect("failed to insert webpage");
+        index
+            .insert(
+                &Webpage::test_parse(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This test page does not contain the forbidden word
+                            </body>
+                        </html>
+                    "#,
+                    "https://www.second.com/first",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
 
@@ -455,8 +473,12 @@ mod tests {
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.second.com/");
+        assert_eq!(result.webpages.len(), 2);
+
+        assert!(result
+            .webpages
+            .iter()
+            .all(|w| w.url != "https://www.first.com/"));
     }
 
     #[test]
