@@ -40,9 +40,9 @@
     <div class="flex min-w-0">
       <div class="flex min-w-0 grow flex-col space-y-0.5">
         <span class="flex flex-col-reverse">
-          <h3>
+          <h3 class="flex">
             <ResultLink
-              _class="title max-w-[calc(100%-30px)] truncate text-xl font-medium text-link visited:text-link-visited hover:underline"
+              _class="title truncate max-w-[calc(100%-30px)] text-xl font-medium text-link visited:text-link-visited hover:underline"
               title={webpage.title}
               href={webpage.url}
               {resultIndex}
