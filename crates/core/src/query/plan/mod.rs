@@ -22,7 +22,10 @@ pub use node::Node;
 
 use crate::schema::{self, text_field::TextField, TextFieldEnum};
 
-use super::parser::{SimpleOrPhrase, SimpleTerm};
+use super::{
+    parser::{SimpleOrPhrase, SimpleTerm},
+    MAX_TERMS_FOR_NGRAM_LOOKUPS,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Term {
@@ -229,24 +232,29 @@ pub fn initial(terms: Vec<super::Term>) -> Option<Node> {
     let mut nodes = Vec::new();
     let terms_for_adjacent = terms.clone();
 
+    let augment_with_adjacent = terms.len() <= MAX_TERMS_FOR_NGRAM_LOOKUPS;
+
     for (i, term) in terms.into_iter().enumerate() {
         let mut adjacent = Vec::new();
 
-        if let super::Term::SimpleOrPhrase(_) = &term {
-            for window_size in 2..=3 {
-                for (start, end) in sliding_window(window_size, i) {
-                    let mut compounds = Vec::new();
+        if augment_with_adjacent {
+            if let super::Term::SimpleOrPhrase(_) = &term {
+                for window_size in 2..=3 {
+                    for (start, end) in sliding_window(window_size, i) {
+                        let mut compounds = Vec::new();
 
-                    for k in start..=end {
-                        if let Some(super::Term::SimpleOrPhrase(super::SimpleOrPhrase::Simple(s))) =
-                            terms_for_adjacent.get(k)
-                        {
-                            compounds.push(s.clone());
+                        for k in start..=end {
+                            if let Some(super::Term::SimpleOrPhrase(
+                                super::SimpleOrPhrase::Simple(s),
+                            )) = terms_for_adjacent.get(k)
+                            {
+                                compounds.push(s.clone());
+                            }
                         }
-                    }
 
-                    if !compounds.is_empty() {
-                        adjacent.push(super::TermCompound { terms: compounds });
+                        if !compounds.is_empty() {
+                            adjacent.push(super::TermCompound { terms: compounds });
+                        }
                     }
                 }
             }

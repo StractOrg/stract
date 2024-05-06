@@ -38,9 +38,10 @@ mod plan;
 pub mod shortcircuit;
 pub mod union;
 
+use self::{optic::AsMultipleTantivyQuery, parser::SimpleOrPhrase};
 use parser::Term;
 
-use self::{optic::AsMultipleTantivyQuery, parser::SimpleOrPhrase};
+pub const MAX_TERMS_FOR_NGRAM_LOOKUPS: usize = 16;
 
 #[derive(Debug)]
 pub struct Query {

@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::query::optic::AsSearchableRule;
-use crate::query::Query;
+use crate::query::{Query, MAX_TERMS_FOR_NGRAM_LOOKUPS};
 use crate::schema::text_field::TextField;
 use crate::Result;
 use crate::{enum_map::EnumMap, fastfield_reader, schema::TextFieldEnum, webpage::Webpage};
@@ -189,6 +189,12 @@ impl SignalComputer {
                         .as_textfield()
                         .and_then(|f| (f.tantivy_field(schema).map(|tv_field| (f, tv_field))))
                     {
+                        if text_field.ngram_size() > 1
+                            && query.simple_terms.len() > MAX_TERMS_FOR_NGRAM_LOOKUPS
+                        {
+                            continue;
+                        }
+
                         let simple_query = itertools::intersperse(
                             query.simple_terms.iter().map(|s| s.as_str()),
                             " ",
