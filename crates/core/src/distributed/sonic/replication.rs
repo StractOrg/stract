@@ -130,7 +130,7 @@ where
         req: &R,
         timeout: Duration,
     ) -> Result<R::Response> {
-        let conn = self.conn().await?;
+        let mut conn = self.conn().await?;
         conn.send_with_timeout(req, timeout).await
     }
 
@@ -139,7 +139,7 @@ where
         reqs: &[R],
         timeout: Duration,
     ) -> Result<Vec<R::Response>> {
-        let conn = self.conn().await?;
+        let mut conn = self.conn().await?;
         conn.batch_send_with_timeout(reqs, timeout).await
     }
 

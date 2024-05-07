@@ -90,7 +90,7 @@ where
     }
 
     fn send_raw(&self, req: &JobReq<Self::Job>) -> Result<JobResp<Self::Job>> {
-        let conn = self.conn()?;
+        let mut conn = self.conn()?;
         let res = block_on(conn.send(req))?;
         Ok(res)
     }

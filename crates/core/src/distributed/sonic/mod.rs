@@ -109,7 +109,7 @@ where
         }
     }
 
-    async fn send_without_timeout(mut self, request: &Req) -> Result<Res> {
+    async fn send_without_timeout(&mut self, request: &Req) -> Result<Res> {
         let bytes = bincode::encode_to_vec(request, bincode::config::standard()).unwrap();
 
         // disable linger to avoid TIME_WAIT.
@@ -139,7 +139,6 @@ where
         let mut buf = vec![0; header.body_size];
         self.stream.read_exact(&mut buf).await?;
         self.stream.flush().await?;
-        self.stream.shutdown().await?;
 
         tracing::debug!("deserializing {:?}", std::any::type_name::<(Req, Res)>());
         let (res, _) = bincode::decode_from_slice(&buf, bincode::config::standard()).unwrap();
@@ -147,12 +146,12 @@ where
         Ok(res)
     }
 
-    pub async fn send(self, request: &Req) -> Result<Res> {
+    pub async fn send(&mut self, request: &Req) -> Result<Res> {
         self.send_with_timeout(request, Duration::from_secs(90))
             .await
     }
 
-    pub async fn send_with_timeout(self, request: &Req, timeout: Duration) -> Result<Res> {
+    pub async fn send_with_timeout(&mut self, request: &Req, timeout: Duration) -> Result<Res> {
         match tokio::time::timeout(timeout, self.send_without_timeout(request)).await {
             Ok(res) => res,
             Err(_) => Err(Error::RequestTimeout),
@@ -324,7 +323,7 @@ mod tests {
                     req.respond(b1).await?;
                     Ok(())
                 },
-                |con| async move {
+                |mut con| async move {
                     let res = con.send(&a2).await?;
                     prop_assert_eq!(res, b2);
                     Ok(())

@@ -220,7 +220,7 @@ impl RemoteClient {
         R: sonic::service::Wrapper<Server>,
         E: std::error::Error,
     {
-        let conn = self.raft_conn().await?;
+        let mut conn = self.raft_conn().await?;
         conn.send_with_timeout(&rpc, option.soft_ttl())
             .await
             .map_err(|e| match e {

@@ -115,7 +115,10 @@ impl<'a, S: Service> Connection<'a, S> {
         })
     }
 
-    pub async fn send_without_timeout<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
+    pub async fn send_without_timeout<R: Wrapper<S>>(
+        &mut self,
+        request: &'a R,
+    ) -> Result<R::Response> {
         Ok(R::unwrap_response(
             self.inner
                 .send_without_timeout(&OneOrMany::One(R::wrap_request_ref(request)))
@@ -126,7 +129,7 @@ impl<'a, S: Service> Connection<'a, S> {
         .unwrap())
     }
 
-    pub async fn send<R: Wrapper<S>>(self, request: &'a R) -> Result<R::Response> {
+    pub async fn send<R: Wrapper<S>>(&mut self, request: &'a R) -> Result<R::Response> {
         Ok(R::unwrap_response(
             self.inner
                 .send(&OneOrMany::One(R::wrap_request_ref(request)))
@@ -138,7 +141,7 @@ impl<'a, S: Service> Connection<'a, S> {
     }
 
     pub async fn send_with_timeout<R: Wrapper<S>>(
-        self,
+        &mut self,
         request: &'a R,
         timeout: Duration,
     ) -> Result<R::Response> {
@@ -153,7 +156,7 @@ impl<'a, S: Service> Connection<'a, S> {
     }
 
     pub async fn batch_send_with_timeout<R: Wrapper<S>>(
-        self,
+        &mut self,
         requests: &'a [R],
         timeout: Duration,
     ) -> Result<Vec<R::Response>> {
