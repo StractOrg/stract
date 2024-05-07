@@ -74,7 +74,6 @@ min-max-heap = {workspace = true}
 nom = {workspace = true}
 num-bigint = {workspace = true}
 num-rational = {workspace = true}
-num_cpus = {workspace = true}
 once_cell = {workspace = true}
 openraft = {workspace = true}
 optics = {path = "../optics"}

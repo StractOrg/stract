@@ -32,7 +32,7 @@ impl Executor {
     }
 
     pub fn multi_thread(prefix: &'static str) -> Result<Executor> {
-        Self::with_threads(num_cpus::get(), prefix)
+        Self::with_threads(std::thread::available_parallelism()?.into(), prefix)
     }
 
     pub fn with_threads(num_threads: usize, prefix: &'static str) -> Result<Executor> {

@@ -135,7 +135,7 @@ pub fn run(config: WebSpellConfig) -> Result<()> {
         })
         .collect_vec();
 
-    let num_workers = (num_cpus::get()).min(jobs.len());
+    let num_workers = usize::from(std::thread::available_parallelism()?).min(jobs.len());
     let mut handlers = Vec::new();
 
     for i in 0..num_workers {

@@ -126,7 +126,7 @@ pub fn build(config: FeedIndexingConfig) -> Result<()> {
 pub fn merge(indexes: Vec<IndexPointer>) -> Result<()> {
     let num_indexes = indexes.len();
     let mut it = indexes.into_iter();
-    let num_cores = num_cpus::get();
+    let num_cores = usize::from(std::thread::available_parallelism()?);
 
     let mut threads = Vec::new();
 

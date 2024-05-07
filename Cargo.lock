@@ -4657,7 +4657,6 @@ dependencies = [
  "nom",
  "num-bigint",
  "num-rational",
- "num_cpus",
  "once_cell",
  "openraft",
  "optics",

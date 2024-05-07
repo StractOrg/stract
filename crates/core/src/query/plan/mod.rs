@@ -147,8 +147,21 @@ impl Query {
                     if terms.len() == 1 {
                         let term = terms.remove(0);
                         Some(Box::new(tantivy::query::TermQuery::new(term, option)))
-                    } else {
+                    } else if !terms.is_empty() && option.has_positions() {
                         Some(Box::new(tantivy::query::PhraseQuery::new(terms)))
+                    } else {
+                        Some(Box::new(tantivy::query::BooleanQuery::new(
+                            terms
+                                .into_iter()
+                                .map(|term| {
+                                    (
+                                        tantivy::query::Occur::Must,
+                                        Box::new(tantivy::query::TermQuery::new(term, option))
+                                            as Box<dyn tantivy::query::Query + 'static>,
+                                    )
+                                })
+                                .collect(),
+                        )))
                     }
                 }
                 SimpleOrPhrase::Phrase(p) => {

@@ -106,7 +106,7 @@ impl<'a> FnCache<'a> {
     pub fn pretokenized_schema_json(&mut self) -> &PreTokenizedString {
         if self.pretokenized_schema_json.is_none() {
             self.pretokenized_schema_json =
-                match schema_org::flattened_json(dbg!(self.schema_org().clone())) {
+                match schema_org::flattened_json(self.schema_org().clone()) {
                     Ok(mut f) => {
                         let mut tokens = Vec::new();
 

@@ -1322,4 +1322,61 @@ mod tests {
 
         assert_eq!(res.num_websites, approx_count::Count::Approximate(1_000));
     }
+
+    #[test]
+    fn test_search_special_characters() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        let webpage = Webpage::test_parse(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>C++</title>
+                    </head>
+                    <body>
+                        {CONTENT} test
+                    </body>
+                </html>
+            "#,
+                CONTENT = crate::rand_words(100)
+            ),
+            "https://www.a.com",
+        )
+        .unwrap();
+
+        index.insert(&webpage).unwrap();
+
+        index.commit().expect("failed to commit index");
+
+        let ctx = index.local_search_ctx();
+
+        let query = Query::parse(
+            &ctx,
+            &SearchQuery {
+                query: "c++".to_string(),
+                ..Default::default()
+            },
+            &index,
+        )
+        .expect("Failed to parse query");
+
+        let ranker = Ranker::new(
+            SignalComputer::new(Some(&query)),
+            ctx.fastfield_reader.clone(),
+            CollectorConfig::default(),
+        );
+
+        let res = index
+            .search_initial(&query, &ctx, ranker.collector(ctx.clone()))
+            .unwrap();
+
+        assert_eq!(res.top_websites.len(), 1);
+
+        let webpages = index.retrieve_websites(&res.top_websites, &query).unwrap();
+
+        assert_eq!(webpages.len(), 1);
+        assert_eq!(webpages[0].title, "C++");
+        assert_eq!(webpages[0].url, "https://www.a.com/");
+    }
 }

@@ -361,7 +361,10 @@ impl CrawlPlanner {
 
         let next_queue = AtomicUsize::new(0);
 
-        let num_threads = self.config.num_threads.unwrap_or_else(num_cpus::get);
+        let num_threads = self
+            .config
+            .num_threads
+            .unwrap_or_else(|| usize::from(std::thread::available_parallelism().unwrap()));
 
         let pool = ThreadPoolBuilder::new()
             .num_threads(num_threads)

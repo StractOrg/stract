@@ -81,7 +81,7 @@ pub fn create(config: CanonicalIndexConfig) -> Result<()> {
         })
         .collect();
 
-    let num_workers = num_cpus::get();
+    let num_workers = usize::from(std::thread::available_parallelism()?);
     let mut handles = Vec::new();
 
     for i in 0..num_workers {

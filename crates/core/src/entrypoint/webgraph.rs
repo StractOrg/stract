@@ -204,7 +204,7 @@ impl Webgraph {
             None
         };
 
-        let num_workers = num_cpus::get();
+        let num_workers = usize::from(std::thread::available_parallelism()?);
 
         let mut handlers = Vec::new();
         let host_path = &config.host_graph_base_path;
