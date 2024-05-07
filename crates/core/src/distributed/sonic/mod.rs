@@ -182,9 +182,33 @@ where
         })
     }
 
-    async fn parse_incoming_stream(&self, mut stream: TcpStream) -> Result<Request<Req, Res>> {
+    pub async fn accept(&self) -> Result<ServerConnection<Req, Res>> {
+        let (stream, client) = self.listener.accept().await?;
+        tracing::debug!(?client, "accepted connection");
+
+        Ok(ServerConnection::new(stream))
+    }
+}
+
+pub struct ServerConnection<Req, Res> {
+    stream: TcpStream,
+    marker: PhantomData<(Req, Res)>,
+}
+
+impl<Req, Res> ServerConnection<Req, Res>
+where
+    Req: bincode::Decode,
+{
+    fn new(stream: TcpStream) -> Self {
+        ServerConnection {
+            stream,
+            marker: PhantomData,
+        }
+    }
+
+    pub async fn request(&mut self) -> Result<Request<'_, Req, Res>> {
         let mut header_buf = vec![0; std::mem::size_of::<Header>()];
-        stream.read_exact(&mut header_buf).await?;
+        self.stream.read_exact(&mut header_buf).await?;
         let header: Header = *bytemuck::from_bytes(&header_buf);
 
         if header.body_size > MAX_BODY_SIZE_BYTES {
@@ -196,52 +220,38 @@ where
 
         let mut buf = vec![0; header.body_size];
 
-        stream.read_exact(&mut buf).await?;
+        self.stream.read_exact(&mut buf).await?;
 
         let (body, _) = bincode::decode_from_slice(&buf, bincode::config::standard()).unwrap();
 
         Ok(Request {
-            stream,
+            conn: self,
             body: Some(body),
-            marker: PhantomData,
         })
     }
-
-    pub async fn accept(&self) -> Result<Request<Req, Res>> {
-        let (stream, client) = self.listener.accept().await?;
-        tracing::debug!(?client, "accepted connection");
-
-        tokio::time::timeout(Duration::from_secs(60), self.parse_incoming_stream(stream))
-            .await
-            .map_err(|_| Error::ConnectionTimeout)?
-    }
 }
 
-pub struct Request<Req, Res> {
-    stream: TcpStream,
+pub struct Request<'a, Req, Res> {
+    conn: &'a mut ServerConnection<Req, Res>,
     body: Option<Req>,
-    marker: PhantomData<(Req, Res)>,
 }
 
-impl<Req, Res> Request<Req, Res>
+impl<'a, Req, Res> Request<'a, Req, Res>
 where
     Res: bincode::Encode,
 {
-    async fn respond_without_timeout(mut self, response: Res) -> Result<()> {
+    async fn respond_without_timeout(self, response: Res) -> Result<()> {
         let bytes = bincode::encode_to_vec(&response, bincode::config::standard()).unwrap();
         let header = Header {
             body_size: bytes.len(),
         };
 
-        self.stream.write_all(bytemuck::bytes_of(&header)).await?;
-        self.stream.write_all(&bytes).await?;
-        self.stream.flush().await?;
-
-        // wait for client to close connection
-        let mut buf: [u8; 1] = [0];
-        tokio::time::timeout(Duration::from_secs(5), self.stream.read_exact(&mut buf))
-            .await
-            .ok();
+        self.conn
+            .stream
+            .write_all(bytemuck::bytes_of(&header))
+            .await?;
+        self.conn.stream.write_all(&bytes).await?;
+        self.conn.stream.flush().await?;
 
         Ok(())
     }
@@ -318,7 +328,8 @@ mod tests {
             let (a2, b2) = (a1.clone(), b1.clone());
             let (svr_res, con_res) = fixture(
                 |svr| async move {
-                    let req = svr.accept().await?;
+                    let mut conn = svr.accept().await?;
+                    let req = conn.request().await?;
                     prop_assert_eq!(req.body(), &a1);
                     req.respond(b1).await?;
                     Ok(())

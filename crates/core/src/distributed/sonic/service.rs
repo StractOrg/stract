@@ -55,27 +55,29 @@ impl<S: Service> Server<S> {
         })
     }
     pub async fn accept(&self) -> Result<()> {
-        let mut req = self.inner.accept().await?;
+        let mut conn = self.inner.accept().await?;
 
         let service = Arc::clone(&self.service);
         tokio::spawn(async move {
-            match req.take_body() {
-                OneOrMany::One(body) => {
-                    let res = S::handle(body, &service).await;
+            while let Ok(mut req) = conn.request().await {
+                match req.take_body() {
+                    OneOrMany::One(body) => {
+                        let res = S::handle(body, &service).await;
 
-                    if let Err(e) = req.respond(OneOrMany::One(res)).await {
-                        tracing::error!("failed to respond to request: {}", e);
+                        if let Err(e) = req.respond(OneOrMany::One(res)).await {
+                            tracing::error!("failed to respond to request: {}", e);
+                        }
                     }
-                }
-                OneOrMany::Many(bodies) => {
-                    let mut res = Vec::new();
+                    OneOrMany::Many(bodies) => {
+                        let mut res = Vec::new();
 
-                    for req in bodies {
-                        res.push(S::handle(req, &service).await);
-                    }
+                        for req in bodies {
+                            res.push(S::handle(req, &service).await);
+                        }
 
-                    if let Err(e) = req.respond(OneOrMany::Many(res)).await {
-                        tracing::error!("failed to respond to request: {}", e);
+                        if let Err(e) = req.respond(OneOrMany::Many(res)).await {
+                            tracing::error!("failed to respond to request: {}", e);
+                        }
                     }
                 }
             }
