@@ -1159,7 +1159,7 @@ impl TextField for FlattenedSchemaOrgJson {
         doc.add_pre_tokenized_text(
             self.tantivy_field(schema)
                 .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
-            cache.pretokenized_schema_json().clone(),
+            dbg!(cache.pretokenized_schema_json().clone()),
         );
 
         Ok(())

@@ -576,7 +576,7 @@ impl<'a> tantivy::tokenizer::TokenStream for JsonFieldTokenStream<'a> {
         let mut prev_was_quote = false;
 
         while let Some((offset_from, c)) = self.chars.next() {
-            if c.is_alphanumeric() {
+            if !matches!(c, '.' | '\n' | '"') {
                 let offset_to = self.search_token_end(prev_was_quote);
                 self.token.offset_from = offset_from;
                 self.token.offset_to = offset_to;
@@ -866,31 +866,19 @@ Breadcrumb.url="https://www.eurotecnicaservice.it/testing\"
     #[test]
     fn tokenize_json_field() {
         assert_eq!(
-            tokenize_json(
-                r#"
-                Test.field="value"
-            "#
-            ),
+            tokenize_json(r#"Test.field="value""#),
             vec!["Test", "field", "\"value\"",]
         );
         assert_eq!(
-            tokenize_json(
-                r#"
-                Test.field="this is the value"
-            "#
-            ),
+            tokenize_json(r#"Test.field="this is the value""#),
             vec!["Test", "field", "\"this is the value\"",]
         );
         assert_eq!(
-            tokenize_json(
-                r#"
-                Test.field="this is\" the value"
-            "#
-            ),
+            tokenize_json(r#"Test.field="this is\" the value""#),
             vec!["Test", "field", "\"this is\\\" the value\"",]
         );
         assert_eq!(
-            tokenize_json("\n        Test.field=\"this*@# is\\\" the\\\" \nvalue\"\n    "),
+            tokenize_json("Test.field=\"this*@# is\\\" the\\\" \nvalue\""),
             vec!["Test", "field", "\"this*@# is\\\" the\\\" \nvalue\"",]
         );
     }
@@ -936,6 +924,19 @@ key2="2""#;
         "#;
         let expected = r#"key1.key2="value1"
 key1.key3="value2""#;
+
+        flattened_json_helper(json, expected);
+
+        let json = r#"
+        {
+            "$key1": {
+                "$key2": "value1",
+                "key3": "value2"
+            }
+        }
+        "#;
+        let expected = r#"$key1.$key2="value1"
+$key1.key3="value2""#;
 
         flattened_json_helper(json, expected);
 

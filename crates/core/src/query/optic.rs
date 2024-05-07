@@ -15,14 +15,14 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use itertools::Itertools;
-use optics::{Action, MatchLocation, Matching, Optic, Rule};
+use optics::{Action, MatchLocation, Matching, Optic, PatternPart, Rule};
 use std::iter;
 use tantivy::{
     query::{BooleanQuery, Occur, QueryClone},
     schema::Schema,
 };
 
-use crate::{fastfield_reader::FastFieldReader, schema::text_field};
+use crate::{fastfield_reader::FastFieldReader, schema::text_field, webpage::schema_org};
 
 use super::{const_query::ConstQuery, pattern_query::PatternQuery, union::UnionQuery};
 
@@ -247,15 +247,27 @@ impl AsTantivyQuery for Matching {
                 )),
                 1.0,
             )),
-            MatchLocation::Schema => Box::new(ConstQuery::new(
-                Box::new(PatternQuery::new(
-                    self.pattern.clone(),
-                    text_field::FlattenedSchemaOrgJson.into(),
-                    schema,
-                    fastfield_reader.clone(),
-                )),
-                1.0,
-            )),
+            MatchLocation::Schema => {
+                let mut pattern = self.pattern.clone();
+                // add TYPE_PREFIX to first term in pattern to ensure
+                // we match from the beginning of the path
+                if let Some(PatternPart::Raw(first_term)) = pattern
+                    .iter_mut()
+                    .find(|p| matches!(p, PatternPart::Raw(_)))
+                {
+                    *first_term = format!("{}{}", schema_org::TYPE_PREFIX, first_term);
+                }
+
+                Box::new(ConstQuery::new(
+                    Box::new(PatternQuery::new(
+                        pattern,
+                        text_field::FlattenedSchemaOrgJson.into(),
+                        schema,
+                        fastfield_reader.clone(),
+                    )),
+                    1.0,
+                ))
+            }
         }
     }
 }
@@ -794,7 +806,8 @@ mod tests {
                                 "contentUrl": "mexico-beach.jpg",
                                 "datePublished": "2008-01-25",
                                 "description": "I took this picture while on vacation last year.",
-                                "name": "Beach in Mexico"
+                                "name": "Beach in Mexico",
+                                "BlogPosting": "whatever"
                                 }}
                             </script>
                         </head>

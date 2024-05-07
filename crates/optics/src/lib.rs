@@ -198,21 +198,11 @@ impl TryFrom<RawMatchPart> for Matching {
 
         let mut pattern = Vec::new();
 
-        if matches!(&loc, MatchLocation::Schema) {
-            for tok in PatternToken::lex(&s) {
-                match tok {
-                    PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
-                    PatternToken::Wildcard => return Err(Error::Pattern),
-                    PatternToken::Anchor => return Err(Error::Pattern),
-                }
-            }
-        } else {
-            for tok in PatternToken::lex(&s) {
-                match tok {
-                    PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
-                    PatternToken::Wildcard => pattern.push(PatternPart::Wildcard),
-                    PatternToken::Anchor => pattern.push(PatternPart::Anchor),
-                }
+        for tok in PatternToken::lex(&s) {
+            match tok {
+                PatternToken::Raw(s) => pattern.push(PatternPart::Raw(s)),
+                PatternToken::Wildcard => pattern.push(PatternPart::Wildcard),
+                PatternToken::Anchor => pattern.push(PatternPart::Anchor),
             }
         }
 

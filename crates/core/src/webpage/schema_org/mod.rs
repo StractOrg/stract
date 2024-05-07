@@ -24,6 +24,11 @@ use crate::{OneOrMany, Result};
 mod json_ld;
 mod microdata;
 
+/// All itemtypes will be prefixed with TYPE_PREFIX
+/// in the flattened json. This allows us to make sure that
+/// the matching during search starts at an itemtype.
+pub const TYPE_PREFIX: char = '$';
+
 #[derive(
     Debug,
     Clone,
@@ -65,15 +70,15 @@ impl Property {
     bincode::Decode,
 )]
 #[serde(untagged)]
-enum SingleMap {
+enum FlattenedJsonMap {
     Leaf(String),
-    Node(HashMap<RawOneOrMany<String>, HashMap<String, RawOneOrMany<SingleMap>>>),
+    Node(HashMap<RawOneOrMany<String>, HashMap<String, RawOneOrMany<FlattenedJsonMap>>>),
 }
 
-impl From<Property> for SingleMap {
+impl From<Property> for FlattenedJsonMap {
     fn from(value: Property) -> Self {
         match value {
-            Property::String(s) => SingleMap::Leaf(s),
+            Property::String(s) => FlattenedJsonMap::Leaf(s),
             Property::Item(item) => {
                 let mut res = HashMap::new();
 
@@ -81,22 +86,47 @@ impl From<Property> for SingleMap {
                     let recursive = item
                         .properties
                         .into_iter()
+                        .map(|(key, val)| {
+                            (key.chars().skip_while(|c| *c == TYPE_PREFIX).collect(), val)
+                        })
                         .map(|(key, val)| match val {
-                            OneOrMany::One(one) => (key, RawOneOrMany::One(SingleMap::from(one))),
+                            OneOrMany::One(one) => {
+                                (key, RawOneOrMany::One(FlattenedJsonMap::from(one)))
+                            }
                             OneOrMany::Many(many) => (
                                 key,
-                                RawOneOrMany::Many(many.into_iter().map(SingleMap::from).collect()),
+                                RawOneOrMany::Many(
+                                    many.into_iter().map(FlattenedJsonMap::from).collect(),
+                                ),
                             ),
                         })
                         .collect();
 
                     match tt {
-                        OneOrMany::One(one) => res.insert(RawOneOrMany::One(one), recursive),
-                        OneOrMany::Many(many) => res.insert(RawOneOrMany::Many(many), recursive),
+                        OneOrMany::One(one) => {
+                            let one: String =
+                                one.chars().skip_while(|c| *c == TYPE_PREFIX).collect();
+                            let one = TYPE_PREFIX.to_string() + one.as_str();
+                            res.insert(RawOneOrMany::One(one), recursive)
+                        }
+
+                        OneOrMany::Many(many) => {
+                            let many = many
+                                .into_iter()
+                                .map(|s| {
+                                    s.chars()
+                                        .skip_while(|c| *c == TYPE_PREFIX)
+                                        .collect::<String>()
+                                })
+                                .map(|s| TYPE_PREFIX.to_string() + s.as_str())
+                                .collect();
+
+                            res.insert(RawOneOrMany::Many(many), recursive)
+                        }
                     };
                 }
 
-                SingleMap::Node(res)
+                FlattenedJsonMap::Node(res)
             }
         }
     }
@@ -169,8 +199,8 @@ impl Item {
         }
     }
 
-    fn into_single_map(self) -> SingleMap {
-        SingleMap::from(Property::Item(self))
+    fn into_flattened_json_map(self) -> FlattenedJsonMap {
+        FlattenedJsonMap::from(Property::Item(self))
     }
 }
 
@@ -241,7 +271,7 @@ pub fn parse(root: NodeRef) -> Vec<Item> {
 pub(crate) fn flattened_json(schemas: Vec<Item>) -> Result<FlattenedJson> {
     let single_maps: Vec<_> = schemas
         .into_iter()
-        .map(|item| item.into_single_map())
+        .map(|item| item.into_flattened_json_map())
         .collect();
     FlattenedJson::new(&single_maps)
 }
