@@ -70,7 +70,7 @@
         <AdjustVertical class="text-md" />
       </button>
     </div>
-    <div class="snippet text-sm font-normal text-neutral-focus [&>b]:font-bold">
+    <p class="snippet text-sm font-normal text-neutral-focus [&>b]:font-bold">
       {#if $summary}
         <Summary url={webpage.url} on:hide={() => clearSummary(webpage)} />
       {:else if webpage.richSnippet && webpage.richSnippet._type == 'stackOverflowQA'}
@@ -116,6 +116,6 @@
           </div>
         </div>
       {/if}
-    </div>
+    </p>
   </div>
 </span>
