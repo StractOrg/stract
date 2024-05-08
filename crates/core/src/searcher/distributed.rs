@@ -155,7 +155,7 @@ impl DistributedSearcher {
 
         match client
             .send(
-                &search_server::RetrieveWebsites {
+                search_server::RetrieveWebsites {
                     websites: pointers,
                     query: query.to_string(),
                 },
@@ -184,7 +184,7 @@ impl SearchClient for DistributedSearcher {
 
         if let Ok(res) = client
             .send(
-                &search_server::Search {
+                search_server::Search {
                     query: query.clone(),
                 },
                 &AllShardsSelector,
@@ -248,7 +248,7 @@ impl SearchClient for DistributedSearcher {
 
         let res = client
             .send(
-                &search_server::GetWebpage {
+                search_server::GetWebpage {
                     url: url.to_string(),
                 },
                 &AllShardsSelector,
@@ -274,7 +274,7 @@ impl SearchClient for DistributedSearcher {
 
         let res = client
             .send(
-                &search_server::GetHomepageDescriptions {
+                search_server::GetHomepageDescriptions {
                     urls: urls.to_vec(),
                 },
                 &AllShardsSelector,
@@ -305,7 +305,7 @@ impl SearchClient for DistributedSearcher {
 
         Ok(client
             .send(
-                &entity_search_server::GetEntityImage {
+                entity_search_server::GetEntityImage {
                     image_id: image_id.to_string(),
                     max_height,
                     max_width,
@@ -323,7 +323,7 @@ impl SearchClient for DistributedSearcher {
 
         client
             .send(
-                &entity_search_server::Search {
+                entity_search_server::Search {
                     query: query.to_string(),
                 },
                 &RandomReplicaSelector,

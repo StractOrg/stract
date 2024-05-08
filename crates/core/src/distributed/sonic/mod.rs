@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -14,13 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+pub mod connection_pool;
 pub mod replication;
 pub mod service;
 
-use std::{marker::PhantomData, time::Duration};
+pub use connection_pool::ConnectionPool;
 
+use std::{marker::PhantomData, task::Poll, time::Duration};
+
+use futures::future::poll_fn;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt, ReadBuf},
     net::{TcpListener, TcpStream, ToSocketAddrs},
 };
 
@@ -156,6 +160,16 @@ where
             Ok(res) => res,
             Err(_) => Err(Error::RequestTimeout),
         }
+    }
+
+    pub async fn is_closed(&self) -> bool {
+        poll_fn(
+            |cx| match self.stream.poll_peek(cx, &mut ReadBuf::new(&mut [0u8])) {
+                Poll::Ready(t) => Poll::Ready(t.is_err()),
+                Poll::Pending => Poll::Ready(false),
+            },
+        )
+        .await
     }
 }
 

@@ -23,8 +23,7 @@ use crate::OneOrMany;
 use super::Result;
 
 pub trait Service: Sized + Send + Sync + 'static {
-    type Request: bincode::Decode + Send + Sync;
-    type RequestRef<'a>: bincode::Encode + Send + Sync;
+    type Request: bincode::Encode + bincode::Decode + Send + Sync;
     type Response: bincode::Encode + bincode::Decode + Send + Sync;
 
     fn handle(
@@ -38,7 +37,7 @@ pub trait Message<S: Service> {
     fn handle(self, server: &S) -> impl std::future::Future<Output = Self::Response>;
 }
 pub trait Wrapper<S: Service>: Message<S> {
-    fn wrap_request_ref(req: &Self) -> S::RequestRef<'_>;
+    fn wrap_request(req: Self) -> S::Request;
     fn unwrap_response(res: S::Response) -> Option<Self::Response>;
 }
 
@@ -87,12 +86,12 @@ impl<S: Service> Server<S> {
     }
 }
 
-pub struct Connection<'a, S: Service> {
-    inner: super::Connection<OneOrMany<S::RequestRef<'a>>, OneOrMany<S::Response>>,
+pub struct Connection<S: Service> {
+    inner: super::Connection<OneOrMany<S::Request>, OneOrMany<S::Response>>,
 }
 
-impl<'a, S: Service> Connection<'a, S> {
-    pub async fn create(server: impl ToSocketAddrs) -> Result<Connection<'a, S>> {
+impl<S: Service> Connection<S> {
+    pub async fn create(server: impl ToSocketAddrs) -> Result<Connection<S>> {
         Ok(Connection {
             inner: super::Connection::create(server).await?,
         })
@@ -101,7 +100,7 @@ impl<'a, S: Service> Connection<'a, S> {
     pub async fn create_with_timeout(
         server: impl ToSocketAddrs,
         timeout: Duration,
-    ) -> Result<Connection<'a, S>> {
+    ) -> Result<Connection<S>> {
         Ok(Connection {
             inner: super::Connection::create_with_timeout(server, timeout).await?,
         })
@@ -111,19 +110,16 @@ impl<'a, S: Service> Connection<'a, S> {
         server: impl ToSocketAddrs + Clone,
         timeout: Duration,
         retry: impl Iterator<Item = Duration>,
-    ) -> Result<Connection<'a, S>> {
+    ) -> Result<Connection<S>> {
         Ok(Connection {
             inner: super::Connection::create_with_timeout_retry(server, timeout, retry).await?,
         })
     }
 
-    pub async fn send_without_timeout<R: Wrapper<S>>(
-        &mut self,
-        request: &'a R,
-    ) -> Result<R::Response> {
+    pub async fn send_without_timeout<R: Wrapper<S>>(&mut self, request: R) -> Result<R::Response> {
         Ok(R::unwrap_response(
             self.inner
-                .send_without_timeout(&OneOrMany::One(R::wrap_request_ref(request)))
+                .send_without_timeout(&OneOrMany::One(R::wrap_request(request)))
                 .await?
                 .one()
                 .expect("response is missing"),
@@ -131,10 +127,10 @@ impl<'a, S: Service> Connection<'a, S> {
         .unwrap())
     }
 
-    pub async fn send<R: Wrapper<S>>(&mut self, request: &'a R) -> Result<R::Response> {
+    pub async fn send<R: Wrapper<S>>(&mut self, request: R) -> Result<R::Response> {
         Ok(R::unwrap_response(
             self.inner
-                .send(&OneOrMany::One(R::wrap_request_ref(request)))
+                .send(&OneOrMany::One(R::wrap_request(request)))
                 .await?
                 .one()
                 .expect("response is missing"),
@@ -144,12 +140,12 @@ impl<'a, S: Service> Connection<'a, S> {
 
     pub async fn send_with_timeout<R: Wrapper<S>>(
         &mut self,
-        request: &'a R,
+        request: R,
         timeout: Duration,
     ) -> Result<R::Response> {
         Ok(R::unwrap_response(
             self.inner
-                .send_with_timeout(&OneOrMany::One(R::wrap_request_ref(request)), timeout)
+                .send_with_timeout(&OneOrMany::One(R::wrap_request(request)), timeout)
                 .await?
                 .one()
                 .expect("response is missing"),
@@ -157,9 +153,9 @@ impl<'a, S: Service> Connection<'a, S> {
         .unwrap())
     }
 
-    pub async fn batch_send_with_timeout<R: Wrapper<S>>(
+    pub async fn batch_send_with_timeout<R: Wrapper<S> + Clone>(
         &mut self,
-        requests: &'a [R],
+        requests: &[R],
         timeout: Duration,
     ) -> Result<Vec<R::Response>> {
         Ok(self
@@ -168,7 +164,7 @@ impl<'a, S: Service> Connection<'a, S> {
                 &OneOrMany::Many(
                     requests
                         .iter()
-                        .map(|req| R::wrap_request_ref(req))
+                        .map(|req| R::wrap_request(req.clone()))
                         .collect::<Vec<_>>(),
                 ),
                 timeout,
@@ -178,6 +174,10 @@ impl<'a, S: Service> Connection<'a, S> {
             .into_iter()
             .map(|res| R::unwrap_response(res).unwrap())
             .collect())
+    }
+
+    pub async fn is_closed(&self) -> bool {
+        self.inner.is_closed().await
     }
 }
 
@@ -190,13 +190,9 @@ macro_rules! sonic_service {
 
             use $crate::distributed::sonic;
 
-            #[derive(Debug, Clone, ::bincode::Decode)]
+            #[derive(Debug, Clone, ::bincode::Encode, ::bincode::Decode)]
             pub enum Request {
                 $($req(Box<$req>),)*
-            }
-            #[derive(Debug, Clone, ::bincode::Encode)]
-            pub enum RequestRef<'a> {
-                $($req(&'a $req),)*
             }
             #[derive(::bincode::Encode, ::bincode::Decode)]
             pub enum Response {
@@ -204,8 +200,8 @@ macro_rules! sonic_service {
             }
             $(
                 impl sonic::service::Wrapper<$service> for $req {
-                    fn wrap_request_ref(req: &Self) -> RequestRef {
-                        RequestRef::$req(req)
+                    fn wrap_request(req: Self) -> Request {
+                        Request::$req(Box::new(req))
                     }
                     fn unwrap_response(res: <$service as sonic::service::Service>::Response) -> Option<Self::Response> {
                         #[allow(irrefutable_let_patterns)]
@@ -219,7 +215,6 @@ macro_rules! sonic_service {
             )*
             impl sonic::service::Service for $service {
                 type Request = Request;
-                type RequestRef<'a> = RequestRef<'a>;
                 type Response = Response;
 
                 // NOTE: This is a workaround for the fact that async functions
@@ -253,6 +248,8 @@ mod tests {
 
     use std::{marker::PhantomData, net::SocketAddr, sync::atomic::AtomicI32};
 
+    use crate::distributed::sonic::{service, ConnectionPool};
+
     use super::{Server, Service, Wrapper};
     use futures::Future;
 
@@ -262,11 +259,16 @@ mod tests {
     }
 
     impl<S: Service> ConnectionBuilder<S> {
-        async fn send<R: Wrapper<S>>(&self, req: &R) -> Result<R::Response, anyhow::Error> {
-            Ok(super::Connection::create(self.addr)
-                .await?
-                .send(req)
-                .await?)
+        async fn conn(&self) -> Result<super::Connection<S>, anyhow::Error> {
+            Ok(super::Connection::create(self.addr).await?)
+        }
+
+        async fn send<R: Wrapper<S>>(&self, req: R) -> Result<R::Response, anyhow::Error> {
+            Ok(self.conn().await?.send(req).await?)
+        }
+
+        fn addr(&self) -> SocketAddr {
+            self.addr
         }
     }
 
@@ -370,20 +372,20 @@ mod tests {
             },
             |b| async move {
                 let val = b
-                    .send(&Change { amount: 15 })
+                    .send(Change { amount: 15 })
                     .await
                     .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
                 assert_eq!(val, 15);
                 let val = b
-                    .send(&Change { amount: 15 })
+                    .send(Change { amount: 15 })
                     .await
                     .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
                 assert_eq!(val, 30);
-                b.send(&Reset)
+                b.send(Reset)
                     .await
                     .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
                 let val = b
-                    .send(&Change { amount: 15 })
+                    .send(Change { amount: 15 })
                     .await
                     .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
                 assert_eq!(val, 15);
@@ -394,12 +396,84 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_connection_reuse() {
+        fixture(
+            CounterService {
+                counter: AtomicI32::new(0),
+            },
+            |b| async move {
+                let mut conn = b.conn().await.unwrap();
+
+                let val = conn
+                    .send(Change { amount: 15 })
+                    .await
+                    .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                assert_eq!(val, 15);
+
+                let val = conn
+                    .send(Change { amount: 15 })
+                    .await
+                    .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                assert_eq!(val, 30);
+
+                conn.send(Reset)
+                    .await
+                    .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+
+                // send in a new connection
+                let val = b
+                    .send(Change { amount: 15 })
+                    .await
+                    .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                assert_eq!(val, 15);
+
+                Ok(())
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_connection_pool() {
+        fixture(
+            CounterService {
+                counter: AtomicI32::new(0),
+            },
+            |b| async move {
+                let pool: ConnectionPool<service::Connection<CounterService>> =
+                    ConnectionPool::new(b.addr()).unwrap();
+
+                let val = pool
+                    .get()
+                    .await
+                    .unwrap()
+                    .send(Change { amount: 15 })
+                    .await
+                    .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                assert_eq!(val, 15);
+
+                let val = pool
+                    .get()
+                    .await
+                    .unwrap()
+                    .send(Change { amount: 15 })
+                    .await
+                    .map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                assert_eq!(val, 30);
+
+                Ok(())
+            },
+        )
+        .unwrap();
+    }
+
     proptest! {
         #[test]
         fn ref_serialization(a: Change) {
             fixture(CounterService { counter: AtomicI32::new(0) }, |conn| async move {
-                conn.send(&Reset).await.map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
-                let val = conn.send(&a).await.map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                conn.send(Reset).await.map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
+                let val = conn.send(a.clone()).await.map_err(|e| TestCaseError::Fail(e.to_string().into()))?;
                 prop_assert_eq!(val, a.amount);
                 Ok(())
             })?;

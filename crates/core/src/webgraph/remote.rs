@@ -113,7 +113,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &GetNode { node: id },
+                GetNode { node: id },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -158,7 +158,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &IngoingEdges { node, limit },
+                IngoingEdges { node, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -178,7 +178,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &RawIngoingEdges { node: id, limit },
+                RawIngoingEdges { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -202,7 +202,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &RawIngoingEdgesWithLabels { node: id, limit },
+                RawIngoingEdgesWithLabels { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -284,7 +284,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &OutgoingEdges { node, limit },
+                OutgoingEdges { node, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -304,7 +304,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &RawOutgoingEdges { node: id, limit },
+                RawOutgoingEdges { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -328,7 +328,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &RawOutgoingEdgesWithLabels { node: id, limit },
+                RawOutgoingEdgesWithLabels { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )

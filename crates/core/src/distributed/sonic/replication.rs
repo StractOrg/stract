@@ -104,7 +104,7 @@ where
         .await
     }
 
-    pub async fn send<R: sonic::service::Wrapper<S>>(&self, req: &R) -> Result<R::Response> {
+    pub async fn send<R: sonic::service::Wrapper<S> + Clone>(&self, req: R) -> Result<R::Response> {
         self.send_with_timeout_retry(
             req,
             Duration::from_secs(60),
@@ -113,7 +113,7 @@ where
         .await
     }
 
-    pub async fn batch_send<R: sonic::service::Wrapper<S>>(
+    pub async fn batch_send<R: sonic::service::Wrapper<S> + Clone>(
         &self,
         reqs: &[R],
     ) -> Result<Vec<R::Response>> {
@@ -125,16 +125,16 @@ where
         .await
     }
 
-    pub async fn send_with_timeout<R: sonic::service::Wrapper<S>>(
+    pub async fn send_with_timeout<R: sonic::service::Wrapper<S> + Clone>(
         &self,
-        req: &R,
+        req: R,
         timeout: Duration,
     ) -> Result<R::Response> {
         let mut conn = self.conn().await?;
         conn.send_with_timeout(req, timeout).await
     }
 
-    pub async fn batch_send_with_timeout<R: sonic::service::Wrapper<S>>(
+    pub async fn batch_send_with_timeout<R: sonic::service::Wrapper<S> + Clone>(
         &self,
         reqs: &[R],
         timeout: Duration,
@@ -143,15 +143,15 @@ where
         conn.batch_send_with_timeout(reqs, timeout).await
     }
 
-    pub async fn send_with_timeout_retry<R: sonic::service::Wrapper<S>>(
+    pub async fn send_with_timeout_retry<R: sonic::service::Wrapper<S> + Clone>(
         &self,
-        req: &R,
+        req: R,
         timeout: Duration,
         retry: impl Iterator<Item = Duration>,
     ) -> Result<R::Response> {
         let mut er = None;
         for backoff in retry {
-            match self.send_with_timeout(req, timeout).await {
+            match self.send_with_timeout(req.clone(), timeout).await {
                 Ok(r) => return Ok(r),
                 Err(e) => {
                     tracing::error!("Failed to send request: {:?}", e);
@@ -164,7 +164,7 @@ where
         Err(er.unwrap())
     }
 
-    pub async fn batch_send_with_timeout_retry<R: sonic::service::Wrapper<S>>(
+    pub async fn batch_send_with_timeout_retry<R: sonic::service::Wrapper<S> + Clone>(
         &self,
         reqs: &[R],
         timeout: Duration,
@@ -227,27 +227,27 @@ where
 
     async fn send_single<Req>(
         &self,
-        req: &Req,
+        req: Req,
         client: &RemoteClient<S>,
     ) -> Result<(SocketAddr, Req::Response)>
     where
-        Req: sonic::service::Wrapper<S>,
+        Req: sonic::service::Wrapper<S> + Clone,
     {
         Ok((client.addr(), client.send(req).await?))
     }
 
     pub async fn send<Req, Sel>(
         &self,
-        req: &Req,
+        req: Req,
         selector: &Sel,
     ) -> Result<Vec<(SocketAddr, Req::Response)>>
     where
-        Req: sonic::service::Wrapper<S>,
+        Req: sonic::service::Wrapper<S> + Clone,
         Sel: ReplicaSelector<S>,
     {
         let mut futures = Vec::new();
         for client in selector.select(&self.clients) {
-            futures.push(self.send_single(req, client));
+            futures.push(self.send_single(req.clone(), client));
         }
 
         let mut results = Vec::new();
@@ -269,7 +269,7 @@ where
         client: &RemoteClient<S>,
     ) -> Result<(SocketAddr, Vec<Req::Response>)>
     where
-        Req: sonic::service::Wrapper<S>,
+        Req: sonic::service::Wrapper<S> + Clone,
     {
         Ok((client.addr(), client.batch_send(reqs).await?))
     }
@@ -280,7 +280,7 @@ where
         selector: &Sel,
     ) -> Result<Vec<(SocketAddr, Vec<Req::Response>)>>
     where
-        Req: sonic::service::Wrapper<S>,
+        Req: sonic::service::Wrapper<S> + Clone,
         Sel: ReplicaSelector<S>,
     {
         let mut futures = Vec::new();
@@ -375,12 +375,12 @@ where
 
     async fn send_single<Req, Sel>(
         &self,
-        req: &Req,
+        req: Req,
         shard: &Shard<S, Id>,
         replica_selector: &Sel,
     ) -> Result<(Id, Vec<(SocketAddr, Req::Response)>)>
     where
-        Req: sonic::service::Wrapper<S>,
+        Req: sonic::service::Wrapper<S> + Clone,
         Sel: ReplicaSelector<S>,
     {
         Ok((
@@ -391,18 +391,18 @@ where
 
     pub async fn send<Req, SSel, RSel>(
         &self,
-        req: &Req,
+        req: Req,
         shard_selector: &SSel,
         replica_selector: &RSel,
     ) -> Result<Vec<(Id, Vec<(SocketAddr, Req::Response)>)>>
     where
-        Req: sonic::service::Wrapper<S>,
+        Req: sonic::service::Wrapper<S> + Clone,
         SSel: ShardSelector<S, Id>,
         RSel: ReplicaSelector<S>,
     {
         let mut futures = Vec::new();
         for shard in shard_selector.select(&self.shards) {
-            futures.push(self.send_single(req, shard, replica_selector));
+            futures.push(self.send_single(req.clone(), shard, replica_selector));
         }
 
         let mut results = Vec::new();
@@ -425,7 +425,7 @@ where
         replica_selector: &Sel,
     ) -> Result<(Id, Vec<(SocketAddr, Vec<Req::Response>)>)>
     where
-        Req: sonic::service::Wrapper<S>,
+        Req: sonic::service::Wrapper<S> + Clone,
         Sel: ReplicaSelector<S>,
     {
         Ok((
@@ -441,7 +441,7 @@ where
         replica_selector: &RSel,
     ) -> Result<Vec<(Id, Vec<(SocketAddr, Vec<Req::Response>)>)>>
     where
-        Req: sonic::service::Wrapper<S>,
+        Req: sonic::service::Wrapper<S> + Clone,
         SSel: ShardSelector<S, Id>,
         RSel: ReplicaSelector<S>,
     {

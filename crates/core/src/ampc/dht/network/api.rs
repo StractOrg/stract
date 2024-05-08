@@ -351,7 +351,7 @@ impl RemoteClient {
                 .as_ref()
                 .unwrap_or(&self.self_remote)
                 .send_with_timeout(
-                    &Set {
+                    Set {
                         table: table.clone(),
                         key: key.clone(),
                         value: value.clone(),
@@ -420,7 +420,7 @@ impl RemoteClient {
                 .as_ref()
                 .unwrap_or(&self.self_remote)
                 .send_with_timeout(
-                    &BatchSet {
+                    BatchSet {
                         table: table.clone(),
                         values: values.clone(),
                     },
@@ -482,7 +482,7 @@ impl RemoteClient {
             match self
                 .self_remote
                 .send_with_timeout(
-                    &Get {
+                    Get {
                         table: table.clone(),
                         key: key.clone(),
                     },
@@ -518,7 +518,7 @@ impl RemoteClient {
             match self
                 .self_remote
                 .send_with_timeout(
-                    &BatchGet {
+                    BatchGet {
                         table: table.clone(),
                         keys: keys.clone(),
                     },
@@ -556,7 +556,7 @@ impl RemoteClient {
                 .as_ref()
                 .unwrap_or(&self.self_remote)
                 .send_with_timeout(
-                    &DropTable {
+                    DropTable {
                         table: table.clone(),
                     },
                     Duration::from_secs(5),
@@ -621,7 +621,7 @@ impl RemoteClient {
                 .as_ref()
                 .unwrap_or(&self.self_remote)
                 .send_with_timeout(
-                    &CreateTable {
+                    CreateTable {
                         table: table.clone(),
                     },
                     Duration::from_secs(5),
@@ -685,7 +685,7 @@ impl RemoteClient {
                 .await
                 .as_ref()
                 .unwrap_or(&self.self_remote)
-                .send_with_timeout(&AllTables, Duration::from_secs(5))
+                .send_with_timeout(AllTables, Duration::from_secs(5))
                 .await;
 
             match res {
@@ -746,7 +746,7 @@ impl RemoteClient {
                 .as_ref()
                 .unwrap_or(&self.self_remote)
                 .send_with_timeout(
-                    &CloneTable {
+                    CloneTable {
                         from: from.clone(),
                         to: to.clone(),
                     },
@@ -820,7 +820,7 @@ impl RemoteClient {
                 .as_ref()
                 .unwrap_or(&self.self_remote)
                 .send_with_timeout(
-                    &Upsert {
+                    Upsert {
                         table: table.clone(),
                         key: key.clone(),
                         value: value.clone(),
@@ -896,7 +896,7 @@ impl RemoteClient {
                 .as_ref()
                 .unwrap_or(&self.self_remote)
                 .send_with_timeout(
-                    &BatchUpsert {
+                    BatchUpsert {
                         table: table.clone(),
                         upsert_fn: upsert.clone(),
                         values: values.clone(),
@@ -964,7 +964,7 @@ impl RemoteClient {
             let res = self
                 .self_remote
                 .send_with_timeout(
-                    &RangeGet {
+                    RangeGet {
                         table: table.clone(),
                         range: range.clone(),
                         limit,

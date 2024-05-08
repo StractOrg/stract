@@ -30,7 +30,7 @@ impl RemoteCoordinator {
         let mut conn = self.conn().await?;
 
         let response = conn
-            .send_with_timeout(&GetJob {}, Duration::from_secs(90))
+            .send_with_timeout(GetJob {}, Duration::from_secs(90))
             .await?;
 
         Ok(response)

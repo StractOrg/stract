@@ -169,7 +169,7 @@ async fn metrics(
 
     for backoff in retry {
         let res = client
-            .send_with_timeout(&rpc, Duration::from_secs(30))
+            .send_with_timeout(rpc.clone(), Duration::from_secs(30))
             .await;
 
         match res {
@@ -221,7 +221,7 @@ impl RemoteClient {
         E: std::error::Error,
     {
         let mut conn = self.raft_conn().await?;
-        conn.send_with_timeout(&rpc, option.soft_ttl())
+        conn.send_with_timeout(rpc, option.soft_ttl())
             .await
             .map_err(|e| match e {
                 sonic::Error::ConnectionTimeout | sonic::Error::RequestTimeout => {
@@ -250,7 +250,7 @@ impl RemoteClient {
                 .likely_leader
                 .read()
                 .await
-                .send_with_timeout(&rpc, Duration::from_secs(30))
+                .send_with_timeout(rpc.clone(), Duration::from_secs(30))
                 .await;
 
             match res {
@@ -309,7 +309,7 @@ impl RemoteClient {
                 .likely_leader
                 .read()
                 .await
-                .send_with_timeout(&rpc, Duration::from_secs(30))
+                .send_with_timeout(rpc.clone(), Duration::from_secs(30))
                 .await;
 
             match res {

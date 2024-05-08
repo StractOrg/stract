@@ -93,6 +93,7 @@ where
 
         Ok(())
     }
+
     fn handle(&mut self) -> Result<()> {
         block_on(self.async_handle())
     }
