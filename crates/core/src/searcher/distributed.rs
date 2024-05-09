@@ -19,8 +19,9 @@ use crate::{
         cluster::Cluster,
         member::{Service, ShardId},
         sonic::replication::{
-            AllShardsSelector, RandomReplicaSelector, RemoteClient, ReplicatedClient, Shard,
-            ShardIdentifier, ShardedClient, SpecificShardSelector,
+            AllShardsSelector, RandomReplicaSelector, RemoteClient, ReplicatedClient,
+            ReusableClientManager, ReusableShardedClient, Shard, ShardIdentifier, ShardedClient,
+            SpecificShardSelector,
         },
     },
     entity_index::EntityMatch,
@@ -42,9 +43,12 @@ use futures::future::join_all;
 use itertools::Itertools;
 use std::future::Future;
 use thiserror::Error;
+use tokio::sync::Mutex;
 use url::Url;
 
 use super::{InitialWebsiteResult, LocalSearcher, SearchQuery};
+
+const CLIENT_REFRESH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -104,18 +108,18 @@ pub struct InitialSearchResultShard {
     pub shard: ShardId,
 }
 
-pub struct DistributedSearcher {
-    cluster: Arc<Cluster>,
-}
+struct SearchClientManager;
 
-impl DistributedSearcher {
-    pub fn new(cluster: Arc<Cluster>) -> Self {
-        Self { cluster }
-    }
+impl ReusableClientManager for SearchClientManager {
+    const CLIENT_REFRESH_INTERVAL: std::time::Duration = CLIENT_REFRESH_INTERVAL;
 
-    async fn client(&self) -> ShardedClient<SearchService, ShardId> {
+    type Service = SearchService;
+
+    type ShardId = ShardId;
+
+    async fn new_client(&self, cluster: &Cluster) -> ShardedClient<Self::Service, Self::ShardId> {
         let mut shards = HashMap::new();
-        for member in self.cluster.members().await {
+        for member in cluster.members().await {
             if let Service::Searcher { host, shard } = member.service {
                 shards.entry(shard).or_insert_with(Vec::new).push(host);
             }
@@ -132,16 +136,57 @@ impl DistributedSearcher {
 
         ShardedClient::new(shard_clients)
     }
+}
 
-    async fn entity_client(&self) -> ReplicatedClient<entity_search_server::SearchService> {
+struct EntitySearchClientManager;
+
+impl ReusableClientManager for EntitySearchClientManager {
+    const CLIENT_REFRESH_INTERVAL: std::time::Duration = CLIENT_REFRESH_INTERVAL;
+
+    type Service = entity_search_server::SearchService;
+    type ShardId = ();
+
+    async fn new_client(&self, cluster: &Cluster) -> ShardedClient<Self::Service, Self::ShardId> {
         let mut replicas = Vec::new();
-        for member in self.cluster.members().await {
+        for member in cluster.members().await {
             if let Service::EntitySearcher { host } = member.service {
                 replicas.push(RemoteClient::new(host));
             }
         }
 
-        ReplicatedClient::new(replicas)
+        let rep = ReplicatedClient::new(replicas);
+
+        if !rep.is_empty() {
+            ShardedClient::new(vec![Shard::new((), rep)])
+        } else {
+            ShardedClient::new(vec![])
+        }
+    }
+}
+
+pub struct DistributedSearcher {
+    client: Mutex<ReusableShardedClient<SearchClientManager>>,
+    entiy_client: Mutex<ReusableShardedClient<EntitySearchClientManager>>,
+}
+
+impl DistributedSearcher {
+    pub async fn new(cluster: Arc<Cluster>) -> Self {
+        Self {
+            client: Mutex::new(
+                ReusableShardedClient::new(cluster.clone(), SearchClientManager).await,
+            ),
+            entiy_client: Mutex::new(
+                ReusableShardedClient::new(cluster, EntitySearchClientManager).await,
+            ),
+        }
+    }
+
+    async fn conn(&self) -> Arc<ShardedClient<SearchService, ShardId>> {
+        self.client.lock().await.conn().await
+    }
+
+    async fn entity_conn(&self) -> Arc<ShardedClient<entity_search_server::SearchService, ()>> {
+        self.entiy_client.lock().await.conn().await
     }
 
     async fn retrieve_webpages_from_shard(
@@ -179,7 +224,7 @@ impl DistributedSearcher {
 
 impl SearchClient for DistributedSearcher {
     async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultShard> {
-        let client = self.client().await;
+        let client = self.conn().await;
         let mut results = Vec::new();
 
         if let Ok(res) = client
@@ -222,7 +267,7 @@ impl SearchClient for DistributedSearcher {
             rankings.insert(*i, pointer.website.clone());
         }
 
-        let client = self.client().await;
+        let client = self.conn().await;
         let mut futures = Vec::new();
         for (shard, pointers) in pointers {
             futures.push(self.retrieve_webpages_from_shard(shard, &client, query, pointers));
@@ -244,7 +289,7 @@ impl SearchClient for DistributedSearcher {
     }
 
     async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        let client = self.client().await;
+        let client = self.conn().await;
 
         let res = client
             .send(
@@ -270,7 +315,7 @@ impl SearchClient for DistributedSearcher {
     }
 
     async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
-        let client = self.client().await;
+        let client = self.conn().await;
 
         let res = client
             .send(
@@ -301,7 +346,7 @@ impl SearchClient for DistributedSearcher {
         max_height: Option<u64>,
         max_width: Option<u64>,
     ) -> Result<Option<Image>> {
-        let client = self.entity_client().await;
+        let client = self.entity_conn().await;
 
         Ok(client
             .send(
@@ -310,27 +355,31 @@ impl SearchClient for DistributedSearcher {
                     max_height,
                     max_width,
                 },
+                &AllShardsSelector,
                 &RandomReplicaSelector,
             )
             .await
             .map_err(|_| Error::SearchFailed)?
             .pop()
+            .and_then(|(_, mut v)| v.pop())
             .and_then(|(_, v)| v))
     }
 
     async fn search_entity(&self, query: &str) -> Option<EntityMatch> {
-        let client = self.entity_client().await;
+        let client = self.entity_conn().await;
 
         client
             .send(
                 entity_search_server::Search {
                     query: query.to_string(),
                 },
+                &AllShardsSelector,
                 &RandomReplicaSelector,
             )
             .await
             .ok()?
             .pop()
+            .and_then(|(_, mut v)| v.pop())
             .and_then(|(_, v)| v)
     }
 }

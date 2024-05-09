@@ -17,6 +17,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
+    ops::DerefMut,
     time::Duration,
 };
 
@@ -203,7 +204,10 @@ impl RemoteClient {
     }
     async fn raft_conn<E: std::error::Error>(
         &self,
-    ) -> Result<Connection<Server>, crate::bincode_utils::SerdeCompat<RPCError<E>>> {
+    ) -> Result<
+        impl DerefMut<Target = Connection<Server>>,
+        crate::bincode_utils::SerdeCompat<RPCError<E>>,
+    > {
         self.inner.conn().await.map_err(|e| {
             crate::bincode_utils::SerdeCompat(RPCError::Unreachable(
                 openraft::error::Unreachable::new(&e),
@@ -284,7 +288,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -343,7 +347,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest

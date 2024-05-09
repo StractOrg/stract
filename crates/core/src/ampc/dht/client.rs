@@ -33,9 +33,57 @@ use super::{
     UpsertAction,
 };
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug)]
 pub struct Node {
     api: api::RemoteClient,
+}
+
+impl bincode::Encode for Node {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> std::prelude::v1::Result<(), bincode::error::EncodeError> {
+        let addr = self.api.addr();
+        addr.encode(encoder)
+    }
+}
+
+impl bincode::Decode for Node {
+    fn decode<D: bincode::de::Decoder>(
+        decoder: &mut D,
+    ) -> std::prelude::v1::Result<Self, bincode::error::DecodeError> {
+        let addr = SocketAddr::decode(decoder)?;
+        Ok(Self::new(addr))
+    }
+}
+
+impl<'de> bincode::BorrowDecode<'de> for Node {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
+        decoder: &mut D,
+    ) -> std::prelude::v1::Result<Self, bincode::error::DecodeError> {
+        let addr = SocketAddr::borrow_decode(decoder)?;
+        Ok(Self::new(addr))
+    }
+}
+
+impl serde::Serialize for Node {
+    fn serialize<S>(&self, serializer: S) -> std::prelude::v1::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let addr = self.api.addr();
+        addr.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Node {
+    fn deserialize<D>(deserializer: D) -> std::prelude::v1::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let addr = SocketAddr::deserialize(deserializer)?;
+        Ok(Self::new(addr))
+    }
 }
 
 impl Clone for Node {

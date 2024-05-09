@@ -31,7 +31,19 @@ pub struct ConnectionPool<C>
 where
     C: Connection,
 {
+    addr: SocketAddr,
     pool: managed::Pool<C::Manager>,
+}
+
+impl<C> std::fmt::Debug for ConnectionPool<C>
+where
+    C: Connection,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConnectionPool")
+            .field("addr", &self.addr)
+            .finish()
+    }
 }
 
 impl<C> ConnectionPool<C>
@@ -42,7 +54,7 @@ where
         let manager = C::new_manager(addr);
         let pool = managed::Pool::builder(manager).build()?;
 
-        Ok(Self { pool })
+        Ok(Self { addr, pool })
     }
 
     pub async fn get(&self) -> Result<managed::Object<C::Manager>> {

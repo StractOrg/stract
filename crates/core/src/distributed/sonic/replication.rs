@@ -18,44 +18,17 @@ use futures::future::join_all;
 use rand::seq::IteratorRandom;
 
 use super::Result;
-use crate::distributed::{retry_strategy::ExponentialBackoff, sonic};
-use std::{net::SocketAddr, time::Duration};
+use crate::distributed::{cluster::Cluster, retry_strategy::ExponentialBackoff, sonic};
+use std::{net::SocketAddr, ops::DerefMut, sync::Arc, time::Duration};
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct RemoteClient<S> {
+#[derive(Debug)]
+pub struct RemoteClient<S>
+where
+    S: sonic::service::Service,
+{
     addr: SocketAddr,
+    pool: sonic::ConnectionPool<sonic::service::Connection<S>>,
     _phantom: std::marker::PhantomData<S>,
-}
-
-impl<S> bincode::Encode for RemoteClient<S> {
-    fn encode<E: bincode::enc::Encoder>(
-        &self,
-        encoder: &mut E,
-    ) -> Result<(), bincode::error::EncodeError> {
-        self.addr.encode(encoder)
-    }
-}
-
-impl<S> bincode::Decode for RemoteClient<S> {
-    fn decode<D: bincode::de::Decoder>(
-        decoder: &mut D,
-    ) -> Result<Self, bincode::error::DecodeError> {
-        Ok(Self {
-            addr: SocketAddr::decode(decoder)?,
-            _phantom: std::marker::PhantomData,
-        })
-    }
-}
-
-impl<'de, S> bincode::BorrowDecode<'de> for RemoteClient<S> {
-    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
-        decoder: &mut D,
-    ) -> Result<Self, bincode::error::DecodeError> {
-        Ok(Self {
-            addr: SocketAddr::borrow_decode(decoder)?,
-            _phantom: std::marker::PhantomData,
-        })
-    }
 }
 
 impl<S> Clone for RemoteClient<S>
@@ -78,6 +51,7 @@ where
     pub fn create(addr: SocketAddr) -> Self {
         Self {
             addr,
+            pool: sonic::ConnectionPool::new(addr).unwrap(),
             _phantom: std::marker::PhantomData,
         }
     }
@@ -91,17 +65,11 @@ impl<S> RemoteClient<S>
 where
     S: sonic::service::Service,
 {
-    pub async fn conn(&self) -> Result<sonic::service::Connection<S>> {
-        let retry = ExponentialBackoff::from_millis(30)
-            .with_limit(Duration::from_millis(200))
-            .take(5);
-
-        sonic::service::Connection::create_with_timeout_retry(
-            self.addr,
-            Duration::from_secs(30),
-            retry,
-        )
-        .await
+    pub async fn conn(&self) -> Result<impl DerefMut<Target = sonic::service::Connection<S>>> {
+        self.pool
+            .get()
+            .await
+            .map_err(|_| crate::distributed::sonic::Error::PoolGet)
     }
 
     pub async fn send<R: sonic::service::Wrapper<S> + Clone>(&self, req: R) -> Result<R::Response> {
@@ -225,6 +193,10 @@ where
         Self { clients }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.clients.is_empty()
+    }
+
     async fn send_single<Req>(
         &self,
         req: Req,
@@ -304,6 +276,8 @@ where
 
 pub trait ShardIdentifier: PartialEq + Eq + Clone {}
 
+impl ShardIdentifier for () {}
+
 pub trait ShardSelector<S: sonic::service::Service, Id: ShardIdentifier> {
     fn select<'a>(&self, shards: &'a [Shard<S, Id>]) -> Vec<&'a Shard<S, Id>>;
 }
@@ -371,6 +345,10 @@ where
 {
     pub fn new(shards: Vec<Shard<S, Id>>) -> Self {
         Self { shards }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.shards.is_empty()
     }
 
     async fn send_single<Req, Sel>(
@@ -461,5 +439,54 @@ where
         }
 
         Ok(results)
+    }
+}
+
+pub trait ReusableClientManager {
+    const CLIENT_REFRESH_INTERVAL: Duration;
+
+    type Service: sonic::service::Service;
+    type ShardId: ShardIdentifier;
+
+    fn new_client(
+        &self,
+        cluster: &Cluster,
+    ) -> impl std::future::Future<Output = ShardedClient<Self::Service, Self::ShardId>>;
+}
+
+pub struct ReusableShardedClient<M>
+where
+    M: ReusableClientManager,
+{
+    cluster: Arc<Cluster>,
+    client: Arc<sonic::replication::ShardedClient<M::Service, M::ShardId>>,
+    last_client_update: std::time::Instant,
+    manager: M,
+}
+
+impl<M> ReusableShardedClient<M>
+where
+    M: ReusableClientManager,
+{
+    pub async fn new(cluster: Arc<Cluster>, manager: M) -> Self {
+        let client = Arc::new(manager.new_client(&cluster).await);
+        let last_client_update = std::time::Instant::now();
+
+        Self {
+            cluster,
+            client,
+            last_client_update,
+            manager,
+        }
+    }
+
+    pub async fn conn(&mut self) -> Arc<sonic::replication::ShardedClient<M::Service, M::ShardId>> {
+        if self.client.is_empty() || self.last_client_update.elapsed() > M::CLIENT_REFRESH_INTERVAL
+        {
+            self.client = Arc::new(self.manager.new_client(&self.cluster).await);
+            self.last_client_update = std::time::Instant::now();
+        }
+
+        self.client.clone()
     }
 }

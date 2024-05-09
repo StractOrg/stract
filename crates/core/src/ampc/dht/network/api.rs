@@ -283,44 +283,9 @@ impl std::fmt::Debug for RemoteClient {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
 pub struct RemoteClient {
     self_remote: sonic::replication::RemoteClient<Server>,
-    #[serde(skip)]
     likely_leader: RwLock<Option<sonic::replication::RemoteClient<Server>>>,
-}
-
-impl bincode::Encode for RemoteClient {
-    fn encode<E: bincode::enc::Encoder>(
-        &self,
-        encoder: &mut E,
-    ) -> Result<(), bincode::error::EncodeError> {
-        self.self_remote.encode(encoder)
-    }
-}
-
-impl bincode::Decode for RemoteClient {
-    fn decode<D: bincode::de::Decoder>(
-        decoder: &mut D,
-    ) -> Result<Self, bincode::error::DecodeError> {
-        let self_remote = sonic::replication::RemoteClient::decode(decoder)?;
-        Ok(Self {
-            self_remote,
-            likely_leader: RwLock::new(None),
-        })
-    }
-}
-
-impl<'de> bincode::BorrowDecode<'de> for RemoteClient {
-    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
-        decoder: &mut D,
-    ) -> Result<Self, bincode::error::DecodeError> {
-        let self_remote = sonic::replication::RemoteClient::borrow_decode(decoder)?;
-        Ok(Self {
-            self_remote,
-            likely_leader: RwLock::new(None),
-        })
-    }
 }
 
 impl RemoteClient {
@@ -393,7 +358,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -461,7 +426,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -495,7 +460,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -531,7 +496,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -596,7 +561,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -661,7 +626,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -721,7 +686,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -787,7 +752,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -863,7 +828,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -938,7 +903,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -981,7 +946,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest

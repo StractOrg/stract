@@ -43,8 +43,8 @@ pub enum Error {
     #[error("Failed to get response for request: connection timeout")]
     RequestTimeout,
 
-    #[error("Could not build connection pool")]
-    PoolCreation,
+    #[error("Could not get connection from pool")]
+    PoolGet,
 
     #[error("The request could not be processed")]
     BadRequest,

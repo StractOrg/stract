@@ -150,7 +150,10 @@ impl Webgraph {
             ),
             IndexingGraphConfig::Remote { gossip } => {
                 let cluster = crate::start_gossip_cluster_thread(gossip.clone(), None);
-                Self::Remote(RemoteWebgraph::new(cluster, WebgraphGranularity::Page))
+                Self::Remote(crate::block_on(RemoteWebgraph::new(
+                    cluster,
+                    WebgraphGranularity::Page,
+                )))
             }
         }
     }
