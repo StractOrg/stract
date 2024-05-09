@@ -17,6 +17,7 @@
 use std::sync::Arc;
 
 use itertools::Itertools;
+use tokio::sync::Mutex;
 use url::Url;
 
 use crate::{
@@ -40,22 +41,21 @@ use crate::{
 
 use super::{Edge, EdgeLimit, FullEdge, Node, NodeID};
 
-pub struct RemoteWebgraph {
+struct WebgraphClientManager {
     granularity: WebgraphGranularity,
-    cluster: Arc<Cluster>,
 }
 
-impl RemoteWebgraph {
-    pub fn new(cluster: Arc<Cluster>, granularity: WebgraphGranularity) -> Self {
-        Self {
-            cluster,
-            granularity,
-        }
-    }
+impl sonic::replication::ReusableClientManager for WebgraphClientManager {
+    const CLIENT_REFRESH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 
-    async fn conn(&self) -> sonic::replication::ShardedClient<WebGraphService, ShardId> {
-        let shards = self
-            .cluster
+    type Service = WebGraphService;
+    type ShardId = ShardId;
+
+    async fn new_client(
+        &self,
+        cluster: &Cluster,
+    ) -> sonic::replication::ShardedClient<Self::Service, Self::ShardId> {
+        let shards = cluster
             .members()
             .await
             .into_iter()
@@ -87,6 +87,26 @@ impl RemoteWebgraph {
 
         sonic::replication::ShardedClient::new(shards)
     }
+}
+
+pub struct RemoteWebgraph {
+    client: Mutex<sonic::replication::ReusableShardedClient<WebgraphClientManager>>,
+}
+
+impl RemoteWebgraph {
+    pub async fn new(cluster: Arc<Cluster>, granularity: WebgraphGranularity) -> Self {
+        let manager = WebgraphClientManager { granularity };
+
+        Self {
+            client: Mutex::new(
+                sonic::replication::ReusableShardedClient::new(cluster, manager).await,
+            ),
+        }
+    }
+
+    async fn conn(&self) -> Arc<sonic::replication::ShardedClient<WebGraphService, ShardId>> {
+        self.client.lock().await.conn().await
+    }
 
     pub async fn knows(&self, mut host: String) -> Result<Option<Node>> {
         if let Some(suf) = host.strip_prefix("http://") {
@@ -113,7 +133,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &GetNode { node: id },
+                GetNode { node: id },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -158,7 +178,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &IngoingEdges { node, limit },
+                IngoingEdges { node, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -178,7 +198,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &RawIngoingEdges { node: id, limit },
+                RawIngoingEdges { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -202,7 +222,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &RawIngoingEdgesWithLabels { node: id, limit },
+                RawIngoingEdgesWithLabels { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -284,7 +304,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &OutgoingEdges { node, limit },
+                OutgoingEdges { node, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -304,7 +324,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &RawOutgoingEdges { node: id, limit },
+                RawOutgoingEdges { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )
@@ -328,7 +348,7 @@ impl RemoteWebgraph {
             .conn()
             .await
             .send(
-                &RawOutgoingEdgesWithLabels { node: id, limit },
+                RawOutgoingEdgesWithLabels { node: id, limit },
                 &AllShardsSelector,
                 &RandomReplicaSelector,
             )

@@ -184,11 +184,11 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
     );
 
     let host_webgraph =
-        RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Host);
+        RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Host).await;
     let page_webgraph =
-        RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Page);
+        RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Page).await;
 
-    let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster));
+    let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster)).await;
     let live_searcher = LiveSearcher::new(Arc::clone(&cluster));
 
     let state = {

@@ -92,7 +92,7 @@ impl LiveSearcher {
 
         match client
             .send(
-                &search_server::RetrieveWebsites {
+                search_server::RetrieveWebsites {
                     websites: pointers,
                     query: query.to_string(),
                 },
@@ -121,7 +121,7 @@ impl SearchClient for LiveSearcher {
 
         if let Ok(res) = client
             .send(
-                &search_server::Search {
+                search_server::Search {
                     query: query.clone(),
                 },
                 &AllShardsSelector,

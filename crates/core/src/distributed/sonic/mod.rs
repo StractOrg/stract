@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -14,13 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+pub mod connection_pool;
 pub mod replication;
 pub mod service;
 
-use std::{marker::PhantomData, time::Duration};
+pub use connection_pool::ConnectionPool;
 
+use std::{marker::PhantomData, task::Poll, time::Duration};
+
+use futures::future::poll_fn;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt, ReadBuf},
     net::{TcpListener, TcpStream, ToSocketAddrs},
 };
 
@@ -39,8 +43,8 @@ pub enum Error {
     #[error("Failed to get response for request: connection timeout")]
     RequestTimeout,
 
-    #[error("Could not build connection pool")]
-    PoolCreation,
+    #[error("Could not get connection from pool")]
+    PoolGet,
 
     #[error("The request could not be processed")]
     BadRequest,
@@ -109,7 +113,7 @@ where
         }
     }
 
-    async fn send_without_timeout(mut self, request: &Req) -> Result<Res> {
+    async fn send_without_timeout(&mut self, request: &Req) -> Result<Res> {
         let bytes = bincode::encode_to_vec(request, bincode::config::standard()).unwrap();
 
         // disable linger to avoid TIME_WAIT.
@@ -139,7 +143,6 @@ where
         let mut buf = vec![0; header.body_size];
         self.stream.read_exact(&mut buf).await?;
         self.stream.flush().await?;
-        self.stream.shutdown().await?;
 
         tracing::debug!("deserializing {:?}", std::any::type_name::<(Req, Res)>());
         let (res, _) = bincode::decode_from_slice(&buf, bincode::config::standard()).unwrap();
@@ -147,16 +150,26 @@ where
         Ok(res)
     }
 
-    pub async fn send(self, request: &Req) -> Result<Res> {
+    pub async fn send(&mut self, request: &Req) -> Result<Res> {
         self.send_with_timeout(request, Duration::from_secs(90))
             .await
     }
 
-    pub async fn send_with_timeout(self, request: &Req, timeout: Duration) -> Result<Res> {
+    pub async fn send_with_timeout(&mut self, request: &Req, timeout: Duration) -> Result<Res> {
         match tokio::time::timeout(timeout, self.send_without_timeout(request)).await {
             Ok(res) => res,
             Err(_) => Err(Error::RequestTimeout),
         }
+    }
+
+    pub async fn is_closed(&self) -> bool {
+        poll_fn(
+            |cx| match self.stream.poll_peek(cx, &mut ReadBuf::new(&mut [0u8])) {
+                Poll::Ready(t) => Poll::Ready(t.is_err()),
+                Poll::Pending => Poll::Ready(false),
+            },
+        )
+        .await
     }
 }
 
@@ -183,9 +196,33 @@ where
         })
     }
 
-    async fn parse_incoming_stream(&self, mut stream: TcpStream) -> Result<Request<Req, Res>> {
+    pub async fn accept(&self) -> Result<ServerConnection<Req, Res>> {
+        let (stream, client) = self.listener.accept().await?;
+        tracing::debug!(?client, "accepted connection");
+
+        Ok(ServerConnection::new(stream))
+    }
+}
+
+pub struct ServerConnection<Req, Res> {
+    stream: TcpStream,
+    marker: PhantomData<(Req, Res)>,
+}
+
+impl<Req, Res> ServerConnection<Req, Res>
+where
+    Req: bincode::Decode,
+{
+    fn new(stream: TcpStream) -> Self {
+        ServerConnection {
+            stream,
+            marker: PhantomData,
+        }
+    }
+
+    pub async fn request(&mut self) -> Result<Request<'_, Req, Res>> {
         let mut header_buf = vec![0; std::mem::size_of::<Header>()];
-        stream.read_exact(&mut header_buf).await?;
+        self.stream.read_exact(&mut header_buf).await?;
         let header: Header = *bytemuck::from_bytes(&header_buf);
 
         if header.body_size > MAX_BODY_SIZE_BYTES {
@@ -197,52 +234,38 @@ where
 
         let mut buf = vec![0; header.body_size];
 
-        stream.read_exact(&mut buf).await?;
+        self.stream.read_exact(&mut buf).await?;
 
         let (body, _) = bincode::decode_from_slice(&buf, bincode::config::standard()).unwrap();
 
         Ok(Request {
-            stream,
+            conn: self,
             body: Some(body),
-            marker: PhantomData,
         })
     }
-
-    pub async fn accept(&self) -> Result<Request<Req, Res>> {
-        let (stream, client) = self.listener.accept().await?;
-        tracing::debug!(?client, "accepted connection");
-
-        tokio::time::timeout(Duration::from_secs(60), self.parse_incoming_stream(stream))
-            .await
-            .map_err(|_| Error::ConnectionTimeout)?
-    }
 }
 
-pub struct Request<Req, Res> {
-    stream: TcpStream,
+pub struct Request<'a, Req, Res> {
+    conn: &'a mut ServerConnection<Req, Res>,
     body: Option<Req>,
-    marker: PhantomData<(Req, Res)>,
 }
 
-impl<Req, Res> Request<Req, Res>
+impl<'a, Req, Res> Request<'a, Req, Res>
 where
     Res: bincode::Encode,
 {
-    async fn respond_without_timeout(mut self, response: Res) -> Result<()> {
+    async fn respond_without_timeout(self, response: Res) -> Result<()> {
         let bytes = bincode::encode_to_vec(&response, bincode::config::standard()).unwrap();
         let header = Header {
             body_size: bytes.len(),
         };
 
-        self.stream.write_all(bytemuck::bytes_of(&header)).await?;
-        self.stream.write_all(&bytes).await?;
-        self.stream.flush().await?;
-
-        // wait for client to close connection
-        let mut buf: [u8; 1] = [0];
-        tokio::time::timeout(Duration::from_secs(5), self.stream.read_exact(&mut buf))
-            .await
-            .ok();
+        self.conn
+            .stream
+            .write_all(bytemuck::bytes_of(&header))
+            .await?;
+        self.conn.stream.write_all(&bytes).await?;
+        self.conn.stream.flush().await?;
 
         Ok(())
     }
@@ -319,12 +342,13 @@ mod tests {
             let (a2, b2) = (a1.clone(), b1.clone());
             let (svr_res, con_res) = fixture(
                 |svr| async move {
-                    let req = svr.accept().await?;
+                    let mut conn = svr.accept().await?;
+                    let req = conn.request().await?;
                     prop_assert_eq!(req.body(), &a1);
                     req.respond(b1).await?;
                     Ok(())
                 },
-                |con| async move {
+                |mut con| async move {
                     let res = con.send(&a2).await?;
                     prop_assert_eq!(res, b2);
                     Ok(())

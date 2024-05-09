@@ -96,9 +96,9 @@ impl WorkerThread {
 
     pub async fn run(self) {
         loop {
-            let conn = self.router_conn().await.unwrap();
+            let mut conn = self.router_conn().await.unwrap();
             let res = conn
-                .send_with_timeout(&NewJob {}, Duration::from_secs(90))
+                .send_with_timeout(NewJob {}, Duration::from_secs(90))
                 .await;
 
             match res {

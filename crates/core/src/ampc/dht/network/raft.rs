@@ -17,6 +17,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
+    ops::DerefMut,
     time::Duration,
 };
 
@@ -169,7 +170,7 @@ async fn metrics(
 
     for backoff in retry {
         let res = client
-            .send_with_timeout(&rpc, Duration::from_secs(30))
+            .send_with_timeout(rpc.clone(), Duration::from_secs(30))
             .await;
 
         match res {
@@ -203,7 +204,10 @@ impl RemoteClient {
     }
     async fn raft_conn<E: std::error::Error>(
         &self,
-    ) -> Result<Connection<Server>, crate::bincode_utils::SerdeCompat<RPCError<E>>> {
+    ) -> Result<
+        impl DerefMut<Target = Connection<Server>>,
+        crate::bincode_utils::SerdeCompat<RPCError<E>>,
+    > {
         self.inner.conn().await.map_err(|e| {
             crate::bincode_utils::SerdeCompat(RPCError::Unreachable(
                 openraft::error::Unreachable::new(&e),
@@ -220,8 +224,8 @@ impl RemoteClient {
         R: sonic::service::Wrapper<Server>,
         E: std::error::Error,
     {
-        let conn = self.raft_conn().await?;
-        conn.send_with_timeout(&rpc, option.soft_ttl())
+        let mut conn = self.raft_conn().await?;
+        conn.send_with_timeout(rpc, option.soft_ttl())
             .await
             .map_err(|e| match e {
                 sonic::Error::ConnectionTimeout | sonic::Error::RequestTimeout => {
@@ -250,7 +254,7 @@ impl RemoteClient {
                 .likely_leader
                 .read()
                 .await
-                .send_with_timeout(&rpc, Duration::from_secs(30))
+                .send_with_timeout(rpc.clone(), Duration::from_secs(30))
                 .await;
 
             match res {
@@ -284,7 +288,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest
@@ -309,7 +313,7 @@ impl RemoteClient {
                 .likely_leader
                 .read()
                 .await
-                .send_with_timeout(&rpc, Duration::from_secs(30))
+                .send_with_timeout(rpc.clone(), Duration::from_secs(30))
                 .await;
 
             match res {
@@ -343,7 +347,7 @@ impl RemoteClient {
                     sonic::Error::IO(_)
                     | sonic::Error::ConnectionTimeout
                     | sonic::Error::RequestTimeout
-                    | sonic::Error::PoolCreation => {
+                    | sonic::Error::PoolGet => {
                         tokio::time::sleep(backoff).await;
                     }
                     sonic::Error::BadRequest

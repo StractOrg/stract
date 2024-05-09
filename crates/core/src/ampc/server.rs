@@ -38,47 +38,64 @@ impl<W> Server<W>
 where
     W: Worker + 'static,
 {
-    fn handle(&mut self) -> Result<()> {
-        let req = block_on(self.conn.accept())?;
+    async fn async_handle(&mut self) -> Result<()> {
+        let mut conn = self.conn.accept().await?;
+        while let Ok(req) = conn.request().await {
+            match req.body().clone() {
+                Req::Coordinator(coord_req) => {
+                    let res = match coord_req {
+                        CoordReq::CurrentJob => Resp::Coordinator(CoordResp::CurrentJob(
+                            self.current_job.lock().unwrap().clone(),
+                        )),
+                        CoordReq::ScheduleJob { job, mapper } => {
+                            *self.current_job.lock().unwrap() = Some(job.clone());
+                            let worker = Arc::clone(&self.worker);
+                            let dht = self.dht.clone();
 
-        match req.body().clone() {
-            Req::Coordinator(coord_req) => {
-                let res = match coord_req {
-                    CoordReq::CurrentJob => Resp::Coordinator(CoordResp::CurrentJob(
-                        self.current_job.lock().unwrap().clone(),
-                    )),
-                    CoordReq::ScheduleJob { job, mapper } => {
-                        *self.current_job.lock().unwrap() = Some(job.clone());
-                        let worker = Arc::clone(&self.worker);
-                        let dht = self.dht.clone();
+                            let current_job = Arc::clone(&self.current_job);
+                            std::thread::spawn(move || {
+                                mapper.map(
+                                    job.clone(),
+                                    &worker,
+                                    dht.as_ref().expect("DHT not set"),
+                                );
+                                current_job.lock().unwrap().take();
+                            });
 
-                        let current_job = Arc::clone(&self.current_job);
-                        std::thread::spawn(move || {
-                            mapper.map(job.clone(), &worker, dht.as_ref().expect("DHT not set"));
-                            current_job.lock().unwrap().take();
-                        });
+                            Resp::Coordinator(CoordResp::ScheduleJob(()))
+                        }
+                        CoordReq::Setup { dht } => {
+                            self.dht = Some(Arc::new(dht));
+                            Resp::Coordinator(CoordResp::Setup(()))
+                        }
+                    };
 
-                        Resp::Coordinator(CoordResp::ScheduleJob(()))
-                    }
-                    CoordReq::Setup { dht } => {
-                        self.dht = Some(Arc::new(dht));
-                        Resp::Coordinator(CoordResp::Setup(()))
-                    }
-                };
+                    req.respond(res).await?;
+                }
+                Req::User(user_req) => {
+                    let worker = Arc::clone(&self.worker);
 
-                block_on(req.respond(res))?;
-            }
-            Req::User(user_req) => {
-                let worker = Arc::clone(&self.worker);
+                    let (tx, rx) = crossbeam_channel::bounded(1);
 
-                std::thread::spawn(move || {
-                    let res = Resp::User(worker.handle(user_req.clone()));
-                    block_on(req.respond(res)).unwrap();
-                });
-            }
-        };
+                    std::thread::spawn(move || {
+                        let res = Resp::User(worker.handle(user_req.clone()));
+                        tx.send(res).unwrap();
+                    });
+
+                    let res = tokio::task::spawn_blocking(move || rx.recv())
+                        .await
+                        .unwrap()?;
+
+                    req.respond(res).await?;
+                }
+            };
+        }
 
         Ok(())
+    }
+
+    fn handle(&mut self) -> Result<()> {
+        block_on(self.async_handle())
     }
 
     pub fn bind(addr: impl ToSocketAddrs, worker: W) -> Result<Server<W>> {
