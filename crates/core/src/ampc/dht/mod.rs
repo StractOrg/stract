@@ -232,6 +232,7 @@ pub mod tests {
             vec![].into(),
         )
         .await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
         assert_eq!(res, Some("world".as_bytes().into()));
@@ -249,6 +250,7 @@ pub mod tests {
             vec![].into(),
         )
         .await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
         assert_eq!(res, Some("world2".as_bytes().into()));
@@ -310,6 +312,7 @@ pub mod tests {
             vec![].into(),
         )
         .await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
 
