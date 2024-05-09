@@ -184,7 +184,7 @@ pub mod tests {
     #[traced_test]
     async fn test_simple_set_get() -> anyhow::Result<()> {
         let (raft1, server1, addr1) = server(1).await?;
-        let (raft2, server2, addr2) = server(2).await?;
+        let (_, server2, addr2) = server(2).await?;
 
         let servers = vec![server1, server2];
 
@@ -211,16 +211,6 @@ pub mod tests {
             }
         };
 
-        if let Err(e) = raft2.initialize(members.clone()).await {
-            match e {
-                openraft::error::RaftError::APIError(e) => match e {
-                    InitializeError::NotAllowed(_) => {}
-                    InitializeError::NotInMembers(_) => panic!("{:?}", e),
-                },
-                openraft::error::RaftError::Fatal(_) => panic!("{:?}", e),
-            }
-        };
-
         let c1 = RemoteClient::new(addr1);
         let c2 = RemoteClient::new(addr2);
 
@@ -236,6 +226,13 @@ pub mod tests {
         let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
         assert_eq!(res, Some("world".as_bytes().into()));
 
+        c2.set(
+            table.clone(),
+            "ensure-linearized-read".as_bytes().into(),
+            vec![].into(),
+        )
+        .await?;
+
         let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
         assert_eq!(res, Some("world".as_bytes().into()));
 
@@ -243,6 +240,13 @@ pub mod tests {
             table.clone(),
             "hello".as_bytes().into(),
             "world2".as_bytes().into(),
+        )
+        .await?;
+
+        c1.set(
+            table.clone(),
+            "ensure-linearized-read".as_bytes().into(),
+            vec![].into(),
         )
         .await?;
 
@@ -299,7 +303,13 @@ pub mod tests {
             "world".as_bytes().into(),
         )
         .await?;
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await; // reads are not linearized (only eventual consistency)
+
+        c2.set(
+            table.clone(),
+            "ensure-linearized-read".as_bytes().into(),
+            vec![].into(),
+        )
+        .await?;
 
         let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
 
