@@ -25,8 +25,10 @@ use chrono::{NaiveDateTime, Utc};
 use url::Url;
 use utoipa::ToSchema;
 
+#[cfg(feature = "return_body")]
+use crate::api::search::ReturnBody;
+
 use crate::{
-    api::search::ReturnBody,
     highlighted::HighlightedFragment,
     inverted_index::RetrievedWebpage,
     ranking::{SignalEnumDiscriminants, SignalScore},
@@ -190,6 +192,7 @@ pub struct DisplayedWebpage {
     pub domain: String,
     pub pretty_url: String,
     pub snippet: Snippet,
+    #[cfg(feature = "return_body")]
     pub body: Option<String>,
     pub rich_snippet: Option<RichSnippet>,
     pub ranking_signals: Option<HashMap<SignalEnumDiscriminants, SignalScore>>,
@@ -220,11 +223,6 @@ impl DisplayedWebpage {
         let domain = url.root_domain().unwrap_or_default().to_string();
         let pretty_url = prettify_url(&url);
 
-        let body = query.return_body.map(|r| match r {
-            ReturnBody::All => webpage.body,
-            ReturnBody::Truncated(n) => webpage.body.chars().take(n).collect::<String>(),
-        });
-
         let structured_data = if query.return_structured_data {
             Some(
                 webpage
@@ -237,6 +235,12 @@ impl DisplayedWebpage {
             None
         };
 
+        #[cfg(feature = "return_body")]
+        let body = query.return_body.map(|r| match r {
+            ReturnBody::All => webpage.body,
+            ReturnBody::Truncated(n) => webpage.body.chars().take(n).collect::<String>(),
+        });
+
         Self {
             title: webpage.title,
             site: url.normalized_host().unwrap_or_default().to_string(),
@@ -244,6 +248,7 @@ impl DisplayedWebpage {
             pretty_url,
             domain,
             snippet,
+            #[cfg(feature = "return_body")]
             body,
             ranking_signals: None,
             score: None,

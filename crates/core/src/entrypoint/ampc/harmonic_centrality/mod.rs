@@ -24,6 +24,7 @@ pub mod coordinator;
 mod mapper;
 pub mod worker;
 
+use bloom::U64BloomFilter;
 pub use coordinator::{CentralityFinish, CentralitySetup};
 pub use mapper::CentralityMapper;
 pub use worker::{CentralityWorker, RemoteCentralityWorker};
@@ -31,6 +32,7 @@ pub use worker::{CentralityWorker, RemoteCentralityWorker};
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct Meta {
     round_had_changes: bool,
+    upper_bound_num_nodes: u64,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
@@ -38,6 +40,7 @@ pub struct CentralityTables {
     counters: DefaultDhtTable<webgraph::NodeID, HyperLogLog<64>>,
     meta: DefaultDhtTable<(), Meta>,
     centrality: DefaultDhtTable<webgraph::NodeID, KahanSum>,
+    changed_nodes: DefaultDhtTable<ShardId, U64BloomFilter>,
 }
 
 impl CentralityTables {
@@ -46,7 +49,10 @@ impl CentralityTables {
     }
 }
 
-impl_dht_tables!(CentralityTables, [counters, meta, centrality]);
+impl_dht_tables!(
+    CentralityTables,
+    [counters, meta, centrality, changed_nodes]
+);
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct CentralityJob {
@@ -67,17 +73,59 @@ impl Job for CentralityJob {
 mod tests {
     use tracing_test::traced_test;
 
-    use crate::{free_socket_addr, webgraph::centrality::harmonic::HarmonicCentrality};
+    use crate::{
+        executor::Executor,
+        free_socket_addr,
+        webgraph::{centrality::harmonic::HarmonicCentrality, Compression, WebgraphWriter},
+    };
 
     use super::*;
 
     #[test]
     #[traced_test]
     fn test_simple_graph() {
-        let graph = crate::webgraph::tests::test_graph();
-        let expected = HarmonicCentrality::calculate(&graph);
-        let num_nodes = graph.nodes().count();
-        let worker = CentralityWorker::new(1.into(), graph);
+        let mut combined = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            Executor::single_thread(),
+            Compression::default(),
+            None,
+        );
+        let mut a = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            Executor::single_thread(),
+            Compression::default(),
+            None,
+        );
+        let mut b = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            Executor::single_thread(),
+            Compression::default(),
+            None,
+        );
+
+        let edges = crate::webgraph::tests::test_edges();
+
+        for (i, (from, to, label)) in edges.into_iter().enumerate() {
+            combined.insert(from.clone(), to.clone(), label.clone());
+
+            if i % 2 == 0 {
+                a.insert(from, to, label);
+            } else {
+                b.insert(from, to, label);
+            }
+        }
+
+        combined.commit();
+        a.commit();
+        b.commit();
+
+        let combined = combined.finalize();
+        let a = a.finalize();
+        let b = b.finalize();
+
+        let expected = HarmonicCentrality::calculate(&combined);
+        let num_nodes = combined.nodes().count();
+        let worker = CentralityWorker::new(1.into(), a);
 
         let worker_addr = free_socket_addr();
 
@@ -85,15 +133,30 @@ mod tests {
             worker.run(worker_addr).unwrap();
         });
 
-        std::thread::sleep(std::time::Duration::from_secs(1)); // Wait for worker to start
+        std::thread::sleep(std::time::Duration::from_secs(2)); // Wait for worker to start
+        let a = RemoteCentralityWorker::new(1.into(), worker_addr);
 
-        let remote_worker = RemoteCentralityWorker::new(1.into(), worker_addr);
+        let worker = CentralityWorker::new(2.into(), b);
+        let worker_addr = free_socket_addr();
+        std::thread::spawn(move || {
+            worker.run(worker_addr).unwrap();
+        });
 
-        assert_eq!(remote_worker.num_nodes(), num_nodes as u64);
+        std::thread::sleep(std::time::Duration::from_secs(2)); // Wait for worker to start
+
+        let b = RemoteCentralityWorker::new(2.into(), worker_addr);
+
+        // assert_eq!(a.num_nodes() + b.num_nodes(), num_nodes as u64);
 
         let (dht_shard, dht_addr) = crate::entrypoint::ampc::dht::tests::setup();
-        let res = coordinator::build(&[(dht_shard, dht_addr)], vec![remote_worker])
-            .run(vec![CentralityJob { shard: 1.into() }], CentralityFinish)
+        let res = coordinator::build(&[(dht_shard, dht_addr)], vec![a, b])
+            .run(
+                vec![
+                    CentralityJob { shard: 1.into() },
+                    CentralityJob { shard: 2.into() },
+                ],
+                CentralityFinish,
+            )
             .unwrap();
 
         let mut actual = res

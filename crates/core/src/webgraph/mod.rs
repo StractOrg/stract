@@ -345,7 +345,7 @@ impl Webgraph {
 pub mod tests {
     use super::*;
 
-    fn test_edges() -> Vec<(Node, Node, String)> {
+    pub fn test_edges() -> Vec<(Node, Node, String)> {
         vec![
             (Node::from("A"), Node::from("B"), String::new()),
             (Node::from("B"), Node::from("C"), String::new()),

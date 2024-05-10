@@ -101,6 +101,10 @@ impl Node {
         Self { api }
     }
 
+    pub async fn num_keys(&self, table: Table) -> Result<u64> {
+        self.api.num_keys(table).await
+    }
+
     pub async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {
         self.api.get(table, key).await
     }
@@ -211,6 +215,10 @@ impl Shard {
 
     pub async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
         self.node().batch_get(table, keys).await
+    }
+
+    pub async fn num_keys(&self, table: Table) -> Result<u64> {
+        self.node().num_keys(table).await
     }
 
     pub async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
@@ -340,6 +348,16 @@ impl Client {
         futures::future::try_join_all(futures).await?;
 
         Ok(())
+    }
+
+    pub async fn num_keys(&self, table: Table) -> Result<u64> {
+        let mut total = 0;
+
+        for shard in self.shards.values() {
+            total += shard.num_keys(table.clone()).await?;
+        }
+
+        Ok(total)
     }
 
     pub async fn upsert<F: Into<UpsertEnum>>(

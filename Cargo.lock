@@ -545,6 +545,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "bitvec",
+ "serde",
  "xxhash-rust",
 ]
 

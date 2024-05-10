@@ -25,8 +25,9 @@ use optics::{HostRankings, Optic};
 
 use utoipa::ToSchema;
 
+use crate::api::search::ReturnBody;
+
 use crate::{
-    api::search::ReturnBody,
     bangs::BangHit,
     collector::approx_count::Count,
     config::defaults,

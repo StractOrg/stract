@@ -192,6 +192,10 @@ impl Db {
         }
     }
 
+    pub fn num_keys(&self, table: &Table) -> usize {
+        self.data.get(table).map(|m| m.len()).unwrap_or(0)
+    }
+
     pub fn upsert(
         &mut self,
         table: Table,

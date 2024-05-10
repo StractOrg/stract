@@ -25,7 +25,10 @@ use crate::{
 };
 use std::{
     net::SocketAddr,
-    sync::{atomic::AtomicU64, Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, AtomicU64},
+        Arc, Mutex,
+    },
 };
 
 use super::CentralityJob;
@@ -35,6 +38,7 @@ pub struct CentralityWorker {
     graph: Webgraph,
     changed_nodes: Arc<Mutex<U64BloomFilter>>,
     round: AtomicU64,
+    has_updated_meta_for_round: AtomicBool,
 }
 
 impl CentralityWorker {
@@ -51,7 +55,18 @@ impl CentralityWorker {
             graph,
             changed_nodes: Arc::new(Mutex::new(changed_nodes)),
             round: AtomicU64::new(0),
+            has_updated_meta_for_round: AtomicBool::new(false),
         }
+    }
+
+    pub fn setup_changed_nodes(&self, upper_bound_num_nodes: u64) {
+        let mut new_changed_nodes = U64BloomFilter::new(upper_bound_num_nodes, 0.05);
+
+        for node in self.graph.nodes() {
+            new_changed_nodes.insert(node.as_u64());
+        }
+
+        *self.changed_nodes.lock().unwrap() = new_changed_nodes;
     }
 
     pub fn shard(&self) -> ShardId {
@@ -68,6 +83,16 @@ impl CentralityWorker {
 
     pub fn round(&self) -> u64 {
         self.round.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn has_updated_meta_for_round(&self) -> bool {
+        self.has_updated_meta_for_round
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn set_has_updated_meta_for_round(&self, value: bool) {
+        self.has_updated_meta_for_round
+            .store(value, std::sync::atomic::Ordering::Relaxed);
     }
 
     pub fn inc_round(&self) -> u64 {

@@ -196,7 +196,6 @@ export type ApiSearchQuery = {
   optic?: string;
   page?: number;
   query: string;
-  returnBody?: ReturnBody;
   returnRankingSignals?: boolean;
   returnStructuredData?: boolean;
   safeSearch?: boolean;
@@ -273,7 +272,6 @@ export type DisplayedSidebar =
       };
     };
 export type DisplayedWebpage = {
-  body?: string;
   domain: string;
   likelyHasAds: boolean;
   likelyHasPaywall: boolean;

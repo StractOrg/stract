@@ -202,6 +202,10 @@ pub trait DhtTable: Clone + bincode::Encode + bincode::Decode {
         block_on(self.client().batch_set(self.table().dht(), pairs)).unwrap();
     }
 
+    fn num_keys(&self) -> u64 {
+        block_on(self.client().num_keys(self.table().dht())).unwrap()
+    }
+
     fn upsert<F: Into<UpsertEnum>>(
         &self,
         upsert: F,

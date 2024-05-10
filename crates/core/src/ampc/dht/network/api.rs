@@ -79,6 +79,11 @@ pub struct BatchGet {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+pub struct NumKeys {
+    pub table: Table,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct DropTable {
     pub table: Table,
 }
@@ -199,6 +204,20 @@ impl sonic::service::Message<Server> for BatchGet {
             .await
             .db
             .batch_get(&self.table, &self.keys)
+    }
+}
+
+impl sonic::service::Message<Server> for NumKeys {
+    type Response = u64;
+
+    async fn handle(self, server: &Server) -> Self::Response {
+        server
+            .state_machine_store
+            .state_machine
+            .read()
+            .await
+            .db
+            .num_keys(&self.table) as u64
     }
 }
 
@@ -440,6 +459,39 @@ impl RemoteClient {
         }
 
         Err(anyhow!("failed to batch set values"))
+    }
+
+    pub async fn num_keys(&self, table: Table) -> Result<u64> {
+        for backoff in Self::retry_strat() {
+            match self
+                .self_remote
+                .send_with_timeout(
+                    NumKeys {
+                        table: table.clone(),
+                    },
+                    Duration::from_secs(5),
+                )
+                .await
+            {
+                Ok(res) => return Ok(res),
+                Err(e) => match e {
+                    sonic::Error::IO(_)
+                    | sonic::Error::ConnectionTimeout
+                    | sonic::Error::RequestTimeout
+                    | sonic::Error::PoolGet => {
+                        tokio::time::sleep(backoff).await;
+                    }
+                    sonic::Error::BadRequest
+                    | sonic::Error::BodyTooLarge {
+                        body_size: _,
+                        max_size: _,
+                    }
+                    | sonic::Error::Application(_) => return Err(e.into()),
+                },
+            }
+        }
+
+        Err(anyhow!("failed to get number of keys"))
     }
 
     pub async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {

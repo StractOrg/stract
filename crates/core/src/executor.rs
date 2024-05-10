@@ -19,7 +19,9 @@ use crate::{Error, Result};
 use crossbeam_channel::unbounded;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
+#[derive(Default)]
 pub enum Executor {
+    #[default]
     #[allow(unused)]
     SingleThread,
     ThreadPool(ThreadPool),

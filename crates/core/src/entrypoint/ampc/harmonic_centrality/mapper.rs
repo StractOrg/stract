@@ -31,15 +31,18 @@ use crate::{
     webgraph,
 };
 
-use super::{CentralityJob, CentralityTables, CentralityWorker, Meta};
+use super::{CentralityJob, CentralityTables, CentralityWorker};
 
 const OPS_BATCH_PER_SHARD: u64 = 4096;
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub enum CentralityMapper {
     SetupCounters,
+    SetupBloom,
     Cardinalities,
     Centralities,
+    SaveBloom,
+    UpdateBloom,
 }
 
 impl CentralityMapper {
@@ -122,6 +125,7 @@ impl CentralityMapper {
     }
 
     fn update_dht(
+        worker: &CentralityWorker,
         batch: &[webgraph::Edge<()>],
         new_changed_nodes: &Mutex<U64BloomFilter>,
         dht: &DhtConn<CentralityTables>,
@@ -134,17 +138,19 @@ impl CentralityMapper {
         Self::update_changed_nodes(&changes, new_changed_nodes);
 
         // if any nodes changed, indicate in dht that we aren't finished yet
-        if changes.iter().any(|(_, upsert_res)| match upsert_res {
-            UpsertAction::Merged => true,
-            UpsertAction::NoChange => false,
-            UpsertAction::Inserted => true,
-        }) {
-            dht.next().meta.set(
-                (),
-                Meta {
-                    round_had_changes: true,
-                },
-            )
+        if !worker.has_updated_meta_for_round()
+            && changes.iter().any(|(_, upsert_res)| match upsert_res {
+                UpsertAction::Merged => true,
+                UpsertAction::NoChange => false,
+                UpsertAction::Inserted => true,
+            })
+        {
+            // it's okay that this is not atomic as it will just cause an extra meta update
+            worker.set_has_updated_meta_for_round(true);
+
+            let mut meta = dht.next().meta.get(()).unwrap();
+            meta.round_had_changes = true;
+            dht.next().meta.set((), meta)
         }
     }
 
@@ -203,37 +209,49 @@ impl CentralityMapper {
     }
 
     fn map_setup_counters(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+        if worker.round() != 0 {
+            return;
+        }
+
         // shards are the same for both prev and next
         let num_shards = dht.prev().num_shards();
         let batch_size = (num_shards * OPS_BATCH_PER_SHARD) as usize;
 
         let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
 
-        if worker.round() == 0 {
-            pool.scope(|s| {
-                let mut batch = Vec::with_capacity(batch_size);
-                let mut changed_nodes = worker.changed_nodes().lock().unwrap();
+        pool.scope(|s| {
+            let mut batch = Vec::with_capacity(batch_size);
+            let mut changed_nodes = worker.changed_nodes().lock().unwrap();
 
-                for node in worker.graph().nodes() {
-                    changed_nodes.insert(node.as_u64());
-                    batch.push(node);
-                    if batch.len() >= batch_size {
-                        let update_batch = batch.clone();
-                        s.spawn(move |_| Self::setup_counters(&update_batch, dht));
-
-                        batch.clear();
-                    }
-                }
-
-                if !batch.is_empty() {
+            for node in worker.graph().nodes() {
+                changed_nodes.insert(node.as_u64());
+                batch.push(node);
+                if batch.len() >= batch_size {
                     let update_batch = batch.clone();
                     s.spawn(move |_| Self::setup_counters(&update_batch, dht));
+
+                    batch.clear();
                 }
-            });
+            }
+
+            if !batch.is_empty() {
+                let update_batch = batch.clone();
+                s.spawn(move |_| Self::setup_counters(&update_batch, dht));
+            }
+        });
+    }
+
+    fn map_setup_bloom(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+        if worker.round() != 0 {
+            return;
         }
+
+        let upper_bound_num_nodes = dht.prev().meta.get(()).unwrap().upper_bound_num_nodes;
+        worker.setup_changed_nodes(upper_bound_num_nodes);
     }
 
     fn map_cardinalities(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+        worker.set_has_updated_meta_for_round(false);
         // shards are the same for both prev and next
         let num_shards = dht.prev().num_shards();
         let batch_size = (num_shards * OPS_BATCH_PER_SHARD) as usize;
@@ -258,7 +276,9 @@ impl CentralityMapper {
                     let new_changed_nodes = Arc::clone(&new_changed_nodes);
                     let update_batch = batch.clone();
 
-                    s.spawn(move |_| Self::update_dht(&update_batch, &new_changed_nodes, dht));
+                    s.spawn(move |_| {
+                        Self::update_dht(worker, &update_batch, &new_changed_nodes, dht)
+                    });
 
                     batch.clear();
                 }
@@ -268,7 +288,7 @@ impl CentralityMapper {
                 let new_changed_nodes = Arc::clone(&new_changed_nodes);
                 let update_batch = batch.clone();
 
-                s.spawn(move |_| Self::update_dht(&update_batch, &new_changed_nodes, dht));
+                s.spawn(move |_| Self::update_dht(worker, &update_batch, &new_changed_nodes, dht));
             }
         });
         *worker.changed_nodes().lock().unwrap() = new_changed_nodes.lock().unwrap().clone();
@@ -309,6 +329,26 @@ impl CentralityMapper {
             }
         });
     }
+
+    fn map_save_bloom(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+        let changed_nodes = worker.changed_nodes().lock().unwrap();
+        dht.next()
+            .changed_nodes
+            .set(worker.shard(), changed_nodes.clone());
+    }
+
+    fn map_update_bloom(worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
+        let changed_nodes: Vec<_> = dht.next().changed_nodes.iter().map(|(_, v)| v).collect();
+
+        let mut new_changed_nodes =
+            U64BloomFilter::empty_from(&worker.changed_nodes().lock().unwrap());
+
+        for bloom in changed_nodes {
+            new_changed_nodes.union(bloom.clone());
+        }
+
+        *worker.changed_nodes().lock().unwrap() = new_changed_nodes;
+    }
 }
 
 impl Mapper for CentralityMapper {
@@ -316,8 +356,11 @@ impl Mapper for CentralityMapper {
 
     fn map(&self, _: Self::Job, worker: &CentralityWorker, dht: &DhtConn<CentralityTables>) {
         match self {
+            CentralityMapper::SetupBloom => Self::map_setup_bloom(worker, dht),
             CentralityMapper::SetupCounters => Self::map_setup_counters(worker, dht),
             CentralityMapper::Cardinalities => Self::map_cardinalities(worker, dht),
+            CentralityMapper::SaveBloom => Self::map_save_bloom(worker, dht),
+            CentralityMapper::UpdateBloom => Self::map_update_bloom(worker, dht),
             CentralityMapper::Centralities => Self::map_centralities(worker, dht),
         }
     }

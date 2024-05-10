@@ -81,6 +81,8 @@ where
         match tokio::time::timeout(timeout, TcpStream::connect(server)).await {
             Ok(stream) => {
                 let stream = stream?;
+                stream.set_nodelay(true)?;
+
                 Ok(Connection {
                     stream,
                     marker: PhantomData,

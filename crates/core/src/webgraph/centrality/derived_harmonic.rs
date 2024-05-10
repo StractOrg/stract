@@ -52,7 +52,7 @@ impl BloomMap {
         let mut bf = self.map.pop().unwrap().into_inner().unwrap();
 
         for m in self.map {
-            bf.merge(m.into_inner().unwrap());
+            bf.union(m.into_inner().unwrap());
         }
 
         bf

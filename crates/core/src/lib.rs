@@ -52,7 +52,7 @@ pub mod crawler;
 pub mod distributed;
 pub mod entity_index;
 mod enum_map;
-mod executor;
+pub mod executor;
 mod external_sort;
 mod fastfield_reader;
 pub mod feed;
@@ -237,7 +237,6 @@ fn free_socket_addr() -> std::net::SocketAddr {
     use std::net::{Ipv4Addr, TcpListener};
 
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
-    
 
     listener.local_addr().unwrap()
 }

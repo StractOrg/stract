@@ -32,11 +32,12 @@ use super::{CentralityJob, CentralityMapper, CentralityTables, Meta, RemoteCentr
 
 pub struct CentralitySetup {
     dht: DhtConn<CentralityTables>,
+    workers: Vec<RemoteCentralityWorker>,
 }
 
 impl CentralitySetup {
     pub async fn new(cluster: &Cluster) -> Self {
-        let members: Vec<_> = cluster
+        let dht_members: Vec<_> = cluster
             .members()
             .await
             .into_iter()
@@ -49,19 +50,36 @@ impl CentralitySetup {
             })
             .collect();
 
-        Self::new_for_dht_members(&members)
+        let workers: Vec<_> = cluster
+            .members()
+            .await
+            .into_iter()
+            .filter_map(|member| {
+                if let Service::HarmonicWorker { host, shard } = member.service {
+                    Some(RemoteCentralityWorker::new(shard, host))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Self::new_for_dht_members(&dht_members, workers)
     }
 
-    pub fn new_for_dht_members(members: &[(ShardId, SocketAddr)]) -> Self {
+    pub fn new_for_dht_members(
+        dht_members: &[(ShardId, SocketAddr)],
+        workers: Vec<RemoteCentralityWorker>,
+    ) -> Self {
         let initial = CentralityTables {
-            counters: DefaultDhtTable::new(members, "counters"),
-            meta: DefaultDhtTable::new(members, "meta"),
-            centrality: DefaultDhtTable::new(members, "centrality"),
+            counters: DefaultDhtTable::new(dht_members, "counters"),
+            meta: DefaultDhtTable::new(dht_members, "meta"),
+            centrality: DefaultDhtTable::new(dht_members, "centrality"),
+            changed_nodes: DefaultDhtTable::new(dht_members, "changed_nodes"),
         };
 
         let dht = DhtConn::new(initial);
 
-        Self { dht }
+        Self { dht, workers }
     }
 }
 
@@ -73,19 +91,20 @@ impl Setup for CentralitySetup {
     }
 
     fn setup_round(&self, dht: &Self::DhtTables) {
-        dht.meta.set(
-            (),
-            Meta {
-                round_had_changes: false,
-            },
-        );
+        let mut meta = dht.meta.get(()).unwrap();
+        meta.round_had_changes = false;
+
+        dht.meta.set((), meta);
     }
 
     fn setup_first_round(&self, dht: &Self::DhtTables) {
+        let upper_bound_num_nodes = self.workers.iter().map(|w| w.num_nodes()).sum();
+
         dht.meta.set(
             (),
             Meta {
                 round_had_changes: true, // force first round to run
+                upper_bound_num_nodes,
             },
         );
     }
@@ -105,11 +124,14 @@ pub fn build(
     dht: &[(ShardId, SocketAddr)],
     workers: Vec<RemoteCentralityWorker>,
 ) -> Coordinator<CentralityJob> {
-    let setup = CentralitySetup::new_for_dht_members(dht);
+    let setup = CentralitySetup::new_for_dht_members(dht, workers.clone());
 
     Coordinator::new(setup, workers)
         .with_mapper(CentralityMapper::SetupCounters)
+        .with_mapper(CentralityMapper::SetupBloom)
         .with_mapper(CentralityMapper::Cardinalities)
+        .with_mapper(CentralityMapper::SaveBloom)
+        .with_mapper(CentralityMapper::UpdateBloom)
         .with_mapper(CentralityMapper::Centralities)
 }
 
@@ -182,7 +204,7 @@ pub fn run(config: HarmonicCoordinatorConfig) -> Result<()> {
     let coordinator = build(&cluster.dht, cluster.workers.clone());
     let res = coordinator.run(jobs, CentralityFinish)?;
 
-    let num_nodes = cluster.workers.iter().map(|w| w.num_nodes()).sum::<u64>();
+    let num_nodes = res.counters.num_keys();
     let output_path = Path::new(&config.output_path);
 
     let store = store_harmonic(

@@ -75,6 +75,7 @@ pub struct ApiSearchQuery {
     #[serde(default = "defaults::SearchQuery::return_structured_data")]
     pub return_structured_data: bool,
 
+    #[cfg(feature = "return_body")]
     pub return_body: Option<ReturnBody>,
 }
 
@@ -100,7 +101,10 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             return_ranking_signals: api.return_ranking_signals,
             safe_search: api.safe_search.unwrap_or(default.safe_search),
             count_results_exact: api.count_results_exact,
+            #[cfg(feature = "return_body")]
             return_body: api.return_body,
+            #[cfg(not(feature = "return_body"))]
+            return_body: None,
             return_structured_data: api.return_structured_data,
         })
     }
