@@ -387,7 +387,7 @@ impl<K, V> Db<K, V> {
 
     pub fn merge(&mut self, other: Self) -> Result<()> {
         let other_folder = other.folder().to_path_buf();
-        for segment in other.segments {
+        for mut segment in other.segments {
             segment.move_to(self.folder())?;
             self.segments.push(segment);
         }

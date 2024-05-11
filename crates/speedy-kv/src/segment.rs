@@ -189,7 +189,7 @@ impl<K, V> Segment<K, V> {
 
         // cleanup old segments
         for segment in segments {
-            std::fs::remove_file(segment.blob_index.path())?;
+            std::fs::remove_file(dbg!(segment.blob_index.path()))?;
             std::fs::remove_file(segment.id_index.path())?;
             std::fs::remove_file(segment.store.path())?;
             std::fs::remove_file(segment.bloom_path())?;
@@ -267,7 +267,7 @@ impl<K, V> Segment<K, V> {
         self.folder.join(Self::bloom_file_name(self.uuid))
     }
 
-    pub fn move_to<P: AsRef<Path>>(&self, new_folder: P) -> Result<()> {
+    pub fn move_to<P: AsRef<Path>>(&mut self, new_folder: P) -> Result<()> {
         if !new_folder.as_ref().exists() {
             std::fs::create_dir_all(&new_folder)?;
         }
@@ -294,6 +294,8 @@ impl<K, V> Segment<K, V> {
             self.bloom_path(),
             new_folder.as_ref().join(Self::bloom_file_name(self.uuid)),
         )?;
+
+        *self = Segment::open(self.uuid, new_folder)?;
 
         Ok(())
     }

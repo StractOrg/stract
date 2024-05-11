@@ -446,11 +446,14 @@ pub mod tests {
             graph.merge(other).unwrap();
         }
 
+        graph.optimize_read();
+
         assert_eq!(
             graph.distances(Node::from("A")).get(&Node::from("H")),
             Some(&7)
         );
     }
+
     #[test]
     fn merge_cycle() {
         let mut graphs = Vec::new();
