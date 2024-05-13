@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
 use std::{
+    collections::BinaryHeap,
     io::{BufWriter, Write},
     ops::RangeBounds,
     path::{Path, PathBuf},
@@ -189,7 +190,7 @@ impl<K, V> Segment<K, V> {
 
         // cleanup old segments
         for segment in segments {
-            std::fs::remove_file(dbg!(segment.blob_index.path()))?;
+            std::fs::remove_file(segment.blob_index.path())?;
             std::fs::remove_file(segment.id_index.path())?;
             std::fs::remove_file(segment.store.path())?;
             std::fs::remove_file(segment.bloom_path())?;
@@ -301,65 +302,101 @@ impl<K, V> Segment<K, V> {
     }
 }
 
-struct SortedSegments<I>
+struct SortedPeekable<'a, K, V, I>
 where
-    I: Iterator,
+    I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
 {
-    segments: Vec<Peekable<I>>,
+    segment_ord: usize,
+    iter: Peekable<I>,
 }
 
-impl<I> SortedSegments<I>
+impl<'a, K, V, I> PartialOrd for SortedPeekable<'a, K, V, I>
 where
-    I: Iterator,
+    I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
 {
-    fn new(segments: Vec<Peekable<I>>) -> Self {
-        Self { segments }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
-impl<'a, K, V, I> Iterator for SortedSegments<I>
+impl<'a, K, V, I> Ord for SortedPeekable<'a, K, V, I>
+where
+    I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self.iter.peek(), other.iter.peek()) {
+            (Some((a, _)), Some((b, _))) => a
+                .cmp(b)
+                .reverse()
+                .then_with(|| self.segment_ord.cmp(&other.segment_ord)),
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+    }
+}
+
+impl<'a, K, V, I> PartialEq for SortedPeekable<'a, K, V, I>
+where
+    I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        match (self.iter.peek(), other.iter.peek()) {
+            (Some((a, _)), Some((b, _))) => a == b && self.segment_ord == other.segment_ord,
+            (None, None) => true,
+            _ => false,
+        }
+    }
+}
+
+impl<'a, K, V, I> Eq for SortedPeekable<'a, K, V, I> where
+    I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>
+{
+}
+
+struct SortedSegments<'a, K, V, I>
+where
+    I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
+{
+    segments: BinaryHeap<SortedPeekable<'a, K, V, I>>,
+}
+
+impl<'a, K, V, I> SortedSegments<'a, K, V, I>
+where
+    I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
+{
+    fn new(segments: Vec<Peekable<I>>) -> Self {
+        Self {
+            segments: segments
+                .into_iter()
+                .enumerate()
+                .map(|(segment_ord, iter)| SortedPeekable { segment_ord, iter })
+                .collect(),
+        }
+    }
+}
+
+impl<'a, K, V, I> Iterator for SortedSegments<'a, K, V, I>
 where
     I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
 {
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut min_idx = None;
+        let (key, value) = {
+            let mut min = self.segments.peek_mut()?;
+            min.iter.next()?
+        };
 
-        let num_segments = self.segments.len();
-
-        for idx in 0..num_segments {
-            let segment = &self.segments[idx];
-            if let Some(item) = segment.peek() {
-                if let Some(min) = min_idx {
-                    let v: &Peekable<I> = &self.segments[min];
-                    let value = &v.peek().unwrap().0;
-
-                    if &item.0 <= value {
-                        min_idx = Some(idx);
-                    }
-                } else {
-                    min_idx = Some(idx);
-                }
-            }
-        }
-
-        if let Some(idx) = min_idx {
-            let res = self.segments[idx].next();
-
-            if let Some(res) = res.as_ref() {
-                for segment in &mut self.segments {
-                    if let Some(peeked) = segment.peek() {
-                        if peeked.0 == res.0 {
-                            segment.next();
-                        }
-                    }
-                }
+        // advance all segments with the same key
+        while let Some(mut peek) = self.segments.peek_mut() {
+            if peek.iter.peek().map(|(k, _)| k) != Some(&key) {
+                break;
             }
 
-            res
-        } else {
-            None
+            peek.iter.next();
         }
+
+        Some((key, value))
     }
 }

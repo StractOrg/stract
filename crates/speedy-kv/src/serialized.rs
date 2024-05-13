@@ -98,10 +98,31 @@ impl<T> Serialized<T> {
     }
 }
 
-#[derive(Debug)]
 pub struct SerializedRef<'a, T> {
     bytes: &'a [u8],
     _marker: std::marker::PhantomData<T>,
+}
+
+impl<'a, T> std::fmt::Debug for SerializedRef<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let truncated = self.bytes.len() > 16;
+
+        let truncated_bytes = if truncated {
+            &self.bytes[..16]
+        } else {
+            self.bytes
+        };
+
+        let field = if truncated {
+            "bytes (truncated)"
+        } else {
+            "bytes"
+        };
+
+        f.debug_struct("Serialized")
+            .field(field, &truncated_bytes)
+            .finish()
+    }
 }
 
 impl<'a, T> Clone for SerializedRef<'a, T> {

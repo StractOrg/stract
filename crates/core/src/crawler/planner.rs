@@ -407,23 +407,21 @@ impl CrawlPlanner {
                 .finalize()?;
         }
 
-        let mut metadata = Metadata {
-            stats: stats.into_inner().unwrap_or_else(|e| e.into_inner()),
+        let mut stats = stats.into_inner().unwrap_or_else(|e| e.into_inner());
+        stats.sort_by(|a, b| b.schedule_budget.cmp(&a.schedule_budget));
+
+        let total_scheduled_urls: u64 = stats.iter().map(|d| d.scheduled_urls).sum();
+        let total_wander_budget: u64 = stats.iter().map(|d| d.wander_budget).sum();
+
+        let metadata = Metadata {
+            stats,
+            total_scheduled_urls,
+            total_wander_budget,
         };
 
-        tracing::info!(
-            "total scheduled urls: {}",
-            metadata.stats.iter().map(|d| d.scheduled_urls).sum::<u64>()
-        );
+        tracing::info!("total scheduled urls: {}", metadata.total_scheduled_urls);
 
-        tracing::info!(
-            "total wander budget: {}",
-            metadata.stats.iter().map(|d| d.wander_budget).sum::<u64>()
-        );
-
-        metadata
-            .stats
-            .sort_by(|a, b| b.schedule_budget.cmp(&a.schedule_budget));
+        tracing::info!("total wander budget: {}", metadata.total_wander_budget);
 
         let metadata_path = output.as_ref().join("metadata.json");
 
@@ -446,6 +444,8 @@ struct DomainStats {
 
 #[derive(serde::Serialize)]
 struct Metadata {
+    total_scheduled_urls: u64,
+    total_wander_budget: u64,
     stats: Vec<DomainStats>,
 }
 
