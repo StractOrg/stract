@@ -14,6 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#[macro_export]
+macro_rules! enum_map {
+    [$($key:expr => $value:expr),+ $(,)?] => {{
+        let mut map = $crate::enum_map::EnumMap::new();
+        $(
+            map.insert($key, $value);
+        )+
+        map
+    }};
+}
+
 pub trait InsertEnumMapKey: Sized {
     fn into_usize(self) -> usize;
 }
@@ -170,6 +181,8 @@ impl<K: InsertEnumMapKey + GetEnumMapKey> EnumSet<K> {
 
 #[cfg(test)]
 mod tests {
+    use crate::enum_map;
+
     use super::*;
 
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -187,10 +200,11 @@ mod tests {
 
     #[test]
     fn test_enum_map() {
-        let mut map = EnumMap::new();
-        map.insert(TestEnum::A, TestEnum::B);
-        map.insert(TestEnum::B, TestEnum::C);
-        map.insert(TestEnum::C, TestEnum::A);
+        let map = enum_map! {
+            TestEnum::A => TestEnum::B,
+            TestEnum::B => TestEnum::C,
+            TestEnum::C => TestEnum::A,
+        };
 
         assert_eq!(map.get(TestEnum::A), Some(&TestEnum::B));
         assert_eq!(map.get(TestEnum::B), Some(&TestEnum::C));

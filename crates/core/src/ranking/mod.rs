@@ -123,11 +123,6 @@ mod tests {
 
     use std::path::Path;
 
-    use optics::{
-        ast::{RankingCoeff, RankingTarget},
-        Optic,
-    };
-
     use crate::{
         config::{IndexingDualEncoderConfig, IndexingLocalConfig, WarcSource},
         entrypoint::indexer::IndexingWorker,
@@ -334,13 +329,9 @@ mod tests {
             .search(&SearchQuery {
                 query: "title".to_string(),
                 return_ranking_signals: true,
-                optic: Some(Optic {
-                    rankings: vec![RankingCoeff {
-                        target: RankingTarget::Signal("update_timestamp".to_string()),
-                        value: 1_000_000.0,
-                    }],
-                    ..Default::default()
-                }),
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::UpdateTimestamp) => 100_000.0,
+                }.into(),
                 ..Default::default()
             })
             .expect("Search failed");
@@ -556,15 +547,12 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                optic: Some(
-                    Optic::parse(
-                        r#"
-                        Ranking(Signal("bm25_title"), 20000000);
-                        Ranking(Signal("host_centrality"), 0);
-                    "#,
-                    )
-                    .unwrap(),
-                ),
+
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::Bm25Title) => 20_000_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::HostCentrality) => 0.0,
+                }.into(),
+
                 ..Default::default()
             })
             .unwrap();
@@ -575,14 +563,11 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "example".to_string(),
-                optic: Some(
-                    Optic::parse(
-                        r#"
-                        Ranking(Signal("host_centrality"), 2000000)
-                    "#,
-                    )
-                    .unwrap(),
-                ),
+
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::HostCentrality) => 2_000_000.0,
+                }.into(),
+
                 ..Default::default()
             })
             .unwrap();
@@ -648,13 +633,9 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 query: "test".to_string(),
-                optic: Some(Optic {
-                    rankings: vec![RankingCoeff {
-                        target: RankingTarget::Signal("fetch_time_ms".to_string()),
-                        value: 100_000.0,
-                    }],
-                    ..Default::default()
-                }),
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::FetchTimeMs) => 100_000.0,
+                }.into(),
                 ..Default::default()
             })
             .expect("Search failed");
@@ -745,19 +726,12 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 query: "test".to_string(),
-                optic: Some(Optic {
-                    rankings: vec![
-                        RankingCoeff {
-                            target: RankingTarget::Signal("url_slashes".to_string()),
-                            value: 100_000.0,
-                        },
-                        RankingCoeff {
-                            target: RankingTarget::Signal("url_digits".to_string()),
-                            value: 100_000.0,
-                        },
-                    ],
-                    ..Default::default()
-                }),
+
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::UrlSlashes) => 100_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::UrlDigits) => 100_000.0,
+                }.into(),
+
                 ..Default::default()
             })
             .expect("Search failed");
@@ -859,13 +833,11 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 query: "best chocolate cake".to_string(),
-                optic: Some(Optic {
-                    rankings: vec![RankingCoeff {
-                        target: RankingTarget::Signal("title_embedding_similarity".to_string()),
-                        value: 100_000.0,
-                    }],
-                    ..Default::default()
-                }),
+
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::TitleEmbeddingSimilarity) => 100_000.0,
+                }.into(),
+
                 ..Default::default()
             })
             .expect("Search failed");
@@ -949,13 +921,11 @@ mod tests {
         let result = searcher
             .search(&SearchQuery {
                 query: "best chocolate cake".to_string(),
-                optic: Some(Optic {
-                    rankings: vec![RankingCoeff {
-                        target: RankingTarget::Signal("keyword_embedding_similarity".to_string()),
-                        value: 100_000.0,
-                    }],
-                    ..Default::default()
-                }),
+
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::KeywordEmbeddingSimilarity) => 100_000.0,
+                }.into(),
+
                 ..Default::default()
             })
             .expect("Search failed");

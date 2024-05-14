@@ -15,8 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::enum_map::EnumMap;
-use optics::ast::RankingTarget;
-use optics::Optic;
 
 use std::str::FromStr;
 
@@ -49,7 +47,7 @@ impl FromStr for SignalEnumDiscriminants {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub struct SignalCoefficient {
     map: EnumMap<SignalEnum, f64>,
 }
@@ -57,6 +55,12 @@ pub struct SignalCoefficient {
 impl Default for SignalCoefficient {
     fn default() -> Self {
         Self::new(SignalEnum::all().map(|signal| (signal, signal.default_coefficient())))
+    }
+}
+
+impl From<EnumMap<SignalEnum, f64>> for SignalCoefficient {
+    fn from(map: EnumMap<SignalEnum, f64>) -> Self {
+        Self { map }
     }
 }
 
@@ -76,16 +80,6 @@ impl SignalCoefficient {
         }
 
         Self { map }
-    }
-
-    pub fn from_optic(optic: &Optic) -> Self {
-        SignalCoefficient::new(optic.rankings.iter().filter_map(|coeff| {
-            match &coeff.target {
-                RankingTarget::Signal(signal) => SignalEnumDiscriminants::from_str(signal)
-                    .ok()
-                    .map(|signal| (signal.into(), coeff.value)),
-            }
-        }))
     }
 
     pub fn merge_add(&mut self, coeffs: SignalCoefficient) {

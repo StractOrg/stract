@@ -17,7 +17,6 @@
 use super::Error;
 use super::Result as ModResult;
 use lalrpop_util::lalrpop_mod;
-use std::fmt::Display;
 
 use super::lexer;
 
@@ -26,39 +25,9 @@ lalrpop_mod!(pub parser, "/parser.rs");
 pub static PARSER: once_cell::sync::Lazy<parser::BlocksParser> =
     once_cell::sync::Lazy::new(parser::BlocksParser::new);
 
-#[derive(
-    Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
-)]
-pub enum RankingTarget {
-    Signal(String),
-}
-
-#[derive(
-    Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
-)]
-pub struct RankingCoeff {
-    pub target: RankingTarget,
-    pub value: f64,
-}
-
-impl Display for RankingCoeff {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Ranking(")?;
-
-        match &self.target {
-            RankingTarget::Signal(signal) => {
-                write!(f, "Signal(\"{signal}\")")?;
-            }
-        }
-
-        write!(f, ", {})", self.value)
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub struct RawOptic {
     pub rules: Vec<RawRule>,
-    pub rankings: Vec<RankingCoeff>,
     pub host_preferences: Vec<RawHostPreference>,
     pub discard_non_matching: bool,
 }
@@ -66,13 +35,11 @@ pub struct RawOptic {
 impl From<Vec<RawOpticBlock>> for RawOptic {
     fn from(blocks: Vec<RawOpticBlock>) -> Self {
         let mut rules = Vec::new();
-        let mut rankings = Vec::new();
         let mut host_preferences = Vec::new();
         let mut discard_non_matching = false;
 
         for block in blocks {
             match block {
-                RawOpticBlock::Ranking(ranking) => rankings.push(ranking),
                 RawOpticBlock::Rule(rule) => rules.push(rule),
                 RawOpticBlock::HostPreference(pref) => host_preferences.push(pref),
                 RawOpticBlock::DiscardNonMatching => discard_non_matching = true,
@@ -81,7 +48,6 @@ impl From<Vec<RawOpticBlock>> for RawOptic {
 
         RawOptic {
             rules,
-            rankings,
             host_preferences,
             discard_non_matching,
         }
@@ -92,7 +58,6 @@ impl From<Vec<RawOpticBlock>> for RawOptic {
 pub enum RawOpticBlock {
     Rule(RawRule),
     HostPreference(RawHostPreference),
-    Ranking(RankingCoeff),
     DiscardNonMatching,
 }
 
@@ -170,9 +135,6 @@ mod tests {
             /*
                 this is a block comment
              */
-            Ranking(Signal("host_centrality"), 3);
-            Ranking(Signal("bm25"), 100);
-
             Rule {
                 Matches {
                     Url("/this/is/a/*/pattern")
@@ -204,16 +166,6 @@ mod tests {
                             RawMatchPart::Site("example.com".to_string()),
                         ])],
                         action: None,
-                    },
-                ],
-                rankings: vec![
-                    RankingCoeff {
-                        target: RankingTarget::Signal("host_centrality".to_string()),
-                        value: 3.0,
-                    },
-                    RankingCoeff {
-                        target: RankingTarget::Signal("bm25".to_string()),
-                        value: 100.0,
                     },
                 ],
                 host_preferences: vec![],
@@ -259,7 +211,6 @@ mod tests {
                         action: Some(RawAction::Downrank(4)),
                     },
                 ],
-                rankings: vec![],
                 host_preferences: vec![],
                 discard_non_matching: false,
             }
@@ -304,7 +255,6 @@ mod tests {
                         action: Some(RawAction::Downrank(4)),
                     },
                 ],
-                rankings: vec![],
                 host_preferences: vec![],
                 discard_non_matching: true,
             }

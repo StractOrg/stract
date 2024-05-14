@@ -16,10 +16,7 @@
 
 #[cfg(test)]
 mod tests {
-    use optics::{
-        ast::{RankingCoeff, RankingTarget},
-        HostRankings, Optic,
-    };
+    use optics::HostRankings;
 
     use crate::{
         bangs::Bangs,
@@ -179,13 +176,11 @@ mod tests {
                     disliked: vec![],
                     blocked: vec![],
                 }),
-                optic: Some(Optic {
-                    rankings: vec![RankingCoeff {
-                        target: RankingTarget::Signal("inbound_similarity".to_string()),
-                        value: 100_000_000.0,
-                    }],
-                    ..Default::default()
-                }),
+
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::InboundSimilarity) => 100_000_000.0,
+                }.into(),
+
                 ..Default::default()
             })
             .await
@@ -205,13 +200,11 @@ mod tests {
                     disliked: vec!["www.second.com".to_string()],
                     blocked: vec!["first.com".to_string()],
                 }),
-                optic: Some(Optic {
-                    rankings: vec![RankingCoeff {
-                        target: RankingTarget::Signal("inbound_similarity".to_string()),
-                        value: 100_000_000.0,
-                    }],
-                    ..Default::default()
-                }),
+
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::InboundSimilarity) => 100_000_000.0,
+                }.into(),
+
                 return_ranking_signals: true,
                 ..Default::default()
             })
@@ -231,13 +224,11 @@ mod tests {
                     disliked: vec![],
                     blocked: vec!["abc.first.com".to_string()],
                 }),
-                optic: Some(Optic {
-                    rankings: vec![RankingCoeff {
-                        target: RankingTarget::Signal("inbound_similarity".to_string()),
-                        value: 100_000_000.0,
-                    }],
-                    ..Default::default()
-                }),
+
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::InboundSimilarity) => 100_000_000.0,
+                }.into(),
+
                 return_ranking_signals: true,
                 ..Default::default()
             })

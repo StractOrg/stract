@@ -274,14 +274,11 @@ impl AsTantivyQuery for Matching {
 
 #[cfg(test)]
 mod tests {
-    use optics::{
-        ast::{RankingCoeff, RankingTarget},
-        HostRankings, Optic,
-    };
+    use optics::{HostRankings, Optic};
 
     use crate::{
         bangs::Bangs,
-        gen_temp_path,
+        enum_map, gen_temp_path,
         index::Index,
         searcher::{
             api::{ApiSearcher, Config},
@@ -354,13 +351,10 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                optic: Some(Optic {
-                    rankings: vec![RankingCoeff {
-                        target: RankingTarget::Signal("host_centrality".to_string()),
-                        value: 1_000_000.0,
-                    }],
-                    ..Default::default()
-                }),
+                signal_coefficients: enum_map!{
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::Bm25Title) => 1_000_000.0
+                
+                }.into(),
                 ..Default::default()
             })
             .unwrap()
@@ -759,11 +753,11 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
+                signal_coefficients: crate::enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::signal::InboundSimilarity) => 100_000.0
+                }.into(),
+
                 optic: Some(Optic {
-                    rankings: vec![RankingCoeff {
-                        target: RankingTarget::Signal("inbound_similarity".to_string()),
-                        value: 100_000.0,
-                    }],
                     host_rankings: HostRankings {
                         liked: vec!["www.a.com".to_string(), "www.b.com".to_string()],
                         disliked: vec!["www.c.com".to_string()],

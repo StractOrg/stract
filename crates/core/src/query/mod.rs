@@ -53,6 +53,7 @@ pub struct Query {
     optics: Vec<Optic>,
     top_n: usize,
     count_results_exact: bool,
+    signal_coefficients: SignalCoefficient,
 }
 
 impl Clone for Query {
@@ -66,6 +67,7 @@ impl Clone for Query {
             optics: self.optics.clone(),
             top_n: self.top_n,
             count_results_exact: self.count_results_exact,
+            signal_coefficients: self.signal_coefficients.clone(),
         }
     }
 }
@@ -143,6 +145,7 @@ impl Query {
             region: query.selected_region,
             top_n: query.num_results,
             count_results_exact: query.count_results_exact,
+            signal_coefficients: query.signal_coefficients(),
         })
     }
 
@@ -174,22 +177,8 @@ impl Query {
         &self.host_rankings
     }
 
-    pub fn signal_coefficients(&self) -> Option<SignalCoefficient> {
-        // TODO: we should make sure taht `SearchQuery::signal_coefficients`
-        // return the same coefficients as the ones we calculate here
-        if self.optics.is_empty() {
-            return None;
-        }
-
-        Some(
-            self.optics
-                .iter()
-                .fold(SignalCoefficient::default(), |mut acc, optic| {
-                    let coeffs = SignalCoefficient::from_optic(optic);
-                    acc.merge_add(coeffs);
-                    acc
-                }),
-        )
+    pub fn signal_coefficients(&self) -> SignalCoefficient {
+        self.signal_coefficients.clone()
     }
 }
 

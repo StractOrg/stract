@@ -66,7 +66,6 @@ pub async fn explore_export_optic(
         },
         rules: vec![rule],
         discard_non_matching: true,
-        ..Default::default()
     };
 
     Ok(optic.to_string())

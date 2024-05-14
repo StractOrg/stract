@@ -17,7 +17,6 @@
 pub mod ast;
 mod lexer;
 
-use ast::RankingCoeff;
 use itertools::Itertools;
 use std::fmt::Display;
 use thiserror::Error;
@@ -101,7 +100,6 @@ impl TryFrom<RawOptic> for Optic {
 
         Ok(Self {
             rules,
-            rankings: raw.rankings,
             discard_non_matching: raw.discard_non_matching,
             host_rankings: HostRankings {
                 liked: liked_hosts,
@@ -364,7 +362,6 @@ impl Display for Action {
     bincode::Decode,
 )]
 pub struct Optic {
-    pub rankings: Vec<RankingCoeff>,
     pub host_rankings: HostRankings,
     pub rules: Vec<Rule>,
     pub discard_non_matching: bool,
@@ -384,10 +381,6 @@ impl Display for Optic {
 
         for rule in &self.rules {
             write!(f, "{rule}")?;
-        }
-
-        for ranking in &self.rankings {
-            writeln!(f, "{ranking};")?;
         }
 
         write!(f, "{}", self.host_rankings)
@@ -579,8 +572,6 @@ impl HostRankings {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::RankingTarget;
-
     use super::*;
     #[test]
     fn pattern_part() {
@@ -609,10 +600,6 @@ mod tests {
     #[test]
     fn export() {
         let optic = Optic {
-            rankings: vec![RankingCoeff {
-                target: RankingTarget::Signal("bm25".to_string()),
-                value: 1.0,
-            }],
             host_rankings: HostRankings {
                 liked: vec!["liked.com".to_string()],
                 disliked: vec!["disliked.com".to_string()],

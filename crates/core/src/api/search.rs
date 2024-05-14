@@ -14,10 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::config::defaults;
+use crate::{
+    config::defaults,
+    enum_map::EnumMap,
+    ranking::{SignalCoefficient, SignalEnum, SignalEnumDiscriminants},
+};
 use http::StatusCode;
 use optics::{HostRankings, Optic};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use utoipa::ToSchema;
 
 use axum::Json;
@@ -63,6 +67,8 @@ pub struct ApiSearchQuery {
     pub host_rankings: Option<HostRankings>,
     pub safe_search: Option<bool>,
 
+    pub signal_coefficients: Option<HashMap<SignalEnumDiscriminants, f64>>,
+
     #[serde(default = "defaults::SearchQuery::return_ranking_signals")]
     pub return_ranking_signals: bool,
 
@@ -89,6 +95,15 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             None
         };
 
+        let signal_coefficients: Option<SignalCoefficient> =
+            api.signal_coefficients.map(|coefficients| {
+                coefficients
+                    .into_iter()
+                    .map(|(signal, coefficient)| (signal.into(), coefficient))
+                    .collect::<EnumMap<SignalEnum, f64>>()
+                    .into()
+            });
+
         let default = SearchQuery::default();
 
         Ok(SearchQuery {
@@ -101,6 +116,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             return_ranking_signals: api.return_ranking_signals,
             safe_search: api.safe_search.unwrap_or(default.safe_search),
             count_results_exact: api.count_results_exact,
+            signal_coefficients: signal_coefficients.unwrap_or(default.signal_coefficients),
             #[cfg(feature = "return_body")]
             return_body: api.return_body,
             #[cfg(not(feature = "return_body"))]

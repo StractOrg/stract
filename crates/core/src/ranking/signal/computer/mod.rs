@@ -131,7 +131,7 @@ impl std::fmt::Debug for SignalComputer {
 
 impl SignalComputer {
     pub fn new(query: Option<&Query>) -> Self {
-        let query_signal_coefficients = query.as_ref().and_then(|q| q.signal_coefficients());
+        let query_signal_coefficients = query.as_ref().map(|q| q.signal_coefficients());
 
         let fetch_time_ms_cache: Vec<_> = (0..1000)
             .map(|fetch_time| 1.0 / (fetch_time as f64 + 1.0))

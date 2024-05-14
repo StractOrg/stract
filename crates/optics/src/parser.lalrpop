@@ -18,7 +18,6 @@ pub Blocks: Vec<RawOpticBlock> = <Sep<";", Block>>;
 
 Block: RawOpticBlock = {
     <Rule> => RawOpticBlock::Rule(<>),
-    <Ranking> => RawOpticBlock::Ranking(<>),
     <HostPreference> => RawOpticBlock::HostPreference(<>),
     "DiscardNonMatching" => RawOpticBlock::DiscardNonMatching,
 }
@@ -69,24 +68,6 @@ InnerAction: RawAction= {
     "Discard" => RawAction::Discard,
 }
 
-Ranking: RankingCoeff = {
-    "Ranking" "(" <target:RankingTarget> "," <l:@L> <value:Number> <r:@R> ")" =>? {
-        match value.parse() {
-            Ok(value) => Ok(RankingCoeff {
-                target,
-                value
-            }),
-            Err(_) => Err(ParseError::User {
-                error: crate::Error::NumberParse{ token: (l, value.to_string(), r)}
-            })
-        }
-    }
-}
-
-RankingTarget: RankingTarget = {
-    "Signal" "(" <StringLiteral> ")" => RankingTarget::Signal(<>.to_string()),
-}
-
 HostPreference: RawHostPreference = {
     "Like" "(" "Site" "(" <StringLiteral> ")" ")" => RawHostPreference::Like(<>.to_string()),
     "Dislike" "(" "Site" "(" <StringLiteral> ")" ")" => RawHostPreference::Dislike(<>.to_string())
@@ -106,7 +87,6 @@ extern {
 
         "DiscardNonMatching" => Token::DiscardNonMatching,
         "Rule" => Token::Rule,
-        "Ranking" => Token::Ranking,
         "Stage" => Token::Stage,
         "Signal" => Token::Signal,
         "Field" => Token::Field,

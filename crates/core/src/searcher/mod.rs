@@ -79,6 +79,8 @@ pub struct SearchQuery {
     pub count_results_exact: bool,
     pub return_body: Option<ReturnBody>,
     pub return_structured_data: bool,
+
+    pub signal_coefficients: SignalCoefficient,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
@@ -105,6 +107,7 @@ impl Default for SearchQuery {
             count_results_exact: defaults::SearchQuery::count_results_exact(),
             return_body: None,
             return_structured_data: defaults::SearchQuery::return_structured_data(),
+            signal_coefficients: Default::default(),
         }
     }
 }
@@ -115,13 +118,7 @@ impl SearchQuery {
     }
 
     pub fn signal_coefficients(&self) -> SignalCoefficient {
-        let mut signal_coefficients = SignalCoefficient::default();
-
-        if let Some(optic) = &self.optic {
-            signal_coefficients.merge_overwrite(SignalCoefficient::from_optic(optic));
-        }
-
-        signal_coefficients
+        self.signal_coefficients.clone()
     }
 
     pub fn host_rankings(&self) -> HostRankings {
