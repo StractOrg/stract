@@ -79,6 +79,7 @@ pub struct QueryData {
     simple_terms: Vec<String>,
     optic_rules: Vec<optics::Rule>,
     selected_region: Option<crate::webpage::Region>,
+    lang: Option<whatlang::Lang>,
 }
 impl QueryData {
     pub fn selected_region(&self) -> Option<crate::webpage::Region> {
@@ -154,6 +155,7 @@ impl SignalComputer {
                 .cloned()
                 .collect(),
             selected_region: q.region().cloned(),
+            lang: q.lang(),
         });
 
         let mut s = Self {
@@ -202,7 +204,7 @@ impl SignalComputer {
                         .collect::<String>();
 
                         let mut terms = Vec::new();
-                        let mut tokenizer = text_field.tokenizer();
+                        let mut tokenizer = text_field.tokenizer(query.lang.as_ref());
                         let mut stream = tokenizer.token_stream(&simple_query);
 
                         while let Some(token) = stream.next() {

@@ -136,12 +136,13 @@ impl Query {
 
     pub fn as_tantivy(
         &self,
+        lang: Option<&whatlang::Lang>,
         schema: &tantivy::schema::Schema,
     ) -> Option<Box<dyn tantivy::query::Query>> {
         match self {
             Query::Term(Term { text, field }) => match text {
                 SimpleOrPhrase::Simple(s) => {
-                    let mut terms = process_tantivy_term(s.as_str(), *field, schema);
+                    let mut terms = process_tantivy_term(s.as_str(), *field, lang, schema);
 
                     let option = field.record_option();
                     if terms.len() == 1 {
@@ -166,7 +167,7 @@ impl Query {
                 }
                 SimpleOrPhrase::Phrase(p) => {
                     let phrase = p.join(" ");
-                    let mut processed_terms = process_tantivy_term(&phrase, *field, schema);
+                    let mut processed_terms = process_tantivy_term(&phrase, *field, lang, schema);
 
                     if processed_terms.is_empty() {
                         return None;
@@ -188,7 +189,7 @@ impl Query {
             Query::Boolean { clauses } => {
                 let mut t_clauses = Vec::new();
                 for (occur, query) in clauses {
-                    if let Some(query) = query.as_tantivy(schema) {
+                    if let Some(query) = query.as_tantivy(lang, schema) {
                         t_clauses.push(((*occur).into(), query));
                     }
                 }
@@ -202,10 +203,11 @@ impl Query {
 fn process_tantivy_term<T: TextField>(
     term: &str,
     field: T,
+    lang: Option<&whatlang::Lang>,
     schema: &tantivy::schema::Schema,
 ) -> Vec<tantivy::Term> {
     let mut terms: Vec<tantivy::Term> = Vec::new();
-    let mut tokenizer = field.query_tokenizer();
+    let mut tokenizer = field.query_tokenizer(lang);
     let mut token_stream = tokenizer.token_stream(term);
 
     if let Some(tantivy_field) = field.tantivy_field(schema) {

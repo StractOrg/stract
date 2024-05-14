@@ -67,10 +67,6 @@ pub enum Tokenizer {
 }
 
 impl Tokenizer {
-    pub fn new_stemmed() -> Self {
-        Self::Stemmed(Stemmed::default())
-    }
-
     pub fn as_str(&self) -> &'static str {
         match self {
             Tokenizer::Normal(_) => Normal::as_str(),
@@ -81,6 +77,12 @@ impl Tokenizer {
             Tokenizer::Json(_) => JsonField::as_str(),
             Tokenizer::SiteOperator(_) => SiteOperatorUrlTokenizer::as_str(),
         }
+    }
+}
+
+impl From<Stemmed> for Tokenizer {
+    fn from(stemmed: Stemmed) -> Self {
+        Self::Stemmed(stemmed)
     }
 }
 

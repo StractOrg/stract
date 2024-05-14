@@ -28,7 +28,8 @@ use crate::{
     enum_dispatch_from_discriminant,
     enum_map::InsertEnumMapKey,
     tokenizer::{
-        BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer, TrigramTokenizer,
+        self, BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer,
+        TrigramTokenizer,
     },
     webpage::Html,
     Result,
@@ -51,21 +52,23 @@ pub trait TextField:
         schema: &tantivy::schema::Schema,
     ) -> Result<()>;
 
+    #[allow(unused_variables)]
     fn add_webpage_tantivy(
         &self,
-        _webpage: &crate::webpage::Webpage,
-        _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        webpage: &crate::webpage::Webpage,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         Ok(())
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    #[allow(unused_variables)]
+    fn tokenizer(&self, lang: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::default()
     }
 
-    fn query_tokenizer(&self) -> Tokenizer {
-        self.tokenizer()
+    fn query_tokenizer(&self, lang: Option<&whatlang::Lang>) -> Tokenizer {
+        self.tokenizer(lang)
     }
 
     fn ngram_size(&self) -> usize {
@@ -118,7 +121,7 @@ pub trait TextField:
     }
 
     fn indexing_option(&self) -> IndexingOption {
-        let tokenizer = self.tokenizer();
+        let tokenizer = self.tokenizer(None);
         let option = self.record_option();
 
         let mut opt = TextOptions::default().set_indexing_options(
@@ -362,8 +365,11 @@ impl TextField for StemmedTitle {
         "stemmed_title"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
-        Tokenizer::new_stemmed()
+    fn tokenizer(&self, lang: Option<&whatlang::Lang>) -> Tokenizer {
+        match lang {
+            Some(lang) => tokenizer::Stemmed::with_forced_language(*lang).into(),
+            None => tokenizer::Stemmed::default().into(),
+        }
     }
 
     fn is_searchable(&self) -> bool {
@@ -405,8 +411,11 @@ impl TextField for StemmedCleanBody {
         "stemmed_body"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
-        Tokenizer::new_stemmed()
+    fn tokenizer(&self, lang: Option<&whatlang::Lang>) -> Tokenizer {
+        match lang {
+            Some(lang) => tokenizer::Stemmed::with_forced_language(*lang).into(),
+            None => tokenizer::Stemmed::default().into(),
+        }
     }
 
     fn is_stored(&self) -> bool {
@@ -527,7 +536,7 @@ impl TextField for UrlNoTokenizer {
         "url_no_tokenizer"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -574,7 +583,7 @@ impl TextField for UrlForSiteOperator {
         true
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::SiteOperator(SiteOperatorUrlTokenizer)
     }
 
@@ -657,7 +666,7 @@ impl TextField for SiteNoTokenizer {
         "site_no_tokenizer"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -700,7 +709,7 @@ impl TextField for DomainNoTokenizer {
         "domain_no_tokenizer"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -743,7 +752,7 @@ impl TextField for DomainNameNoTokenizer {
         "domain_name_no_tokenizer"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -786,7 +795,7 @@ impl TextField for SiteIfHomepageNoTokenizer {
         "site_if_homepage_no_tokenizer"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -866,7 +875,7 @@ impl TextField for DomainNameIfHomepageNoTokenizer {
         "domain_name_if_homepage_no_tokenizer"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -913,7 +922,7 @@ impl TextField for DomainIfHomepageNoTokenizer {
         "domain_if_homepage_no_tokenizer"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -1109,7 +1118,7 @@ impl TextField for SchemaOrgJson {
         "schema_org_json"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -1145,7 +1154,7 @@ impl TextField for FlattenedSchemaOrgJson {
         true
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Json(JsonField)
     }
 
@@ -1181,11 +1190,11 @@ impl TextField for CleanBodyBigrams {
         CleanBody.into()
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Bigram(BigramTokenizer::default())
     }
 
-    fn query_tokenizer(&self) -> Tokenizer {
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::default()
     }
 
@@ -1225,11 +1234,11 @@ impl TextField for TitleBigrams {
         Title.into()
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Bigram(BigramTokenizer::default())
     }
 
-    fn query_tokenizer(&self) -> Tokenizer {
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::default()
     }
 
@@ -1275,11 +1284,11 @@ impl TextField for CleanBodyTrigrams {
         CleanBody.into()
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Trigram(TrigramTokenizer::default())
     }
 
-    fn query_tokenizer(&self) -> Tokenizer {
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::default()
     }
 
@@ -1319,11 +1328,11 @@ impl TextField for TitleTrigrams {
         Title.into()
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Trigram(TrigramTokenizer::default())
     }
 
-    fn query_tokenizer(&self) -> Tokenizer {
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::default()
     }
 
@@ -1389,7 +1398,7 @@ impl TextField for SafetyClassification {
         "safety_classification"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -1431,7 +1440,7 @@ impl TextField for InsertionTimestamp {
         "insertion_timestamp"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 
@@ -1474,7 +1483,7 @@ impl TextField for RecipeFirstIngredientTagId {
         "recipe_first_ingredient_tag_id"
     }
 
-    fn tokenizer(&self) -> Tokenizer {
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
         Tokenizer::Identity(Identity {})
     }
 

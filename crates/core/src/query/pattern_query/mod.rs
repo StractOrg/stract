@@ -96,7 +96,10 @@ impl PatternQuery {
         for pattern in &patterns {
             match pattern {
                 PatternPart::Raw(text) => {
-                    let mut tokenizer = field.as_text().unwrap().tokenizer();
+                    let mut tokenizer = field
+                        .as_text()
+                        .unwrap()
+                        .tokenizer(Some(&whatlang::Lang::Eng));
                     let mut stream = tokenizer.token_stream(text);
 
                     while let Some(token) = stream.next() {

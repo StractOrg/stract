@@ -54,6 +54,7 @@ pub struct Query {
     top_n: usize,
     count_results_exact: bool,
     signal_coefficients: SignalCoefficient,
+    lang: Option<whatlang::Lang>,
 }
 
 impl Clone for Query {
@@ -68,12 +69,15 @@ impl Clone for Query {
             top_n: self.top_n,
             count_results_exact: self.count_results_exact,
             signal_coefficients: self.signal_coefficients.clone(),
+            lang: self.lang,
         }
     }
 }
 
 impl Query {
     pub fn parse(ctx: &Ctx, query: &SearchQuery, index: &InvertedIndex) -> Result<Query> {
+        let lang = whatlang::detect_lang(&query.query);
+
         let parsed_terms = parser::truncate(parser::parse(&query.query)?);
 
         if parsed_terms.is_empty() {
@@ -115,7 +119,7 @@ impl Query {
 
         let mut tantivy_query = plan
             .into_query()
-            .as_tantivy(&schema)
+            .as_tantivy(lang.as_ref(), &schema)
             .expect("there should at least be one field in the index");
 
         let mut optics = Vec::new();
@@ -146,6 +150,7 @@ impl Query {
             top_n: query.num_results,
             count_results_exact: query.count_results_exact,
             signal_coefficients: query.signal_coefficients(),
+            lang,
         })
     }
 
@@ -179,6 +184,10 @@ impl Query {
 
     pub fn signal_coefficients(&self) -> SignalCoefficient {
         self.signal_coefficients.clone()
+    }
+
+    pub fn lang(&self) -> Option<whatlang::Lang> {
+        self.lang
     }
 }
 

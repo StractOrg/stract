@@ -104,7 +104,7 @@ impl Collector for ApproxCount {
         segment: &tantivy::SegmentReader,
     ) -> tantivy::Result<Self::Child> {
         let field = text_field::AllBody.tantivy_field(segment.schema()).unwrap();
-        let mut tokenizer = text_field::AllBody.query_tokenizer();
+        let mut tokenizer = text_field::AllBody.query_tokenizer(None);
 
         let inverted_index = segment.inverted_index(field)?;
         let num_docs = segment.max_doc() as u64;
