@@ -20,7 +20,6 @@ use std::fs;
 use std::path::Path;
 use stract::config;
 use stract::entrypoint::autosuggest_scrape::{self, Gl};
-use tracing::level_filters::LevelFilter;
 
 #[cfg(feature = "dev")]
 use stract::entrypoint::configure;
@@ -262,9 +261,8 @@ fn main() -> Result<()> {
         .with_max_level(tracing::Level::INFO)
         .with_env_filter(
             tracing_subscriber::EnvFilter::builder()
-                .with_default_directive(LevelFilter::OFF.into())
-                .from_env_lossy()
-                .add_directive("stract=info".parse().unwrap()),
+                .with_default_directive("stract=info".parse().unwrap())
+                .from_env_lossy(),
         )
         .without_time()
         .with_target(false)

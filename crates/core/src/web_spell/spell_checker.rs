@@ -157,14 +157,14 @@ impl LangSpellChecker {
             let scaled_term_log_prob = self.config.lm_prob_weight * term_log_prob
                 + ((1.0 - self.config.misspelled_prob).log2());
 
-            tracing::debug!(?term, ?scaled_term_log_prob);
+            tracing::debug!(?term, ?term_log_prob, ?scaled_term_log_prob);
 
             if let Some((best_term, score)) =
                 self.score_candidates(term, &candidates, context, this_term_context_idx)
             {
                 let diff = score - scaled_term_log_prob;
                 tracing::debug!(?best_term, ?score, ?diff);
-                if diff > self.config.correction_threshold {
+                if diff.is_finite() && diff > self.config.correction_threshold {
                     corrections.push((i, best_term.clone()));
                     terms[i] = best_term; // make sure the next terms use the corrected context
                 }

@@ -79,7 +79,7 @@ impl StupidBackoffTrainer {
 
     pub fn train(&mut self, tokens: &[String]) {
         for window in tokens.windows(self.max_ngram_size) {
-            for i in 1..window.len() {
+            for i in 1..=window.len() {
                 let ngram = Ngram {
                     terms: window[..i].to_vec(),
                 };
@@ -433,5 +433,43 @@ mod tests {
             model.contexts("b"),
             vec![(vec!["a".to_string(), "b".to_string(), "c".to_string()], 1)]
         );
+
+        assert_eq!(model.n_counts, vec![24, 24, 24]);
+    }
+
+    #[test]
+    fn test_merge() {
+        let mut a = StupidBackoffTrainer::new(3);
+
+        a.train(&tokenize(
+            "a b c d e f g h i j k l m n o p q r s t u v w x y z",
+        ));
+
+        let path = gen_temp_path();
+
+        a.build(&path).unwrap();
+
+        let a = StupidBackoff::open(&path).unwrap();
+
+        let mut b = StupidBackoffTrainer::new(3);
+
+        b.train(&tokenize(
+            "a b c d e f g h i j k l m n o p q r s t u v w x y z",
+        ));
+
+        let path = gen_temp_path();
+
+        b.build(&path).unwrap();
+
+        let b = StupidBackoff::open(&path).unwrap();
+
+        let path = gen_temp_path();
+        let model = StupidBackoff::merge(vec![a, b], &path).unwrap();
+
+        assert_eq!(model.n_counts, vec![48, 48, 48]);
+
+        let model = StupidBackoff::open(path).unwrap();
+
+        assert_eq!(model.n_counts, vec![48, 48, 48]);
     }
 }
