@@ -3,7 +3,7 @@
   import Searchbar from '$lib/components/Searchbar.svelte';
   import type { PageData } from './$types';
   import RegionSelect from '$lib/components/RegionSelect.svelte';
-  import { searchQueryStore, useKeyboardShortcuts } from '$lib/stores';
+  import { searchQueryStore, showRankingSignals, useKeyboardShortcuts } from '$lib/stores';
   import { page } from '$app/stores';
   import { updateQueryId } from '$lib/improvements';
   import { browser } from '$app/environment';
@@ -45,7 +45,12 @@
   const clientSearch = async () => {
     if (!browser) return;
 
-    const res = await search(data.params, { fetch: fetch });
+    const params = {
+      ...data.params,
+      showRankingSignals: $showRankingSignals,
+    };
+
+    const res = await search(params, { fetch: fetch });
 
     if (res._type == 'bang') {
       window.location.replace(res.redirectTo);

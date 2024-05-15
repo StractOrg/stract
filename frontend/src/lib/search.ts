@@ -18,8 +18,9 @@ export type SearchParams = {
   optic: string | undefined;
   selectedRegion: Region | undefined;
   safeSearch: boolean;
-  compressedhost_rankings: string | null;
-  host_rankings: RankedSites | undefined;
+  compressedHostRankings: string | null;
+  hostRankings: RankedSites | undefined;
+  showRankingSignals?: boolean;
 };
 
 export type SearchResults =
@@ -53,8 +54,8 @@ export const extractSearchParams = (searchParams: URLSearchParams | FormData): S
     optic,
     selectedRegion,
     safeSearch,
-    compressedhost_rankings,
-    host_rankings,
+    compressedHostRankings: compressedhost_rankings,
+    hostRankings: host_rankings,
   };
 };
 
@@ -105,7 +106,8 @@ export const search = async (params: SearchParams, options: ApiOptions) => {
       safeSearch: params.safeSearch,
       optic: params.optic && (await fetchRemoteOptic({ opticUrl: params.optic, fetch })),
       selectedRegion: params.selectedRegion,
-      hostRankings: params.host_rankings,
+      hostRankings: params.hostRankings,
+      returnRankingSignals: params.showRankingSignals,
     },
     options,
   );
@@ -139,7 +141,7 @@ export const search = async (params: SearchParams, options: ApiOptions) => {
             numResults: 10,
             safeSearch: params.safeSearch,
             selectedRegion: params.selectedRegion,
-            hostRankings: params.host_rankings,
+            hostRankings: params.hostRankings,
           },
           options,
         )
