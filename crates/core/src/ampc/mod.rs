@@ -16,7 +16,6 @@
 
 use self::{job::Job, worker::WorkerRef};
 use crate::distributed::sonic;
-use std::time::Duration;
 
 mod coordinator;
 pub mod dht;
@@ -75,34 +74,4 @@ type JobConn<J> = sonic::Connection<JobReq<J>, JobResp<J>>;
 enum JobScheduled {
     Success(WorkerRef),
     NoAvailableWorkers,
-}
-
-struct ExponentialBackoff {
-    min: Duration,
-    max: Duration,
-    factor: f64,
-    attempts: usize,
-}
-
-impl ExponentialBackoff {
-    fn new(min: Duration, max: Duration, factor: f64) -> Self {
-        Self {
-            min,
-            max,
-            factor,
-            attempts: 0,
-        }
-    }
-}
-
-impl ExponentialBackoff {
-    fn next(&mut self) -> Duration {
-        let duration = self.min.mul_f64(self.factor.powi(self.attempts as i32));
-        self.attempts += 1;
-        duration.min(self.max)
-    }
-
-    fn success(&mut self) {
-        self.attempts = 0;
-    }
 }

@@ -20,11 +20,8 @@ use std::{
     time::Duration,
 };
 
-use super::{
-    DhtConn, ExponentialBackoff, Finisher, Job, JobScheduled, RemoteWorker, Setup, Worker,
-    WorkerRef,
-};
-use crate::Result;
+use super::{DhtConn, Finisher, Job, JobScheduled, RemoteWorker, Setup, Worker, WorkerRef};
+use crate::{distributed::retry_strategy::ExponentialBackoff, Result};
 use anyhow::anyhow;
 
 pub struct Coordinator<J>
@@ -108,8 +105,7 @@ where
         mapper: J::Mapper,
     ) -> Result<()> {
         tracing::debug!("Awaiting scheduled jobs");
-        let mut sleeper =
-            ExponentialBackoff::new(Duration::from_millis(100), Duration::from_secs(10), 2.0);
+        let mut sleeper = ExponentialBackoff::from_millis(100).with_limit(Duration::from_secs(10));
 
         loop {
             let worker_jobs = self
@@ -144,7 +140,7 @@ where
                 break;
             }
 
-            std::thread::sleep(sleeper.next());
+            std::thread::sleep(sleeper.next().expect("sleeper should not be exhausted"));
         }
 
         Ok(())
@@ -168,11 +164,8 @@ where
             for mapper in &self.mappers {
                 // run round
                 let mut remaining_jobs: VecDeque<_> = jobs.clone().into_iter().collect();
-                let mut sleeper = ExponentialBackoff::new(
-                    Duration::from_millis(100),
-                    Duration::from_secs(10),
-                    2.0,
-                );
+                let mut sleeper =
+                    ExponentialBackoff::from_millis(100).with_limit(Duration::from_secs(10));
 
                 let mut scheduled_jobs: BTreeMap<WorkerRef, J> = BTreeMap::new();
 
@@ -201,7 +194,8 @@ where
                         }
                         JobScheduled::NoAvailableWorkers => {
                             remaining_jobs.push_front(job);
-                            let sleep_duration = sleeper.next();
+                            let sleep_duration =
+                                sleeper.next().expect("sleeper should not be exhausted");
                             std::thread::sleep(sleep_duration);
                         }
                     }

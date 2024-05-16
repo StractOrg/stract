@@ -33,6 +33,10 @@ impl ExponentialBackoff {
         self.max_delay = Some(limit);
         self
     }
+
+    pub fn success(&mut self) {
+        self.current = self.base;
+    }
 }
 
 impl Iterator for ExponentialBackoff {
