@@ -86,7 +86,6 @@ impl HostDb {
 
     pub fn flush(&mut self) {
         self.db.commit().unwrap();
-        self.db.merge_all_segments().unwrap();
     }
 }
 

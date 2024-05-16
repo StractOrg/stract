@@ -12,7 +12,6 @@ use std::time::Duration;
 pub struct ExponentialBackoff {
     current: u64,
     base: u64,
-    factor: u64,
     max_delay: Option<Duration>,
 }
 
@@ -26,7 +25,6 @@ impl ExponentialBackoff {
         ExponentialBackoff {
             current: base,
             base,
-            factor: 1u64,
             max_delay: None,
         }
     }
@@ -41,12 +39,7 @@ impl Iterator for ExponentialBackoff {
     type Item = Duration;
 
     fn next(&mut self) -> Option<Duration> {
-        // set delay duration by applying factor
-        let duration = if let Some(duration) = self.current.checked_mul(self.factor) {
-            Duration::from_millis(duration)
-        } else {
-            Duration::from_millis(u64::MAX)
-        };
+        let duration = Duration::from_millis(self.current);
 
         // check if we reached max delay
         if let Some(ref max_delay) = self.max_delay {
@@ -55,6 +48,7 @@ impl Iterator for ExponentialBackoff {
             }
         }
 
+        // calculate next delay
         if let Some(next) = self.current.checked_mul(self.base) {
             self.current = next;
         } else {

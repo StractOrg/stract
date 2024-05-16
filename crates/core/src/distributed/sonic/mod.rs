@@ -118,11 +118,6 @@ where
     async fn send_without_timeout(&mut self, request: &Req) -> Result<Res> {
         let bytes = bincode::encode_to_vec(request, bincode::config::standard()).unwrap();
 
-        // disable linger to avoid TIME_WAIT.
-        // should be safe since the connection is closed from the client side.
-        // No stray packets should therefore find its way to the socket.
-        self.stream.set_linger(Some(Duration::from_secs(0)))?;
-
         let header = Header {
             body_size: bytes.len(),
         };
@@ -160,7 +155,10 @@ where
     pub async fn send_with_timeout(&mut self, request: &Req, timeout: Duration) -> Result<Res> {
         match tokio::time::timeout(timeout, self.send_without_timeout(request)).await {
             Ok(res) => res,
-            Err(_) => Err(Error::RequestTimeout),
+            Err(_) => {
+                self.stream.shutdown().await?;
+                Err(Error::RequestTimeout)
+            }
         }
     }
 

@@ -255,6 +255,21 @@ pub mod tests {
         let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
         assert_eq!(res, Some("world2".as_bytes().into()));
 
+        let res = c1.batch_get(table.clone(), vec![]).await?;
+        assert!(res.is_empty());
+
+        let res = c1
+            .batch_get(table.clone(), vec!["hello".as_bytes().into()])
+            .await?;
+
+        assert!(res.len() == 1);
+
+        let res = c1
+            .batch_get(table.clone(), vec!["non-existent-key".as_bytes().into()])
+            .await?;
+
+        assert!(res.is_empty());
+
         Ok(())
     }
 

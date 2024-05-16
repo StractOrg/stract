@@ -340,7 +340,7 @@ impl RemoteClient {
                         key: key.clone(),
                         value: value.clone(),
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await;
 
@@ -408,7 +408,7 @@ impl RemoteClient {
                         table: table.clone(),
                         values: values.clone(),
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await;
 
@@ -469,7 +469,7 @@ impl RemoteClient {
                     NumKeys {
                         table: table.clone(),
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await
             {
@@ -503,7 +503,7 @@ impl RemoteClient {
                         table: table.clone(),
                         key: key.clone(),
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await
             {
@@ -539,7 +539,7 @@ impl RemoteClient {
                         table: table.clone(),
                         keys: keys.clone(),
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await
             {
@@ -576,7 +576,7 @@ impl RemoteClient {
                     DropTable {
                         table: table.clone(),
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await;
 
@@ -641,7 +641,7 @@ impl RemoteClient {
                     CreateTable {
                         table: table.clone(),
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await;
 
@@ -702,7 +702,7 @@ impl RemoteClient {
                 .await
                 .as_ref()
                 .unwrap_or(&self.self_remote)
-                .send_with_timeout(AllTables, Duration::from_secs(5))
+                .send_with_timeout(AllTables, Duration::from_secs(60))
                 .await;
 
             match res {
@@ -767,7 +767,7 @@ impl RemoteClient {
                         from: from.clone(),
                         to: to.clone(),
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await;
 
@@ -843,7 +843,7 @@ impl RemoteClient {
                         value: value.clone(),
                         upsert_fn: upsert.clone(),
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await;
 
@@ -918,7 +918,7 @@ impl RemoteClient {
                         upsert_fn: upsert.clone(),
                         values: values.clone(),
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await;
 
@@ -986,7 +986,7 @@ impl RemoteClient {
                         range: range.clone(),
                         limit,
                     },
-                    Duration::from_secs(5),
+                    Duration::from_secs(60),
                 )
                 .await;
 
