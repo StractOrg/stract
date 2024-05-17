@@ -200,6 +200,7 @@ export type ApiSearchQuery = {
   returnStructuredData?: boolean;
   safeSearch?: boolean;
   selectedRegion?: Region;
+  signalCoefficients?: {};
 };
 export type ApiSearchResult =
   | (WebsitesResult & {
@@ -376,6 +377,89 @@ export type ScoredHost = {
 export type SidebarQuery = {
   query: string;
 };
+export type SignalEnumDiscriminants =
+  | 'bm25_title'
+  | 'bm25_title_bigrams'
+  | 'bm25_title_trigrams'
+  | 'bm25_clean_body'
+  | 'bm25_clean_body_bigrams'
+  | 'bm25_clean_body_trigrams'
+  | 'bm25_stemmed_title'
+  | 'bm25_stemmed_clean_body'
+  | 'bm25_all_body'
+  | 'bm25_keywords'
+  | 'bm25_backlink_text'
+  | 'idf_sum_url'
+  | 'idf_sum_site'
+  | 'idf_sum_domain'
+  | 'idf_sum_site_no_tokenizer'
+  | 'idf_sum_domain_no_tokenizer'
+  | 'idf_sum_domain_name_no_tokenizer'
+  | 'idf_sum_domain_if_homepage'
+  | 'idf_sum_domain_name_if_homepage_no_tokenizer'
+  | 'idf_sum_domain_if_homepage_no_tokenizer'
+  | 'idf_sum_title_if_homepage'
+  | 'cross_encoder_snippet'
+  | 'cross_encoder_title'
+  | 'host_centrality'
+  | 'host_centrality_rank'
+  | 'page_centrality'
+  | 'page_centrality_rank'
+  | 'is_homepage'
+  | 'fetch_time_ms'
+  | 'update_timestamp'
+  | 'tracker_score'
+  | 'region'
+  | 'query_centrality'
+  | 'inbound_similarity'
+  | 'lambda_mart'
+  | 'url_digits'
+  | 'url_slashes'
+  | 'link_density'
+  | 'title_embedding_similarity'
+  | 'keyword_embedding_similarity';
+export const SIGNAL_ENUM_DISCRIMINANTS = [
+  'bm25_title',
+  'bm25_title_bigrams',
+  'bm25_title_trigrams',
+  'bm25_clean_body',
+  'bm25_clean_body_bigrams',
+  'bm25_clean_body_trigrams',
+  'bm25_stemmed_title',
+  'bm25_stemmed_clean_body',
+  'bm25_all_body',
+  'bm25_keywords',
+  'bm25_backlink_text',
+  'idf_sum_url',
+  'idf_sum_site',
+  'idf_sum_domain',
+  'idf_sum_site_no_tokenizer',
+  'idf_sum_domain_no_tokenizer',
+  'idf_sum_domain_name_no_tokenizer',
+  'idf_sum_domain_if_homepage',
+  'idf_sum_domain_name_if_homepage_no_tokenizer',
+  'idf_sum_domain_if_homepage_no_tokenizer',
+  'idf_sum_title_if_homepage',
+  'cross_encoder_snippet',
+  'cross_encoder_title',
+  'host_centrality',
+  'host_centrality_rank',
+  'page_centrality',
+  'page_centrality_rank',
+  'is_homepage',
+  'fetch_time_ms',
+  'update_timestamp',
+  'tracker_score',
+  'region',
+  'query_centrality',
+  'inbound_similarity',
+  'lambda_mart',
+  'url_digits',
+  'url_slashes',
+  'link_density',
+  'title_embedding_similarity',
+  'keyword_embedding_similarity',
+] satisfies SignalEnumDiscriminants[];
 export type SignalScore = {
   coefficient: number;
   value: number;

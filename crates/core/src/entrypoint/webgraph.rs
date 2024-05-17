@@ -240,11 +240,9 @@ impl Webgraph {
                 }
 
                 r.recv().unwrap();
-                let mut host = worker.host_graph.finalize();
-                host.optimize_read();
 
-                let mut page = worker.page_graph.finalize();
-                page.optimize_read();
+                let host = worker.host_graph.finalize();
+                let page = worker.page_graph.finalize();
 
                 s.send(()).unwrap();
                 (host, page)

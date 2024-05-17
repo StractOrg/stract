@@ -6,6 +6,7 @@
   import MarkPagesWithPaywallSelect from './MarkPagesWithPaywallSelect.svelte';
   import ResultsInNewTabs from './ResultsInNewTabs.svelte';
   import UseKeyboardShortcuts from './UseKeyboardShortcuts.svelte';
+  import ShowRankingSignals from './ShowRankingSignals.svelte';
 
   const settings = [
     {
@@ -44,6 +45,11 @@
       description: 'Enables the use of keyboard shortcuts on the site',
       _type: 'use-keeb-shortcuts',
     },
+    {
+      title: 'Show ranking explanations',
+      description: 'Show the top ranking signals for each search result in the modal window',
+      _type: 'show-ranking-signals',
+    },
   ] as const;
 </script>
 
@@ -73,6 +79,8 @@
                 <ResultsInNewTabs />
               {:else if setting._type == 'use-keeb-shortcuts'}
                 <UseKeyboardShortcuts />
+              {:else if setting._type == 'show-ranking-signals'}
+                <ShowRankingSignals />
               {/if}
             </div>
           </div>
