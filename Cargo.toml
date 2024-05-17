@@ -132,8 +132,8 @@ tracing-subscriber = {version = "0.3.11", features = ["env-filter"]}
 tracing-test = "0.2.4"
 url = {version = "2.4.0", features = ["serde"]}
 urlencoding = "2.1.2"
-utoipa = {version = "4.0.0", features = ["axum_extras"]}
-utoipa-swagger-ui = {version = "5.0.0", features = ["axum"]}
+utoipa = {version = "4.2.3", features = ["axum_extras"]}
+utoipa-swagger-ui = {version = "7.0.0", features = ["axum"]}
 uuid = "1.1.2"
 whatlang = {version = "0.16.0", features = ["serde"]}
 xxhash-rust = {version = "0.8.10", features = ["xxh3", "const_xxh3"]}

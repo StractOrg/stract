@@ -71,7 +71,10 @@ pub trait Signal:
     serde::Deserialize,
     bincode::Encode,
     bincode::Decode,
-    Hash
+    PartialOrd,
+    Ord,
+    Hash,
+    utoipa::ToSchema,
 ))]
 #[strum_discriminants(serde(rename_all = "snake_case"))]
 pub enum SignalEnum {

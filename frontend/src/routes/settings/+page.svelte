@@ -46,8 +46,8 @@
       _type: 'use-keeb-shortcuts',
     },
     {
-      title: 'Show ranking signals',
-      description: 'Show the top ranking signals for search result',
+      title: 'Show ranking explanations',
+      description: 'Show the top ranking signals for each search result in the modal window',
       _type: 'show-ranking-signals',
     },
   ] as const;

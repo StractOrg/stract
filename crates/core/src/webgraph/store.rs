@@ -396,6 +396,10 @@ mod tests {
         let edges: Vec<_> = store.get_with_label(&NodeID::from(1_u64), &EdgeLimit::Unlimited);
 
         assert_eq!(edges.len(), 0);
+
+        let edges = store.iter_without_label().collect::<Vec<_>>();
+
+        assert_eq!(edges.len(), 1);
     }
 
     #[test]
