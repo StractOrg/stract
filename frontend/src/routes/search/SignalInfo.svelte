@@ -13,56 +13,73 @@
   };
   const signalInfo = (label: SignalLabel): SignalInfo => {
     return match(label)
-      .with('title', () => ({ title: 'Title', description: 'The title of the webpage.' }))
-      .with('body', () => ({ title: 'Body', description: 'The body of the webpage.' }))
+      .with('title', () => ({
+        title: 'Title',
+        description: 'The query seems to match the title of the webpage',
+      }))
+      .with('body', () => ({
+        title: 'Body',
+        description: 'The query seems to match the text body of the webpage',
+      }))
       .with('keywords', () => ({
         title: 'Keywords',
-        description: 'Keywords extracted from the webpage.',
+        description: 'The page contains keywords that also appear in the query',
       }))
       .with('backlink_text', () => ({
         title: 'Backlink Text',
-        description: 'Text of the backlink to the webpage.',
+        description: 'Pages linking to this page contain the query in their anchor text',
       }))
-      .with('url', () => ({ title: 'URL', description: 'The URL of the webpage.' }))
-      .with('site', () => ({ title: 'Site', description: 'The site of the webpage.' }))
-      .with('domain', () => ({ title: 'Domain', description: 'The domain of the webpage.' }))
+      .with('url', () => ({ title: 'URL', description: 'Words from the query appear in the URL' }))
+      .with('site', () => ({
+        title: 'Site',
+        description: 'The query matches the site of the page',
+      }))
+      .with('domain', () => ({
+        title: 'Domain',
+        description: 'The query matches the domain of the page',
+      }))
       .with('hostCentrality', () => ({
         title: 'Host Centrality',
-        description: 'The centrality of the host.',
+        description: 'The host of the page has a high centrality score in the web graph',
       }))
       .with('pageCentrality', () => ({
         title: 'Page Centrality',
-        description: 'The centrality of the page.',
+        description: 'The page has a high centrality score in the web graph',
       }))
       .with('isHomepage', () => ({
         title: 'Is Homepage',
-        description: 'Whether the webpage is the homepage of the site.',
+        description: 'The page is the homepage of the site',
       }))
       .with('fetchTime', () => ({
         title: 'Fetch Time',
-        description: 'The time it took to fetch the webpage.',
+        description:
+          'The page had a low fetch time, indicating you will get a good user experience on the page',
       }))
       .with('updateTimestamp', () => ({
         title: 'Update Timestamp',
-        description: 'The time the webpage was last updated.',
+        description: 'The page was recently updated',
       }))
       .with('trackerScore', () => ({
         title: 'Tracker Score',
-        description: 'Score to determine if a page has few trackers.',
+        description: 'We found few/no trackers on the page',
       }))
-      .with('region', () => ({ title: 'Region', description: 'The region of the webpage.' }))
+      .with('region', () => ({
+        title: 'Language',
+        description:
+          'The page seems to be written in a widely spoken language, or matches the language you have set during search (if any)',
+      }))
       .with('queryCentrality', () => ({
-        title: '',
-        description: '',
+        title: 'Query Centrality',
+        description: 'Other pages in the result set links to this page',
       }))
       .with('inboundSimilarity', () => ({
-        title: '',
-        description: '',
+        title: 'Liked/Disliked',
+        description: 'Another page you have liked/disliked influences the ranking of this page',
       }))
       .with('urlSymbols', () => ({ title: '', description: '' }))
       .with('linkDensity', () => ({
         title: 'Link Density',
-        description: 'The density of links in the webpage.',
+        description: 'The page has a low number of links compared to the amount of text',
       }))
       .exhaustive();
   };
@@ -78,12 +95,14 @@
     </div>
   </summary>
   <p class="text-sm">{signalInfo(label).description}</p>
-  <div class="mb-2 mt-1">
+  <div class="mb-2 mt-1 text-xs">
     <div class="flex flex-wrap gap-x-1 gap-y-1">
       {#each signals.slice(0, 3) as [signal, score]}
         <span
           class="rounded-full bg-base-200 px-2 text-center text-xs text-neutral-focus"
-          title="score: {(score.value * score.coefficient).toFixed(2)}"
+          title="The '{signal.replace(/_/g, '-')}' signal has a score of {(
+            score.value * score.coefficient
+          ).toFixed(2)}"
         >
           {signal.replace(/_/g, '-')}
         </span>
