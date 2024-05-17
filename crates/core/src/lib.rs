@@ -386,12 +386,12 @@ where
     let mut threshold = None;
     for hit in hits {
         if let Some(threshold) = threshold {
-            if hit.sort_key() <= threshold {
+            if hit.sort_key() > threshold {
                 continue;
             }
         }
         top_k.push(hit);
-        if top_k.len() == 2 * k {
+        if top_k.len() >= 2 * k {
             // The standard library does all of the heavy lifting here.
             let (_, median_el, _) = top_k.select_nth_unstable(k - 1);
             threshold = Some(median_el.sort_key());
