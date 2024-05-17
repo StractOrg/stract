@@ -38,6 +38,7 @@ pub trait UpsertFn {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub enum UpsertEnum {
     HyperLogLog64Upsert,
+    HyperLogLog128Upsert,
     U64Add,
     F64Add,
 }
@@ -53,6 +54,30 @@ impl UpsertFn for HyperLogLog64Upsert {
         )
         .unwrap();
         let (new, _) = bincode::decode_from_slice::<HyperLogLog<64>, _>(
+            new.as_bytes(),
+            bincode::config::standard(),
+        )
+        .unwrap();
+
+        old.merge(&new);
+
+        bincode::encode_to_vec(&old, bincode::config::standard())
+            .unwrap()
+            .into()
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+pub struct HyperLogLog128Upsert;
+
+impl UpsertFn for HyperLogLog128Upsert {
+    fn upsert(&self, old: Value, new: Value) -> Value {
+        let (mut old, _) = bincode::decode_from_slice::<HyperLogLog<128>, _>(
+            old.as_bytes(),
+            bincode::config::standard(),
+        )
+        .unwrap();
+        let (new, _) = bincode::decode_from_slice::<HyperLogLog<128>, _>(
             new.as_bytes(),
             bincode::config::standard(),
         )
