@@ -225,7 +225,7 @@ pub fn run(config: HarmonicCoordinatorConfig) -> Result<()> {
 
     let top_nodes = top_nodes
         .iter()
-        .map(|(id, c)| (id2node[id].clone(), *c))
+        .filter_map(|(id, c)| id2node.get(id).map(|n| (n.clone(), *c)))
         .collect::<Vec<_>>();
 
     store_csv(top_nodes, output_path.join("harmonic.csv"));
