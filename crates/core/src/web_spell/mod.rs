@@ -210,6 +210,30 @@ impl<'a> MergePointer<'a> {
     }
 }
 
+impl<'a> PartialOrd for MergePointer<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'a> Ord for MergePointer<'a> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self.is_finished, other.is_finished) {
+            (true, true) | (false, false) => self.term.cmp(&other.term),
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+        }
+    }
+}
+
+impl<'a> PartialEq for MergePointer<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.term == other.term && self.is_finished == other.is_finished
+    }
+}
+
+impl<'a> Eq for MergePointer<'a> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

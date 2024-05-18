@@ -16,9 +16,10 @@
 
 use super::{tokenize, MergePointer, Result};
 use std::{
-    collections::BTreeMap,
+    cmp::Reverse,
+    collections::{BTreeMap, BinaryHeap},
     fs::{File, OpenOptions},
-    io::BufWriter,
+    io::{BufWriter, Write},
     path::Path,
 };
 
@@ -143,6 +144,7 @@ impl StupidBackoffTrainer {
         let mut wrt = BufWriter::new(f);
 
         bincode::encode_into_std_write(&self.n_counts, &mut wrt, bincode::config::standard())?;
+        wrt.flush()?;
 
         Ok(())
     }
@@ -166,40 +168,38 @@ fn merge_streams(
         pointer.advance();
     }
 
-    while pointers.iter().any(|p| !p.is_finished) {
-        let mut min_pointer: Option<&MergePointer<'_>> = None;
+    let mut pointers: BinaryHeap<_> = pointers.into_iter().map(Reverse).collect();
 
-        for pointer in pointers.iter() {
-            if pointer.is_finished {
-                continue;
-            }
-
-            if let Some(min) = min_pointer {
-                if pointer.term < min.term {
-                    min_pointer = Some(pointer);
+    loop {
+        let (term, mut freq, is_finished) = {
+            match pointers.peek_mut() {
+                Some(mut pointer) => {
+                    let res = (
+                        pointer.0.term.clone(),
+                        pointer.0.value,
+                        pointer.0.is_finished,
+                    );
+                    pointer.0.advance();
+                    res
                 }
-            } else {
-                min_pointer = Some(pointer);
+                None => break,
             }
+        };
+
+        if is_finished {
+            break;
         }
 
-        if let Some(min_pointer) = min_pointer {
-            let term = min_pointer.term.clone();
-            let mut freq = 0;
-
-            for pointer in pointers.iter_mut() {
-                if pointer.is_finished {
-                    continue;
-                }
-
-                if pointer.term == term {
-                    freq += pointer.value;
-                    pointer.advance();
-                }
+        while let Some(mut other) = pointers.peek_mut() {
+            if other.0.term != term || other.0.is_finished {
+                break;
             }
 
-            builder.insert(term, freq)?;
+            freq += other.0.value;
+            other.0.advance();
         }
+
+        builder.insert(term, freq)?;
     }
 
     builder.finish()?;
@@ -255,6 +255,7 @@ impl StupidBackoff {
 
         let mut wrt = BufWriter::new(file);
         bincode::encode_into_std_write(&n_counts, &mut wrt, bincode::config::standard())?;
+        wrt.flush()?;
 
         let file = OpenOptions::new()
             .create(true)
@@ -281,11 +282,12 @@ impl StupidBackoff {
         let wtr = BufWriter::new(file);
         let builder = fst::MapBuilder::new(wtr)?;
 
-        let streams: Vec<_> = models.iter().map(|d| d.ngrams.stream()).collect();
+        let streams: Vec<_> = models.iter().map(|d| d.rotated_ngrams.stream()).collect();
 
         merge_streams(builder, streams)?;
 
-        let mmap = unsafe { memmap2::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
+        let mmap =
+            unsafe { memmap2::Mmap::map(&File::open(path.as_ref().join("rotated_ngrams.bin"))?)? };
         let rotated_ngrams = fst::Map::new(mmap)?;
 
         Ok(Self {
