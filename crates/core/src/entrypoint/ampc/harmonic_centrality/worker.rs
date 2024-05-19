@@ -46,9 +46,7 @@ impl CentralityWorker {
         let num_nodes = graph.estimate_num_nodes() as u64;
         let mut changed_nodes = U64BloomFilter::new(num_nodes, 0.05);
 
-        for node in graph.nodes() {
-            changed_nodes.insert(node.as_u64());
-        }
+        changed_nodes.fill();
 
         Self {
             shard,
@@ -62,9 +60,7 @@ impl CentralityWorker {
     pub fn setup_changed_nodes(&self, upper_bound_num_nodes: u64) {
         let mut new_changed_nodes = U64BloomFilter::new(upper_bound_num_nodes, 0.05);
 
-        for node in self.graph.nodes() {
-            new_changed_nodes.insert(node.as_u64());
-        }
+        new_changed_nodes.fill();
 
         *self.changed_nodes.lock().unwrap() = new_changed_nodes;
     }

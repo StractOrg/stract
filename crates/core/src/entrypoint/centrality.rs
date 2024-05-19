@@ -82,7 +82,7 @@ impl Centrality {
         {
             approx_rank.insert(node, rank as u64).unwrap();
 
-            if approx_rank.uncommitted_inserts() > 1_000_000 {
+            if approx_rank.uncommitted_inserts() > 100_000_000 {
                 approx_rank.commit().unwrap();
             }
 

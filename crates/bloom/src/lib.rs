@@ -67,6 +67,12 @@ impl U64BloomFilter {
         }
     }
 
+    pub fn fill(&mut self) {
+        for i in 0..self.bit_vec.len() {
+            self.bit_vec.set(i, true);
+        }
+    }
+
     fn hash(item: u64) -> usize {
         item.wrapping_mul(LARGE_PRIME) as usize
     }
