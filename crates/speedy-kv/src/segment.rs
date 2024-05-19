@@ -80,6 +80,7 @@ where
 
         let mut wrt = BufWriter::new(self.writers.bloom);
         bincode::encode_into_std_write(self.bloom, &mut wrt, bincode::config::standard())?;
+        wrt.flush()?;
 
         Ok(())
     }

@@ -20,7 +20,7 @@ use std::{
     collections::{BTreeMap, BinaryHeap},
     fs::{File, OpenOptions},
     io::{BufWriter, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use fst::{Automaton, IntoStreamer, Streamer};
@@ -211,18 +211,20 @@ pub struct StupidBackoff {
     ngrams: fst::Map<memmap2::Mmap>,
     rotated_ngrams: fst::Map<memmap2::Mmap>,
     n_counts: Vec<u64>,
+    folder: PathBuf,
 }
 
 impl StupidBackoff {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mmap = unsafe { memmap2::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
+    pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
+        let mmap = unsafe { memmap2::Mmap::map(&File::open(folder.as_ref().join("ngrams.bin"))?)? };
         let ngrams = fst::Map::new(mmap)?;
 
-        let mmap =
-            unsafe { memmap2::Mmap::map(&File::open(path.as_ref().join("rotated_ngrams.bin"))?)? };
+        let mmap = unsafe {
+            memmap2::Mmap::map(&File::open(folder.as_ref().join("rotated_ngrams.bin"))?)?
+        };
         let rotated_ngrams = fst::Map::new(mmap)?;
 
-        let file = File::open(path.as_ref().join("n_counts.bin"))?;
+        let file = File::open(folder.as_ref().join("n_counts.bin"))?;
         let mut reader = std::io::BufReader::new(file);
         let n_counts = bincode::decode_from_std_read(&mut reader, bincode::config::standard())?;
 
@@ -230,12 +232,13 @@ impl StupidBackoff {
             ngrams,
             rotated_ngrams,
             n_counts,
+            folder: folder.as_ref().to_path_buf(),
         })
     }
 
-    pub fn merge<P: AsRef<Path>>(models: Vec<Self>, path: P) -> Result<Self> {
-        if !path.as_ref().exists() {
-            std::fs::create_dir_all(path.as_ref())?;
+    pub fn merge<P: AsRef<Path>>(models: Vec<Self>, folder: P) -> Result<Self> {
+        if !folder.as_ref().exists() {
+            std::fs::create_dir_all(folder.as_ref())?;
         }
         let n_counts = models
             .iter()
@@ -251,7 +254,7 @@ impl StupidBackoff {
             .create(true)
             .truncate(true)
             .write(true)
-            .open(path.as_ref().join("n_counts.bin"))?;
+            .open(folder.as_ref().join("n_counts.bin"))?;
 
         let mut wrt = BufWriter::new(file);
         bincode::encode_into_std_write(&n_counts, &mut wrt, bincode::config::standard())?;
@@ -261,7 +264,7 @@ impl StupidBackoff {
             .create(true)
             .truncate(true)
             .write(true)
-            .open(path.as_ref().join("ngrams.bin"))?;
+            .open(folder.as_ref().join("ngrams.bin"))?;
 
         let wtr = BufWriter::new(file);
         let builder = fst::MapBuilder::new(wtr)?;
@@ -270,14 +273,14 @@ impl StupidBackoff {
 
         merge_streams(builder, streams)?;
 
-        let mmap = unsafe { memmap2::Mmap::map(&File::open(path.as_ref().join("ngrams.bin"))?)? };
+        let mmap = unsafe { memmap2::Mmap::map(&File::open(folder.as_ref().join("ngrams.bin"))?)? };
         let ngrams = fst::Map::new(mmap)?;
 
         let file = OpenOptions::new()
             .create(true)
             .truncate(true)
             .write(true)
-            .open(path.as_ref().join("rotated_ngrams.bin"))?;
+            .open(folder.as_ref().join("rotated_ngrams.bin"))?;
 
         let wtr = BufWriter::new(file);
         let builder = fst::MapBuilder::new(wtr)?;
@@ -286,14 +289,20 @@ impl StupidBackoff {
 
         merge_streams(builder, streams)?;
 
-        let mmap =
-            unsafe { memmap2::Mmap::map(&File::open(path.as_ref().join("rotated_ngrams.bin"))?)? };
+        let mmap = unsafe {
+            memmap2::Mmap::map(&File::open(folder.as_ref().join("rotated_ngrams.bin"))?)?
+        };
         let rotated_ngrams = fst::Map::new(mmap)?;
+
+        for model in models {
+            std::fs::remove_dir_all(model.folder)?;
+        }
 
         Ok(Self {
             ngrams,
             rotated_ngrams,
             n_counts,
+            folder: folder.as_ref().to_path_buf(),
         })
     }
 

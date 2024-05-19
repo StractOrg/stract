@@ -16,6 +16,7 @@
 
 use std::fmt::Display;
 use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::Path;
 
 use itertools::Itertools;
@@ -187,6 +188,7 @@ impl Model {
             .open(path)?;
 
         bincode::encode_into_std_write(&self, &mut file, bincode::config::standard())?;
+        file.flush()?;
 
         Ok(())
     }

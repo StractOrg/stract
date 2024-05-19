@@ -18,6 +18,7 @@ use super::{MergePointer, Result};
 use fst::{IntoStreamer, Streamer};
 
 use std::{
+    cmp::Reverse,
     collections::{BTreeMap, BinaryHeap},
     fs::{File, OpenOptions},
     io::BufWriter,
@@ -85,12 +86,12 @@ impl StoredDict {
         })
     }
 
-    fn merge<P: AsRef<Path>>(dicts: Vec<Self>, path: P) -> Result<Self> {
+    fn merge<P: AsRef<Path>>(dicts: Vec<Self>, folder: P) -> Result<Self> {
         let file = OpenOptions::new()
             .create(true)
             .truncate(true)
             .write(true)
-            .open(path.as_ref())?;
+            .open(folder.as_ref())?;
 
         let wtr = BufWriter::new(file);
         let mut builder = fst::MapBuilder::new(wtr)?;
@@ -109,49 +110,47 @@ impl StoredDict {
             pointer.advance();
         }
 
-        while pointers.iter().any(|p| !p.is_finished) {
-            let mut min_pointer: Option<&MergePointer<'_>> = None;
+        let mut pointers: BinaryHeap<_> = pointers.into_iter().map(Reverse).collect();
 
-            for pointer in pointers.iter() {
-                if pointer.is_finished {
-                    continue;
-                }
-
-                if let Some(min) = min_pointer {
-                    if pointer.term < min.term {
-                        min_pointer = Some(pointer);
+        loop {
+            let (term, mut freq, is_finished) = {
+                match pointers.peek_mut() {
+                    Some(mut pointer) => {
+                        let res = (
+                            pointer.0.term.clone(),
+                            pointer.0.value,
+                            pointer.0.is_finished,
+                        );
+                        pointer.0.advance();
+                        res
                     }
-                } else {
-                    min_pointer = Some(pointer);
+                    None => break,
                 }
+            };
+
+            if is_finished {
+                break;
             }
 
-            if let Some(min_pointer) = min_pointer {
-                let term = min_pointer.term.clone();
-                let mut freq = 0;
-
-                for pointer in pointers.iter_mut() {
-                    if pointer.is_finished {
-                        continue;
-                    }
-
-                    if pointer.term == term {
-                        freq += pointer.value;
-                        pointer.advance();
-                    }
+            while let Some(mut other) = pointers.peek_mut() {
+                if other.0.term != term || other.0.is_finished {
+                    break;
                 }
 
-                builder.insert(term, freq)?;
+                freq += other.0.value;
+                other.0.advance();
             }
+
+            builder.insert(term, freq)?;
         }
 
         builder.finish()?;
 
-        let mmap = unsafe { memmap2::Mmap::map(&File::open(path.as_ref())?)? };
+        let mmap = unsafe { memmap2::Mmap::map(&File::open(folder.as_ref())?)? };
 
         Ok(StoredDict {
             map: fst::Map::new(mmap)?,
-            path: path.as_ref().to_path_buf(),
+            path: folder.as_ref().to_path_buf(),
         })
     }
 }
@@ -305,6 +304,7 @@ impl TermDict {
         self.save_meta()?;
 
         self.stored.push(merged);
+        self.gc()?;
 
         Ok(())
     }
@@ -452,6 +452,7 @@ mod tests {
         dict.insert("foo");
         dict.insert("bar");
         dict.insert("foo");
+        dict.insert("abc");
 
         dict.commit()?;
 
@@ -459,9 +460,10 @@ mod tests {
 
         assert_eq!(dict.stored.len(), 1);
 
-        assert_eq!(dict.freq("foo"), Some(6));
+        assert_eq!(dict.freq("abc"), Some(1));
         assert_eq!(dict.freq("bar"), Some(4));
         assert_eq!(dict.freq("baz"), Some(2));
+        assert_eq!(dict.freq("foo"), Some(6));
 
         Ok(())
     }

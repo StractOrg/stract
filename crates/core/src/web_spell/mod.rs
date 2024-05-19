@@ -220,8 +220,8 @@ impl<'a> Ord for MergePointer<'a> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match (self.is_finished, other.is_finished) {
             (true, true) | (false, false) => self.term.cmp(&other.term),
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
+            (true, false) => std::cmp::Ordering::Greater,
+            (false, true) => std::cmp::Ordering::Less,
         }
     }
 }
