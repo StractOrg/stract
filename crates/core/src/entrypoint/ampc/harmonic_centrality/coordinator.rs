@@ -220,7 +220,12 @@ pub fn run(config: HarmonicCoordinatorConfig) -> Result<()> {
     let id2node: BTreeMap<_, _> = cluster
         .workers
         .iter()
-        .flat_map(|w| w.batch_id2node(ids.clone()))
+        .flat_map(|w| {
+            ids.clone()
+                .chunks(10_000)
+                .flat_map(move |c| w.batch_id2node(c.to_vec()))
+                .collect::<Vec<_>>()
+        })
         .collect();
 
     let top_nodes = top_nodes

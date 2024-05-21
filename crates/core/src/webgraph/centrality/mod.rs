@@ -80,7 +80,7 @@ where
     for (node_id, centrality) in centralities {
         store.insert(node_id, centrality).unwrap();
 
-        if store.uncommitted_inserts() >= 1_000_000 {
+        if store.uncommitted_inserts() >= 100_000_000 {
             store.commit().unwrap();
         }
     }
@@ -103,7 +103,7 @@ where
     {
         rank_store.insert(node_id, rank as u64).unwrap();
 
-        if rank_store.uncommitted_inserts() >= 1_000_000 {
+        if rank_store.uncommitted_inserts() >= 100_000_000 {
             rank_store.commit().unwrap();
         }
     }
@@ -120,7 +120,8 @@ mod tests {
 
     #[test]
     fn test_top_k() {
-        let hits = [(SortableFloat(0.0), NodeID::from(0_u64)),
+        let hits = [
+            (SortableFloat(0.0), NodeID::from(0_u64)),
             (SortableFloat(1.0), NodeID::from(1_u64)),
             (SortableFloat(2.0), NodeID::from(2_u64)),
             (SortableFloat(3.0), NodeID::from(3_u64)),
@@ -129,7 +130,8 @@ mod tests {
             (SortableFloat(6.0), NodeID::from(6_u64)),
             (SortableFloat(7.0), NodeID::from(7_u64)),
             (SortableFloat(8.0), NodeID::from(8_u64)),
-            (SortableFloat(9.0), NodeID::from(9_u64))];
+            (SortableFloat(9.0), NodeID::from(9_u64)),
+        ];
 
         let top_5 = crate::sorted_k(hits.iter().copied(), 5);
         assert_eq!(
@@ -159,7 +161,8 @@ mod tests {
 
     #[test]
     fn test_top_k_reversed() {
-        let hits = [(SortableFloat(9.0), NodeID::from(9_u64)),
+        let hits = [
+            (SortableFloat(9.0), NodeID::from(9_u64)),
             (SortableFloat(8.0), NodeID::from(8_u64)),
             (SortableFloat(7.0), NodeID::from(7_u64)),
             (SortableFloat(6.0), NodeID::from(6_u64)),
@@ -168,7 +171,8 @@ mod tests {
             (SortableFloat(3.0), NodeID::from(3_u64)),
             (SortableFloat(2.0), NodeID::from(2_u64)),
             (SortableFloat(1.0), NodeID::from(1_u64)),
-            (SortableFloat(0.0), NodeID::from(0_u64))];
+            (SortableFloat(0.0), NodeID::from(0_u64)),
+        ];
 
         let top_5 = crate::sorted_k(hits.iter().copied().map(Reverse), 5)
             .into_iter()
