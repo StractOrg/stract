@@ -63,6 +63,10 @@ where
             .await
             .map_err(|_| anyhow::anyhow!("Failed to get connection from pool"))
     }
+
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
+    }
 }
 
 pub struct Manager<Req, Res> {

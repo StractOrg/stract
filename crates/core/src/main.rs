@@ -144,6 +144,14 @@ enum AmpcOptions {
     /// Start a coordinator to distribute the harmonic centrality computation.
     /// Workers needs to be started before the coordinator.
     HarmonicCoordinator { config_path: String },
+
+    /// Start a worker to compute an approximation of the harmonic centrality of a graph.
+    /// The approximation samples a subset of the graph and computes shortest paths from the sampled nodes.
+    ApproxHarmonicWorker { config_path: String },
+
+    /// Start a coordinator to distribute the approximation of the harmonic centrality computation.
+    /// Workers needs to be started before the coordinator.
+    ApproxHarmonicCoordinator { config_path: String },
 }
 
 #[derive(Subcommand)]
@@ -452,6 +460,15 @@ fn main() -> Result<()> {
             AmpcOptions::HarmonicCoordinator { config_path } => {
                 let config: config::HarmonicCoordinatorConfig = load_toml_config(config_path);
                 entrypoint::ampc::harmonic_centrality::coordinator::run(config)?;
+            }
+
+            AmpcOptions::ApproxHarmonicWorker { config_path } => {
+                let config: config::ApproxHarmonicWorkerConfig = load_toml_config(config_path);
+                entrypoint::ampc::approximated_harmonic_centrality::worker::run(config)?;
+            }
+            AmpcOptions::ApproxHarmonicCoordinator { config_path } => {
+                let config: config::ApproxHarmonicCoordinatorConfig = load_toml_config(config_path);
+                entrypoint::ampc::approximated_harmonic_centrality::coordinator::run(config)?;
             }
         },
     }

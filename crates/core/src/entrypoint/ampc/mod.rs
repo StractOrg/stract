@@ -14,5 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+pub mod approximated_harmonic_centrality;
 pub mod dht;
 pub mod harmonic_centrality;

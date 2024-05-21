@@ -585,6 +585,27 @@ pub struct HarmonicWorkerConfig {
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct ApproxHarmonicCoordinatorConfig {
+    pub gossip: GossipConfig,
+    pub host: SocketAddr,
+    pub output_path: String,
+
+    #[serde(default = "defaults::ApproxHarmonic::sample_rate")]
+    pub sample_rate: f64,
+
+    #[serde(default = "defaults::ApproxHarmonic::max_distance")]
+    pub max_distance: u8,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct ApproxHarmonicWorkerConfig {
+    pub gossip: GossipConfig,
+    pub shard: ShardId,
+    pub graph_path: String,
+    pub host: SocketAddr,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct CanonicalIndexConfig {
     pub output_path: String,
     pub warc_source: WarcSource,

@@ -94,6 +94,13 @@ pub enum Service {
     HarmonicCoordinator {
         host: SocketAddr,
     },
+    ApproxHarmonicWorker {
+        host: SocketAddr,
+        shard: ShardId,
+    },
+    ApproxHarmonicCoordinator {
+        host: SocketAddr,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]

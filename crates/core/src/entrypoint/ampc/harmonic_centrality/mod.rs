@@ -134,7 +134,7 @@ mod tests {
         });
 
         std::thread::sleep(std::time::Duration::from_secs(2)); // Wait for worker to start
-        let a = RemoteCentralityWorker::new(1.into(), worker_addr);
+        let a = RemoteCentralityWorker::new(1.into(), worker_addr).unwrap();
 
         let worker = CentralityWorker::new(2.into(), b);
         let worker_addr = free_socket_addr();
@@ -144,7 +144,7 @@ mod tests {
 
         std::thread::sleep(std::time::Duration::from_secs(2)); // Wait for worker to start
 
-        let b = RemoteCentralityWorker::new(2.into(), worker_addr);
+        let b = RemoteCentralityWorker::new(2.into(), worker_addr).unwrap();
 
         // assert_eq!(a.num_nodes() + b.num_nodes(), num_nodes as u64);
 

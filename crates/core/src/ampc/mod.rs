@@ -68,7 +68,7 @@ pub enum Resp<J, R> {
 
 type JobDht<J> = DhtConn<<J as Job>::DhtTables>;
 
-type JobConn<J> = sonic::Connection<JobReq<J>, JobResp<J>>;
+pub type JobConn<J> = sonic::Connection<JobReq<J>, JobResp<J>>;
 
 #[must_use = "this `JobScheduled` may not have scheduled the job on any worker"]
 enum JobScheduled {

@@ -4795,6 +4795,7 @@ dependencies = [
  "robotstxt-with-cache",
  "rust-s3",
  "rust-stemmers",
+ "rustc-hash",
  "safetensors 0.3.3",
  "scylla",
  "serde",

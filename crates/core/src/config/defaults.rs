@@ -185,3 +185,14 @@ impl Indexing {
         25_000
     }
 }
+
+pub struct ApproxHarmonic;
+impl ApproxHarmonic {
+    pub fn sample_rate() -> f64 {
+        0.3
+    }
+
+    pub fn max_distance() -> u8 {
+        7
+    }
+}

@@ -17,9 +17,12 @@
 use bloom::U64BloomFilter;
 
 use crate::{
-    ampc::prelude::*,
+    ampc::{prelude::*, JobConn},
     config::HarmonicWorkerConfig,
-    distributed::member::{Service, ShardId},
+    distributed::{
+        member::{Service, ShardId},
+        sonic,
+    },
     webgraph::{self, Webgraph},
     Result,
 };
@@ -98,16 +101,6 @@ impl CentralityWorker {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
-pub struct GetShard;
-
-impl Message<CentralityWorker> for GetShard {
-    type Response = ShardId;
-
-    fn handle(self, worker: &CentralityWorker) -> Self::Response {
-        worker.shard
-    }
-}
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct NumNodes;
 
 impl Message<CentralityWorker> for NumNodes {
@@ -132,17 +125,20 @@ impl Message<CentralityWorker> for BatchId2Node {
     }
 }
 
-impl_worker!(CentralityJob, RemoteCentralityWorker => CentralityWorker, [GetShard, NumNodes, BatchId2Node]);
+impl_worker!(CentralityJob, RemoteCentralityWorker => CentralityWorker, [NumNodes, BatchId2Node]);
 
 #[derive(Clone)]
 pub struct RemoteCentralityWorker {
     shard: ShardId,
-    addr: SocketAddr,
+    pool: Arc<sonic::ConnectionPool<JobConn<CentralityJob>>>,
 }
 
 impl RemoteCentralityWorker {
-    pub fn new(shard: ShardId, addr: SocketAddr) -> Self {
-        Self { shard, addr }
+    pub fn new(shard: ShardId, addr: SocketAddr) -> Result<Self> {
+        Ok(Self {
+            shard,
+            pool: Arc::new(sonic::ConnectionPool::new(addr)?),
+        })
     }
 
     pub fn shard(&self) -> ShardId {
@@ -164,8 +160,8 @@ impl RemoteCentralityWorker {
 impl RemoteWorker for RemoteCentralityWorker {
     type Job = CentralityJob;
 
-    fn remote_addr(&self) -> SocketAddr {
-        self.addr
+    fn pool(&self) -> &crate::distributed::sonic::ConnectionPool<JobConn<Self::Job>> {
+        &self.pool
     }
 }
 

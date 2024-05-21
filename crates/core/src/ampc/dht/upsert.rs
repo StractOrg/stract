@@ -16,7 +16,7 @@
 
 use enum_dispatch::enum_dispatch;
 
-use crate::hyperloglog::HyperLogLog;
+use crate::{hyperloglog::HyperLogLog, kahan_sum::KahanSum};
 
 use super::Value;
 
@@ -46,6 +46,7 @@ pub enum UpsertEnum {
     HyperLogLog128Upsert,
     U64Add,
     F64Add,
+    KahanSumAdd,
 }
 
 macro_rules! hyperloglog_upsert {
@@ -117,6 +118,28 @@ impl UpsertFn for F64Add {
                 .unwrap();
 
         bincode::encode_to_vec(old + new, bincode::config::standard())
+            .unwrap()
+            .into()
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+pub struct KahanSumAdd;
+
+impl UpsertFn for KahanSumAdd {
+    fn upsert(&self, old: Value, new: Value) -> Value {
+        let (old, _) =
+            bincode::decode_from_slice::<KahanSum, _>(old.as_bytes(), bincode::config::standard())
+                .unwrap();
+        let (new, _) =
+            bincode::decode_from_slice::<KahanSum, _>(new.as_bytes(), bincode::config::standard())
+                .unwrap();
+
+        let new: f64 = new.into();
+
+        let res: KahanSum = old + new;
+
+        bincode::encode_to_vec(res, bincode::config::standard())
             .unwrap()
             .into()
     }

@@ -36,7 +36,7 @@ pub struct CentralitySetup {
 }
 
 impl CentralitySetup {
-    pub async fn new(cluster: &Cluster) -> Self {
+    pub async fn new(cluster: &Cluster) -> Result<Self> {
         let dht_members: Vec<_> = cluster
             .members()
             .await
@@ -50,7 +50,7 @@ impl CentralitySetup {
             })
             .collect();
 
-        let workers: Vec<_> = cluster
+        let workers = cluster
             .members()
             .await
             .into_iter()
@@ -61,9 +61,9 @@ impl CentralitySetup {
                     None
                 }
             })
-            .collect();
+            .collect::<Result<Vec<RemoteCentralityWorker>>>()?;
 
-        Self::new_for_dht_members(&dht_members, workers)
+        Ok(Self::new_for_dht_members(&dht_members, workers))
     }
 
     pub fn new_for_dht_members(
@@ -177,7 +177,7 @@ async fn setup_gossip(config: HarmonicCoordinatorConfig) -> Result<ClusterInfo> 
                 None
             }
         })
-        .collect();
+        .collect::<Result<Vec<RemoteCentralityWorker>>>()?;
 
     Ok(ClusterInfo {
         _handle: handle,

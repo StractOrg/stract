@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use std::net::SocketAddr;
+use std::ops::DerefMut;
 
 use super::{CoordReq, CoordResp, DhtConn, Job, JobConn, JobReq, JobResp, Req, Resp, Server};
 use crate::block_on;
+use crate::distributed::sonic;
 use crate::Result;
 use anyhow::anyhow;
 use tokio::net::ToSocketAddrs;
@@ -57,7 +58,7 @@ where
 {
     type Job: Job;
 
-    fn remote_addr(&self) -> SocketAddr;
+    fn pool(&self) -> &sonic::ConnectionPool<JobConn<Self::Job>>;
 
     fn schedule_job(&self, job: &Self::Job, mapper: <Self::Job as Job>::Mapper) -> Result<()> {
         self.send_raw(&JobReq::Coordinator(CoordReq::ScheduleJob {
@@ -84,8 +85,8 @@ where
         }
     }
 
-    fn conn(&self) -> Result<JobConn<Self::Job>> {
-        let conn = block_on(JobConn::connect(self.remote_addr()))?;
+    fn conn(&self) -> Result<impl DerefMut<Target = JobConn<Self::Job>>> {
+        let conn = block_on(self.pool().get())?;
         Ok(conn)
     }
 
