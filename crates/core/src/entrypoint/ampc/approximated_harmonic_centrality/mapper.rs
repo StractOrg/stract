@@ -132,7 +132,7 @@ impl Workers {
                         if dist < *cur_dist {
                             distances.insert(node, dist);
 
-                            if dist <= max_dist {
+                            if dist < max_dist {
                                 queue.push(cmp::Reverse((dist, node)));
                             }
                         }
@@ -146,7 +146,10 @@ impl Workers {
 
                     if dist < *cur_dist {
                         distances.insert(node, dist);
-                        queue.push(cmp::Reverse((dist, node)));
+
+                        if dist < max_dist {
+                            queue.push(cmp::Reverse((dist, node)));
+                        }
                     }
                 }
             }

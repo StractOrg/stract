@@ -146,7 +146,8 @@ enum AmpcOptions {
     HarmonicCoordinator { config_path: String },
 
     /// Start a worker to compute an approximation of the harmonic centrality of a graph.
-    /// The approximation samples a subset of the graph and computes shortest paths from the sampled nodes.
+    /// The approximation samples O(log n / sample_rate^2) nodes from the graph and computes
+    /// shortest paths from the sampled nodes.
     ApproxHarmonicWorker { config_path: String },
 
     /// Start a coordinator to distribute the approximation of the harmonic centrality computation.

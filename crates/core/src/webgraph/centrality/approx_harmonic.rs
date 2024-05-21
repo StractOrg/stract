@@ -22,12 +22,12 @@ use rayon::prelude::*;
 
 use crate::webgraph::{NodeID, ShortestPaths, Webgraph};
 
-const EPSILON: f64 = 0.05;
+const EPSILON: f64 = 0.3;
 
 // Approximate harmonic centrality by sampling O(log n / epsilon^2) nodes and
 // computing single-source shortest paths from each of them.
 //
-// Epsilong is set to 0.05.
+// Epsilong is set to 0.3.
 pub struct ApproxHarmonic {
     inner: speedy_kv::Db<NodeID, f64>,
 }
@@ -49,7 +49,7 @@ impl ApproxHarmonic {
         let norm = num_nodes as f32 / (num_samples as f32 * (num_nodes as f32 - 1.0));
 
         sampled.into_par_iter().progress().for_each(|source| {
-            let dists = graph.raw_distances_with_max(source, 5);
+            let dists = graph.raw_distances_with_max(source, 7);
 
             for (target, dist) in dists {
                 if dist == 0 {
