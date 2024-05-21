@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
+use indicatif::ParallelProgressIterator;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cmp, collections::BTreeMap};
@@ -190,7 +191,7 @@ impl Mapper for ApproxCentralityMapper {
                     .graph()
                     .random_nodes_with_outgoing(num_samples as usize);
 
-                sampled.into_par_iter().for_each(|node| {
+                sampled.into_par_iter().progress().for_each(|node| {
                     for chunk in workers
                         .dijkstra(node, job.max_distance)
                         .into_iter()
