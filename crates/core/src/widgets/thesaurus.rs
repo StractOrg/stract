@@ -470,6 +470,9 @@ impl Dictionary {
             });
         }
 
+        res.sort_by_key(|i| i.similar.len() + i.hyponyms.len() + i.hypernyms.len());
+        res.reverse();
+
         Ok(res)
     }
 
