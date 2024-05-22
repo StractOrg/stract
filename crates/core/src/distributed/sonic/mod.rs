@@ -30,6 +30,7 @@ use tokio::{
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
 const MAX_BODY_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024; // 1TB
+const MAX_CONNECTION_TTL: Duration = Duration::from_secs(60);
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -57,6 +58,7 @@ pub enum Error {
 
 pub struct Connection<Req, Res> {
     stream: TcpStream,
+    created: std::time::Instant,
     marker: PhantomData<(Req, Res)>,
 }
 
@@ -84,6 +86,7 @@ where
 
                 Ok(Connection {
                     stream,
+                    created: std::time::Instant::now(),
                     marker: PhantomData,
                 })
             }
@@ -162,6 +165,11 @@ where
     }
 
     pub async fn is_closed(&mut self) -> bool {
+        if self.created.elapsed() > MAX_CONNECTION_TTL {
+            self.stream.shutdown().await.ok();
+            return true;
+        }
+
         !matches!(
             tokio::time::timeout(Duration::from_secs(1), self.stream.read_exact(&mut [])).await,
             Ok(Ok(_))
