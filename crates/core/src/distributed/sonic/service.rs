@@ -176,7 +176,7 @@ impl<S: Service> Connection<S> {
             .collect())
     }
 
-    pub async fn is_closed(&self) -> bool {
+    pub async fn is_closed(&mut self) -> bool {
         self.inner.is_closed().await
     }
 }

@@ -20,11 +20,10 @@ pub mod service;
 
 pub use connection_pool::ConnectionPool;
 
-use std::{marker::PhantomData, task::Poll, time::Duration};
+use std::{marker::PhantomData, time::Duration};
 
-use futures::future::poll_fn;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt, ReadBuf},
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, ToSocketAddrs},
 };
 
@@ -162,14 +161,11 @@ where
         }
     }
 
-    pub async fn is_closed(&self) -> bool {
-        poll_fn(
-            |cx| match self.stream.poll_peek(cx, &mut ReadBuf::new(&mut [0u8])) {
-                Poll::Ready(t) => Poll::Ready(t.is_err()),
-                Poll::Pending => Poll::Ready(false),
-            },
+    pub async fn is_closed(&mut self) -> bool {
+        !matches!(
+            tokio::time::timeout(Duration::from_secs(1), self.stream.read_exact(&mut [])).await,
+            Ok(Ok(_))
         )
-        .await
     }
 }
 
