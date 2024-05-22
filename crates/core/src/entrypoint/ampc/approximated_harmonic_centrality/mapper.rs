@@ -123,24 +123,11 @@ impl Workers {
                 break;
             }
 
-            match queue.pop() {
-                Some(cmp::Reverse((dist, node))) => batch.push((dist, node)),
-                None => {
-                    for (node, dist) in self.run_batch(&mut batch) {
-                        let cur_dist = distances.get(&node).unwrap_or(&u8::MAX);
-
-                        if dist < *cur_dist {
-                            distances.insert(node, dist);
-
-                            if dist < max_dist {
-                                queue.push(cmp::Reverse((dist, node)));
-                            }
-                        }
-                    }
-                }
+            if let Some(cmp::Reverse((dist, node))) = queue.pop() {
+                batch.push((dist, node));
             }
 
-            if batch.len() >= BATCH_SIZE {
+            if batch.len() >= BATCH_SIZE || queue.is_empty() {
                 for (node, dist) in self.run_batch(&mut batch) {
                     let cur_dist = distances.get(&node).unwrap_or(&u8::MAX);
 
