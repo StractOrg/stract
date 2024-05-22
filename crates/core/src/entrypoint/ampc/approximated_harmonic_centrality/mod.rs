@@ -48,6 +48,7 @@ impl_dht_tables!(ApproxCentralityTables, [centrality, meta]);
 pub struct ApproxCentralityJob {
     shard: ShardId,
     max_distance: u8,
+    norm: f64,
     all_workers: Vec<(ShardId, SocketAddr)>,
 }
 

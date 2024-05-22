@@ -185,7 +185,13 @@ impl Mapper for ApproxCentralityMapper {
                     for chunk in workers
                         .dijkstra(node, job.max_distance)
                         .into_iter()
-                        .map(|(n, d)| (n, KahanSum::from(1.0 / d as f64)))
+                        .filter_map(|(n, d)| {
+                            if d == 0 {
+                                None
+                            } else {
+                                Some((n, KahanSum::from((1.0 / d as f64) * job.norm)))
+                            }
+                        })
                         .chunks(BATCH_SIZE)
                         .into_iter()
                     {
