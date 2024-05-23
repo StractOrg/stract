@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use rustc_hash::{FxHashMap, FxHashSet};
-
 use crate::{
     ampc::JobConn,
     config::ApproxHarmonicWorkerConfig,
@@ -65,29 +63,6 @@ impl Message<ApproxCentralityWorker> for NumNodes {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
-pub struct OutgoingEdgeNodes {
-    pub from: Vec<webgraph::NodeID>,
-    pub limit: webgraph::EdgeLimit,
-}
-
-impl Message<ApproxCentralityWorker> for OutgoingEdgeNodes {
-    type Response = FxHashMap<webgraph::NodeID, FxHashSet<webgraph::NodeID>>;
-
-    fn handle(self, worker: &ApproxCentralityWorker) -> Self::Response {
-        let mut res: FxHashMap<webgraph::NodeID, FxHashSet<webgraph::NodeID>> =
-            FxHashMap::default();
-
-        for node in &self.from {
-            for edge in worker.graph().raw_outgoing_edges(node, self.limit) {
-                res.entry(*node).or_default().insert(edge.to);
-            }
-        }
-
-        res
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct BatchId2Node(Vec<webgraph::NodeID>);
 
 impl Message<ApproxCentralityWorker> for BatchId2Node {
@@ -101,7 +76,7 @@ impl Message<ApproxCentralityWorker> for BatchId2Node {
     }
 }
 
-impl_worker!(ApproxCentralityJob, RemoteApproxCentralityWorker => ApproxCentralityWorker, [NumNodes, OutgoingEdgeNodes, BatchId2Node]);
+impl_worker!(ApproxCentralityJob, RemoteApproxCentralityWorker => ApproxCentralityWorker, [NumNodes, BatchId2Node]);
 
 #[derive(Clone)]
 pub struct RemoteApproxCentralityWorker {
@@ -127,14 +102,6 @@ impl RemoteApproxCentralityWorker {
 
     pub fn num_nodes(&self) -> u64 {
         self.send(NumNodes)
-    }
-
-    pub fn outgoing_edge_nodes(
-        &self,
-        from: Vec<webgraph::NodeID>,
-        limit: webgraph::EdgeLimit,
-    ) -> FxHashMap<webgraph::NodeID, FxHashSet<webgraph::NodeID>> {
-        self.send(OutgoingEdgeNodes { from, limit })
     }
 
     pub fn batch_id2node(
