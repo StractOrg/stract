@@ -21,8 +21,8 @@ use std::{cmp, collections::BTreeMap};
 
 use super::{worker::ApproxCentralityWorker, ApproxCentralityJob, Mapper};
 use crate::{
-    ampc::dht::upsert, distributed::member::ShardId,
-    entrypoint::ampc::approximated_harmonic_centrality::DhtTable, kahan_sum::KahanSum, webgraph,
+    ampc::dht::upsert, entrypoint::ampc::approximated_harmonic_centrality::DhtTable,
+    kahan_sum::KahanSum, webgraph,
 };
 use rayon::prelude::*;
 
@@ -30,7 +30,7 @@ const BATCH_SIZE: usize = 1024;
 
 #[derive(Debug, Clone, bincode::Decode, bincode::Encode)]
 pub enum ApproxCentralityMapper {
-    ApproximateCentrality { worker_shard: ShardId },
+    ApproximateCentrality,
 }
 
 struct Workers {
@@ -131,11 +131,7 @@ impl Mapper for ApproxCentralityMapper {
         dht: &crate::ampc::DhtConn<<<Self as Mapper>::Job as super::Job>::DhtTables>,
     ) {
         match self {
-            ApproxCentralityMapper::ApproximateCentrality { worker_shard } => {
-                if worker.shard() != *worker_shard {
-                    return;
-                }
-
+            ApproxCentralityMapper::ApproximateCentrality => {
                 let workers = Workers::new(worker.clone());
                 let num_samples = dht.next().meta.get(()).unwrap().num_samples_per_worker;
 

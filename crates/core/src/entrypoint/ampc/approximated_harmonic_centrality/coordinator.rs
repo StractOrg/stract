@@ -143,15 +143,8 @@ pub fn build(
 ) -> Coordinator<ApproxCentralityJob> {
     let setup = ApproxCentralitySetup::new_for_dht_members(dht, workers.clone(), sample_rate);
 
-    let mut coord = Coordinator::new(setup, workers.clone());
-
-    for worker in &workers {
-        coord = coord.with_mapper(ApproxCentralityMapper::ApproximateCentrality {
-            worker_shard: worker.shard(),
-        });
-    }
-
-    coord
+    Coordinator::new(setup, workers.clone())
+        .with_mapper(ApproxCentralityMapper::ApproximateCentrality)
 }
 
 struct ClusterInfo {
