@@ -18,9 +18,9 @@ use crate::Result;
 use bincode::de::read::Reader;
 use bincode::enc::write::Writer;
 use image::imageops::FilterType;
-use image::{DynamicImage, ImageOutputFormat};
+use image::DynamicImage;
 use serde::Serialize;
-use std::io::{Cursor, Read, Seek};
+use std::io::{BufWriter, Cursor, Read, Seek, Write};
 use std::path::Path;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -198,10 +198,11 @@ impl Image {
     }
 
     pub(crate) fn as_raw_bytes(&self) -> Vec<u8> {
-        let mut cursor = Cursor::new(Vec::new());
-        self.0
-            .write_to(&mut cursor, ImageOutputFormat::Png)
-            .unwrap();
+        let mut wrt = BufWriter::new(Cursor::new(Vec::new()));
+        self.0.write_to(&mut wrt, image::ImageFormat::Png).unwrap();
+        wrt.flush().unwrap();
+
+        let mut cursor = wrt.into_inner().unwrap();
         cursor.rewind().unwrap();
 
         let mut bytes = Vec::new();
