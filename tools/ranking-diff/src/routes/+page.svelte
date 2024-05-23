@@ -1,37 +1,55 @@
 <script lang="ts">
-  import type { PageData } from './$types';
-  import Experiments from './components/Experiments.svelte';
-  import Queries from './components/Queries.svelte';
-  export let data: PageData;
+  import type { Experiment } from '$lib';
+  import { onMount } from 'svelte';
+  import Navbar from './components/Navbar.svelte';
+  import AddIcon from '~icons/heroicons/plus-circle';
+  import ExperimentComponent from './Experiment.svelte';
 
-  type Page = 'experiments' | 'queries';
+  const getExperiments = async () => {
+    const res = await fetch('/api/experiments');
+    experiments = await res.json();
+  };
 
-  let page: Page = 'experiments';
+  const newExperiment = async () => {
+    await fetch('/api/experiments/new', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
 
-  const { experiments, queries } = data;
+    await getExperiments();
+  };
+
+  const clearExperiments = async () => {
+    await fetch('/api/experiments/clear', { method: 'POST' });
+    await getExperiments();
+  };
+
+  onMount(async () => {
+    await getExperiments();
+  });
+
+  let experiments: Experiment[] = [];
 </script>
 
-<nav class="flex gap-x-2">
-  <button
-    on:click|preventDefault={() => (page = 'experiments')}
-    class="border-content rounded-full border-slate-500 px-2 py-1 {page === 'experiments'
-      ? 'border'
-      : ''}"
-  >
-    Experiments
-  </button>
-  <button
-    on:click|preventDefault={() => (page = 'queries')}
-    class="border-content rounded-full border-slate-500 px-2 py-1 {page === 'queries'
-      ? 'border'
-      : ''}"
-  >
-    Queries
-  </button>
-</nav>
+<Navbar page="experiments" />
 
-{#if page === 'experiments'}
-  <Experiments {experiments} />
-{:else}
-  <Queries {queries} />
-{/if}
+<div class="flex w-full flex-col items-center">
+  <div class="flex">
+    <h1 class="text-2xl">Experiments</h1>
+    <button on:click={newExperiment} class="ml-2">
+      <AddIcon class="h-6 w-6 text-green-500" />
+    </button>
+  </div>
+
+  <div class="mt-5 flex flex-col space-y-5">
+    {#each experiments as experiment}
+      <ExperimentComponent {experiment} on:delete={getExperiments} />
+    {/each}
+  </div>
+
+  <button
+    on:click={clearExperiments}
+    class="mt-10 h-8 w-40 rounded bg-red-500 text-white disabled:bg-gray-400"
+    disabled={experiments.length == 0}>Clear All</button
+  >
+</div>
