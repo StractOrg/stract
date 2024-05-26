@@ -84,6 +84,8 @@ struct Site(String);
     Debug,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     serde::Serialize,
     serde::Deserialize,

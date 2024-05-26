@@ -439,20 +439,16 @@ impl Default for WidgetsConfig {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct CrawlPlannerConfig {
-    pub page_harmonic_path: String,
     pub host_harmonic_path: String,
-    pub page_graph_path: String,
-    pub host_graph_path: String,
+    pub page_harmonic_path: String,
     pub output_path: String,
 
     pub num_job_queues: usize,
 
     pub crawl_budget: usize,
-    pub top_host_fraction: f64,
     pub wander_fraction: f64,
-    pub top_n_hosts_surplus: usize,
 
-    pub num_threads: Option<usize>,
+    pub gossip: GossipConfig,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]

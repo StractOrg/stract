@@ -20,7 +20,6 @@ use crate::{
     config,
     crawler::{self, planner::CrawlPlanner, CrawlCoordinator, Crawler},
     distributed::sonic::service::{sonic_service, Message},
-    webgraph::WebgraphBuilder,
     Result,
 };
 
@@ -62,24 +61,25 @@ pub async fn router(config: config::CrawlRouterConfig) -> Result<()> {
     }
 }
 
-pub fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
+pub async fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
     let page_centrality = speedy_kv::Db::open_or_create(&config.page_harmonic_path).unwrap();
     let host_centrality = speedy_kv::Db::open_or_create(&config.host_harmonic_path).unwrap();
-    let page_graph = WebgraphBuilder::new(&config.page_graph_path)
-        .single_threaded()
-        .open();
-    let host_graph = WebgraphBuilder::new(&config.host_graph_path).open();
+
+    let gossip = config.gossip.clone();
+    let cluster = Arc::new(
+        crate::distributed::cluster::Cluster::join_as_spectator(
+            gossip.cluster_id,
+            gossip.addr,
+            gossip.seed_nodes.unwrap_or_default(),
+        )
+        .await?,
+    );
+
     let output_path = config.output_path.clone();
 
-    let planner = CrawlPlanner::new(
-        host_centrality,
-        page_centrality,
-        host_graph,
-        page_graph,
-        config,
-    )?;
+    let planner = CrawlPlanner::new(host_centrality, page_centrality, cluster, config).await?;
 
-    planner.build(output_path)?;
+    planner.build(output_path).await?;
 
     Ok(())
 }
