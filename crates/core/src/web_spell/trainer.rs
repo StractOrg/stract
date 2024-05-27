@@ -103,7 +103,6 @@ impl SecondTrainer {
 
         let mut term_dict = TermDict::open(path.as_ref().join("term_dict"))?;
         term_dict.merge_dicts()?;
-        term_dict.prune(10_000_000)?;
 
         Ok(Self {
             term_dict,
@@ -159,7 +158,7 @@ impl SecondTrainer {
                             }
                         },
                     )
-                    .filter(|c| c.len() != 3)
+                    .filter(|c| c.len() == 3)
                     .map(|context| {
                         let most_probable = possible_corrections
                             .iter()

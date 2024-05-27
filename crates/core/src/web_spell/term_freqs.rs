@@ -324,61 +324,6 @@ impl TermDict {
         freqs
     }
 
-    pub fn prune(&mut self, top_n_terms: usize) -> Result<()> {
-        let mut top_term_freqs: BinaryHeap<u64> = BinaryHeap::new();
-
-        for stored in self.stored.iter() {
-            let mut stream = stored.map.stream();
-
-            while let Some((_, freq)) = stream.next() {
-                if top_term_freqs.len() < top_n_terms {
-                    top_term_freqs.push(freq);
-                } else if let Some(mut min) = top_term_freqs.peek_mut() {
-                    if freq > *min {
-                        *min = freq;
-                    }
-                }
-            }
-        }
-
-        if top_term_freqs.len() < top_n_terms {
-            return Ok(());
-        }
-
-        let lowest = top_term_freqs.into_sorted_vec().pop().unwrap();
-
-        self.metadata.dicts.clear();
-        for stored in self.stored.iter_mut() {
-            let uuid = uuid::Uuid::new_v4();
-            let file = OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(self.path.join(format!("{}.dict", uuid)))?;
-
-            let wtr = BufWriter::new(file);
-
-            let mut builder = fst::MapBuilder::new(wtr)?;
-
-            let mut stream = stored.map.stream();
-            while let Some((term, freq)) = stream.next() {
-                if freq >= lowest {
-                    builder.insert(term, freq)?;
-                }
-            }
-
-            self.metadata.dicts.push(uuid);
-
-            builder.finish()?;
-
-            *stored = StoredDict::open(self.path.join(format!("{}.dict", uuid)))?;
-        }
-
-        self.save_meta()?;
-
-        Ok(())
-    }
-
     pub fn terms(&self) -> Vec<String> {
         let mut terms = Vec::new();
 
