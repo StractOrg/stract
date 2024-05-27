@@ -4,22 +4,13 @@
   import AdjustVertical from '~icons/heroicons/adjustments-vertical';
   import type { DisplayedWebpage } from '$lib/api';
   import { createEventDispatcher } from 'svelte';
-  import {
-    clearSummary,
-    summariesStore,
-    markPagesWithAdsStore,
-    markPagesWithPaywallStore,
-  } from '$lib/stores';
-  import Summary from './Summary.svelte';
-  import { derived } from 'svelte/store';
+  import { markPagesWithAdsStore, markPagesWithPaywallStore } from '$lib/stores';
   import TextSnippet from '$lib/components/TextSnippet.svelte';
   import StackOverflowSnippet from './StackOverflowSnippet.svelte';
   import ResultLink from './ResultLink.svelte';
 
   export let webpage: DisplayedWebpage;
   export let resultIndex: number;
-
-  const summary = derived(summariesStore, ($summaries) => $summaries[webpage.url]);
 
   let button: HTMLButtonElement;
 
@@ -71,9 +62,7 @@
       </button>
     </div>
     <p class="snippet text-sm font-normal text-neutral-focus [&>b]:font-bold">
-      {#if $summary}
-        <Summary url={webpage.url} on:hide={() => clearSummary(webpage)} />
-      {:else if webpage.richSnippet && webpage.richSnippet._type == 'stackOverflowQA'}
+      {#if webpage.richSnippet && webpage.richSnippet._type == 'stackOverflowQA'}
         <StackOverflowSnippet
           question={webpage.richSnippet.question}
           answers={webpage.richSnippet.answers}

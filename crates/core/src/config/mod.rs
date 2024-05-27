@@ -213,13 +213,6 @@ impl Default for ApiThresholds {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
-pub struct LLMConfig {
-    pub api_base: String,
-    pub model: String,
-    pub api_key: Option<String>,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ApiSpellCheck {
     pub path: String,
 
@@ -229,7 +222,6 @@ pub struct ApiSpellCheck {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ApiConfig {
-    pub summarizer_path: String,
     pub queries_csv_path: String,
     pub host: SocketAddr,
     pub prometheus_host: SocketAddr,
@@ -246,8 +238,6 @@ pub struct ApiConfig {
     pub max_similar_hosts: usize,
 
     pub spell_check: Option<ApiSpellCheck>,
-
-    pub llm: LLMConfig,
 
     #[serde(default)]
     pub thresholds: ApiThresholds,

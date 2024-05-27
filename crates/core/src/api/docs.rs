@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::{autosuggest, explore, hosts, search, summarize, webgraph};
+use super::{autosuggest, explore, hosts, search, webgraph};
 use axum::Router;
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
@@ -33,7 +33,6 @@ use utoipa_swagger_ui::SwaggerUi;
             webgraph::page::ingoing_pages,
             webgraph::page::outgoing_pages,
             autosuggest::route,
-            summarize::summarize_route,
             hosts::hosts_export_optic,
             explore::explore_export_optic,
         ),

@@ -76,7 +76,10 @@
         title: 'Liked/Disliked',
         description: 'Another page you have liked/disliked influences the ranking of this page',
       }))
-      .with('urlSymbols', () => ({ title: '', description: '' }))
+      .with('urlSymbols', () => ({
+        title: 'URL Symbols',
+        description: 'The URL contains few non-alphanumeric characters',
+      }))
       .with('linkDensity', () => ({
         title: 'Link Density',
         description: 'The page has a low number of links compared to the amount of text',
