@@ -1,22 +1,33 @@
 <script lang="ts">
-  import type { Experiment } from '$lib';
+  import type { Experiment, Query } from '$lib';
   import { onMount } from 'svelte';
   import Navbar from './components/Navbar.svelte';
   import AddIcon from '~icons/heroicons/plus-circle';
   import ExperimentComponent from './Experiment.svelte';
+  import ExperimentProgress from './ExperimentProgress.svelte';
 
   const getExperiments = async () => {
     const res = await fetch('/api/experiments');
     experiments = await res.json();
   };
 
+  const getQueries = async () => {
+    const res = await fetch('/api/queries');
+    queries = await res.json();
+  };
+
   const newExperiment = async () => {
-    await fetch('/api/experiments/new', {
+    if (queries.length == 0) {
+      alert('No queries available. Please add a query first.');
+      return;
+    }
+
+    const experiment = (await fetch('/api/experiments/new', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-    });
+    }).then((res) => res.json())) as Experiment;
 
-    await getExperiments();
+    currentlyBuildingExperiment = experiment;
   };
 
   const clearExperiments = async () => {
@@ -24,11 +35,20 @@
     await getExperiments();
   };
 
+  const finishExperiment = async () => {
+    currentlyBuildingExperiment = null;
+    await getExperiments();
+  };
+
   onMount(async () => {
     await getExperiments();
+    await getQueries();
   });
 
   let experiments: Experiment[] = [];
+  let queries: Query[] = [];
+
+  let currentlyBuildingExperiment: Experiment | null = null;
 </script>
 
 <Navbar page="experiments" />
@@ -36,20 +56,35 @@
 <div class="flex w-full flex-col items-center">
   <div class="flex">
     <h1 class="text-2xl">Experiments</h1>
-    <button on:click={newExperiment} class="ml-2">
-      <AddIcon class="h-6 w-6 text-green-500" />
+    <button on:click={newExperiment} class="ml-2 text-green-500">
+      <AddIcon class="h-6 w-6" />
     </button>
   </div>
 
   <div class="mt-5 flex flex-col space-y-5">
+    {#if currentlyBuildingExperiment}
+      <ExperimentProgress
+        experiment={currentlyBuildingExperiment}
+        {queries}
+        on:finish={finishExperiment}
+      />
+    {/if}
+
     {#each experiments as experiment}
       <ExperimentComponent {experiment} on:delete={getExperiments} />
     {/each}
+
+    {#if experiments.length == 0}
+      <p class="text-gray-500">No experiments available.</p>
+    {/if}
   </div>
 
-  <button
-    on:click={clearExperiments}
-    class="mt-10 h-8 w-40 rounded bg-red-500 text-white disabled:bg-gray-400"
-    disabled={experiments.length == 0}>Clear All</button
-  >
+  {#if experiments.length > 0}
+    <button
+      on:click={clearExperiments}
+      class="mt-10 h-8 w-40 rounded bg-red-500 text-white disabled:bg-gray-400"
+    >
+      Clear All
+    </button>
+  {/if}
 </div>

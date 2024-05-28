@@ -78,13 +78,21 @@ export const getQueries = (): Query[] => {
   return query.all() as Query[];
 };
 
-export const newExperiment = (name: string) => {
+export const newExperiment = (name: string): Experiment => {
   const insertExperiment = db.prepare(`
     INSERT OR IGNORE INTO experiments (name)
     VALUES (@name)
   `);
 
   insertExperiment.run({ name });
+
+  const query = db.prepare(`
+    SELECT *
+    FROM experiments
+    WHERE name = @name
+  `);
+
+  return query.get({ name }) as Experiment;
 };
 
 export const clearExperiments = () => {

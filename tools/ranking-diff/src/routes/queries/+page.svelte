@@ -79,9 +79,12 @@
     {/each}
   </div>
 
-  <button
-    on:click={clearQueries}
-    class="mt-10 h-8 w-40 rounded bg-red-500 text-white disabled:bg-gray-400"
-    disabled={queries.length == 0}>Clear All</button
-  >
+  {#if queries.length == 0}
+    <p class="text-gray-500">No queries available.</p>
+  {:else}
+    <button
+      on:click={clearQueries}
+      class="mt-10 h-8 w-40 rounded bg-red-500 text-white disabled:bg-gray-400">Clear All</button
+    >
+  {/if}
 </div>

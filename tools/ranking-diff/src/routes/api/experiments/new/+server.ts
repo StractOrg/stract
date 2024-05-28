@@ -3,7 +3,7 @@ import { newExperiment } from '$lib/db';
 
 export async function POST({}: RequestEvent): Promise<Response> {
   const curTime = new Date().toISOString();
-  newExperiment(curTime);
+  const experiment = newExperiment(curTime);
 
-  return new Response('OK');
+  return new Response(JSON.stringify(experiment));
 }
