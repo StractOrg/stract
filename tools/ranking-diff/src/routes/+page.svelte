@@ -37,7 +37,8 @@
 
   const finishExperiment = async () => {
     currentlyBuildingExperiment = null;
-    await getExperiments();
+    // reload page
+    window.location.reload();
   };
 
   onMount(async () => {
@@ -45,8 +46,23 @@
     await getQueries();
   });
 
+  const selectExperiment = (id: number): boolean => {
+    if (selectedExperimentIds.length >= 2) {
+      return false;
+    }
+
+    selectedExperimentIds = [...selectedExperimentIds, id];
+    return true;
+  };
+
+  const deselectExperiment = (id: number) => {
+    selectedExperimentIds = selectedExperimentIds.filter((i) => i !== id);
+  };
+
   let experiments: Experiment[] = [];
   let queries: Query[] = [];
+
+  $: selectedExperimentIds = [] as number[];
 
   let currentlyBuildingExperiment: Experiment | null = null;
 </script>
@@ -71,7 +87,12 @@
     {/if}
 
     {#each experiments as experiment}
-      <ExperimentComponent {experiment} on:delete={getExperiments} />
+      <ExperimentComponent
+        {experiment}
+        on:delete={getExperiments}
+        selectionCallback={selectExperiment}
+        deselectionCallback={deselectExperiment}
+      />
     {/each}
 
     {#if experiments.length == 0}
@@ -80,11 +101,23 @@
   </div>
 
   {#if experiments.length > 0}
-    <button
-      on:click={clearExperiments}
-      class="mt-10 h-8 w-40 rounded bg-red-500 text-white disabled:bg-gray-400"
-    >
-      Clear All
-    </button>
+    <div>
+      <button
+        on:click={clearExperiments}
+        class="mt-10 h-8 w-40 rounded bg-red-500 text-white disabled:bg-gray-400"
+      >
+        Clear All
+      </button>
+
+      <button
+        class="mt-10 h-8 w-40 rounded bg-sky-400 text-white disabled:bg-gray-400"
+        disabled={selectedExperimentIds.length !== 2}
+        on:click={() => {
+          window.location.href = `/experiments/compare/${selectedExperimentIds[0]}/${selectedExperimentIds[1]}`;
+        }}
+      >
+        Compare
+      </button>
+    </div>
   {/if}
 </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Experiment, Query } from '$lib';
+  import { asSimpleWebpage, type SimpleWebpage, type Webpage } from '$lib/webpage';
   import { createEventDispatcher, onMount } from 'svelte';
   import { tweened } from 'svelte/motion';
 
@@ -12,16 +13,29 @@
 
   let currentQuery = 0;
 
-  const search = async (query: Query) => {
+  const search = async (query: Query): Promise<SimpleWebpage[]> => {
     const res = await fetch(`${API}/search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: query.text }),
+      body: JSON.stringify({ query: query.text, returnRankingSignals: true }),
     });
 
     const data = await res.json();
+    const webpages = data.webpages as Webpage[];
 
-    console.log(data.webpages);
+    return webpages.map((webpage) => asSimpleWebpage(webpage));
+  };
+
+  const addSerpToExperiment = async (query: Query, pages: SimpleWebpage[]) => {
+    await fetch('/api/experiments/add_serp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        experimentId: experiment.id,
+        queryId: query.id,
+        webpages: pages,
+      }),
+    });
   };
 
   onMount(async () => {
@@ -29,7 +43,10 @@
       currentQuery = i;
       progress.set(((i + 1) / queries.length) * 100);
 
-      await search(queries[i]);
+      const query = queries[i];
+      const pages = await search(query);
+      await addSerpToExperiment(query, pages);
+
       await new Promise((resolve) => setTimeout(resolve, REQ_DELAY_MS));
     }
 

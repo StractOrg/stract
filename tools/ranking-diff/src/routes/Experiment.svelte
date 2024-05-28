@@ -29,6 +29,10 @@
   };
 
   export let experiment: Experiment;
+  export let selectionCallback: (id: number) => boolean;
+  export let deselectionCallback: (id: number) => void;
+
+  let selected: boolean = false;
 
   let editable = false;
 
@@ -58,9 +62,22 @@
       paragraph?.blur();
     }
   }
+
+  export const onClick = () => {
+    if (editable) {
+      return;
+    }
+
+    if (!selected) {
+      selected = selectionCallback(experiment.id);
+    } else {
+      deselectionCallback(experiment.id);
+      selected = false;
+    }
+  };
 </script>
 
-<div class="flex items-center gap-x-2">
+<button class="flex items-center gap-x-2 {selected ? 'bg-sky-100' : ''}" on:click={onClick}>
   <button class="text-gray-400 hover:text-red-500" on:click={() => deleteExperiment(experiment.id)}>
     <DeleteIcon class="h-4 w-4" />
   </button>
@@ -73,4 +90,4 @@
   <p bind:this={paragraph} class="w-full text-center" contenteditable={editable}>
     {experiment.name}
   </p>
-</div>
+</button>

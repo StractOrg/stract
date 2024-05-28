@@ -1,5 +1,6 @@
 import type { Experiment, Query } from '$lib';
 import Database from 'better-sqlite3';
+import type { SimpleWebpage } from './webpage';
 
 const db = new Database('../../data/ranking-diff.sqlite', {
   fileMustExist: false,
@@ -96,6 +97,12 @@ export const newExperiment = (name: string): Experiment => {
 };
 
 export const clearExperiments = () => {
+  const clearSerps = db.prepare(`
+    DELETE FROM serps
+  `);
+
+  clearSerps.run();
+
   const clearExperiments = db.prepare(`
     DELETE FROM experiments
   `);
@@ -104,6 +111,13 @@ export const clearExperiments = () => {
 };
 
 export const deleteExperiment = (id: number) => {
+  const deleteSerps = db.prepare(`
+    DELETE FROM serps
+    WHERE experimentId = @id
+  `);
+
+  deleteSerps.run({ id });
+
   const deleteExperiment = db.prepare(`
     DELETE FROM experiments
     WHERE id = @id
@@ -130,6 +144,43 @@ export const getExperiments = (): Experiment[] => {
   `);
 
   return query.all() as Experiment[];
+};
+
+export const addSerp = (experimentId: number, queryId: number, webpages: SimpleWebpage[]) => {
+  const insertSerp = db.prepare(`
+    INSERT OR REPLACE INTO serps (queryId, experimentId, results)
+
+    VALUES (@queryId, @experimentId, @results)
+  `);
+
+  insertSerp.run({
+    queryId,
+    experimentId,
+    results: JSON.stringify(webpages),
+  });
+};
+
+export const queryIntersection = (experimentIdA: number, experimentIdB: number): Query[] => {
+  const query = db.prepare(`
+    SELECT q.id, q.text
+    FROM queries q
+    JOIN serps sa ON sa.queryId = q.id
+    JOIN serps sb ON sb.queryId = q.id
+    WHERE sa.experimentId = @experimentIdA
+    AND sb.experimentId = @experimentIdB
+  `);
+
+  return query.all({ experimentIdA, experimentIdB }) as Query[];
+};
+
+export const experimentById = (id: number): Experiment => {
+  const query = db.prepare(`
+    SELECT *
+    FROM experiments
+    WHERE id = @id
+  `);
+
+  return query.get({ id }) as Experiment;
 };
 
 setupDB();
