@@ -2,16 +2,22 @@
   import type { PageData } from './$types';
   import BackIcon from '~icons/heroicons/arrow-left';
   import Query from './Query.svelte';
+  import Settings from '../../../../components/Settings.svelte';
 
   export let data: PageData;
 
   const { baseline, experiment, queries } = data;
 </script>
 
-<div class="w-fit">
-  <a href="/">
-    <BackIcon class="h-6 w-6" />
-  </a>
+<div class="flex w-full justify-between">
+  <div class="w-fit">
+    <a href="/">
+      <BackIcon class="h-6 w-6" />
+    </a>
+  </div>
+  <div>
+    <Settings />
+  </div>
 </div>
 
 <div class="flex flex-col gap-y-10">

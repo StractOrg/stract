@@ -3,9 +3,11 @@
   import BackIcon from '~icons/heroicons/arrow-left';
   import LikeIcon from '~icons/heroicons/hand-thumb-up';
   import Serp from './Serp.svelte';
-  import { applyAction } from '$app/forms';
   import { isLiked, like, unlike } from '$lib/api';
-  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+  import Settings from '../../../../../components/Settings.svelte';
+  import { shuffleExperimentsStore } from '$lib/stores';
+
   export let data: PageData;
 
   $: baseline = data.baseline;
@@ -17,16 +19,24 @@
   $: prevQuery = allQueries[queryIndex - 1];
   $: nextQuery = allQueries[queryIndex + 1];
 
-  $: experiments = [baseline, experiment]
-    .map((value) => ({ value, sort: Math.random() }))
-    .sort((a, b) => a.sort - b.sort)
-    .map(({ value }) => value);
+  $: experiments = [baseline, experiment];
+
+  $: {
+    if ($shuffleExperimentsStore && browser && experiments) {
+      experiments = experiments
+        .map((value) => ({ value, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .map(({ value }) => value);
+    } else {
+      experiments = [baseline, experiment];
+    }
+
+    if (browser && experiments) {
+      updateLikedExperiment();
+    }
+  }
 
   $: likedExperiment = null as number | null;
-
-  onMount(async () => {
-    await updateLikedExperiment();
-  });
 
   const updateLikedExperiment = async () => {
     let newLikedExperiment = null;
@@ -62,10 +72,13 @@
   };
 </script>
 
-<div class="w-fit">
-  <a href="/experiments/compare/{baseline.experiment.id}/{experiment.experiment.id}">
-    <BackIcon class="h-6 w-6" />
-  </a>
+<div class="flex w-full justify-between">
+  <div class="w-fit">
+    <a href="/experiments/compare/{baseline.experiment.id}/{experiment.experiment.id}">
+      <BackIcon class="h-6 w-6" />
+    </a>
+  </div>
+  <div><Settings /></div>
 </div>
 <div>
   <h1 class="grow text-center text-lg font-semibold">{query.text}</h1>

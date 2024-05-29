@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SimpleWebpage } from '$lib/webpage';
   import TopSignals from './TopSignals.svelte';
+  import { showSignalsStore } from '$lib/stores';
 
   export let webpage: SimpleWebpage;
 
@@ -18,5 +19,7 @@
   >
   <p class="line-clamp-3 text-sm">{webpage.snippet}</p>
   <p class="text-xs text-gray-500">Score: {totalScore.toFixed(4)}</p>
-  <TopSignals signals={webpage.rankingSignals} />
+  {#if $showSignalsStore}
+    <TopSignals signals={webpage.rankingSignals} />
+  {/if}
 </div>
