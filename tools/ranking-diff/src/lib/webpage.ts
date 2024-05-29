@@ -1,19 +1,26 @@
 export type SimpleWebpage = {
-    title: string;
-    url: string;
-    snippet: string,
-    rankingSignals: Record<string, number>;
+  title: string;
+  url: string;
+  snippet: string;
+  rankingSignals: Record<string, number>;
 };
 
 export const asSimpleWebpage = (webpage: Webpage): SimpleWebpage => {
-    return {
-        title: webpage.title,
-        url: webpage.url,
-        snippet: webpage.snippet.type === "normal" ? webpage.snippet.text.fragments.map(f => f.text).join("") : webpage.snippet.question.body.map(f => f.value).join(""),
-        rankingSignals: Object.fromEntries(Object.entries(webpage.rankingSignals).map(([key, value]) => [key, value.value])),
-    };
-}
-
+  return {
+    title: webpage.title,
+    url: webpage.url,
+    snippet:
+      webpage.snippet.type === 'normal'
+        ? webpage.snippet.text.fragments.map((f) => f.text).join('')
+        : webpage.snippet.question.body.map((f) => f.value).join(''),
+    rankingSignals: Object.fromEntries(
+      Object.entries(webpage.rankingSignals).map(([key, value]) => [
+        key,
+        value.coefficient * value.value,
+      ]),
+    ),
+  };
+};
 
 export type Webpage = {
   title: string;
@@ -25,20 +32,20 @@ export type Webpage = {
 export type RankingSignals = Record<string, RankingSignal>;
 
 export type RankingSignal = {
-    coefficient: number;
-    value: number;
+  coefficient: number;
+  value: number;
 };
 
 export type Snippet =
   | {
       date?: string;
       text: TextSnippet;
-      type: "normal";
+      type: 'normal';
     }
   | {
       answers: StackOverflowAnswer[];
       question: StackOverflowQuestion;
-      type: "stackOverflowQA";
+      type: 'stackOverflowQA';
     };
 export type StackOverflowAnswer = {
   accepted: boolean;
@@ -57,14 +64,14 @@ export type TextSnippetFragment = {
   kind: TextSnippetFragmentKind;
   text: string;
 };
-export type TextSnippetFragmentKind = "normal" | "highlighted";
+export type TextSnippetFragmentKind = 'normal' | 'highlighted';
 
 export type CodeOrText =
   | {
-      type: "code";
+      type: 'code';
       value: string;
     }
   | {
-      type: "text";
+      type: 'text';
       value: string;
     };

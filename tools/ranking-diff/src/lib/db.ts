@@ -42,6 +42,19 @@ const setupDB = () => {
     );
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS liked_experiments (
+      queryId INTEGER NOT NULL,
+      experimentId INTEGER NOT NULL,
+
+      FOREIGN KEY(queryId) REFERENCES
+        queries(id),
+      FOREIGN KEY(experimentId) REFERENCES
+        experiments(id),
+      PRIMARY KEY(queryId, experimentId)
+    );
+  `);
+
   return db;
 };
 
@@ -209,5 +222,65 @@ export const serpByQueryAndExperiment = (
     (query.get({ queryId, experimentId }) as any).results as string,
   ) as SimpleWebpage[];
 };
+
+export const nextQuery = (experimentId: number, currentQueryId: number): Query | undefined => {
+  const query = db.prepare(`
+    SELECT q.id, q.text
+    FROM queries q
+    JOIN serps sa ON sa.queryId = q.id
+    WHERE sa.experimentId = @experimentId
+    AND q.id > @currentQueryId
+    ORDER BY q.id
+    LIMIT 1
+  `);
+
+  return query.get({ experimentId, currentQueryId }) as Query;
+};
+
+export const previousQuery = (experimentId: number, currentQueryId: number): Query | undefined => {
+  const query = db.prepare(`
+    SELECT q.id, q.text
+    FROM queries q
+    JOIN serps sa ON sa.queryId = q.id
+    WHERE sa.experimentId = @experimentId
+    AND q.id < @currentQueryId
+    ORDER BY q.id
+    LIMIT 1
+  `);
+
+  return query.get({ experimentId, currentQueryId }) as Query;
+};
+
+export const isLiked = (experimentId: number, queryId: number): boolean => {
+  const query = db.prepare(`
+    SELECT *
+    FROM liked_experiments
+    WHERE experimentId = @experimentId
+    AND queryId = @queryId
+  `);
+
+  return query.get({ experimentId, queryId }) !== undefined;
+};
+
+export const like = (experimentId: number, queryId: number) =>
+  db
+    .prepare(
+      `
+    INSERT OR IGNORE INTO liked_experiments (experimentId, queryId)
+    VALUES (@experimentId, @queryId)
+  `,
+    )
+    .run({ experimentId, queryId });
+
+export const unlike = (experimentId: number, queryId: number) =>
+  db
+    .prepare(
+      `
+    DELETE FROM liked_experiments
+    WHERE experimentId = @experimentId
+    AND queryId = @queryId
+  `,
+    )
+    .run({ experimentId, queryId });
 
 setupDB();

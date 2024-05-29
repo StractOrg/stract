@@ -51,3 +51,59 @@ export const fetchSerpByQueryAndExperiment = async (
 
   return serp;
 };
+
+export const fetchQueriesIntersection = async (
+  experimentA: number,
+  experimentB: number,
+  options?: ApiOptions,
+): Promise<Query[]> => {
+  const res = await (options?.fetch ?? fetch)(`/api/experiments/queries/intersection`, {
+    method: 'POST',
+    body: JSON.stringify({
+      experimentA,
+      experimentB,
+    }),
+  });
+
+  const queries = (await res.json()) as Query[];
+
+  return queries;
+};
+
+export const like = async (experimentId: number, queryId: number, options?: ApiOptions) => {
+  await (options?.fetch ?? fetch)(`/api/experiments/like`, {
+    method: 'POST',
+    body: JSON.stringify({
+      experimentId,
+      queryId,
+    }),
+  });
+};
+
+export const unlike = async (experimentId: number, queryId: number, options?: ApiOptions) => {
+  await (options?.fetch ?? fetch)(`/api/experiments/unlike`, {
+    method: 'POST',
+    body: JSON.stringify({
+      experimentId,
+      queryId,
+    }),
+  });
+};
+
+export const isLiked = async (
+  experimentId: number,
+  queryId: number,
+  options?: ApiOptions,
+): Promise<boolean> => {
+  const res = await (options?.fetch ?? fetch)(`/api/experiments/is_liked`, {
+    method: 'POST',
+    body: JSON.stringify({
+      experimentId,
+      queryId,
+    }),
+  });
+
+  const liked = (await res.json()) as boolean;
+
+  return liked;
+};

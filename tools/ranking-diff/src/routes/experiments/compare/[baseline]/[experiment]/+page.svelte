@@ -8,7 +8,7 @@
   const { baseline, experiment, queries } = data;
 </script>
 
-<div>
+<div class="w-fit">
   <a href="/">
     <BackIcon class="h-6 w-6" />
   </a>

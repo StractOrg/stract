@@ -1,5 +1,10 @@
 import type { ExperimentResult } from '$lib';
-import { fetchExperimentById, fetchQueryById, fetchSerpByQueryAndExperiment } from '$lib/api';
+import {
+  fetchExperimentById,
+  fetchQueriesIntersection,
+  fetchQueryById,
+  fetchSerpByQueryAndExperiment,
+} from '$lib/api';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async (req) => {
@@ -21,9 +26,16 @@ export const load: PageLoad = async (req) => {
     { fetch },
   );
 
+  const allQueries = await fetchQueriesIntersection(
+    Number(params.baseline),
+    Number(params.experiment),
+    { fetch },
+  );
+
   return {
     baseline: { experiment: baseline, serp: baselineSerp } as ExperimentResult,
     experiment: { experiment, serp: experimentSerp } as ExperimentResult,
     query,
+    allQueries,
   };
 };
