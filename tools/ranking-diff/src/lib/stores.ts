@@ -47,3 +47,9 @@ export const shuffleExperimentsStore = writableLocalStorage<boolean>(SHUFFLE_EXP
 
 const SHOW_SIGNALS = 'showSignals';
 export const showSignalsStore = writableLocalStorage<boolean>(SHOW_SIGNALS, false);
+
+const SEARCH_API = 'searchApi';
+export const searchApiStore = writableLocalStorage<string>(
+  SEARCH_API,
+  'http://localhost:3000/beta/api/search',
+);

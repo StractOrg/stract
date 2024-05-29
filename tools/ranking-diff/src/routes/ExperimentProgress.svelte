@@ -3,18 +3,17 @@
   import { asSimpleWebpage, type SimpleWebpage, type Webpage } from '$lib/webpage';
   import { createEventDispatcher, onMount } from 'svelte';
   import { tweened } from 'svelte/motion';
+  import { searchApiStore } from '$lib/stores';
 
   export let experiment: Experiment;
   export let queries: Query[];
 
-  // const API = 'http://localhost:3000/beta/api';
-  const API = 'https://stract.com/beta/api';
   const REQ_DELAY_MS = 1000;
 
   let currentQuery = 0;
 
   const search = async (query: Query): Promise<SimpleWebpage[]> => {
-    const res = await fetch(`${API}/search`, {
+    const res = await fetch($searchApiStore, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: query.text, returnRankingSignals: true }),

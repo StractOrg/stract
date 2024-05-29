@@ -1,6 +1,6 @@
 <script lang="ts">
   import SettingsIcon from '~icons/heroicons/cog';
-  import { shuffleExperimentsStore, showSignalsStore } from '$lib/stores';
+  import { shuffleExperimentsStore, showSignalsStore, searchApiStore } from '$lib/stores';
 
   let open = false;
 </script>
@@ -18,6 +18,14 @@
       <div class="flex gap-x-1">
         <input id="show_signals" type="checkbox" bind:checked={$showSignalsStore} />
         <label for="show_signals">Show Signals</label>
+      </div>
+      <div class="flex">
+        <input
+          class="border border-slate-700"
+          type="text"
+          bind:value={$searchApiStore}
+          placeholder="search api"
+        />
       </div>
     </div>
   {/if}

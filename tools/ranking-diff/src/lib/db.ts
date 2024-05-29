@@ -45,13 +45,17 @@ const setupDB = () => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS liked_experiments (
       queryId INTEGER NOT NULL,
+      baselineId INTEGER NOT NULL,
       experimentId INTEGER NOT NULL,
+      likedState TEXT NOT NULL,
 
       FOREIGN KEY(queryId) REFERENCES
         queries(id),
+      FOREIGN KEY(baselineId) REFERENCES
+        experiments(id),
       FOREIGN KEY(experimentId) REFERENCES
         experiments(id),
-      PRIMARY KEY(queryId, experimentId)
+      PRIMARY KEY(queryId, baselineId, experimentId)
     );
   `);
 
@@ -251,36 +255,54 @@ export const previousQuery = (experimentId: number, currentQueryId: number): Que
   return query.get({ experimentId, currentQueryId }) as Query;
 };
 
-export const isLiked = (experimentId: number, queryId: number): boolean => {
+export type LikedState = 'baseline' | 'experiment' | 'none';
+export const likedState = (
+  baselineId: number,
+  experimentId: number,
+  queryId: number,
+): LikedState => {
   const query = db.prepare(`
-    SELECT *
+    SELECT likedState
     FROM liked_experiments
     WHERE experimentId = @experimentId
     AND queryId = @queryId
+    AND baselineId = @baselineId
   `);
 
-  return query.get({ experimentId, queryId }) !== undefined;
+  const res = query.get({ baselineId, experimentId, queryId });
+
+  if (res) {
+    return (res as any).likedState as LikedState;
+  }
+
+  return 'none';
 };
 
-export const like = (experimentId: number, queryId: number) =>
+export const like = (
+  baselineId: number,
+  experimentId: number,
+  queryId: number,
+  state: LikedState,
+) =>
   db
     .prepare(
       `
-    INSERT OR IGNORE INTO liked_experiments (experimentId, queryId)
-    VALUES (@experimentId, @queryId)
+    INSERT OR IGNORE INTO liked_experiments (baselineId, experimentId, queryId, likedState)
+    VALUES (@baselineId, @experimentId, @queryId, @state)
   `,
     )
-    .run({ experimentId, queryId });
+    .run({ baselineId, experimentId, queryId, state });
 
-export const unlike = (experimentId: number, queryId: number) =>
+export const unlike = (baselineId: number, experimentId: number, queryId: number) =>
   db
     .prepare(
       `
     DELETE FROM liked_experiments
     WHERE experimentId = @experimentId
     AND queryId = @queryId
+    AND baselineId = @baselineId
   `,
     )
-    .run({ experimentId, queryId });
+    .run({ baselineId, experimentId, queryId });
 
 setupDB();

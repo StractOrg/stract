@@ -1,4 +1,5 @@
 import type { Experiment, Query } from '$lib';
+import type { LikedState } from './db';
 import type { SimpleWebpage } from './webpage';
 
 export type ApiOptions = {
@@ -70,40 +71,56 @@ export const fetchQueriesIntersection = async (
   return queries;
 };
 
-export const like = async (experimentId: number, queryId: number, options?: ApiOptions) => {
+export const like = async (
+  baselineId: number,
+  experimentId: number,
+  queryId: number,
+  state: LikedState,
+  options?: ApiOptions,
+) => {
   await (options?.fetch ?? fetch)(`/api/experiments/like`, {
     method: 'POST',
     body: JSON.stringify({
+      baselineId,
       experimentId,
       queryId,
+      state,
     }),
   });
 };
 
-export const unlike = async (experimentId: number, queryId: number, options?: ApiOptions) => {
-  await (options?.fetch ?? fetch)(`/api/experiments/unlike`, {
-    method: 'POST',
-    body: JSON.stringify({
-      experimentId,
-      queryId,
-    }),
-  });
-};
-
-export const isLiked = async (
+export const unlike = async (
+  baselineId: number,
   experimentId: number,
   queryId: number,
   options?: ApiOptions,
-): Promise<boolean> => {
-  const res = await (options?.fetch ?? fetch)(`/api/experiments/is_liked`, {
+) => {
+  await (options?.fetch ?? fetch)(`/api/experiments/unlike`, {
     method: 'POST',
     body: JSON.stringify({
+      baselineId,
+      experimentId,
+      queryId,
+    }),
+  });
+};
+
+export const likedState = async (
+  baselineId: number,
+  experimentId: number,
+  queryId: number,
+  options?: ApiOptions,
+): Promise<LikedState> => {
+  const res = await (options?.fetch ?? fetch)(`/api/experiments/liked_state`, {
+    method: 'POST',
+    body: JSON.stringify({
+      baselineId,
       experimentId,
       queryId,
     }),
   });
 
-  const liked = (await res.json()) as boolean;
+  const state = (await res.json()) as LikedState;
 
-  return liked;
+  return state;
 };

@@ -1,24 +1,17 @@
 <script lang="ts">
   import type { Query, Experiment } from '$lib';
-  import { isLiked } from '$lib/api';
+  import { likedState as getLikedState } from '$lib/api';
+  import type { LikedState } from '$lib/db';
   import { onMount } from 'svelte';
 
   export let baseline: Experiment;
   export let experiment: Experiment;
   export let query: Query;
 
-  type LikedState = 'baseline' | 'experiment' | 'none';
-
   let likedState: LikedState = 'none';
 
   onMount(async () => {
-    if (await isLiked(baseline.id, query.id)) {
-      likedState = 'baseline';
-    } else if (await isLiked(experiment.id, query.id)) {
-      likedState = 'experiment';
-    } else {
-      likedState = 'none';
-    }
+    likedState = await getLikedState(baseline.id, experiment.id, query.id);
   });
 
   $: color = 'bg-slate-200';

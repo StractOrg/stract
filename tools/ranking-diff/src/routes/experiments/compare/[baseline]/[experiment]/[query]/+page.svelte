@@ -3,10 +3,13 @@
   import BackIcon from '~icons/heroicons/arrow-left';
   import LikeIcon from '~icons/heroicons/hand-thumb-up';
   import Serp from './Serp.svelte';
-  import { isLiked, like, unlike } from '$lib/api';
+  import { like, likedState, unlike } from '$lib/api';
   import { browser } from '$app/environment';
   import Settings from '../../../../../components/Settings.svelte';
   import { shuffleExperimentsStore } from '$lib/stores';
+  import type { SimpleWebpage } from '$lib/webpage';
+  import type { Experiment } from '$lib';
+  import type { LikedState } from '$lib/db';
 
   export let data: PageData;
 
@@ -19,7 +22,10 @@
   $: prevQuery = allQueries[queryIndex - 1];
   $: nextQuery = allQueries[queryIndex + 1];
 
-  $: experiments = [baseline, experiment];
+  $: experiments = [
+    { isBaseline: true, ...baseline },
+    { isBaseline: false, ...experiment },
+  ];
 
   $: {
     if ($shuffleExperimentsStore && browser && experiments) {
@@ -28,7 +34,10 @@
         .sort((a, b) => a.sort - b.sort)
         .map(({ value }) => value);
     } else {
-      experiments = [baseline, experiment];
+      experiments = [
+        { isBaseline: true, ...baseline },
+        { isBaseline: false, ...experiment },
+      ];
     }
 
     if (browser && experiments) {
@@ -39,38 +48,60 @@
   $: likedExperiment = null as number | null;
 
   const updateLikedExperiment = async () => {
-    let newLikedExperiment = null;
-    for (const experiment of experiments) {
-      const liked = await experimentIsLiked(experiment.experiment.id);
-      if (liked) {
-        newLikedExperiment = experiment.experiment.id;
-      }
+    const state = await likedState(baseline.experiment.id, experiment.experiment.id, query.id, {
+      fetch,
+    });
+    if (state === 'baseline') {
+      likedExperiment = baseline.experiment.id;
+    } else if (state === 'experiment') {
+      likedExperiment = experiment.experiment.id;
+    } else {
+      likedExperiment = null;
     }
-
-    likedExperiment = newLikedExperiment;
   };
-
-  const experimentIsLiked = async (experimentId: number) =>
-    await isLiked(experimentId, query.id, { fetch });
 
   const unlikeAllExperiments = async () => {
-    for (const experiment of experiments) {
-      await unlike(experiment.experiment.id, query.id, { fetch });
-    }
+    await unlike(baseline.experiment.id, experiment.experiment.id, query.id, { fetch });
   };
 
-  const likeExperiment = async (experimentId: number) => {
-    const wasLiked = likedExperiment === experimentId;
-
+  const likeExperiment = async (e: {
+    experiment: Experiment;
+    isBaseline: boolean;
+    serp: SimpleWebpage[];
+  }) => {
     await unlikeAllExperiments();
 
+    const wasLiked = likedExperiment === e.experiment.id;
+
     if (!wasLiked) {
-      await like(experimentId, query.id, { fetch });
+      if (e.isBaseline) {
+        await like(baseline.experiment.id, experiment.experiment.id, query.id, 'baseline', {
+          fetch,
+        });
+      } else {
+        await like(baseline.experiment.id, experiment.experiment.id, query.id, 'experiment', {
+          fetch,
+        });
+      }
     }
 
     await updateLikedExperiment();
   };
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'ArrowLeft' && prevQuery) {
+      window.location.href = prevQuery.id.toString();
+    } else if (event.key === 'ArrowRight' && nextQuery) {
+      window.location.href = nextQuery.id.toString();
+    } else if (event.key.toLowerCase() == 'a') {
+      likeExperiment(experiments[0]);
+    } else if (event.key.toLowerCase() == 'b') {
+      likeExperiment(experiments[1]);
+    }
+  };
 </script>
+
+<svelte:window on:keydown={onKeyDown} />
 
 <div class="flex w-full justify-between">
   <div class="w-fit">
@@ -86,19 +117,24 @@
 
 <div class="mt-10 flex h-3/4 w-full justify-center overflow-auto">
   <div class="flex w-full max-w-5xl gap-x-2">
-    {#each experiments as { serp }}
-      <Serp webpages={serp} />
-    {/each}
+    <div class="w-full">
+      <h2 class="mb-5 text-center">A</h2>
+      <Serp webpages={experiments[0].serp} />
+    </div>
+    <div class="w-full">
+      <h2 class="mb-5 text-center">B</h2>
+      <Serp webpages={experiments[1].serp} />
+    </div>
   </div>
 </div>
 
 <div class="mt-5 flex w-full justify-center">
   <div class="flex w-full max-w-5xl">
-    {#each experiments as experiment}
+    {#each experiments as e}
       <div class="flex grow justify-center">
         <button
-          on:click={() => likeExperiment(experiment.experiment.id)}
-          class="{likedExperiment && likedExperiment == experiment.experiment.id
+          on:click={() => likeExperiment(e)}
+          class="{likedExperiment && likedExperiment == e.experiment.id
             ? 'text-green-500'
             : 'text-slate-300'} hover:text-green-700"><LikeIcon class="h-6 w-6" /></button
         >
