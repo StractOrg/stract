@@ -23,7 +23,8 @@ const setupDB = () => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS experiments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL
+      name TEXT NOT NULL,
+      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
@@ -138,7 +139,7 @@ export const renameExperiment = (id: number, name: string) => {
 
 export const getExperiments = (): Experiment[] => {
   const query = db.prepare(`
-    SELECT id, name
+    SELECT id, name, timestamp
     FROM experiments
     ORDER BY id DESC
   `);
@@ -181,6 +182,32 @@ export const experimentById = (id: number): Experiment => {
   `);
 
   return query.get({ id }) as Experiment;
+};
+
+export const queryById = (id: number): Query => {
+  const query = db.prepare(`
+    SELECT *
+    FROM queries
+    WHERE id = @id
+  `);
+
+  return query.get({ id }) as Query;
+};
+
+export const serpByQueryAndExperiment = (
+  queryId: number,
+  experimentId: number,
+): SimpleWebpage[] => {
+  const query = db.prepare(`
+    SELECT results
+    FROM serps
+    WHERE queryId = @queryId
+    AND experimentId = @experimentId
+  `);
+
+  return JSON.parse(
+    (query.get({ queryId, experimentId }) as any).results as string,
+  ) as SimpleWebpage[];
 };
 
 setupDB();

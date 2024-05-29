@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { PageData } from './$types';
   import BackIcon from '~icons/heroicons/arrow-left';
+  import Query from './Query.svelte';
 
   export let data: PageData;
 
-  const { experimentA, experimentB, queries } = data;
+  const { baseline, experiment, queries } = data;
 </script>
 
 <div>
@@ -15,13 +16,11 @@
 
 <div class="flex flex-col gap-y-10">
   <h1 class="w-full text-center text-xl">
-    Common queries between {experimentA.name} and {experimentB.name}
+    Common queries between {baseline.name} and {experiment.name}
   </h1>
   <div class="grid grid-cols-5 gap-x-2">
     {#each queries as query}
-      <a href="#" class="flex h-24 items-center justify-center rounded bg-slate-200 px-2">
-        <h2 class="line-clamp-2 break-all">{query.text}</h2>
-      </a>
+      <Query {query} {experiment} {baseline} />
     {/each}
   </div>
 </div>

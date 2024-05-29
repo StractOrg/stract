@@ -2,6 +2,6 @@
   import '../app.css';
 </script>
 
-<div class="px-5 py-2">
+<div class="h-screen w-screen px-5 py-2">
   <slot />
 </div>

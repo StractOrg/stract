@@ -52,6 +52,14 @@
     }
 
     selectedExperimentIds = [...selectedExperimentIds, id];
+
+    selectedExperimentIds.sort((a, b) => {
+      const aExp = experiments.find((e) => e.id === a)!;
+      const bExp = experiments.find((e) => e.id === b)!;
+
+      return aExp.name.localeCompare(bExp.name);
+    });
+
     return true;
   };
 
