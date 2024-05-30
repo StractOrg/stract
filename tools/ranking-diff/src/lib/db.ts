@@ -1,4 +1,4 @@
-import type { Experiment, Query } from '$lib';
+import type { Category, Experiment, LikedState, Query } from '$lib';
 import Database from 'better-sqlite3';
 import type { SimpleWebpage } from './webpage';
 
@@ -35,9 +35,9 @@ const setupDB = () => {
       results TEXT NOT NULL,
 
       FOREIGN KEY(queryId) REFERENCES
-        queries(id),
+        queries(id) ON DELETE CASCADE,
       FOREIGN KEY(experimentId) REFERENCES
-        experiments(id),
+        experiments(id) ON DELETE CASCADE,
       PRIMARY KEY(queryId, experimentId)
     );
   `);
@@ -50,12 +50,36 @@ const setupDB = () => {
       likedState TEXT NOT NULL,
 
       FOREIGN KEY(queryId) REFERENCES
-        queries(id),
+        queries(id) ON DELETE CASCADE,
       FOREIGN KEY(baselineId) REFERENCES
-        experiments(id),
+        experiments(id) ON DELETE CASCADE,
       FOREIGN KEY(experimentId) REFERENCES
-        experiments(id),
+        experiments(id) ON DELETE CASCADE,
       PRIMARY KEY(queryId, baselineId, experimentId)
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      UNIQUE(name)
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS query_category (
+      categoryId INTEGER NOT NULL,
+      queryId INTEGER NOT NULL,
+
+      FOREIGN KEY(categoryId) REFERENCES
+        categories(id) ON DELETE CASCADE,
+      FOREIGN KEY(queryId) REFERENCES
+        queries(id) ON DELETE CASCADE,
+      
+      UNIQUE(queryId),
+
+      PRIMARY KEY(categoryId, queryId)
     );
   `);
 
@@ -255,7 +279,6 @@ export const previousQuery = (experimentId: number, currentQueryId: number): Que
   return query.get({ experimentId, currentQueryId }) as Query;
 };
 
-export type LikedState = 'baseline' | 'experiment' | 'none';
 export const likedState = (
   baselineId: number,
   experimentId: number,
@@ -304,5 +327,80 @@ export const unlike = (baselineId: number, experimentId: number, queryId: number
   `,
     )
     .run({ baselineId, experimentId, queryId });
+
+export const addCategory = (name: string) => {
+  const insertCategory = db.prepare(`
+    INSERT OR IGNORE INTO categories (name)
+    VALUES (@name)
+  `);
+
+  insertCategory.run({ name });
+};
+
+export const removeCategory = (categoryId: number) => {
+  const deleteCategory = db.prepare(`
+    DELETE FROM categories
+    WHERE id = @categoryId
+  `);
+
+  deleteCategory.run({ categoryId });
+};
+
+export const addQueryToCategory = (queryId: number, categoryId: number) => {
+  const insertQueryCategory = db.prepare(`
+    INSERT OR IGNORE INTO query_category (queryId, categoryId)
+    VALUES (@queryId, @categoryId)
+  `);
+
+  insertQueryCategory.run({ queryId, categoryId });
+};
+
+export const removeQueryCategories = (queryId: number) => {
+  const deleteQueryCategory = db.prepare(`
+    DELETE FROM query_category
+    WHERE queryId = @queryId
+  `);
+
+  deleteQueryCategory.run({ queryId });
+};
+
+export const getCategories = (): Category[] => {
+  const query = db.prepare(`
+    SELECT id, name
+    FROM categories
+  `);
+
+  return query.all() as Category[];
+};
+
+export const getQueriesByCategory = (categoryId: number) => {
+  const query = db.prepare(`
+    SELECT q.id, q.text
+    FROM queries q
+    JOIN query_category qc ON qc.queryId = q.id
+    WHERE categoryId = @categoryId
+  `);
+
+  return query.all({ categoryId });
+};
+
+export const getQueryCategories = (queryId: number): Category[] => {
+  const query = db.prepare(`
+    SELECT c.id, c.name
+    FROM categories c
+    JOIN query_category qc ON qc.categoryId = c.id
+    WHERE queryId = @queryId
+  `);
+
+  return query.all({ queryId }) as Category[];
+};
+
+export const clearCategories = () => {
+  const clearCategories = db.prepare(`
+    DELETE FROM categories
+  `);
+
+  clearCategories.run();
+};
 
 setupDB();

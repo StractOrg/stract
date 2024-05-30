@@ -1,7 +1,7 @@
 <script lang="ts">
   import Settings from './Settings.svelte';
 
-  type Page = 'experiments' | 'queries';
+  type Page = 'experiments' | 'queries' | 'categories';
   export let page: Page;
 </script>
 
@@ -22,6 +22,14 @@
         : ''}"
     >
       Queries
+    </a>
+    <a
+      href="/categories"
+      class="border-content rounded-full border-slate-500 px-2 py-1 {page === 'categories'
+        ? 'border'
+        : ''}"
+    >
+      Categories
     </a>
   </div>
   <div>

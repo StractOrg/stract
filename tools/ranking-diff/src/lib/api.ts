@@ -1,5 +1,4 @@
-import type { Experiment, Query } from '$lib';
-import type { LikedState } from './db';
+import type { Category, Experiment, Query, LikedState } from '$lib';
 import type { SimpleWebpage } from './webpage';
 
 export type ApiOptions = {
@@ -63,6 +62,30 @@ export const fetchQueriesIntersection = async (
     body: JSON.stringify({
       experimentA,
       experimentB,
+    }),
+  });
+
+  const queries = (await res.json()) as Query[];
+
+  return queries;
+};
+
+export const fetchAllCategories = async (options?: ApiOptions): Promise<Category[]> => {
+  const res = await (options?.fetch ?? fetch)(`/api/categories`);
+
+  const categories = (await res.json()) as Category[];
+
+  return categories;
+};
+
+export const fetchQueriesByCategory = async (
+  categoryId: number,
+  options?: ApiOptions,
+): Promise<Query[]> => {
+  const res = await (options?.fetch ?? fetch)(`/api/categories/get_queries`, {
+    method: 'POST',
+    body: JSON.stringify({
+      categoryId,
     }),
   });
 

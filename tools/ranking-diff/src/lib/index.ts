@@ -1,5 +1,7 @@
 import type { SimpleWebpage } from './webpage';
 
+export type LikedState = 'baseline' | 'experiment' | 'none';
+
 export type Experiment = {
   id: number;
   name: string;
@@ -14,4 +16,9 @@ export type Query = {
 export type ExperimentResult = {
   experiment: Experiment;
   serp: SimpleWebpage[];
+};
+
+export type Category = {
+  id: number;
+  name: string;
 };

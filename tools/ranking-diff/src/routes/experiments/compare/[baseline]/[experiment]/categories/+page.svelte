@@ -1,12 +1,12 @@
 <script lang="ts">
   import type { PageData } from './$types';
   import BackIcon from '~icons/heroicons/arrow-left';
-  import Query from './Query.svelte';
-  import Settings from '../../../../components/Settings.svelte';
+  import Settings from '../../../../../components/Settings.svelte';
+  import Category from './Category.svelte';
 
   export let data: PageData;
 
-  const { baseline, experiment, queries } = data;
+  const { baseline, experiment, categories } = data;
 </script>
 
 <div class="flex w-full justify-between">
@@ -16,10 +16,10 @@
     </a>
     <div class="flex gap-2">
       <a href="/experiments/compare/{baseline.id}/{experiment.id}">
-        <span class="rounded-full border border-slate-500 px-2 py-1">Queries</span>
+        <span class="rounded-full border-slate-500 px-2 py-1">Queries</span>
       </a>
       <a href="/experiments/compare/{baseline.id}/{experiment.id}/categories">
-        <span class="rounded-full border-slate-500 px-2 py-1">Categories</span>
+        <span class="rounded-full border border-slate-500 px-2 py-1">Categories</span>
       </a>
     </div>
   </div>
@@ -28,10 +28,8 @@
   </div>
 </div>
 
-<div class="flex flex-col py-10">
-  <div class="grid grid-cols-5 gap-2">
-    {#each queries as query}
-      <Query {query} {experiment} {baseline} />
-    {/each}
-  </div>
+<div class="flex flex-col gap-y-10 py-10">
+  {#each categories as category}
+    <Category {category} {baseline} {experiment} />
+  {/each}
 </div>

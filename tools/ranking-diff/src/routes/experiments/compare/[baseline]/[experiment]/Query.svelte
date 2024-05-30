@@ -1,7 +1,6 @@
 <script lang="ts">
-  import type { Query, Experiment } from '$lib';
+  import type { Query, Experiment, LikedState } from '$lib';
   import { likedState as getLikedState } from '$lib/api';
-  import type { LikedState } from '$lib/db';
   import { onMount } from 'svelte';
 
   export let baseline: Experiment;
