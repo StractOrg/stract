@@ -50,7 +50,7 @@
   <Gauge value={score} min={-queries.length} max={queries.length} />
 
   {#if showQueries}
-    <div class="mt-5 grid grid-cols-5 gap-2">
+    <div class="mt-5 grid w-full grid-cols-5 gap-2">
       {#each queries as query}
         <QueryComponent {query} {experiment} {baseline} />
       {/each}

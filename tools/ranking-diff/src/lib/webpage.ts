@@ -9,10 +9,7 @@ export const asSimpleWebpage = (webpage: Webpage): SimpleWebpage => {
   return {
     title: webpage.title,
     url: webpage.url,
-    snippet:
-      webpage.snippet.type === 'normal'
-        ? webpage.snippet.text.fragments.map((f) => f.text).join('')
-        : webpage.snippet.question.body.map((f) => f.value).join(''),
+    snippet: webpage.snippet.text.fragments.map((f) => f.text).join(''),
     rankingSignals: Object.fromEntries(
       Object.entries(webpage.rankingSignals).map(([key, value]) => [
         key,
@@ -26,6 +23,7 @@ export type Webpage = {
   title: string;
   url: string;
   snippet: Snippet;
+  richSnippet: RichSnippet;
   rankingSignals: RankingSignals;
 };
 
@@ -36,17 +34,16 @@ export type RankingSignal = {
   value: number;
 };
 
-export type Snippet =
-  | {
-      date?: string;
-      text: TextSnippet;
-      type: 'normal';
-    }
-  | {
-      answers: StackOverflowAnswer[];
-      question: StackOverflowQuestion;
-      type: 'stackOverflowQA';
-    };
+export type Snippet = {
+  date?: string;
+  text: TextSnippet;
+};
+
+export type RichSnippet = {
+  answers: StackOverflowAnswer[];
+  question: StackOverflowQuestion;
+  type: 'stackOverflowQA';
+};
 export type StackOverflowAnswer = {
   accepted: boolean;
   body: CodeOrText[];
