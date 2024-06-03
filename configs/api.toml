@@ -14,7 +14,7 @@ summarizer_path = "data/summarizer"
 path = "data/web_spell/checker"
 
 [spell_check.correction_config]
-correction_threshold = 3.0
+correction_threshold = 0.0
 lm_prob_weight = 1.0
 
 [thresholds]
@@ -23,9 +23,3 @@ stackoverflow = 0.0
 
 [widgets]
 thesaurus_paths = ["data/english-wordnet-2022-subset.ttl"]
-
-[llm]
-api_base = "http://localhost:4000/v1"
-model = "data/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
-# model = "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
-# model = "mistralai/Mixtral-8x7B-Instruct-v0.1"

@@ -380,7 +380,7 @@ impl FinalEdgeStoreWriter {
                     batch.clear();
                     inserts_since_last_flush += batch_len;
 
-                    if inserts_since_last_flush >= 1_000_000 {
+                    if inserts_since_last_flush >= 100_000_000 {
                         self.flush();
                         inserts_since_last_flush = 0;
                     }
