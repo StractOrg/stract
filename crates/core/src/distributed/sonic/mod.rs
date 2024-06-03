@@ -30,6 +30,7 @@ use tokio::{
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
 const MAX_BODY_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024; // 1TB
+const MAX_CONNECTION_TTL: Duration = Duration::from_secs(60);
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -57,7 +58,9 @@ pub enum Error {
 
 pub struct Connection<Req, Res> {
     stream: TcpStream,
+    created: std::time::Instant,
     marker: PhantomData<(Req, Res)>,
+    awaiting_res: bool,
 }
 
 impl<Req, Res> Connection<Req, Res>
@@ -84,6 +87,8 @@ where
 
                 Ok(Connection {
                     stream,
+                    awaiting_res: false,
+                    created: std::time::Instant::now(),
                     marker: PhantomData,
                 })
             }
@@ -115,6 +120,7 @@ where
     }
 
     async fn send_without_timeout(&mut self, request: &Req) -> Result<Res> {
+        self.awaiting_res = true;
         let bytes = bincode::encode_to_vec(request, bincode::config::standard()).unwrap();
 
         let header = Header {
@@ -143,6 +149,8 @@ where
         tracing::debug!("deserializing {:?}", std::any::type_name::<(Req, Res)>());
         let (res, _) = bincode::decode_from_slice(&buf, bincode::config::standard()).unwrap();
 
+        self.awaiting_res = false;
+
         Ok(res)
     }
 
@@ -161,7 +169,16 @@ where
         }
     }
 
+    pub fn awaiting_response(&self) -> bool {
+        self.awaiting_res
+    }
+
     pub async fn is_closed(&mut self) -> bool {
+        if self.created.elapsed() > MAX_CONNECTION_TTL {
+            self.stream.shutdown().await.ok();
+            return true;
+        }
+
         !matches!(
             tokio::time::timeout(Duration::from_secs(1), self.stream.read_exact(&mut [])).await,
             Ok(Ok(_))

@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::{fs, io};
 
 use itertools::Itertools;
-use rand::seq::SliceRandom;
+use rand::seq::{IteratorRandom, SliceRandom};
 use rayon::prelude::*;
 
 use self::id_node_db::Id2NodeDb;
@@ -309,10 +309,9 @@ impl Webgraph {
             .edges()
             .map(|e| e.from)
             .unique()
-            .take(num)
-            .collect::<Vec<_>>();
+            .choose_multiple(&mut rng, num);
         nodes.shuffle(&mut rng);
-        nodes.into_iter().take(num).collect()
+        nodes
     }
 
     pub fn par_nodes(&self) -> impl ParallelIterator<Item = NodeID> + '_ {

@@ -14,117 +14,60 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::{anyhow, Result};
-use hashbrown::HashSet;
 use indicatif::ParallelProgressIterator;
-use indicatif::ProgressIterator;
 use itertools::Itertools;
-use rayon::prelude::*;
-use rayon::ThreadPoolBuilder;
+use rayon::{prelude::*, ThreadPoolBuilder};
 use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::iter;
+use std::sync::Arc;
 use std::{
     path::Path,
     sync::{atomic::AtomicUsize, Mutex},
 };
 use url::Url;
 
+use crate::config::WebgraphGranularity;
 use crate::crawler::WeightedUrl;
+use crate::distributed::cluster::Cluster;
 use crate::webgraph::centrality::{top_nodes, TopNodes};
-use crate::SortableFloat;
+use crate::webgraph::remote::RemoteWebgraph;
+use crate::webgraph::Node;
+use crate::webpage::url_ext::UrlExt;
 use crate::{
     config::CrawlPlannerConfig,
     crawler::{file_queue::FileQueueWriter, Job},
-    webgraph::{NodeID, Webgraph},
+    webgraph::NodeID,
 };
 
 use super::Domain;
 
-const MAX_SURPLUS_BUDGET_ITERATIONS: usize = 100;
-
 pub struct CrawlPlanner {
     host_centrality: speedy_kv::Db<NodeID, f64>,
     page_centrality: speedy_kv::Db<NodeID, f64>,
-    host_graph: Webgraph,
-    page_graph: Webgraph,
+    page_graph: RemoteWebgraph,
     config: CrawlPlannerConfig,
 }
 
 impl CrawlPlanner {
-    pub fn new(
+    pub async fn new(
         host_centrality: speedy_kv::Db<NodeID, f64>,
         page_centrality: speedy_kv::Db<NodeID, f64>,
-        host_graph: Webgraph,
-        page_graph: Webgraph,
+        cluster: Arc<Cluster>,
         config: CrawlPlannerConfig,
     ) -> Result<Self> {
         Self::check_config(&config)?;
 
+        let page_graph = RemoteWebgraph::new(cluster, WebgraphGranularity::Page).await;
+
         Ok(Self {
             host_centrality,
             page_centrality,
-            host_graph,
             page_graph,
             config,
         })
     }
 
-    fn all_pages(&self, host: NodeID) -> Vec<(NodeID, f64)> {
-        self.page_graph
-            .pages_by_host(&host)
-            .into_iter()
-            .map(|id| {
-                (
-                    id,
-                    self.page_centrality
-                        .get(&id)
-                        .ok()
-                        .flatten()
-                        .unwrap_or_default(),
-                )
-            })
-            .collect::<Vec<_>>()
-    }
-
-    fn group_domain(&self, hosts: &[NodeID]) -> Vec<(Domain, Vec<NodeID>)> {
-        let mut domains: HashMap<Domain, Vec<NodeID>> = HashMap::new();
-
-        for host in hosts {
-            let node = self.host_graph.id2node(host).unwrap();
-            if let Ok(url) = Url::parse(&format!("http://{}", node.as_str())) {
-                let domain = Domain::from(url);
-                domains.entry(domain).or_default().push(*host);
-            }
-        }
-
-        domains
-            .into_iter()
-            .sorted_by_cached_key(|(_, hosts)| {
-                let s = hosts
-                    .iter()
-                    .map(|host| {
-                        self.host_centrality
-                            .get(host)
-                            .ok()
-                            .flatten()
-                            .unwrap_or_default()
-                    })
-                    .sum::<f64>();
-
-                SortableFloat::from(s)
-            })
-            .rev()
-            .collect()
-    }
-
     fn check_config(config: &CrawlPlannerConfig) -> Result<()> {
         if !(0.0..=1.0).contains(&config.wander_fraction) {
-            return Err(anyhow::anyhow!(
-                "top_host_fraction must be in range [0.0, 1.0]"
-            ));
-        }
-
-        if !(0.0..=1.0).contains(&config.top_host_fraction) {
             return Err(anyhow::anyhow!(
                 "top_host_fraction must be in range [0.0, 1.0]"
             ));
@@ -136,198 +79,97 @@ impl CrawlPlanner {
     fn prepare_job(
         &self,
         domain: Domain,
-        hosts: &[NodeID],
-        host_budgets: &BTreeMap<NodeID, u64>,
+        pages: Vec<Url>,
+        wander_budget: f64,
+        total_host_centralities: f64,
     ) -> (Job, DomainStats) {
-        let mut total_wander_budget = 0;
-        let mut total_schedule_budget = 0;
-        let mut total_scheduled_urls = 0;
-        let mut total_known_urls = 0;
-        let mut urls = HashSet::new();
+        let hosts = pages
+            .iter()
+            .map(|url| Node::from(url).into_host())
+            .unique()
+            .collect::<Vec<_>>();
 
-        for host in hosts {
-            let mut pages = self.all_pages(*host);
-            total_known_urls += pages.len();
+        let host_centrality: f64 = hosts
+            .iter()
+            .map(|host| host.id())
+            .map(|id| self.host_centrality.get(&id).unwrap().unwrap_or_default())
+            .sum();
 
-            if pages.is_empty() {
-                continue;
-            }
+        let wander_budget = (wander_budget * (host_centrality / total_host_centralities))
+            .max(1.0)
+            .round() as u64;
 
-            pages.sort_by(|(_, a), (_, b)| b.total_cmp(a));
-            tracing::debug!("num pages: {}", pages.len());
-            let host_budget = host_budgets.get(host).copied().unwrap_or_default();
-
-            tracing::debug!("host_budget: {host_budget}");
-            let schedule_budget = (host_budget as f64 * (1.0 - self.config.wander_fraction))
-                .round()
-                .max(0.0) as u64;
-
-            tracing::debug!("schedule_budget: {schedule_budget}");
-            let wander_budget = (host_budget as f64 * self.config.wander_fraction)
-                .max(0.0)
-                .round() as u64;
-            tracing::debug!("wander_budget: {wander_budget}");
-
-            total_wander_budget += wander_budget;
-            total_schedule_budget += schedule_budget;
-            let host_name = self.host_graph.id2node(host).unwrap().as_str().to_string();
-
-            let before = urls.len();
-            urls.extend(
-                pages
+        let mut urls: Vec<_> = pages
+            .into_iter()
+            .chain(
+                hosts
                     .into_iter()
-                    .filter_map(|(id, score)| self.page_graph.id2node(&id).map(|n| (n, score)))
-                    .map(|(n, score)| (n.as_str().to_string(), score))
-                    .filter_map(|(n, score)| {
-                        Url::parse(&format!("http://{n}")).ok().map(|u| (u, score))
-                    })
-                    .map(|(url, score)| WeightedUrl { url, weight: score })
-                    .take(schedule_budget as usize)
-                    .chain(
-                        iter::once_with(|| {
-                            Some(WeightedUrl {
-                                url: format!("http://{host_name}").parse().ok()?,
-                                weight: 1.0,
-                            })
-                        })
-                        .flatten(),
-                    ),
-            );
+                    .map(|host| Url::parse(&format!("https://{}", host.as_str())).unwrap()),
+            )
+            .unique()
+            .map(|url| WeightedUrl {
+                url: url.clone(),
+                weight: self
+                    .page_centrality
+                    .get(&Node::from(url).id())
+                    .unwrap()
+                    .unwrap_or_default(),
+            })
+            .collect();
 
-            total_scheduled_urls += urls.len() as u64 - before as u64;
-        }
-
-        tracing::trace!(
-            "domain: {:#?} hosts: {:#?} urls: {:#?}",
-            domain,
-            hosts,
-            urls
-        );
+        urls.sort_by(|a, b| b.weight.total_cmp(&a.weight));
+        urls.reverse();
 
         let job = Job {
             domain: domain.clone(),
-            urls: urls
-                .into_iter()
-                .sorted_by(|a, b| b.weight.total_cmp(&a.weight))
-                .collect(),
-            wandering_urls: total_wander_budget,
+            urls: urls.into_iter().collect(),
+            wandering_urls: wander_budget,
         };
 
         let domain_stats = DomainStats {
             domain,
-            num_hosts: hosts.len(),
-            schedule_budget: total_schedule_budget,
-            wander_budget: total_wander_budget,
-            scheduled_urls: total_scheduled_urls,
-            known_urls: total_known_urls,
+            known_urls: job.urls.len(),
+            num_hosts: job
+                .urls
+                .iter()
+                .map(|url| url.url.host_str())
+                .unique()
+                .count(),
+            scheduled_urls: job.urls.len() as u64,
+            wander_budget,
         };
 
         (job, domain_stats)
     }
 
-    fn assign_host_budgets(&self, hosts: &[NodeID]) -> BTreeMap<NodeID, u64> {
-        let mut total_host_centrality = hosts
-            .iter()
-            .filter_map(|v| self.host_centrality.get(v).ok().flatten())
-            .sum::<f64>();
+    async fn pages_to_crawl(&self) -> Vec<Url> {
+        let page_ids = top_nodes(
+            &self.page_centrality,
+            TopNodes::Fraction(
+                self.config.crawl_budget as f64 * (1.0 - self.config.wander_fraction),
+            ),
+        )
+        .into_iter()
+        .map(|(page, _)| page)
+        .collect::<Vec<_>>();
 
-        let host_pages: BTreeMap<_, _> = hosts
-            .par_iter()
-            .progress_count(hosts.len() as u64)
-            .map(|host| {
-                let num_pages = self.page_graph.pages_by_host(host).len() as u64;
-                (*host, num_pages)
-            })
-            .collect();
+        let mut pages = Vec::with_capacity(page_ids.len());
 
-        let mut host_budgets: BTreeMap<_, _> = hosts
-            .par_iter()
-            .progress_count(hosts.len() as u64)
-            .map(|host| {
-                let host_centrality = self
-                    .host_centrality
-                    .get(host)
-                    .ok()
+        for chunk in page_ids.into_iter().chunks(1024).into_iter() {
+            let nodes = chunk.collect::<Vec<_>>();
+            let nodes = self.page_graph.batch_get_node(&nodes).await.unwrap();
+            pages.extend(
+                nodes
+                    .into_iter()
                     .flatten()
-                    .unwrap_or_default();
-
-                let host_budget = ((self.config.crawl_budget as f64 * host_centrality)
-                    / total_host_centrality)
-                    .round()
-                    .max(0.0) as u64;
-
-                let num_pages = host_pages.get(host).copied().unwrap_or_default();
-
-                (*host, host_budget.min(num_pages))
-            })
-            .collect();
-
-        let mut surplus_budget = self.config.crawl_budget as u64
-            - host_budgets
-                .values()
-                .sum::<u64>()
-                .min(self.config.crawl_budget as u64);
-
-        // assign surplus budget
-        let mut has_updated = true;
-        let mut i = 0;
-        while surplus_budget > 0 && has_updated && i < MAX_SURPLUS_BUDGET_ITERATIONS {
-            tracing::info!("trying to schedule surplus budget: {}", surplus_budget);
-            i += 1;
-
-            has_updated = false;
-            let mut new_surplus_budget = surplus_budget;
-            let mut new_total_host_centrality = 0.0;
-
-            for host in hosts
-                .iter()
-                .take(self.config.top_n_hosts_surplus)
-                .progress()
-            {
-                if new_surplus_budget == 0 {
-                    break;
-                }
-
-                let num_pages = host_pages.get(host).copied().unwrap_or_default();
-                let host_budget = host_budgets.get_mut(host).unwrap();
-
-                if num_pages > *host_budget {
-                    let centrality = self
-                        .host_centrality
-                        .get(host)
-                        .ok()
-                        .flatten()
-                        .unwrap_or_default();
-                    new_total_host_centrality += centrality;
-
-                    let part = (centrality * surplus_budget as f64 / total_host_centrality)
-                        .round()
-                        .max(0.0) as u64;
-
-                    let diff = num_pages - *host_budget;
-                    let extra = part.min(diff);
-
-                    if extra > 0 {
-                        has_updated = true;
-                    }
-
-                    let extra = ((extra as f64 / (1.0 - self.config.wander_fraction)) as u64)
-                        .min(new_surplus_budget);
-
-                    *host_budget += extra;
-                    new_surplus_budget -= extra;
-                }
-            }
-
-            total_host_centrality = new_total_host_centrality;
-            surplus_budget = new_surplus_budget;
+                    .map(|n| Url::parse(n.as_str()).unwrap()),
+            );
         }
 
-        tracing::info!("surplus done (remaining={})", surplus_budget);
-        host_budgets
+        pages
     }
 
-    pub fn build<P: AsRef<Path>>(&self, output: P) -> Result<()> {
+    pub async fn build<P: AsRef<Path>>(&self, output: P) -> Result<()> {
         if output.as_ref().exists() {
             return Err(anyhow!("output path already exists"));
         }
@@ -335,17 +177,20 @@ impl CrawlPlanner {
         let queue_path = output.as_ref().join("job_queue");
         std::fs::create_dir_all(&queue_path)?;
 
-        let hosts = top_nodes(
-            &self.host_centrality,
-            TopNodes::Fraction(self.config.top_host_fraction),
-        )
-        .into_iter()
-        .map(|(host, _)| host)
-        .collect::<Vec<_>>();
-        tracing::info!("found {} hosts", hosts.len());
+        tracing::info!("getting pages to crawl");
 
-        let grouped_hosts = self.group_domain(&hosts);
-        let num_groups = grouped_hosts.len();
+        let pages = self.pages_to_crawl().await;
+
+        let mut grouped_pages = BTreeMap::new();
+
+        for page in pages {
+            if let Some(domain) = page.icann_domain() {
+                grouped_pages
+                    .entry(Domain::from(domain.to_string()))
+                    .or_insert_with(Vec::new)
+                    .push(page);
+            }
+        }
 
         let job_queues: Vec<Mutex<FileQueueWriter<Job>>> = (0..self.config.num_job_queues)
             .map(|i| {
@@ -359,31 +204,41 @@ impl CrawlPlanner {
 
         let stats = Mutex::new(Vec::new());
 
-        let next_queue = AtomicUsize::new(0);
-
-        let num_threads = self
-            .config
-            .num_threads
-            .unwrap_or_else(|| usize::from(std::thread::available_parallelism().unwrap()));
-
         let pool = ThreadPoolBuilder::new()
-            .num_threads(num_threads)
+            .num_threads(usize::from(std::thread::available_parallelism().unwrap()))
             .stack_size(80_000_000)
             .thread_name(move |num| format!("crawl-planner-{num}"))
             .build()?;
 
         pool.install(|| {
-            let host_budgets = self.assign_host_budgets(&hosts);
+            let total_host_centralities: f64 = grouped_pages
+                .par_iter()
+                .map(|(_, pages)| {
+                    pages
+                        .iter()
+                        .map(|url| Node::from(url).into_host().id())
+                        .unique()
+                        .map(|id| self.host_centrality.get(&id).unwrap().unwrap_or_default())
+                        .sum::<f64>()
+                })
+                .sum();
 
-            grouped_hosts
+            let wander_budget = self.config.crawl_budget as f64 * self.config.wander_fraction;
+
+            let next_queue = AtomicUsize::new(0);
+
+            let num_groups = grouped_pages.len();
+
+            grouped_pages
                 .into_par_iter()
                 .progress_count(num_groups as u64)
-                .for_each(|(domain, hosts)| {
+                .for_each(|(domain, pages)| {
                     if domain.as_str().is_empty() {
                         return;
                     }
 
-                    let (job, domain_stats) = self.prepare_job(domain, &hosts, &host_budgets);
+                    let (job, domain_stats) =
+                        self.prepare_job(domain, pages, wander_budget, total_host_centralities);
 
                     stats
                         .lock()
@@ -408,7 +263,7 @@ impl CrawlPlanner {
         }
 
         let mut stats = stats.into_inner().unwrap_or_else(|e| e.into_inner());
-        stats.sort_by(|a, b| b.schedule_budget.cmp(&a.schedule_budget));
+        stats.sort_by_key(|b| std::cmp::Reverse(b.schedule_budget()));
 
         let total_scheduled_urls: u64 = stats.iter().map(|d| d.scheduled_urls).sum();
         let total_wander_budget: u64 = stats.iter().map(|d| d.wander_budget).sum();
@@ -437,9 +292,14 @@ struct DomainStats {
     domain: Domain,
     known_urls: usize,
     num_hosts: usize,
-    schedule_budget: u64,
     scheduled_urls: u64,
     wander_budget: u64,
+}
+
+impl DomainStats {
+    pub fn schedule_budget(&self) -> u64 {
+        self.scheduled_urls + self.wander_budget
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -447,190 +307,4 @@ struct Metadata {
     total_scheduled_urls: u64,
     total_wander_budget: u64,
     stats: Vec<DomainStats>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{
-        crawler::file_queue::FileQueue,
-        executor::Executor,
-        gen_temp_path,
-        webgraph::{centrality::harmonic::HarmonicCentrality, Compression, Node, WebgraphWriter},
-    };
-
-    fn host_test_edges() -> Vec<(Node, Node, String)> {
-        //     ┌────┐
-        //     │    │
-        // ┌───A◄─┐ │
-        // │      │ │
-        // ▼      │ │
-        // B─────►C◄┘
-        //        ▲
-        //        │
-        //        │
-        //        D
-
-        vec![
-            (
-                Node::from("http://a.com"),
-                Node::from("http://b.com"),
-                String::new(),
-            ),
-            (
-                Node::from("http://b.com"),
-                Node::from("http://c.com"),
-                String::new(),
-            ),
-            (
-                Node::from("http://a.com"),
-                Node::from("http://c.com"),
-                String::new(),
-            ),
-            (
-                Node::from("http://c.com"),
-                Node::from("http://a.com"),
-                String::new(),
-            ),
-            (
-                Node::from("http://d.com"),
-                Node::from("http://c.com"),
-                String::new(),
-            ),
-        ]
-    }
-
-    fn page_test_edges() -> Vec<(Node, Node, String)> {
-        vec![
-            (
-                Node::from("http://a.com/"),
-                Node::from("http://b.com/123"),
-                String::new(),
-            ),
-            (
-                Node::from("http://b.com/123"),
-                Node::from("http://c.com/page"),
-                String::new(),
-            ),
-            (
-                Node::from("http://a.com/whut"),
-                Node::from("http://c.com/page"),
-                String::new(),
-            ),
-            (
-                Node::from("http://c.com/"),
-                Node::from("http://a.com/"),
-                String::new(),
-            ),
-            (
-                Node::from("http://d.com/321"),
-                Node::from("http://c.com/page"),
-                String::new(),
-            ),
-        ]
-    }
-
-    fn test_graph(edges: Vec<(Node, Node, String)>) -> Webgraph {
-        let mut graph = WebgraphWriter::new(
-            crate::gen_temp_path(),
-            Executor::single_thread(),
-            Compression::default(),
-            None,
-        );
-
-        for (from, to, label) in edges {
-            graph.insert(from, to, label);
-        }
-
-        graph.commit();
-
-        graph.finalize()
-    }
-
-    fn test_plan() -> Vec<Job> {
-        let host_graph = test_graph(host_test_edges());
-        let page_graph = test_graph(page_test_edges());
-
-        let centrality = HarmonicCentrality::calculate(&host_graph);
-        let mut host_centrality = speedy_kv::Db::open_or_create(crate::gen_temp_path()).unwrap();
-
-        for (node, score) in centrality.iter() {
-            host_centrality.insert(*node, score).unwrap();
-        }
-        host_centrality.commit().unwrap();
-
-        let centrality = HarmonicCentrality::calculate(&page_graph);
-        let mut page_centrality = speedy_kv::Db::open_or_create(crate::gen_temp_path()).unwrap();
-
-        for (node, score) in centrality.iter() {
-            page_centrality.insert(*node, score).unwrap();
-        }
-        page_centrality.commit().unwrap();
-
-        let planner = CrawlPlanner::new(
-            host_centrality,
-            page_centrality,
-            host_graph,
-            page_graph,
-            CrawlPlannerConfig {
-                crawl_budget: 100,
-                top_host_fraction: 1.0,
-                wander_fraction: 0.1,
-                top_n_hosts_surplus: 2,
-                num_job_queues: 1,
-                page_harmonic_path: String::new(),
-                host_harmonic_path: String::new(),
-                page_graph_path: String::new(),
-                host_graph_path: String::new(),
-                output_path: String::new(),
-                num_threads: Some(1),
-            },
-        )
-        .unwrap();
-
-        let planner_path = gen_temp_path();
-        planner.build(planner_path.clone()).unwrap();
-
-        let mut queue: FileQueue<Job> =
-            FileQueue::open(planner_path.join("job_queue").join("0.queue")).unwrap();
-
-        let mut jobs = Vec::new();
-
-        while let Some(job) = queue.pop().unwrap() {
-            jobs.push(job);
-        }
-
-        jobs
-    }
-
-    #[test]
-    fn test_ordered_by_centralities() {
-        let jobs = test_plan();
-
-        assert_eq!(jobs.len(), 3);
-
-        assert_eq!(jobs[0].domain.as_str(), "c.com");
-        assert_eq!(jobs[1].domain.as_str(), "a.com");
-        assert_eq!(jobs[2].domain.as_str(), "b.com");
-
-        for job in jobs {
-            let urls: Vec<_> = job.urls.iter().collect();
-
-            assert!(urls.windows(2).all(|w| w[0].weight >= w[1].weight));
-        }
-    }
-
-    #[test]
-    fn test_contains_frontpage() {
-        let jobs = test_plan();
-
-        for job in jobs {
-            let domain = job.domain.as_str();
-            assert!(job.urls.iter().any(|url| {
-                url.url.path() == "/"
-                    && url.url.host_str() == Some(domain)
-                    && url.url.query().is_none()
-            }))
-        }
-    }
 }

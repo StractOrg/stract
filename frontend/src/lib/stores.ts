@@ -2,8 +2,6 @@ import { browser } from '$app/environment';
 import { writable } from 'svelte/store';
 import type { OpticOption } from './optics';
 import type { SiteRankings } from './rankings';
-import { api, type DisplayedWebpage } from './api';
-import { match } from 'ts-pattern';
 
 const parseJSONWithFallback = <T>(json: string, fallback: T, message = '') => {
   try {
@@ -96,43 +94,3 @@ if (browser)
     const theme = $theme?.toLowerCase() || '';
     document.documentElement.className = `${c} ${theme}`.trim();
   });
-
-type SummaryState = { inProgress: boolean; tokens: string[] } | undefined;
-export const summariesStore = writable<Record<string, SummaryState>>({});
-
-// Actions
-
-export const summarize = (query: string, site: DisplayedWebpage) => {
-  const updateSummary = (update: (summary: SummaryState) => SummaryState) => {
-    summariesStore.update(($summaries) => ({
-      ...$summaries,
-      [site.url]: update($summaries[site.url]),
-    }));
-  };
-
-  updateSummary(() => ({ inProgress: true, tokens: [] }));
-
-  const { listen, cancel } = api.summarize({ query, url: site.url });
-
-  listen((e) => {
-    match(e)
-      .with({ type: 'message' }, ({ data }) =>
-        updateSummary((summary) => ({
-          inProgress: true,
-          tokens: [...(summary?.tokens ?? []), data],
-        })),
-      )
-      .with({ type: 'error' }, () => {
-        cancel();
-        updateSummary((summary) => ({
-          inProgress: false,
-          tokens: [...(summary?.tokens ?? [])],
-        }));
-      })
-      .exhaustive();
-  });
-};
-
-export const clearSummary = (site: DisplayedWebpage) => {
-  summariesStore.update(($summaries) => ({ ...$summaries, [site.url]: void 0 }));
-};

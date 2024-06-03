@@ -112,7 +112,11 @@ where
         obj: &mut Self::Type,
         _: &managed::Metrics,
     ) -> managed::RecycleResult<Self::Error> {
-        if obj.is_closed().await {
+        if obj.awaiting_response() {
+            Err(managed::RecycleError::Message(
+                "Connection is awaiting response".into(),
+            ))
+        } else if obj.is_closed().await {
             Err(managed::RecycleError::Message(
                 "Connection is closed".into(),
             ))
@@ -163,7 +167,11 @@ where
         obj: &mut Self::Type,
         _: &managed::Metrics,
     ) -> managed::RecycleResult<Self::Error> {
-        if obj.is_closed().await {
+        if obj.awaiting_response() {
+            Err(managed::RecycleError::Message(
+                "Connection is awaiting response".into(),
+            ))
+        } else if obj.is_closed().await {
             Err(managed::RecycleError::Message(
                 "Connection is closed".into(),
             ))

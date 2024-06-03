@@ -14,8 +14,6 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     cargo watch -i frontend -i tools -i crates/client-wasm -x "run $STRACT_CARGO_ARGS -- entity-search-server configs/entity_search_server.toml"
 @dev-webgraph:
     cargo watch -i frontend -i tools -i crates/client-wasm -x "run $STRACT_CARGO_ARGS -- webgraph server configs/webgraph/host_server.toml" && cargo watch -i frontend -x "run $STRACT_CARGO_ARGS -- webgraph server configs/webgraph/page_server.toml"
-@dev-llm:
-    ./.venv/bin/python3 -m llama_cpp.server --model data/mistral-7b-instruct-v0.2.Q4_K_M.gguf --port 4000
 @dev-frontend:
     cd frontend && npm run dev
 

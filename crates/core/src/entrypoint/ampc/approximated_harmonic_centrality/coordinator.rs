@@ -88,6 +88,10 @@ impl ApproxCentralitySetup {
     }
 }
 
+fn num_samples(num_nodes: u64, sample_rate: f64) -> u64 {
+    ((num_nodes as f64).log2() / sample_rate.powi(2)).ceil() as u64
+}
+
 impl Setup for ApproxCentralitySetup {
     type DhtTables = ApproxCentralityTables;
 
@@ -110,8 +114,7 @@ impl Setup for ApproxCentralitySetup {
     fn setup_first_round(&self, dht: &Self::DhtTables) {
         let upper_bound_num_nodes: u64 = self.workers.iter().map(|w| w.num_nodes()).sum();
         let num_samples_per_worker =
-            ((upper_bound_num_nodes as f64).log2() / self.sample_rate.powi(2)).ceil() as u64
-                / (self.workers.len() as u64);
+            num_samples(upper_bound_num_nodes, self.sample_rate) / (self.workers.len() as u64);
 
         dht.meta.set(
             (),
@@ -140,15 +143,8 @@ pub fn build(
 ) -> Coordinator<ApproxCentralityJob> {
     let setup = ApproxCentralitySetup::new_for_dht_members(dht, workers.clone(), sample_rate);
 
-    let mut coord = Coordinator::new(setup, workers.clone());
-
-    for worker in &workers {
-        coord = coord.with_mapper(ApproxCentralityMapper::ApproximateCentrality {
-            worker_shard: worker.shard(),
-        });
-    }
-
-    coord
+    Coordinator::new(setup, workers.clone())
+        .with_mapper(ApproxCentralityMapper::ApproximateCentrality)
 }
 
 struct ClusterInfo {
@@ -209,12 +205,19 @@ pub fn run(config: ApproxHarmonicCoordinatorConfig) -> Result<()> {
         .build()?
         .block_on(setup_gossip(tokio_conf))?;
 
+    let upper_bound_num_nodes: u64 = cluster.workers.iter().map(|w| w.num_nodes()).sum();
+
+    let num_samples = num_samples(upper_bound_num_nodes, config.sample_rate);
+
+    let norm = 1.0 / ((num_samples - 1) as f64);
+
     let jobs = cluster
         .workers
         .iter()
         .map(|worker| ApproxCentralityJob {
             shard: worker.shard(),
             max_distance: config.max_distance,
+            norm,
             all_workers: cluster
                 .workers
                 .clone()
@@ -227,17 +230,10 @@ pub fn run(config: ApproxHarmonicCoordinatorConfig) -> Result<()> {
     let coordinator = build(&cluster.dht, cluster.workers.clone(), config.sample_rate);
     let res = coordinator.run(jobs, ApproxCentralityFinish)?;
 
-    let num_nodes = res.centrality.num_keys();
-
-    let num_samples =
-        res.meta.get(()).unwrap().num_samples_per_worker * cluster.workers.len() as u64;
-
     let output_path = Path::new(&config.output_path);
 
-    let norm = num_nodes as f64 / (num_samples as f64 * (num_nodes as f64 - 1.0));
-
     let store = store_harmonic(
-        res.centrality.iter().map(|(n, c)| (n, f64::from(c) * norm)),
+        res.centrality.iter().map(|(n, c)| (n, f64::from(c))),
         output_path,
     );
 

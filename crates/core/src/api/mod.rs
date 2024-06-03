@@ -39,7 +39,7 @@ use crate::{
     webgraph::remote::RemoteWebgraph,
 };
 
-use crate::{ranking::models::cross_encoder::CrossEncoderModel, summarizer::Summarizer};
+use crate::ranking::models::cross_encoder::CrossEncoderModel;
 
 use anyhow::Result;
 use std::{
@@ -61,7 +61,6 @@ mod hosts;
 pub mod improvement;
 mod metrics;
 pub mod search;
-mod summarize;
 pub mod user_count;
 mod webgraph;
 
@@ -79,7 +78,6 @@ pub struct State {
     pub host_webgraph: Arc<RemoteWebgraph>,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
-    pub summarizer: Arc<Summarizer>,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
     pub _cluster: Arc<Cluster>,
     pub similar_hosts: SimilarHostsFinder,
@@ -123,7 +121,6 @@ fn build_router(state: Arc<State>) -> Router {
                 .route("/api/search/spellcheck", post(search::spellcheck))
                 .route("/api/autosuggest", post(autosuggest::route))
                 .route("/api/autosuggest/browser", get(autosuggest::browser))
-                .route("/api/summarize", get(summarize::summarize_route))
                 .route("/api/webgraph/host/similar", post(webgraph::host::similar))
                 .route("/api/webgraph/host/knows", post(webgraph::host::knows))
                 .route(
@@ -226,12 +223,6 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
             counters,
             host_webgraph,
             page_webgraph,
-            summarizer: Arc::new(Summarizer::new(
-                &config.summarizer_path,
-                config.llm.api_base.clone(),
-                config.llm.model.clone(),
-                config.llm.api_key.clone(),
-            )?),
             improvement_queue: query_store_queue,
             _cluster: cluster,
             similar_hosts,

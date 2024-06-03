@@ -21,13 +21,8 @@ use std::{cmp, collections::BTreeMap};
 
 use super::{worker::ApproxCentralityWorker, ApproxCentralityJob, Mapper};
 use crate::{
-    ampc::dht::upsert,
-    distributed::member::ShardId,
-    entrypoint::ampc::approximated_harmonic_centrality::{
-        worker::RemoteApproxCentralityWorker, DhtTable,
-    },
-    kahan_sum::KahanSum,
-    webgraph,
+    ampc::dht::upsert, entrypoint::ampc::approximated_harmonic_centrality::DhtTable,
+    kahan_sum::KahanSum, webgraph,
 };
 use rayon::prelude::*;
 
@@ -35,23 +30,16 @@ const BATCH_SIZE: usize = 1024;
 
 #[derive(Debug, Clone, bincode::Decode, bincode::Encode)]
 pub enum ApproxCentralityMapper {
-    ApproximateCentrality { worker_shard: ShardId },
+    ApproximateCentrality,
 }
 
 struct Workers {
     worker: ApproxCentralityWorker,
-    remote_workers: Vec<RemoteApproxCentralityWorker>,
 }
 
 impl Workers {
-    fn new(
-        worker: ApproxCentralityWorker,
-        remote_workers: Vec<RemoteApproxCentralityWorker>,
-    ) -> Self {
-        Self {
-            worker,
-            remote_workers,
-        }
+    fn new(worker: ApproxCentralityWorker) -> Self {
+        Self { worker }
     }
 
     fn outgoing_nodes(
@@ -66,19 +54,6 @@ impl Workers {
         for node in nodes {
             for edge in self.worker.graph().raw_outgoing_edges(node, limit) {
                 res.entry(*node).or_default().insert(edge.to);
-            }
-        }
-
-        // this does not retrieve outgoing edges from remote workers asynchronously,
-        // but instead waits for each worker to respond before moving on to the next one.
-        // this is not ideal, but it will only be a problem when we get way more workers
-        // in which case we should probably use an approximation that simply runs the
-        // normal harmonic centrality algorithm a fixed number of times.
-        for remote_worker in &self.remote_workers {
-            let nodes = remote_worker.outgoing_edge_nodes(nodes.to_vec(), limit);
-
-            for (node, outgoing) in nodes {
-                res.entry(node).or_default().extend(outgoing);
             }
         }
 
@@ -156,25 +131,8 @@ impl Mapper for ApproxCentralityMapper {
         dht: &crate::ampc::DhtConn<<<Self as Mapper>::Job as super::Job>::DhtTables>,
     ) {
         match self {
-            ApproxCentralityMapper::ApproximateCentrality { worker_shard } => {
-                if worker.shard() != *worker_shard {
-                    return;
-                }
-
-                let remote_workers: Vec<_> = job
-                    .all_workers
-                    .iter()
-                    .cloned()
-                    .filter_map(|(shard, addr)| {
-                        if shard == worker.shard() {
-                            None
-                        } else {
-                            Some(RemoteApproxCentralityWorker::new(shard, addr).unwrap())
-                        }
-                    })
-                    .collect();
-
-                let workers = Workers::new(worker.clone(), remote_workers);
+            ApproxCentralityMapper::ApproximateCentrality => {
+                let workers = Workers::new(worker.clone());
                 let num_samples = dht.next().meta.get(()).unwrap().num_samples_per_worker;
 
                 let sampled = worker
@@ -185,7 +143,13 @@ impl Mapper for ApproxCentralityMapper {
                     for chunk in workers
                         .dijkstra(node, job.max_distance)
                         .into_iter()
-                        .map(|(n, d)| (n, KahanSum::from(1.0 / d as f64)))
+                        .filter_map(|(n, d)| {
+                            if d == 0 {
+                                None
+                            } else {
+                                Some((n, KahanSum::from((1.0 / d as f64) * job.norm)))
+                            }
+                        })
                         .chunks(BATCH_SIZE)
                         .into_iter()
                     {

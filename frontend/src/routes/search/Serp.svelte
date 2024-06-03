@@ -63,7 +63,7 @@
 </script>
 
 {#if modal}
-  <Modal {query} {modal} />
+  <Modal {modal} />
 {/if}
 
 {#if results._type == 'websites'}

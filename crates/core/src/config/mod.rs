@@ -213,13 +213,6 @@ impl Default for ApiThresholds {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
-pub struct LLMConfig {
-    pub api_base: String,
-    pub model: String,
-    pub api_key: Option<String>,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ApiSpellCheck {
     pub path: String,
 
@@ -229,7 +222,6 @@ pub struct ApiSpellCheck {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ApiConfig {
-    pub summarizer_path: String,
     pub queries_csv_path: String,
     pub host: SocketAddr,
     pub prometheus_host: SocketAddr,
@@ -246,8 +238,6 @@ pub struct ApiConfig {
     pub max_similar_hosts: usize,
 
     pub spell_check: Option<ApiSpellCheck>,
-
-    pub llm: LLMConfig,
 
     #[serde(default)]
     pub thresholds: ApiThresholds,
@@ -439,20 +429,16 @@ impl Default for WidgetsConfig {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct CrawlPlannerConfig {
-    pub page_harmonic_path: String,
     pub host_harmonic_path: String,
-    pub page_graph_path: String,
-    pub host_graph_path: String,
+    pub page_harmonic_path: String,
     pub output_path: String,
 
     pub num_job_queues: usize,
 
     pub crawl_budget: usize,
-    pub top_host_fraction: f64,
     pub wander_fraction: f64,
-    pub top_n_hosts_surplus: usize,
 
-    pub num_threads: Option<usize>,
+    pub gossip: GossipConfig,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]

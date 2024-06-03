@@ -15,16 +15,14 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use candle_core::Tensor;
-use futures::stream::Stream;
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, VecDeque},
     ops::Range,
     path::Path,
 };
-use tokio_stream::StreamExt;
 
-use crate::{llm_utils::OpenAiApi, models::dual_encoder::DualEncoder, Result};
+use crate::{models::dual_encoder::DualEncoder, Result};
 use itertools::{intersperse, Itertools};
 
 use crate::ceil_char_boundary;
@@ -249,39 +247,6 @@ impl ExtractiveSummarizer {
     }
 }
 
-pub struct Summarizer {
-    extractive: ExtractiveSummarizer,
-    abstractive: AbstractiveSummarizer,
-}
-
-impl Summarizer {
-    pub fn new<P: AsRef<Path>>(
-        path: P,
-        llm_api_base: String,
-        model_name: String,
-        api_key: Option<String>,
-    ) -> Result<Self> {
-        Ok(Self {
-            extractive: ExtractiveSummarizer::open(
-                path.as_ref().join("dual_encoder").as_path(),
-                16,
-            )?,
-            abstractive: AbstractiveSummarizer::new(llm_api_base, model_name, api_key),
-        })
-    }
-
-    pub async fn summarize(&self, query: &str, text: &str) -> Result<impl Stream<Item = String>> {
-        let words = text.split_whitespace().count();
-
-        if words < 2000 {
-            self.abstractive.summarize(text).await
-        } else {
-            let summary = self.extractive.summarize(query, text);
-            self.abstractive.summarize(&summary).await
-        }
-    }
-}
-
 impl PassageScorer for DualEncoder {
     type QueryEmbedding = Tensor;
 
@@ -307,101 +272,6 @@ impl PassageScorer for DualEncoder {
             .unwrap()
             .to_vec0()
             .unwrap()
-    }
-}
-
-const TRUNCATE_WORDS_ABSTRACTIVE: usize = 1024;
-
-pub struct AbstractiveSummarizer {
-    api: String,
-    model: String,
-    api_key: Option<String>,
-}
-
-impl AbstractiveSummarizer {
-    pub fn new(api: String, model: String, api_key: Option<String>) -> Self {
-        Self {
-            api,
-            model,
-            api_key,
-        }
-    }
-
-    fn client(&self, max_tokens: Option<u64>) -> OpenAiApi {
-        let mut builder = OpenAiApi::builder(self.api.clone(), self.model.clone())
-            .top_p(0.9)
-            .temp(0.0)
-            .stop(vec!["</s>", "<|endoftext|>"]);
-
-        if let Some(api_key) = &self.api_key {
-            builder = builder.api_key(api_key.clone());
-        }
-
-        if let Some(max_tokens) = max_tokens {
-            builder = builder.max_tokens(max_tokens);
-        }
-
-        builder.build()
-    }
-
-    fn first_prompt(&self, text: &str) -> String {
-        let wc = 100;
-        format!(
-            r##"[INST] I will provide you with piece of content (e.g. articles, papers, documentation, etc.)
-
-You will generate summaries of the content. Refer to the content using words as "this article discusses" etc.
-The summaries should be -{wc} words.
-
-After you have generated the summary, identify 1-3 informative entities from the content which are missing from the summary that can be used to make a more concise summary.
-
-A Missing Entity is:
-
-Relevant: to the main story.
-Specific: descriptive yet concise (5 words or fewer).
-Novel: not in the previous summary.
-Faithful: present in the content piece.
-Anywhere: located anywhere in the Article.
-
-Finaly, give guidance on how to improve the summary.
-
-Content to summarize:
-{text}
-[/INST]"##,
-        )
-    }
-
-    fn final_prompt(&self, text: &str, prev_summary: &str) -> String {
-        let wc = 100;
-        format!(
-            r##"[INST] I will provide you with piece of content (e.g. articles, papers, documentation, etc.) and a summary of the content.
-
-You will improve upon the previous summary to generate a highly consice summary of the content. The summary should be -{wc} words.
-
-Content to summarize:
-{text}
-
-Previous summary:
-{prev_summary}
-[/INST] Summary:"##,
-        )
-    }
-
-    pub async fn summarize(&self, text: &str) -> Result<impl Stream<Item = String>> {
-        let text = text
-            .split_ascii_whitespace()
-            .take(TRUNCATE_WORDS_ABSTRACTIVE)
-            .join(" ");
-
-        let prompt = self.first_prompt(&text);
-        let first_summary = self.client(Some(2048)).generate(&prompt).await?;
-
-        let prompt = self.final_prompt(&text, &first_summary);
-
-        Ok(self
-            .client(Some(128))
-            .stream(&prompt)
-            .await?
-            .filter_map(|tok| tok.ok()))
     }
 }
 

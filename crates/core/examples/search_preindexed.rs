@@ -3,8 +3,8 @@ use rand::seq::SliceRandom;
 use stract::{
     bangs::Bangs,
     config::{
-        defaults, ApiConfig, ApiThresholds, CollectorConfig, CorrectionConfig, LLMConfig,
-        SnippetConfig, WidgetsConfig,
+        defaults, ApiConfig, ApiThresholds, CollectorConfig, CorrectionConfig, SnippetConfig,
+        WidgetsConfig,
     },
     index::Index,
     searcher::{
@@ -29,7 +29,6 @@ pub async fn main() {
         lambda_model_path: None,
         dual_encoder_model_path: None,
         bangs_path: "data/bangs.json".to_string(),
-        summarizer_path: "data/summarizer".to_string(),
         query_store_db_host: None,
         cluster_id: "api".to_string(),
         gossip_seed_nodes: None,
@@ -44,11 +43,6 @@ pub async fn main() {
             path: "data/web_spell".to_string(),
             correction_config: CorrectionConfig::default(),
         }),
-        llm: LLMConfig {
-            api_base: "http://localhost:4000/v1".to_string(),
-            model: "data/mistral-7b-instruct-v0.2.Q4_K_M.gguf".to_string(),
-            api_key: None,
-        },
         max_concurrent_searches: defaults::Api::max_concurrent_searches(),
         max_similar_hosts: defaults::Api::max_similar_hosts(),
     };

@@ -66,7 +66,6 @@ mod intmap;
 mod kahan_sum;
 mod leaky_queue;
 mod live_index;
-mod llm_utils;
 mod metrics;
 mod models;
 pub mod naive_bayes;

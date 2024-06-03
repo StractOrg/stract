@@ -415,7 +415,10 @@ fn main() -> Result<()> {
             Crawler::Plan { config_path } => {
                 let config: config::CrawlPlannerConfig = load_toml_config(config_path);
 
-                entrypoint::crawler::planner(config)?;
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::crawler::planner(config))?;
             }
         },
         Commands::SafetyClassifier { options } => match options {

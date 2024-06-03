@@ -87,12 +87,14 @@ impl<S: Service> Server<S> {
 }
 
 pub struct Connection<S: Service> {
+    await_res: bool,
     inner: super::Connection<OneOrMany<S::Request>, OneOrMany<S::Response>>,
 }
 
 impl<S: Service> Connection<S> {
     pub async fn create(server: impl ToSocketAddrs) -> Result<Connection<S>> {
         Ok(Connection {
+            await_res: false,
             inner: super::Connection::create(server).await?,
         })
     }
@@ -102,6 +104,7 @@ impl<S: Service> Connection<S> {
         timeout: Duration,
     ) -> Result<Connection<S>> {
         Ok(Connection {
+            await_res: false,
             inner: super::Connection::create_with_timeout(server, timeout).await?,
         })
     }
@@ -112,30 +115,37 @@ impl<S: Service> Connection<S> {
         retry: impl Iterator<Item = Duration>,
     ) -> Result<Connection<S>> {
         Ok(Connection {
+            await_res: false,
             inner: super::Connection::create_with_timeout_retry(server, timeout, retry).await?,
         })
     }
 
     pub async fn send_without_timeout<R: Wrapper<S>>(&mut self, request: R) -> Result<R::Response> {
-        Ok(R::unwrap_response(
+        self.await_res = true;
+        let res = Ok(R::unwrap_response(
             self.inner
                 .send_without_timeout(&OneOrMany::One(R::wrap_request(request)))
                 .await?
                 .one()
                 .expect("response is missing"),
         )
-        .unwrap())
+        .unwrap());
+        self.await_res = false;
+        res
     }
 
     pub async fn send<R: Wrapper<S>>(&mut self, request: R) -> Result<R::Response> {
-        Ok(R::unwrap_response(
+        self.await_res = true;
+        let res = Ok(R::unwrap_response(
             self.inner
                 .send(&OneOrMany::One(R::wrap_request(request)))
                 .await?
                 .one()
                 .expect("response is missing"),
         )
-        .unwrap())
+        .unwrap());
+        self.await_res = false;
+        res
     }
 
     pub async fn send_with_timeout<R: Wrapper<S>>(
@@ -143,14 +153,17 @@ impl<S: Service> Connection<S> {
         request: R,
         timeout: Duration,
     ) -> Result<R::Response> {
-        Ok(R::unwrap_response(
+        self.await_res = true;
+        let res = Ok(R::unwrap_response(
             self.inner
                 .send_with_timeout(&OneOrMany::One(R::wrap_request(request)), timeout)
                 .await?
                 .one()
                 .expect("response is missing"),
         )
-        .unwrap())
+        .unwrap());
+        self.await_res = false;
+        res
     }
 
     pub async fn batch_send_with_timeout<R: Wrapper<S> + Clone>(
@@ -158,7 +171,8 @@ impl<S: Service> Connection<S> {
         requests: &[R],
         timeout: Duration,
     ) -> Result<Vec<R::Response>> {
-        Ok(self
+        self.await_res = true;
+        let res = Ok(self
             .inner
             .send_with_timeout(
                 &OneOrMany::Many(
@@ -173,11 +187,17 @@ impl<S: Service> Connection<S> {
             .many()
             .into_iter()
             .map(|res| R::unwrap_response(res).unwrap())
-            .collect())
+            .collect());
+        self.await_res = false;
+        res
     }
 
     pub async fn is_closed(&mut self) -> bool {
         self.inner.is_closed().await
+    }
+
+    pub fn awaiting_response(&self) -> bool {
+        self.await_res
     }
 }
 
@@ -194,7 +214,7 @@ macro_rules! sonic_service {
             pub enum Request {
                 $($req(Box<$req>),)*
             }
-            #[derive(::bincode::Encode, ::bincode::Decode)]
+            #[derive(::bincode::Encode, ::bincode::Decode, Debug)]
             pub enum Response {
                 $($req(Box<<$req as sonic::service::Message<$service>>::Response>),)*
             }

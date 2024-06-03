@@ -22,7 +22,7 @@
 
 <script lang="ts">
   import { Ranking } from '$lib/rankings';
-  import { hostRankingsStore, summarize } from '$lib/stores';
+  import { hostRankingsStore } from '$lib/stores';
   import type { DisplayedWebpage, SignalEnumDiscriminants, SignalScore } from '$lib/api';
   import { twJoin } from 'tailwind-merge';
   import Button from '$lib/components/Button.svelte';
@@ -33,7 +33,6 @@
   import { match } from 'ts-pattern';
   import SignalInfo from './SignalInfo.svelte';
 
-  export let query: string;
   export let modal: { top: number; left: number; site: DisplayedWebpage };
 
   const mediumWidthCutoff = 768;
@@ -168,8 +167,6 @@
       [site.site]: $rankings[site.site] == ranking ? void 0 : ranking,
     }));
   };
-
-  const summarizeSite = (site: DisplayedWebpage) => () => summarize(query, site);
 </script>
 
 <svelte:window bind:innerWidth />
@@ -204,9 +201,6 @@
           <Icon class="w-4" />
         </Button>
       {/each}
-    </div>
-    <div class="mt-4 flex justify-center">
-      <Button pale on:click={summarizeSite(modal.site)}>Summarize Result</Button>
     </div>
     {#if signalGroups.length > 0}
       <h3 class="mt-4 font-medium">Ranking Explanation</h3>
