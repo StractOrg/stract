@@ -1,0 +1,52 @@
+{
+	"name": "ranking-diff",
+	"version": "0.0.1",
+	"private": true,
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"test": "npm run test:integration && npm run test:unit",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"lint": "prettier --plugin prettier-plugin-svelte --plugin prettier-plugin-tailwindcss --check . && eslint .",
+		"format": "prettier --plugin prettier-plugin-svelte --plugin prettier-plugin-tailwindcss --write .",
+		"test:integration": "playwright test",
+		"test:unit": "vitest"
+	},
+	"devDependencies": {
+		"@iconify-json/heroicons": "^1.1.21",
+		"@iconify-json/simple-icons": "^1.1.102",
+		"@iconify/svelte": "^4.0.2",
+		"@playwright/test": "^1.28.1",
+		"@sveltejs/adapter-auto": "^3.0.0",
+		"@sveltejs/kit": "^2.0.0",
+		"@sveltejs/vite-plugin-svelte": "^3.0.0",
+		"@tailwindcss/line-clamp": "^0.4.4",
+		"@types/better-sqlite3": "^7.6.10",
+		"@types/eslint": "^8.56.0",
+		"@typescript-eslint/eslint-plugin": "^7.0.0",
+		"@typescript-eslint/parser": "^7.0.0",
+		"autoprefixer": "^10.4.19",
+		"eslint": "^8.56.0",
+		"eslint-config-prettier": "^9.1.0",
+		"eslint-plugin-svelte": "^2.35.1",
+		"postcss": "^8.4.38",
+		"prettier": "^3.1.1",
+		"prettier-plugin-svelte": "^3.1.2",
+		"prettier-plugin-tailwindcss": "^0.5.14",
+		"svelte": "^4.2.7",
+		"svelte-check": "^3.6.0",
+		"tailwindcss": "^3.4.3",
+		"tslib": "^2.4.1",
+		"typescript": "^5.0.0",
+		"unplugin-icons": "^0.19.0",
+		"vite": "^5.0.3",
+		"vitest": "^1.2.0"
+	},
+	"type": "module",
+	"dependencies": {
+		"better-sqlite3": "^10.0.0",
+		"ts-pattern": "^5.1.1"
+	}
+}
