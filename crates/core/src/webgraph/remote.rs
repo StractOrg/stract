@@ -89,8 +89,9 @@ impl sonic::replication::ReusableClientManager for WebgraphClientManager {
     }
 }
 
+#[derive(Clone)]
 pub struct RemoteWebgraph {
-    client: Mutex<sonic::replication::ReusableShardedClient<WebgraphClientManager>>,
+    client: Arc<Mutex<sonic::replication::ReusableShardedClient<WebgraphClientManager>>>,
 }
 
 impl RemoteWebgraph {
@@ -98,9 +99,9 @@ impl RemoteWebgraph {
         let manager = WebgraphClientManager { granularity };
 
         Self {
-            client: Mutex::new(
+            client: Arc::new(Mutex::new(
                 sonic::replication::ReusableShardedClient::new(cluster, manager).await,
-            ),
+            )),
         }
     }
 

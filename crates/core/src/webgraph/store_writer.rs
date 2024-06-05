@@ -185,7 +185,9 @@ impl EdgeStoreWriter {
         }
     }
 
-    pub fn finalize(self) -> EdgeStore {
+    pub fn finalize(mut self) -> EdgeStore {
+        self.flush_to_file().unwrap();
+
         let mut final_writer = FinalEdgeStoreWriter::open(
             self.compression,
             self.reversed,

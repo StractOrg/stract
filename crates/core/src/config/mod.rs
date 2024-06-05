@@ -428,6 +428,12 @@ impl Default for WidgetsConfig {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct TopHostsBudgetBoostConfig {
+    pub top_hosts: usize,
+    pub reserved_budget_fraction: f64,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct CrawlPlannerConfig {
     pub host_harmonic_path: String,
     pub page_harmonic_path: String,
@@ -437,6 +443,9 @@ pub struct CrawlPlannerConfig {
 
     pub crawl_budget: usize,
     pub wander_fraction: f64,
+    pub top_host_fraction: f64,
+
+    pub top_hosts_budget_boost: Option<TopHostsBudgetBoostConfig>,
 
     pub gossip: GossipConfig,
 }

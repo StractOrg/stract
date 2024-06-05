@@ -355,7 +355,7 @@ impl<'a, K, V, I> Eq for SortedPeekable<'a, K, V, I> where
 {
 }
 
-struct SortedSegments<'a, K, V, I>
+pub struct SortedSegments<'a, K, V, I>
 where
     I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
 {
@@ -366,7 +366,7 @@ impl<'a, K, V, I> SortedSegments<'a, K, V, I>
 where
     I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
 {
-    fn new(segments: Vec<Peekable<I>>) -> Self {
+    pub fn new(segments: Vec<Peekable<I>>) -> Self {
         Self {
             segments: segments
                 .into_iter()

@@ -59,8 +59,6 @@ fn alive_nodes_updater(chitchat: Arc<Mutex<Chitchat>>) -> Arc<RwLock<HashSet<Mem
                                 service,
                                 id: member.id,
                             });
-                        } else {
-                            error!("failed to get service");
                         }
                     } else {
                         error!("no state found for node")

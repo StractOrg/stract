@@ -141,16 +141,13 @@ impl WebgraphWorker {
 
                     link.text = link.text.chars().take(128).collect();
 
-                    trace!("inserting link {:?}", link);
                     let mut source = Node::from(source);
 
                     let mut destination = Node::from(destination);
 
+                    trace!("inserting link {:?}", link);
                     self.page_graph
                         .insert(source.clone(), destination.clone(), link.text.clone());
-
-                    source = source.into_host();
-                    destination = destination.into_host();
 
                     let dest_domain = link.destination.root_domain();
                     let source_domain = link.source.root_domain();
@@ -158,6 +155,9 @@ impl WebgraphWorker {
                         && source_domain.is_some()
                         && dest_domain != source_domain
                     {
+                        source = source.into_host();
+                        destination = destination.into_host();
+
                         self.host_graph.insert(source, destination, link.text);
                     }
                 }

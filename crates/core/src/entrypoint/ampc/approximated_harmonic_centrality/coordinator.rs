@@ -144,6 +144,7 @@ pub fn build(
     let setup = ApproxCentralitySetup::new_for_dht_members(dht, workers.clone(), sample_rate);
 
     Coordinator::new(setup, workers.clone())
+        .with_mapper(ApproxCentralityMapper::InitCentrality)
         .with_mapper(ApproxCentralityMapper::ApproximateCentrality)
 }
 

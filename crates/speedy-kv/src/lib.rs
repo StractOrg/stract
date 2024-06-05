@@ -47,7 +47,8 @@ mod blob_store;
 mod segment;
 mod serialized;
 
-use file_store::ConstSerializable;
+use file_store::{ConstSerializable, Peekable};
+use segment::SortedSegments;
 pub use serialized::{Serialized, SerializedRef};
 
 struct BlobPointer {
@@ -127,6 +128,10 @@ impl<K, V> LiveSegment<K, V> {
             db: BTreeMap::new(),
             _marker: std::marker::PhantomData,
         }
+    }
+
+    fn len(&self) -> usize {
+        self.db.len()
     }
 
     fn insert_raw<SerializedKey, SerializedVal>(&mut self, key: SerializedKey, value: SerializedVal)
@@ -276,7 +281,7 @@ impl<K, V> Db<K, V> {
     }
 
     pub fn uncommitted_inserts(&self) -> usize {
-        self.live_segment.db.len()
+        self.live_segment.len()
     }
 
     fn save_meta(&self) -> Result<()> {
@@ -411,6 +416,17 @@ where
     ) -> impl Iterator<Item = (SerializedRef<'_, K>, SerializedRef<'_, V>)> + '_ {
         self.segments.iter().flat_map(|segment| segment.iter_raw())
     }
+
+    pub fn sorted_iter_raw(
+        &self,
+    ) -> impl Iterator<Item = (SerializedRef<'_, K>, SerializedRef<'_, V>)> + '_ {
+        SortedSegments::new(
+            self.segments
+                .iter()
+                .map(|s| Peekable::new(s.iter_raw()))
+                .collect(),
+        )
+    }
 }
 
 impl<K, V> Db<K, V>
@@ -476,6 +492,17 @@ where
 {
     pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
         self.iter_raw().filter_map(|(k, v)| {
+            let (k, _) =
+                bincode::decode_from_slice(k.as_bytes(), bincode::config::standard()).ok()?;
+            let (v, _) =
+                bincode::decode_from_slice(v.as_bytes(), bincode::config::standard()).ok()?;
+
+            Some((k, v))
+        })
+    }
+
+    pub fn sorted_iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
+        self.sorted_iter_raw().filter_map(|(k, v)| {
             let (k, _) =
                 bincode::decode_from_slice(k.as_bytes(), bincode::config::standard()).ok()?;
             let (v, _) =

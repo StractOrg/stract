@@ -21,8 +21,7 @@ use std::{cmp, collections::BTreeMap};
 
 use super::{worker::ApproxCentralityWorker, ApproxCentralityJob, Mapper};
 use crate::{
-    ampc::dht::upsert, entrypoint::ampc::approximated_harmonic_centrality::DhtTable,
-    kahan_sum::KahanSum, webgraph,
+    ampc::dht::upsert, entrypoint::ampc::approximated_harmonic_centrality::DhtTable, webgraph,
 };
 use rayon::prelude::*;
 
@@ -30,6 +29,7 @@ const BATCH_SIZE: usize = 1024;
 
 #[derive(Debug, Clone, bincode::Decode, bincode::Encode)]
 pub enum ApproxCentralityMapper {
+    InitCentrality,
     ApproximateCentrality,
 }
 
@@ -131,6 +131,18 @@ impl Mapper for ApproxCentralityMapper {
         dht: &crate::ampc::DhtConn<<<Self as Mapper>::Job as super::Job>::DhtTables>,
     ) {
         match self {
+            ApproxCentralityMapper::InitCentrality => {
+                let num_nodes = worker.graph().estimate_num_nodes();
+                let nodes = worker.graph().nodes().collect::<Vec<_>>();
+                nodes
+                    .par_chunks(BATCH_SIZE)
+                    .progress_count(num_nodes as u64 / BATCH_SIZE as u64)
+                    .for_each(|chunk| {
+                        let pairs: Vec<_> = chunk.iter().map(|node| (*node, 0.0)).collect();
+
+                        dht.next().centrality.batch_set(pairs)
+                    });
+            }
             ApproxCentralityMapper::ApproximateCentrality => {
                 let workers = Workers::new(worker.clone());
                 let num_samples = dht.next().meta.get(()).unwrap().num_samples_per_worker;
@@ -147,16 +159,14 @@ impl Mapper for ApproxCentralityMapper {
                             if d == 0 {
                                 None
                             } else {
-                                Some((n, KahanSum::from((1.0 / d as f64) * job.norm)))
+                                Some((n, (1.0 / d as f32) * (job.norm as f32)))
                             }
                         })
                         .chunks(BATCH_SIZE)
                         .into_iter()
                     {
                         let pairs: Vec<_> = chunk.collect();
-                        dht.next()
-                            .centrality
-                            .batch_upsert(upsert::KahanSumAdd, pairs);
+                        dht.next().centrality.batch_upsert(upsert::F32Add, pairs);
                     }
                 });
             }

@@ -75,11 +75,9 @@ pub async fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
         .await?,
     );
 
-    let output_path = config.output_path.clone();
-
     let planner = CrawlPlanner::new(host_centrality, page_centrality, cluster, config).await?;
 
-    planner.build(output_path).await?;
+    planner.build().await?;
 
     Ok(())
 }

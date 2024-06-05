@@ -100,7 +100,9 @@ impl TempDir {
 
 impl Drop for TempDir {
     fn drop(&mut self) {
-        std::fs::remove_dir_all(&self.path).unwrap();
+        if self.path.exists() {
+            std::fs::remove_dir_all(&self.path).unwrap();
+        }
     }
 }
 
@@ -127,7 +129,9 @@ impl TempFile {
 
 impl Drop for TempFile {
     fn drop(&mut self) {
-        std::fs::remove_file(&self.path).unwrap();
+        if self.path.exists() {
+            std::fs::remove_file(&self.path).unwrap();
+        }
     }
 }
 

@@ -45,6 +45,7 @@ pub enum UpsertEnum {
     HyperLogLog64Upsert,
     HyperLogLog128Upsert,
     U64Add,
+    F32Add,
     F64Add,
     KahanSumAdd,
 }
@@ -97,6 +98,24 @@ impl UpsertFn for U64Add {
                 .unwrap();
         let (new, _) =
             bincode::decode_from_slice::<u64, _>(new.as_bytes(), bincode::config::standard())
+                .unwrap();
+
+        bincode::encode_to_vec(old + new, bincode::config::standard())
+            .unwrap()
+            .into()
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+pub struct F32Add;
+
+impl UpsertFn for F32Add {
+    fn upsert(&self, old: Value, new: Value) -> Value {
+        let (old, _) =
+            bincode::decode_from_slice::<f32, _>(old.as_bytes(), bincode::config::standard())
+                .unwrap();
+        let (new, _) =
+            bincode::decode_from_slice::<f32, _>(new.as_bytes(), bincode::config::standard())
                 .unwrap();
 
         bincode::encode_to_vec(old + new, bincode::config::standard())
