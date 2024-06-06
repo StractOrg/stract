@@ -16,8 +16,6 @@
 
 use enum_dispatch::enum_dispatch;
 
-use crate::{hyperloglog::HyperLogLog, kahan_sum::KahanSum};
-
 use super::Value;
 
 #[derive(
@@ -37,8 +35,6 @@ pub trait UpsertFn {
 #[enum_dispatch(UpsertFn)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub enum UpsertEnum {
-    HyperLogLog2Upsert,
-    HyperLogLog4Upsert,
     HyperLogLog8Upsert,
     HyperLogLog16Upsert,
     HyperLogLog32Upsert,
@@ -50,8 +46,18 @@ pub enum UpsertEnum {
     KahanSumAdd,
 }
 
+macro_rules! unwrap_value {
+    ($value:expr, $variant:ident) => {
+        if let Value::$variant(value) = $value {
+            value
+        } else {
+            panic!("Expected {}", stringify!($variant));
+        }
+    };
+}
+
 macro_rules! hyperloglog_upsert {
-    ($name:ident => $n:expr) => {
+    ($name:ident, $variant:ident) => {
         #[derive(
             Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
         )]
@@ -59,50 +65,32 @@ macro_rules! hyperloglog_upsert {
 
         impl UpsertFn for $name {
             fn upsert(&self, old: Value, new: Value) -> Value {
-                let (mut old, _) = bincode::decode_from_slice::<HyperLogLog<$n>, _>(
-                    old.as_bytes(),
-                    bincode::config::standard(),
-                )
-                .unwrap();
-                let (new, _) = bincode::decode_from_slice::<HyperLogLog<$n>, _>(
-                    new.as_bytes(),
-                    bincode::config::standard(),
-                )
-                .unwrap();
+                let mut old = unwrap_value!(old, $variant);
+                let new = unwrap_value!(new, $variant);
 
                 old.merge(&new);
 
-                bincode::encode_to_vec(&old, bincode::config::standard())
-                    .unwrap()
-                    .into()
+                Value::$variant(old)
             }
         }
     };
 }
 
-hyperloglog_upsert!(HyperLogLog2Upsert => 2);
-hyperloglog_upsert!(HyperLogLog4Upsert => 4);
-hyperloglog_upsert!(HyperLogLog8Upsert => 8);
-hyperloglog_upsert!(HyperLogLog16Upsert => 16);
-hyperloglog_upsert!(HyperLogLog32Upsert => 32);
-hyperloglog_upsert!(HyperLogLog64Upsert => 64);
-hyperloglog_upsert!(HyperLogLog128Upsert => 128);
+hyperloglog_upsert!(HyperLogLog8Upsert, HyperLogLog8);
+hyperloglog_upsert!(HyperLogLog16Upsert, HyperLogLog16);
+hyperloglog_upsert!(HyperLogLog32Upsert, HyperLogLog32);
+hyperloglog_upsert!(HyperLogLog64Upsert, HyperLogLog64);
+hyperloglog_upsert!(HyperLogLog128Upsert, HyperLogLog128);
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct U64Add;
 
 impl UpsertFn for U64Add {
     fn upsert(&self, old: Value, new: Value) -> Value {
-        let (old, _) =
-            bincode::decode_from_slice::<u64, _>(old.as_bytes(), bincode::config::standard())
-                .unwrap();
-        let (new, _) =
-            bincode::decode_from_slice::<u64, _>(new.as_bytes(), bincode::config::standard())
-                .unwrap();
+        let old = unwrap_value!(old, U64);
+        let new = unwrap_value!(new, U64);
 
-        bincode::encode_to_vec(old + new, bincode::config::standard())
-            .unwrap()
-            .into()
+        Value::U64(old + new)
     }
 }
 
@@ -111,16 +99,10 @@ pub struct F32Add;
 
 impl UpsertFn for F32Add {
     fn upsert(&self, old: Value, new: Value) -> Value {
-        let (old, _) =
-            bincode::decode_from_slice::<f32, _>(old.as_bytes(), bincode::config::standard())
-                .unwrap();
-        let (new, _) =
-            bincode::decode_from_slice::<f32, _>(new.as_bytes(), bincode::config::standard())
-                .unwrap();
+        let old = unwrap_value!(old, F32);
+        let new = unwrap_value!(new, F32);
 
-        bincode::encode_to_vec(old + new, bincode::config::standard())
-            .unwrap()
-            .into()
+        Value::F32(old + new)
     }
 }
 
@@ -129,16 +111,10 @@ pub struct F64Add;
 
 impl UpsertFn for F64Add {
     fn upsert(&self, old: Value, new: Value) -> Value {
-        let (old, _) =
-            bincode::decode_from_slice::<f64, _>(old.as_bytes(), bincode::config::standard())
-                .unwrap();
-        let (new, _) =
-            bincode::decode_from_slice::<f64, _>(new.as_bytes(), bincode::config::standard())
-                .unwrap();
+        let old = unwrap_value!(old, F64);
+        let new = unwrap_value!(new, F64);
 
-        bincode::encode_to_vec(old + new, bincode::config::standard())
-            .unwrap()
-            .into()
+        Value::F64(old + new)
     }
 }
 
@@ -147,19 +123,11 @@ pub struct KahanSumAdd;
 
 impl UpsertFn for KahanSumAdd {
     fn upsert(&self, old: Value, new: Value) -> Value {
-        let (old, _) =
-            bincode::decode_from_slice::<KahanSum, _>(old.as_bytes(), bincode::config::standard())
-                .unwrap();
-        let (new, _) =
-            bincode::decode_from_slice::<KahanSum, _>(new.as_bytes(), bincode::config::standard())
-                .unwrap();
+        let old = unwrap_value!(old, KahanSum);
+        let new = unwrap_value!(new, KahanSum);
 
         let new: f64 = new.into();
 
-        let res: KahanSum = old + new;
-
-        bincode::encode_to_vec(res, bincode::config::standard())
-            .unwrap()
-            .into()
+        Value::KahanSum(old + new)
     }
 }

@@ -25,6 +25,7 @@ use std::ops::{Add, AddAssign};
     serde::Deserialize,
     bincode::Encode,
     bincode::Decode,
+    PartialEq,
 )]
 pub struct KahanSum {
     sum: f64,

@@ -47,7 +47,16 @@ fn num_hashes(num_bits: u64, estimated_items: u64) -> u64 {
     (((num_bits as f64) / estimated_items as f64 * 2.0_f64.ln()).ceil() as u64).max(1)
 }
 
-#[derive(Clone, bincode::Encode, bincode::Decode, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    bincode::Encode,
+    bincode::Decode,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+)]
 pub struct U64BloomFilter {
     #[bincode(with_serde)]
     bit_vec: BitVec,

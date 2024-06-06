@@ -27,10 +27,12 @@
 //! Heavily inspired by https://github.com/datafuselabs/openraft/blob/main/examples/raft-kv-memstore/
 
 mod client;
+pub mod key;
 pub mod log_store;
 pub mod network;
 pub mod store;
 pub mod upsert;
+pub mod value;
 
 use network::api::{
     AllTables, BatchSet, BatchUpsert, CloneTable, CreateTable, DropTable, Set, Upsert,
@@ -41,6 +43,9 @@ use std::io::Cursor;
 
 use openraft::TokioRuntime;
 
+pub use key::{Key, KeyTrait};
+pub use value::{Value, ValueTrait};
+
 pub use self::network::Server;
 
 pub use network::api::RemoteClient;
@@ -48,7 +53,7 @@ pub use network::raft::RemoteClient as RaftClient;
 
 pub use crate::distributed::member::ShardId;
 pub use client::{Client, Shard};
-pub use store::{Key, Table, Value};
+pub use store::Table;
 pub use upsert::*;
 
 pub type NodeId = u64;
@@ -132,6 +137,7 @@ raft_sonic_request_response!(
 
 #[cfg(test)]
 pub mod tests {
+    use super::{key::Key, value::Value};
     use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
     use tokio::sync::Mutex;
     use tracing_test::traced_test;
@@ -218,54 +224,54 @@ pub mod tests {
 
         c1.set(
             table.clone(),
-            "hello".as_bytes().to_vec().into(),
-            "world".as_bytes().to_vec().into(),
+            "hello".to_string().into(),
+            "world".to_string().into(),
         )
         .await?;
 
-        let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
-        assert_eq!(res, Some("world".as_bytes().into()));
+        let res = c1.get(table.clone(), "hello".to_string().into()).await?;
+        assert_eq!(res, Some("world".to_string().into()));
 
         c2.set(
             table.clone(),
-            "ensure-linearized-read".as_bytes().into(),
-            vec![].into(),
+            "ensure-linearized-read".to_string().into(),
+            ().into(),
         )
         .await?;
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
-        assert_eq!(res, Some("world".as_bytes().into()));
+        let res = c2.get(table.clone(), "hello".to_string().into()).await?;
+        assert_eq!(res, Some("world".to_string().into()));
 
         c2.set(
             table.clone(),
-            "hello".as_bytes().into(),
-            "world2".as_bytes().into(),
+            "hello".to_string().into(),
+            "world2".to_string().into(),
         )
         .await?;
 
         c1.set(
             table.clone(),
-            "ensure-linearized-read".as_bytes().into(),
-            vec![].into(),
+            "ensure-linearized-read".to_string().into(),
+            ().into(),
         )
         .await?;
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
-        assert_eq!(res, Some("world2".as_bytes().into()));
+        let res = c1.get(table.clone(), "hello".to_string().into()).await?;
+        assert_eq!(res, Some("world2".to_string().into()));
 
         let res = c1.batch_get(table.clone(), vec![]).await?;
         assert!(res.is_empty());
 
         let res = c1
-            .batch_get(table.clone(), vec!["hello".as_bytes().into()])
+            .batch_get(table.clone(), vec!["hello".to_string().into()])
             .await?;
 
         assert!(res.len() == 1);
 
         let res = c1
-            .batch_get(table.clone(), vec!["non-existent-key".as_bytes().into()])
+            .batch_get(table.clone(), vec!["non-existent-key".to_string().into()])
             .await?;
 
         assert!(res.is_empty());
@@ -316,29 +322,29 @@ pub mod tests {
 
         c1.set(
             table.clone(),
-            "hello".as_bytes().into(),
-            "world".as_bytes().into(),
+            "hello".to_string().into(),
+            "world".to_string().into(),
         )
         .await?;
 
         c2.set(
             table.clone(),
-            "ensure-linearized-read".as_bytes().into(),
-            vec![].into(),
+            "ensure-linearized-read".to_string().into(),
+            ().into(),
         )
         .await?;
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
+        let res = c2.get(table.clone(), "hello".to_string().into()).await?;
 
-        assert_eq!(res, Some("world".as_bytes().into()));
+        assert_eq!(res, Some("world".to_string().into()));
 
         rc1.join(3, addr3).await?;
         tokio::time::sleep(std::time::Duration::from_secs(1)).await; // join is not blocking
 
         let c3 = RemoteClient::new(addr3);
-        let res = c3.get(table.clone(), "hello".as_bytes().into()).await?;
-        assert_eq!(res, Some("world".as_bytes().into()));
+        let res = c3.get(table.clone(), "hello".to_string().into()).await?;
+        assert_eq!(res, Some("world".to_string().into()));
 
         Ok(())
     }
@@ -379,16 +385,16 @@ pub mod tests {
         client
             .set(
                 table.clone(),
-                "hello".as_bytes().into(),
-                "world".as_bytes().into(),
+                "hello".to_string().into(),
+                "world".to_string().into(),
             )
             .await?;
 
         client
             .set(
                 table.clone(),
-                "hello2".as_bytes().into(),
-                "world2".as_bytes().into(),
+                "hello2".to_string().into(),
+                "world2".to_string().into(),
             )
             .await?;
 
@@ -406,8 +412,8 @@ pub mod tests {
         assert_eq!(
             res,
             vec![
-                ("hello".as_bytes().into(), "world".as_bytes().into()),
-                ("hello2".as_bytes().into(), "world2".as_bytes().into()),
+                ("hello".to_string().into(), "world".to_string().into()),
+                ("hello2".to_string().into(), "world2".to_string().into()),
             ]
         );
 
@@ -418,12 +424,7 @@ pub mod tests {
             .batch_set(
                 table.clone(),
                 (0..N)
-                    .map(|i| {
-                        (
-                            i.to_be_bytes().as_ref().into(),
-                            i.to_be_bytes().as_ref().into(),
-                        )
-                    })
+                    .map(|i| (i.into(), i.into()))
                     .collect::<Vec<(Key, Value)>>(),
             )
             .await?;
@@ -441,13 +442,8 @@ pub mod tests {
         assert_eq!(res.len(), N as usize);
 
         for (i, r) in res.into_iter().enumerate() {
-            assert_eq!(
-                r,
-                (
-                    i.to_be_bytes().as_ref().into(),
-                    i.to_be_bytes().as_ref().into(),
-                )
-            );
+            let i = i as u64;
+            assert_eq!(r, (i.into(), i.into(),));
         }
 
         Ok(())
@@ -496,13 +492,13 @@ pub mod tests {
 
         c1.set(
             table.clone(),
-            "hello".as_bytes().into(),
-            "world".as_bytes().into(),
+            "hello".to_string().into(),
+            "world".to_string().into(),
         )
         .await?;
 
-        let res = c1.get(table.clone(), "hello".as_bytes().into()).await?;
-        assert_eq!(res, Some("world".as_bytes().into()));
+        let res = c1.get(table.clone(), "hello".to_string().into()).await?;
+        assert_eq!(res, Some("world".to_string().into()));
 
         // crash node 2
         tracing::info!("crashing node 2");
@@ -521,8 +517,8 @@ pub mod tests {
 
         let c2 = RemoteClient::new(addr2);
 
-        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
-        assert_eq!(res, Some("world".as_bytes().into()));
+        let res = c2.get(table.clone(), "hello".to_string().into()).await?;
+        assert_eq!(res, Some("world".to_string().into()));
 
         // crash node 2 again
         tracing::info!("crashing node 2 again");
@@ -531,8 +527,8 @@ pub mod tests {
 
         c1.set(
             table.clone(),
-            "hello".as_bytes().into(),
-            "world2".as_bytes().into(),
+            "hello".to_string().into(),
+            "world2".to_string().into(),
         )
         .await?;
 
@@ -547,8 +543,8 @@ pub mod tests {
 
         let c2 = RemoteClient::new(addr2);
 
-        let res = c2.get(table.clone(), "hello".as_bytes().into()).await?;
-        assert_eq!(res, Some("world2".as_bytes().into()));
+        let res = c2.get(table.clone(), "hello".to_string().into()).await?;
+        assert_eq!(res, Some("world2".to_string().into()));
 
         Ok(())
     }
@@ -564,7 +560,7 @@ pub mod tests {
         Arbitrary,
     )]
     enum Action {
-        Set { key: Vec<u8>, value: Vec<u8> },
+        Set { key: String, value: String },
         // get actions[prev_key % actions.len()]
         // if actions[prev_key % actions.len()] is a get, then get a non-existent key
         Get { prev_key: usize },
@@ -576,7 +572,7 @@ pub mod tests {
         #[test]
         #[traced_test]
         fn proptest_chaos(actions: Vec<Action>) {
-            let ground_truth = Arc::new(Mutex::new(BTreeMap::<Vec<u8>, Vec<u8>>::new()));
+            let ground_truth = Arc::new(Mutex::new(BTreeMap::<String, String>::new()));
 
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -640,23 +636,23 @@ pub mod tests {
                             }
                             Action::Get { prev_key } => {
                                 let client = clients.choose(&mut rand::thread_rng()).unwrap();
-                                client.set(table.clone(), b"ensure-linearized-read".to_vec().into(), vec![].into()).await.unwrap();
+                                client.set(table.clone(), "ensure-linearized-read".to_string().into(), ().into()).await.unwrap();
 
                                 let key = if i == 0 {
-                                    b"non-existent-key".to_vec()
+                                    "non-existent-key".to_string()
                                 } else {
                                     match shared_actions[prev_key % i] {
                                         Action::Set { ref key, .. } => {
                                             key.clone()
                                         },
-                                        Action::Get { .. } => b"non-existent-key".to_vec(),
+                                        Action::Get { .. } => "non-existent-key".to_string(),
                                     }
                                 };
 
                                 let res = client.get(table.clone(), key.clone().into()).await.unwrap();
                                 let expected = ground_truth.lock().await.get(&key).cloned();
 
-                                assert_eq!(res.map(|v| v.as_bytes().to_vec()), expected);
+                                assert_eq!(res.map(|v| v.try_into().unwrap()), expected);
                             }
                         }
                     }

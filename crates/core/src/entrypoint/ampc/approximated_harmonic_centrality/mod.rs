@@ -29,13 +29,22 @@ use crate::{
 use self::mapper::ApproxCentralityMapper;
 use self::worker::{ApproxCentralityWorker, RemoteApproxCentralityWorker};
 
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+)]
 pub struct Meta {
     round: u64,
     num_samples_per_worker: u64,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
+#[derive(bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct ApproxCentralityTables {
     centrality: DefaultDhtTable<webgraph::NodeID, f32>,
     meta: DefaultDhtTable<(), Meta>,

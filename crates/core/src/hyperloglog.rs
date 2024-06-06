@@ -4325,13 +4325,21 @@ impl HyperLogLogHasher for StableHasher {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(
+    Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Eq,
+)]
 pub struct HyperLogLog<const N: usize, H = FastHasher>
 where
     H: HyperLogLogHasher,
 {
     registers: Vec<u8>,
     _hasher: PhantomData<H>,
+}
+
+impl<H: HyperLogLogHasher, const N: usize> PartialEq for HyperLogLog<N, H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.registers == other.registers
+    }
 }
 
 impl<H: HyperLogLogHasher, const N: usize> Default for HyperLogLog<N, H> {

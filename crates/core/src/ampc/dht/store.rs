@@ -36,8 +36,10 @@ use tokio::sync::RwLock;
 
 use crate::ampc::dht::network::api;
 
+use super::key::Key;
 use super::upsert::UpsertEnum;
 use super::upsert::UpsertFn;
+use super::value::Value;
 use super::BasicNode;
 use super::NodeId;
 use super::TypeConfig;
@@ -74,74 +76,6 @@ impl From<String> for Table {
 impl From<&str> for Table {
     fn from(v: &str) -> Self {
         Self(v.to_string())
-    }
-}
-
-#[derive(
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-    Debug,
-    Clone,
-    PartialOrd,
-    Ord,
-    PartialEq,
-    Eq,
-)]
-#[serde(transparent)]
-pub struct Key(Vec<u8>);
-
-impl Key {
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl From<Vec<u8>> for Key {
-    fn from(v: Vec<u8>) -> Self {
-        Self(v)
-    }
-}
-
-impl From<&[u8]> for Key {
-    fn from(v: &[u8]) -> Self {
-        Self(v.to_vec())
-    }
-}
-
-#[derive(
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-)]
-#[serde(transparent)]
-pub struct Value(Vec<u8>);
-
-impl Value {
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
-
-    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
-        &mut self.0
-    }
-}
-
-impl From<Vec<u8>> for Value {
-    fn from(v: Vec<u8>) -> Self {
-        Self(v)
-    }
-}
-
-impl From<&[u8]> for Value {
-    fn from(v: &[u8]) -> Self {
-        Self(v.to_vec())
     }
 }
 

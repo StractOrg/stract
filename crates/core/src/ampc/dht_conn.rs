@@ -17,7 +17,7 @@
 use crate::block_on;
 use std::{collections::BTreeMap, net::SocketAddr, pin::Pin};
 
-use super::dht::{self, upsert::UpsertEnum, UpsertAction};
+use super::dht::{self, upsert::UpsertEnum, KeyTrait, UpsertAction, ValueTrait};
 
 use crate::Result;
 
@@ -62,6 +62,7 @@ macro_rules! impl_dht_tables {
     };
 }
 
+use anyhow::anyhow;
 use futures::{Stream, StreamExt};
 pub(crate) use impl_dht_tables;
 
@@ -95,11 +96,51 @@ impl Table {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug)]
+#[derive(Debug)]
 pub struct DefaultDhtTable<K, V> {
     table: Table,
     client: dht::Client,
     _maker: std::marker::PhantomData<(K, V)>,
+}
+
+impl<K, V> bincode::Encode for DefaultDhtTable<K, V> {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> std::prelude::v1::Result<(), bincode::error::EncodeError> {
+        self.table.encode(encoder)?;
+        self.client.encode(encoder)
+    }
+}
+
+impl<K, V> bincode::Decode for DefaultDhtTable<K, V> {
+    fn decode<D: bincode::de::Decoder>(
+        decoder: &mut D,
+    ) -> std::prelude::v1::Result<Self, bincode::error::DecodeError> {
+        let table = Table::decode(decoder)?;
+        let client = dht::Client::decode(decoder)?;
+
+        Ok(Self {
+            table,
+            client,
+            _maker: std::marker::PhantomData,
+        })
+    }
+}
+
+impl<'de, K, V> bincode::BorrowDecode<'de> for DefaultDhtTable<K, V> {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
+        decoder: &mut D,
+    ) -> std::prelude::v1::Result<Self, bincode::error::DecodeError> {
+        let table = Table::borrow_decode(decoder)?;
+        let client = dht::Client::borrow_decode(decoder)?;
+
+        Ok(Self {
+            table,
+            client,
+            _maker: std::marker::PhantomData,
+        })
+    }
 }
 
 impl<K, V> Clone for DefaultDhtTable<K, V> {
@@ -113,8 +154,8 @@ impl<K, V> Clone for DefaultDhtTable<K, V> {
 }
 impl<K, V> DefaultDhtTable<K, V>
 where
-    K: bincode::Encode + bincode::Decode,
-    V: bincode::Encode + bincode::Decode,
+    K: KeyTrait,
+    V: ValueTrait,
 {
     pub fn new<S: AsRef<str>>(members: &[(dht::ShardId, SocketAddr)], prefix: S) -> Self {
         Self {
@@ -130,43 +171,37 @@ where
 }
 
 pub trait DhtTable: Clone + bincode::Encode + bincode::Decode {
-    type Key: bincode::Encode + bincode::Decode;
-    type Value: bincode::Encode + bincode::Decode;
+    type Key: KeyTrait;
+    type Value: ValueTrait;
 
     fn client(&self) -> &dht::Client;
     fn table(&self) -> &Table;
     fn next(&self) -> Self;
 
     fn get(&self, key: Self::Key) -> Option<Self::Value> {
-        let key = bincode::encode_to_vec(&key, bincode::config::standard()).unwrap();
-
         block_on(self.client().get(self.table().dht(), key.into()))
             .unwrap()
             .map(|v| {
-                let (k, _) =
-                    bincode::decode_from_slice(v.as_bytes(), bincode::config::standard()).unwrap();
-                k
+                Self::Value::try_from(v)
+                    .map_err(|_| anyhow!("unexpected value type in DHT table get"))
+                    .unwrap()
             })
     }
 
     fn batch_get(&self, keys: Vec<Self::Key>) -> Vec<(Self::Key, Self::Value)> {
-        let keys: Vec<dht::Key> = keys
-            .into_iter()
-            .map(|k| {
-                bincode::encode_to_vec(&k, bincode::config::standard())
-                    .unwrap()
-                    .into()
-            })
-            .collect::<Vec<_>>();
+        let keys: Vec<dht::Key> = keys.into_iter().map(|k| k.into()).collect::<Vec<_>>();
         let values = block_on(self.client().batch_get(self.table().dht(), keys)).unwrap();
 
         values
             .into_iter()
             .map(|(k, v)| {
-                let (k, _) =
-                    bincode::decode_from_slice(k.as_bytes(), bincode::config::standard()).unwrap();
-                let (v, _) =
-                    bincode::decode_from_slice(v.as_bytes(), bincode::config::standard()).unwrap();
+                let k = Self::Key::try_from(k)
+                    .map_err(|_| anyhow!("unexpected key type in DHT table batch-get"))
+                    .unwrap();
+
+                let v = Self::Value::try_from(v)
+                    .map_err(|_| anyhow!("unexpected value type in DHT table batch-get"))
+                    .unwrap();
 
                 (k, v)
             })
@@ -174,9 +209,6 @@ pub trait DhtTable: Clone + bincode::Encode + bincode::Decode {
     }
 
     fn set(&self, key: Self::Key, value: Self::Value) {
-        let key = bincode::encode_to_vec(&key, bincode::config::standard()).unwrap();
-        let value = bincode::encode_to_vec(&value, bincode::config::standard()).unwrap();
-
         block_on(
             self.client()
                 .set(self.table().dht(), key.into(), value.into()),
@@ -187,16 +219,7 @@ pub trait DhtTable: Clone + bincode::Encode + bincode::Decode {
     fn batch_set(&self, pairs: Vec<(Self::Key, Self::Value)>) {
         let pairs: Vec<(dht::Key, dht::Value)> = pairs
             .into_iter()
-            .map(|(k, v)| {
-                (
-                    bincode::encode_to_vec(&k, bincode::config::standard())
-                        .unwrap()
-                        .into(),
-                    bincode::encode_to_vec(&v, bincode::config::standard())
-                        .unwrap()
-                        .into(),
-                )
-            })
+            .map(|(k, v)| (k.into(), v.into()))
             .collect();
 
         block_on(self.client().batch_set(self.table().dht(), pairs)).unwrap();
@@ -212,9 +235,6 @@ pub trait DhtTable: Clone + bincode::Encode + bincode::Decode {
         key: Self::Key,
         value: Self::Value,
     ) -> UpsertAction {
-        let key = bincode::encode_to_vec(&key, bincode::config::standard()).unwrap();
-        let value = bincode::encode_to_vec(&value, bincode::config::standard()).unwrap();
-
         block_on(
             self.client()
                 .upsert(self.table().dht(), upsert, key.into(), value.into()),
@@ -229,16 +249,7 @@ pub trait DhtTable: Clone + bincode::Encode + bincode::Decode {
     ) -> Vec<(Self::Key, UpsertAction)> {
         let pairs: Vec<(dht::Key, dht::Value)> = pairs
             .into_iter()
-            .map(|(k, v)| {
-                (
-                    bincode::encode_to_vec(&k, bincode::config::standard())
-                        .unwrap()
-                        .into(),
-                    bincode::encode_to_vec(&v, bincode::config::standard())
-                        .unwrap()
-                        .into(),
-                )
-            })
+            .map(|(k, v)| (k.into(), v.into()))
             .collect();
 
         block_on(
@@ -248,8 +259,10 @@ pub trait DhtTable: Clone + bincode::Encode + bincode::Decode {
         .unwrap()
         .into_iter()
         .map(|(k, did_upsert)| {
-            let (k, _) =
-                bincode::decode_from_slice(k.as_bytes(), bincode::config::standard()).unwrap();
+            let k = k
+                .try_into()
+                .map_err(|_| anyhow!("unexpected key type in DHT table batch-upsert"))
+                .unwrap();
             (k, did_upsert)
         })
         .collect()
@@ -274,10 +287,13 @@ pub trait DhtTable: Clone + bincode::Encode + bincode::Decode {
 
     fn iter(&self) -> impl Iterator<Item = (Self::Key, Self::Value)> + '_ {
         self.raw_iter().map(|(key, value)| {
-            let (key, _) =
-                bincode::decode_from_slice(key.as_bytes(), bincode::config::standard()).unwrap();
-            let (value, _) =
-                bincode::decode_from_slice(value.as_bytes(), bincode::config::standard()).unwrap();
+            let key = Self::Key::try_from(key)
+                .map_err(|_| anyhow!("unexpected key type in DHT table iter"))
+                .unwrap();
+
+            let value = Self::Value::try_from(value)
+                .map_err(|_| anyhow!("unexpected value type in DHT table iter"))
+                .unwrap();
 
             (key, value)
         })
@@ -339,8 +355,9 @@ where
 
 impl<K, V> DhtTable for DefaultDhtTable<K, V>
 where
-    K: bincode::Encode + bincode::Decode,
-    V: bincode::Encode + bincode::Decode,
+    K: KeyTrait,
+
+    V: ValueTrait,
 {
     type Key = K;
     type Value = V;
@@ -418,32 +435,10 @@ mod tests {
 
     use super::*;
 
-    #[derive(
-        Debug,
-        Clone,
-        serde::Serialize,
-        serde::Deserialize,
-        bincode::Encode,
-        bincode::Decode,
-        PartialEq,
-        Eq,
-        PartialOrd,
-        Ord,
-    )]
-    struct Id(u64);
-    #[derive(
-        Debug,
-        Clone,
-        serde::Serialize,
-        serde::Deserialize,
-        bincode::Encode,
-        bincode::Decode,
-        PartialEq,
-        Eq,
-    )]
-    struct Counter(u64);
+    type Id = u64;
+    type Counter = u64;
 
-    #[derive(Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+    #[derive(Clone, bincode::Encode, bincode::Decode)]
     struct Tables {
         id: DefaultDhtTable<Id, Counter>,
     }
@@ -492,38 +487,26 @@ mod tests {
             id: DefaultDhtTable::new(&[(1.into(), addr)], "id"),
         };
 
-        tables.id.set(Id(0), Counter(0));
+        tables.id.set(0, 0);
 
-        assert_eq!(tables.id.get(Id(0)), Some(Counter(0)));
+        assert_eq!(tables.id.get(0), Some(0));
 
-        tables
-            .id
-            .batch_set(vec![(Id(1), Counter(0)), (Id(2), Counter(0))]);
+        tables.id.batch_set(vec![(1, 0), (2, 0)]);
 
-        let mut res = tables.id.batch_get(vec![Id(1), Id(2)]);
+        let mut res = tables.id.batch_get(vec![1, 2]);
         res.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-        assert_eq!(res, vec![(Id(1), Counter(0)), (Id(2), Counter(0))]);
+        assert_eq!(res, vec![(1, 0), (2, 0)]);
 
-        tables.id.upsert(upsert::U64Add, Id(0), Counter(1));
-        assert_eq!(tables.id.get(Id(0)), Some(Counter(1)));
+        tables.id.upsert(upsert::U64Add, 0, 1);
+        assert_eq!(tables.id.get(0), Some(1));
 
-        tables.id.batch_upsert(
-            upsert::U64Add,
-            vec![(Id(1), Counter(1)), (Id(2), Counter(1))],
-        );
+        tables.id.batch_upsert(upsert::U64Add, vec![(1, 1), (2, 1)]);
 
-        let mut res = tables.id.batch_get(vec![Id(0), Id(1), Id(2)]);
+        let mut res = tables.id.batch_get(vec![0, 1, 2]);
         res.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-        assert_eq!(
-            res,
-            vec![
-                (Id(0), Counter(1)),
-                (Id(1), Counter(1)),
-                (Id(2), Counter(1))
-            ]
-        );
+        assert_eq!(res, vec![(0, 1), (1, 1), (2, 1)]);
 
         Ok(())
     }

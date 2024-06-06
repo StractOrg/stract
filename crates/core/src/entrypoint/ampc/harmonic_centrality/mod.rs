@@ -29,13 +29,22 @@ pub use coordinator::{CentralityFinish, CentralitySetup};
 pub use mapper::CentralityMapper;
 pub use worker::{CentralityWorker, RemoteCentralityWorker};
 
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+)]
 pub struct Meta {
     round_had_changes: bool,
     upper_bound_num_nodes: u64,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
+#[derive(bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct CentralityTables {
     counters: DefaultDhtTable<webgraph::NodeID, HyperLogLog<64>>,
     meta: DefaultDhtTable<(), Meta>,
@@ -54,7 +63,7 @@ impl_dht_tables!(
     [counters, meta, centrality, changed_nodes]
 );
 
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
+#[derive(bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct CentralityJob {
     shard: ShardId,
 }

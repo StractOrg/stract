@@ -27,9 +27,11 @@ use std::{
 use crate::{distributed::member::ShardId, Result};
 
 use super::{
+    key::{Key, KeyTrait},
     network::api,
-    store::{Key, Table, Value},
+    store::Table,
     upsert::UpsertEnum,
+    value::Value,
     UpsertAction,
 };
 
@@ -301,14 +303,14 @@ impl Client {
     }
 
     pub async fn get(&self, table: Table, key: Key) -> Result<Option<Value>> {
-        self.shard_for_key(key.as_bytes())?.get(table, key).await
+        self.shard_for_key(&key.as_bytes())?.get(table, key).await
     }
 
     pub async fn batch_get(&self, table: Table, keys: Vec<Key>) -> Result<Vec<(Key, Value)>> {
         let mut shard_keys: BTreeMap<ShardId, Vec<Key>> = BTreeMap::new();
 
         for key in keys {
-            let shard = self.shard_id_for_key(key.as_bytes())?;
+            let shard = self.shard_id_for_key(&key.as_bytes())?;
             shard_keys.entry(*shard).or_default().push(key);
         }
 
@@ -326,7 +328,7 @@ impl Client {
     }
 
     pub async fn set(&self, table: Table, key: Key, value: Value) -> Result<()> {
-        self.shard_for_key(key.as_bytes())?
+        self.shard_for_key(&key.as_bytes())?
             .set(table, key, value)
             .await
     }
@@ -335,7 +337,7 @@ impl Client {
         let mut shard_values: BTreeMap<ShardId, Vec<(Key, Value)>> = BTreeMap::new();
 
         for (key, value) in values {
-            let shard = self.shard_id_for_key(key.as_bytes())?;
+            let shard = self.shard_id_for_key(&key.as_bytes())?;
             shard_values.entry(*shard).or_default().push((key, value));
         }
 
@@ -367,7 +369,7 @@ impl Client {
         key: Key,
         value: Value,
     ) -> Result<UpsertAction> {
-        self.shard_for_key(key.as_bytes())?
+        self.shard_for_key(&key.as_bytes())?
             .upsert(table, upsert, key, value)
             .await
     }
@@ -381,7 +383,7 @@ impl Client {
         let mut shard_values: BTreeMap<ShardId, Vec<(Key, Value)>> = BTreeMap::new();
 
         for (key, value) in values {
-            let shard = self.shard_id_for_key(key.as_bytes())?;
+            let shard = self.shard_id_for_key(&key.as_bytes())?;
             shard_values.entry(*shard).or_default().push((key, value));
         }
 
