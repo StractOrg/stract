@@ -51,7 +51,7 @@ impl Workers {
 
         while let Some(cmp::Reverse((dist, node))) = queue.pop() {
             if dist >= max_dist || dist > *distances.get(&node).unwrap_or(&u8::MAX) {
-                break;
+                continue;
             }
 
             for outgoing in self
