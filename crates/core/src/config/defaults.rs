@@ -195,4 +195,8 @@ impl ApproxHarmonic {
     pub fn max_distance() -> u8 {
         7
     }
+
+    pub fn save_centralities_with_zero() -> bool {
+        false
+    }
 }

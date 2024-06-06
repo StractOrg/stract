@@ -140,12 +140,17 @@ pub fn build(
     dht: &[(ShardId, SocketAddr)],
     workers: Vec<RemoteApproxCentralityWorker>,
     sample_rate: f64,
+    save_centralities_with_zero: bool,
 ) -> Coordinator<ApproxCentralityJob> {
     let setup = ApproxCentralitySetup::new_for_dht_members(dht, workers.clone(), sample_rate);
 
-    Coordinator::new(setup, workers.clone())
-        .with_mapper(ApproxCentralityMapper::InitCentrality)
-        .with_mapper(ApproxCentralityMapper::ApproximateCentrality)
+    let mut coord = Coordinator::new(setup, workers.clone());
+
+    if save_centralities_with_zero {
+        coord = coord.with_mapper(ApproxCentralityMapper::InitCentrality)
+    }
+
+    coord.with_mapper(ApproxCentralityMapper::ApproximateCentrality)
 }
 
 struct ClusterInfo {
@@ -228,13 +233,27 @@ pub fn run(config: ApproxHarmonicCoordinatorConfig) -> Result<()> {
         })
         .collect();
 
-    let coordinator = build(&cluster.dht, cluster.workers.clone(), config.sample_rate);
+    let coordinator = build(
+        &cluster.dht,
+        cluster.workers.clone(),
+        config.sample_rate,
+        config.save_centralities_with_zero,
+    );
     let res = coordinator.run(jobs, ApproxCentralityFinish)?;
 
     let output_path = Path::new(&config.output_path);
 
     let store = store_harmonic(
-        res.centrality.iter().map(|(n, c)| (n, f64::from(c))),
+        res.centrality
+            .iter()
+            .map(|(n, c)| (n, f64::from(c)))
+            .filter(|(_, c)| {
+                if config.save_centralities_with_zero {
+                    true
+                } else {
+                    *c > 0.0
+                }
+            }),
         output_path,
     );
 

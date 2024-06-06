@@ -590,6 +590,9 @@ pub struct ApproxHarmonicCoordinatorConfig {
 
     #[serde(default = "defaults::ApproxHarmonic::max_distance")]
     pub max_distance: u8,
+
+    #[serde(default = "defaults::ApproxHarmonic::save_centralities_with_zero")]
+    pub save_centralities_with_zero: bool,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]

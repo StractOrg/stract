@@ -352,7 +352,9 @@ impl CrawlPlanner {
             add_nodes_to_grouper(nodes.into_iter().flatten(), &mut grouper, &mut budgets);
         }
 
-        // make sure frontpage is added for all hosts
+        // make sure frontpage is added for all hosts with a budget.
+        // this is necessary to ensure that we crawl at least one page
+        // for each host.
         let mut futures = FuturesOrdered::new();
         let num_missing_budgets = budgets.len();
         let missing_budgets = budgets.clone();
