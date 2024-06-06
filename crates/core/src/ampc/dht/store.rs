@@ -83,7 +83,7 @@ impl From<&str> for Table {
     serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Default, Clone,
 )]
 pub struct Db {
-    data: BTreeMap<Table, BTreeMap<Arc<Key>, Arc<Value>>>,
+    data: BTreeMap<Table, BTreeMap<Key, Value>>,
 }
 
 impl Db {
@@ -98,16 +98,11 @@ impl Db {
     }
 
     pub fn get(&self, table: &Table, key: &Key) -> Option<Value> {
-        self.data
-            .get(table)
-            .and_then(|m| m.get(key).map(|v| v.as_ref().clone()))
+        self.data.get(table).and_then(|m| m.get(key).cloned())
     }
 
     pub fn set(&mut self, table: Table, key: Key, value: Value) {
-        self.data
-            .entry(table)
-            .or_default()
-            .insert(Arc::new(key), Arc::new(value));
+        self.data.entry(table).or_default().insert(key, value);
     }
 
     pub fn batch_set(&mut self, table: Table, values: Vec<(Key, Value)>) {
@@ -115,12 +110,12 @@ impl Db {
 
         // for some reason, the entry API seems to be faster than using extend or inserts
         for (k, v) in values {
-            match table.entry(Arc::new(k)) {
+            match table.entry(k) {
                 std::collections::btree_map::Entry::Occupied(mut e) => {
-                    *e.get_mut() = Arc::new(v);
+                    *e.get_mut() = v;
                 }
                 std::collections::btree_map::Entry::Vacant(e) => {
-                    e.insert(Arc::new(v));
+                    e.insert(v);
                 }
             }
         }
@@ -141,11 +136,11 @@ impl Db {
 
         match table.get_mut(&key) {
             Some(old) => {
-                let merged = upsert_fn.upsert(old.as_ref().clone(), value);
+                let merged = upsert_fn.upsert(old.clone(), value);
 
-                let has_changed = merged != **old;
+                let has_changed = merged != *old;
 
-                *old = Arc::new(merged);
+                *old = merged;
 
                 if has_changed {
                     UpsertAction::Merged
@@ -154,7 +149,7 @@ impl Db {
                 }
             }
             None => {
-                table.insert(Arc::new(key), Arc::new(value));
+                table.insert(key, value);
                 UpsertAction::Inserted
             }
         }
@@ -172,10 +167,10 @@ impl Db {
         for (key, value) in values {
             match table.get_mut(&key) {
                 Some(old) => {
-                    let merged = upsert_fn.upsert(old.as_ref().clone(), value);
-                    let has_changed = merged != **old;
+                    let merged = upsert_fn.upsert(old.clone(), value);
+                    let has_changed = merged != *old;
 
-                    *old = Arc::new(merged);
+                    *old = merged;
 
                     if has_changed {
                         res.push((key, UpsertAction::Merged));
@@ -184,7 +179,7 @@ impl Db {
                     }
                 }
                 None => {
-                    table.insert(Arc::new(key.clone()), Arc::new(value));
+                    table.insert(key.clone(), value);
                     res.push((key, UpsertAction::Inserted));
                 }
             }
@@ -211,11 +206,7 @@ impl Db {
             None => Vec::new(),
             Some(table) => keys
                 .iter()
-                .filter_map(|key| {
-                    table
-                        .get(key)
-                        .map(|value| (key.clone(), value.as_ref().clone()))
-                })
+                .filter_map(|key| table.get(key).map(|value| (key.clone(), value.clone())))
                 .collect(),
         }
     }
@@ -231,12 +222,12 @@ impl Db {
             Some(table) => match limit {
                 None => table
                     .range((range.start, range.end))
-                    .map(|(key, value)| (key.as_ref().clone(), value.as_ref().clone()))
+                    .map(|(key, value)| (key.clone(), value.clone()))
                     .collect(),
                 Some(limit) => table
                     .range((range.start, range.end))
                     .take(limit)
-                    .map(|(key, value)| (key.as_ref().clone(), value.as_ref().clone()))
+                    .map(|(key, value)| (key.clone(), value.clone()))
                     .collect(),
             },
         }
