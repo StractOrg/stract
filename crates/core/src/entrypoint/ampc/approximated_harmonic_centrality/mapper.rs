@@ -50,6 +50,10 @@ impl Workers {
         distances.insert(source, 0u8);
 
         while let Some(cmp::Reverse((dist, node))) = queue.pop() {
+            if dist >= max_dist || dist > *distances.get(&node).unwrap_or(&u8::MAX) {
+                break;
+            }
+
             for outgoing in self
                 .worker
                 .graph()

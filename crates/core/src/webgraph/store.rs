@@ -43,7 +43,7 @@ struct SerializedEdge {
 }
 
 pub struct HostDb {
-    db: speedy_kv::Db<Vec<u8>, Vec<u8>>,
+    db: speedy_kv::Db<Vec<u8>, ()>,
 }
 
 impl HostDb {
@@ -63,9 +63,8 @@ impl HostDb {
             node.id.as_u64().to_le_bytes(),
         ]
         .concat();
-        let value = vec![];
 
-        self.db.insert_raw(key, value);
+        self.db.insert_raw(key, vec![]);
     }
 
     fn get(&self, host: &NodeID) -> Vec<NodeID> {
