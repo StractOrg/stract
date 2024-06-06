@@ -16,7 +16,6 @@
 
 use indicatif::ParallelProgressIterator;
 use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cmp, collections::BTreeMap};
 
 use super::{worker::ApproxCentralityWorker, ApproxCentralityJob, Mapper};
@@ -43,76 +42,30 @@ impl Workers {
         Self { worker }
     }
 
-    fn outgoing_nodes(
-        &self,
-        nodes: &[webgraph::NodeID],
-    ) -> FxHashMap<webgraph::NodeID, FxHashSet<webgraph::NodeID>> {
-        let mut res: FxHashMap<webgraph::NodeID, FxHashSet<webgraph::NodeID>> =
-            FxHashMap::default();
-
-        let limit = webgraph::EdgeLimit::Unlimited;
-
-        for node in nodes {
-            for edge in self.worker.graph().raw_outgoing_edges(node, limit) {
-                res.entry(*node).or_default().insert(edge.to);
-            }
-        }
-
-        res
-    }
-
-    fn run_batch(&self, batch: &mut Vec<(u8, webgraph::NodeID)>) -> BTreeMap<webgraph::NodeID, u8> {
-        let mut new_distances: BTreeMap<webgraph::NodeID, u8> = BTreeMap::default();
-
-        let nodes: Vec<_> = batch.iter().map(|(_, node)| *node).collect();
-        let outgoing_nodes = self.outgoing_nodes(&nodes);
-
-        for (dist, node) in batch.iter().cloned() {
-            if let Some(outgoing) = outgoing_nodes.get(&node) {
-                for outgoing in outgoing {
-                    let d = dist + 1;
-
-                    let current_dist = new_distances.get(outgoing).unwrap_or(&u8::MAX);
-
-                    if d < *current_dist {
-                        new_distances.insert(*outgoing, d);
-                    }
-                }
-            }
-        }
-
-        batch.clear();
-
-        new_distances
-    }
-
     fn dijkstra(&self, source: webgraph::NodeID, max_dist: u8) -> BTreeMap<webgraph::NodeID, u8> {
         let mut distances: BTreeMap<webgraph::NodeID, u8> = BTreeMap::default();
         let mut queue = std::collections::BinaryHeap::new();
-        let mut batch = Vec::with_capacity(BATCH_SIZE);
 
         queue.push(cmp::Reverse((0u8, source)));
         distances.insert(source, 0u8);
 
-        loop {
-            if queue.is_empty() && batch.is_empty() {
-                break;
-            }
+        while let Some(cmp::Reverse((dist, node))) = queue.pop() {
+            for outgoing in self
+                .worker
+                .graph()
+                .raw_outgoing_edges(&node, webgraph::EdgeLimit::Unlimited)
+                .into_iter()
+                .map(|e| e.to)
+            {
+                let d = dist + 1;
 
-            if let Some(cmp::Reverse((dist, node))) = queue.pop() {
-                batch.push((dist, node));
-            }
+                let current_dist = distances.entry(outgoing).or_insert(u8::MAX);
 
-            if batch.len() >= BATCH_SIZE || queue.is_empty() {
-                for (node, dist) in self.run_batch(&mut batch) {
-                    let cur_dist = distances.get(&node).unwrap_or(&u8::MAX);
+                if d < *current_dist {
+                    *current_dist = d;
 
-                    if dist < *cur_dist {
-                        distances.insert(node, dist);
-
-                        if dist < max_dist {
-                            queue.push(cmp::Reverse((dist, node)));
-                        }
+                    if d < max_dist {
+                        queue.push(cmp::Reverse((d, outgoing)));
                     }
                 }
             }
