@@ -40,7 +40,7 @@ impl Executor {
     pub fn with_threads(num_threads: usize, prefix: &'static str) -> Result<Executor> {
         let pool = ThreadPoolBuilder::new()
             .num_threads(num_threads)
-            .stack_size(80_000_000)
+            .stack_size(160_000_000)
             .thread_name(move |num| format!("{prefix}{num}"))
             .build()?;
         Ok(Executor::ThreadPool(pool))

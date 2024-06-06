@@ -21,6 +21,7 @@ pub mod worker;
 use std::net::SocketAddr;
 
 use crate::distributed::member::ShardId;
+use crate::kahan_sum::KahanSum;
 use crate::{
     ampc::{prelude::*, DefaultDhtTable},
     webgraph,
@@ -46,7 +47,7 @@ pub struct Meta {
 
 #[derive(bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct ApproxCentralityTables {
-    centrality: DefaultDhtTable<webgraph::NodeID, f32>,
+    centrality: DefaultDhtTable<webgraph::NodeID, KahanSum>,
     meta: DefaultDhtTable<(), Meta>,
 }
 

@@ -21,7 +21,8 @@ use std::{cmp, collections::BTreeMap};
 
 use super::{worker::ApproxCentralityWorker, ApproxCentralityJob, Mapper};
 use crate::{
-    ampc::dht::upsert, entrypoint::ampc::approximated_harmonic_centrality::DhtTable, webgraph,
+    ampc::dht::upsert, entrypoint::ampc::approximated_harmonic_centrality::DhtTable,
+    kahan_sum::KahanSum, webgraph,
 };
 use rayon::prelude::*;
 
@@ -130,7 +131,14 @@ impl Mapper for ApproxCentralityMapper {
         worker: &<<Self as Mapper>::Job as super::Job>::Worker,
         dht: &crate::ampc::DhtConn<<<Self as Mapper>::Job as super::Job>::DhtTables>,
     ) {
-        match self {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(usize::from(std::thread::available_parallelism().unwrap()))
+            .stack_size(800_000_000)
+            .thread_name(move |num| format!("approx-harmonic-mapper-{num}"))
+            .build()
+            .unwrap();
+
+        pool.install(|| match self {
             ApproxCentralityMapper::InitCentrality => {
                 let num_nodes = worker.graph().estimate_num_nodes();
                 let nodes = worker.graph().nodes().collect::<Vec<_>>();
@@ -138,7 +146,10 @@ impl Mapper for ApproxCentralityMapper {
                     .par_chunks(BATCH_SIZE)
                     .progress_count(num_nodes as u64 / BATCH_SIZE as u64)
                     .for_each(|chunk| {
-                        let pairs: Vec<_> = chunk.iter().map(|node| (*node, 0.0)).collect();
+                        let pairs: Vec<_> = chunk
+                            .iter()
+                            .map(|node| (*node, KahanSum::from(0.0)))
+                            .collect();
 
                         dht.next().centrality.batch_set(pairs)
                     });
@@ -151,7 +162,9 @@ impl Mapper for ApproxCentralityMapper {
                     .graph()
                     .random_nodes_with_outgoing(num_samples as usize);
 
-                sampled.into_par_iter().progress().for_each(|node| {
+                let pb = indicatif::ProgressBar::new(sampled.len() as u64);
+
+                sampled.into_par_iter().for_each(|node| {
                     for chunk in workers
                         .dijkstra(node, job.max_distance)
                         .into_iter()
@@ -159,17 +172,21 @@ impl Mapper for ApproxCentralityMapper {
                             if d == 0 {
                                 None
                             } else {
-                                Some((n, (1.0 / d as f32) * (job.norm as f32)))
+                                Some((n, KahanSum::from((1.0 / d as f64) * job.norm)))
                             }
                         })
                         .chunks(BATCH_SIZE)
                         .into_iter()
                     {
                         let pairs: Vec<_> = chunk.collect();
-                        dht.next().centrality.batch_upsert(upsert::F32Add, pairs);
+                        dht.next()
+                            .centrality
+                            .batch_upsert(upsert::KahanSumAdd, pairs);
                     }
+
+                    pb.inc(1);
                 });
             }
-        }
+        })
     }
 }
