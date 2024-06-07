@@ -16,7 +16,7 @@
 
 use utoipa::ToSchema;
 
-use super::{FullNodeID, Node, NodeID};
+use super::{store::NodeDatum, FullNodeID, Node, NodeID};
 
 pub const MAX_LABEL_LENGTH: usize = 1024;
 
@@ -59,7 +59,7 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, bincode::Encode, bincode::Decode)]
-pub struct InnerEdge<L>
+pub struct InsertableEdge<L>
 where
     L: EdgeLabel,
 {
@@ -68,11 +68,12 @@ where
     pub label: L,
 }
 
-impl<L> From<InnerEdge<L>> for Edge<L>
+#[cfg(test)]
+impl<L> From<InsertableEdge<L>> for Edge<L>
 where
     L: EdgeLabel,
 {
-    fn from(edge: InnerEdge<L>) -> Self {
+    fn from(edge: InsertableEdge<L>) -> Self {
         Edge {
             from: edge.from.id,
             to: edge.to.id,
@@ -98,4 +99,55 @@ pub struct FullEdge {
     pub from: Node,
     pub to: Node,
     pub label: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SegmentEdge<L>
+where
+    L: EdgeLabel,
+{
+    pub from: NodeDatum,
+    pub to: NodeDatum,
+    pub label: L,
+}
+
+impl<L> From<SegmentEdge<L>> for Edge<L>
+where
+    L: EdgeLabel,
+{
+    fn from(edge: SegmentEdge<L>) -> Self {
+        Edge {
+            from: edge.from.node(),
+            to: edge.to.node(),
+            label: edge.label,
+        }
+    }
+}
+
+#[cfg(test)]
+impl<L> From<Edge<L>> for SegmentEdge<L>
+where
+    L: EdgeLabel,
+{
+    fn from(edge: Edge<L>) -> Self {
+        SegmentEdge {
+            from: NodeDatum::new(edge.from, 0),
+            to: NodeDatum::new(edge.to, 0),
+            label: edge.label,
+        }
+    }
+}
+
+#[cfg(test)]
+impl<L> From<InsertableEdge<L>> for SegmentEdge<L>
+where
+    L: EdgeLabel,
+{
+    fn from(edge: InsertableEdge<L>) -> Self {
+        SegmentEdge {
+            from: NodeDatum::new(edge.from.id, 0),
+            to: NodeDatum::new(edge.to.id, 0),
+            label: edge.label,
+        }
+    }
 }

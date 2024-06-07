@@ -94,6 +94,18 @@ pub enum EdgeLimit {
     Limit(usize),
 }
 
+impl EdgeLimit {
+    pub fn apply<'a, T>(
+        &self,
+        it: impl Iterator<Item = T> + 'a,
+    ) -> Box<dyn Iterator<Item = T> + 'a> {
+        match self {
+            EdgeLimit::Unlimited => Box::new(it),
+            EdgeLimit::Limit(limit) => Box::new(it.take(*limit)),
+        }
+    }
+}
+
 pub struct Webgraph {
     path: String,
     segments: Vec<Segment>,
@@ -171,22 +183,25 @@ impl Webgraph {
     }
 
     pub fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<FullEdge> {
-        let dedup = |edges: &mut Vec<Edge<String>>| {
-            edges.sort_by_key(|e| e.from);
-            edges.dedup_by_key(|e| e.from);
+        let dedup = |edges: &mut Vec<SegmentEdge<String>>| {
+            edges.sort_by_key(|e| e.from.node());
+            edges.dedup_by_key(|e| e.from.node());
         };
 
-        self.inner_edges(
+        let mut edges = self.inner_edges(
             |segment| segment.ingoing_edges_with_label(&node.id(), &limit),
             dedup,
-        )
-        .into_iter()
-        .map(|e| FullEdge {
-            from: self.id2node(&e.from).unwrap(),
-            to: self.id2node(&e.to).unwrap(),
-            label: e.label,
-        })
-        .collect()
+        );
+        edges.sort_by(|a, b| a.from.sort_key().cmp(&b.from.sort_key()));
+
+        limit
+            .apply(edges.into_iter())
+            .map(|e| FullEdge {
+                from: self.id2node(&e.from.node()).unwrap(),
+                to: self.id2node(&e.to.node()).unwrap(),
+                label: e.label,
+            })
+            .collect()
     }
 
     pub fn pages_by_host(&self, host_node: &NodeID) -> Vec<NodeID> {
@@ -208,12 +223,22 @@ impl Webgraph {
     }
 
     pub fn raw_ingoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<Edge<()>> {
-        let dedup = |edges: &mut Vec<Edge<()>>| {
-            edges.sort_by_key(|e| e.from);
-            edges.dedup_by_key(|e| e.from);
+        let dedup = |edges: &mut Vec<SegmentEdge<()>>| {
+            edges.sort_by_key(|e| e.from.node());
+            edges.dedup_by_key(|e| e.from.node());
         };
 
-        self.inner_edges(|segment| segment.ingoing_edges(node, &limit), dedup)
+        let mut edges = self.inner_edges(|segment| segment.ingoing_edges(node, &limit), dedup);
+        edges.sort_by(|a, b| a.from.sort_key().cmp(&b.from.sort_key()));
+
+        limit
+            .apply(edges.into_iter())
+            .map(|e| Edge {
+                from: e.from.node(),
+                to: e.to.node(),
+                label: e.label,
+            })
+            .collect()
     }
 
     pub fn raw_ingoing_edges_with_labels(
@@ -221,15 +246,25 @@ impl Webgraph {
         node: &NodeID,
         limit: EdgeLimit,
     ) -> Vec<Edge<String>> {
-        let dedup = |edges: &mut Vec<Edge<String>>| {
-            edges.sort_by_key(|e| e.from);
-            edges.dedup_by_key(|e| e.from);
+        let dedup = |edges: &mut Vec<SegmentEdge<String>>| {
+            edges.sort_by_key(|e| e.from.node());
+            edges.dedup_by_key(|e| e.from.node());
         };
 
-        self.inner_edges(
+        let mut edges = self.inner_edges(
             |segment| segment.ingoing_edges_with_label(node, &limit),
             dedup,
-        )
+        );
+        edges.sort_by(|a, b| a.from.sort_key().cmp(&b.from.sort_key()));
+
+        limit
+            .apply(edges.into_iter())
+            .map(|e| Edge {
+                from: e.from.node(),
+                to: e.to.node(),
+                label: e.label,
+            })
+            .collect()
     }
 
     pub fn raw_outgoing_edges_with_labels(
@@ -237,50 +272,74 @@ impl Webgraph {
         node: &NodeID,
         limit: EdgeLimit,
     ) -> Vec<Edge<String>> {
-        let dedup = |edges: &mut Vec<Edge<String>>| {
-            edges.sort_by_key(|e| e.from);
-            edges.dedup_by_key(|e| e.from);
+        let dedup = |edges: &mut Vec<SegmentEdge<String>>| {
+            edges.sort_by_key(|e| e.to.node());
+            edges.dedup_by_key(|e| e.to.node());
         };
 
-        self.inner_edges(
+        let mut edges = self.inner_edges(
             |segment| segment.outgoing_edges_with_label(node, &limit),
             dedup,
-        )
+        );
+
+        edges.sort_by(|a, b| a.to.sort_key().cmp(&b.to.sort_key()));
+
+        limit
+            .apply(edges.into_iter())
+            .map(|e| Edge {
+                from: e.from.node(),
+                to: e.to.node(),
+                label: e.label,
+            })
+            .collect()
     }
 
     pub fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<FullEdge> {
-        let dedup = |edges: &mut Vec<Edge<String>>| {
-            edges.sort_by_key(|e| e.to);
-            edges.dedup_by_key(|e| e.to);
+        let dedup = |edges: &mut Vec<SegmentEdge<String>>| {
+            edges.sort_by_key(|e| e.to.node());
+            edges.dedup_by_key(|e| e.to.node());
         };
 
-        self.inner_edges(
+        let mut edges = self.inner_edges(
             |segment| segment.outgoing_edges_with_label(&node.id(), &limit),
             dedup,
-        )
-        .into_iter()
-        .map(|e| FullEdge {
-            from: self.id2node(&e.from).unwrap(),
-            to: self.id2node(&e.to).unwrap(),
-            label: e.label,
-        })
-        .collect()
+        );
+        edges.sort_by(|a, b| a.to.sort_key().cmp(&b.to.sort_key()));
+
+        limit
+            .apply(edges.into_iter())
+            .map(|e| FullEdge {
+                from: self.id2node(&e.from.node()).unwrap(),
+                to: self.id2node(&e.to.node()).unwrap(),
+                label: e.label,
+            })
+            .collect()
     }
 
     pub fn raw_outgoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<Edge<()>> {
-        let dedup = |edges: &mut Vec<Edge<()>>| {
-            edges.sort_by_key(|e| e.to);
-            edges.dedup_by_key(|e| e.to);
+        let dedup = |edges: &mut Vec<SegmentEdge<()>>| {
+            edges.sort_by_key(|e| e.to.node());
+            edges.dedup_by_key(|e| e.to.node());
         };
 
-        self.inner_edges(|segment| segment.outgoing_edges(node, &limit), dedup)
+        let mut edges = self.inner_edges(|segment| segment.outgoing_edges(node, &limit), dedup);
+        edges.sort_by(|a, b| a.to.sort_key().cmp(&b.to.sort_key()));
+
+        limit
+            .apply(edges.into_iter())
+            .map(|e| Edge {
+                from: e.from.node(),
+                to: e.to.node(),
+                label: e.label,
+            })
+            .collect()
     }
 
-    fn inner_edges<F1, F2, L>(&self, loader: F1, dedup: F2) -> Vec<Edge<L>>
+    fn inner_edges<F1, F2, L>(&self, loader: F1, dedup: F2) -> Vec<SegmentEdge<L>>
     where
         L: EdgeLabel,
-        F1: Sized + Sync + Fn(&Segment) -> Vec<Edge<L>>,
-        F2: Fn(&mut Vec<Edge<L>>),
+        F1: Sized + Sync + Fn(&Segment) -> Vec<SegmentEdge<L>>,
+        F2: Fn(&mut Vec<SegmentEdge<L>>),
     {
         let mut edges: Vec<_> = self
             .executor
@@ -330,13 +389,15 @@ impl Webgraph {
     /// Some edges may be returned multiple times.
     /// This happens if they are present in more than one segment.
     pub fn edges(&self) -> impl Iterator<Item = Edge<()>> + '_ {
-        self.segments.iter().flat_map(|segment| segment.edges())
+        self.segments
+            .iter()
+            .flat_map(|segment| segment.edges().map(|e| e.into()))
     }
 
     pub fn par_edges(&self) -> impl ParallelIterator<Item = Edge<()>> + '_ {
         self.segments
             .par_iter()
-            .flat_map(|segment| segment.edges().par_bridge())
+            .flat_map(|segment| segment.edges().par_bridge().map(|e| e.into()))
     }
 }
 
@@ -530,6 +591,57 @@ pub mod tests {
     #[test]
     fn test_edge_limits() {
         let graph = test_graph();
+
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("A"), EdgeLimit::Unlimited)
+                .len(),
+            2
+        );
+
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("A"), EdgeLimit::Limit(1))
+                .len(),
+            1
+        );
+
+        let mut graphs = Vec::new();
+        for (from, to, label) in &[
+            (Node::from("A"), Node::from("B"), String::new()),
+            (Node::from("A"), Node::from("C"), String::new()),
+        ] {
+            let mut wrt = WebgraphWriter::new(
+                crate::gen_temp_path(),
+                Executor::single_thread(),
+                Compression::default(),
+                None,
+            );
+            wrt.insert(from.clone(), to.clone(), label.clone());
+            graphs.push(wrt.finalize());
+        }
+
+        let mut graph = graphs.pop().unwrap();
+
+        for other in graphs {
+            graph.merge(other).unwrap();
+        }
+
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("A"), EdgeLimit::Unlimited)
+                .len(),
+            2
+        );
+
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("A"), EdgeLimit::Limit(1))
+                .len(),
+            1
+        );
+
+        graph.optimize_read();
 
         assert_eq!(
             graph

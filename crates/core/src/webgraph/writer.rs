@@ -19,8 +19,8 @@ use std::{fs, path::Path, sync::Arc};
 use crate::executor::Executor;
 
 use super::{
-    id_node_db::Id2NodeDb, segment::SegmentWriter, Compression, FullNodeID, InnerEdge, Meta, Node,
-    NodeID, Webgraph, MAX_LABEL_LENGTH,
+    id_node_db::Id2NodeDb, segment::SegmentWriter, Compression, FullNodeID, InsertableEdge, Meta,
+    Node, NodeID, Webgraph, MAX_LABEL_LENGTH,
 };
 
 pub struct WebgraphWriter {
@@ -95,7 +95,7 @@ impl WebgraphWriter {
             self.id_or_assign(to.clone()),
         );
 
-        let edge = InnerEdge {
+        let edge = InsertableEdge {
             from: from_id,
             to: to_id,
             label: label.chars().take(MAX_LABEL_LENGTH).collect(),

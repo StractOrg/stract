@@ -26,21 +26,24 @@ use std::{
 
 use itertools::Itertools;
 
-use crate::{webgraph::store::NUM_LABELS_PER_BLOCK, Result};
+use crate::{
+    webgraph::store::{NodeDatum, NodeRange, NUM_LABELS_PER_BLOCK},
+    Result,
+};
 use file_store::iterable::{
     ConstIterableStoreWriter, IterableStoreReader, IterableStoreWriter, SortedIterableStoreReader,
 };
 
 use super::{
     store::{CompressedLabelBlock, EdgeStore, HostDb, LabelBlock, RangesDb},
-    Compression, EdgeLabel, InnerEdge, NodeID,
+    Compression, EdgeLabel, InsertableEdge, NodeID,
 };
 
 #[derive(bincode::Encode, bincode::Decode)]
 struct SortableEdge<L: EdgeLabel> {
     sort_node: NodeID,
     secondary_node: NodeID,
-    edge: InnerEdge<L>,
+    edge: InsertableEdge<L>,
 }
 
 impl<L: EdgeLabel> PartialOrd for SortableEdge<L> {
@@ -151,7 +154,7 @@ impl EdgeStoreWriter {
         Ok(())
     }
 
-    pub fn put(&mut self, edge: InnerEdge<String>) {
+    pub fn put(&mut self, edge: InsertableEdge<String>) {
         let (sort_node, secondary_node) = if self.reversed {
             (edge.to.id, edge.from.id)
         } else {
@@ -213,7 +216,7 @@ struct FinalEdgeStoreWriter {
     hosts: HostDb,
 
     edge_labels: IterableStoreWriter<CompressedLabelBlock, File>,
-    edge_nodes: ConstIterableStoreWriter<NodeID, File>,
+    edge_nodes: ConstIterableStoreWriter<NodeDatum, File>,
 
     host_centrality_rank_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
 
@@ -265,7 +268,7 @@ impl FinalEdgeStoreWriter {
     /// The edges *must* have been de-duplicated by their from/to node.
     /// I.e. if the store is not reversed, there should only ever be a single
     /// put for each from node, and vice versa.
-    fn put_store(&mut self, edges: &mut [InnerEdge<String>]) {
+    fn put_store(&mut self, edges: &mut [InsertableEdge<String>]) {
         if edges.is_empty() {
             return;
         }
@@ -294,15 +297,25 @@ impl FinalEdgeStoreWriter {
         debug_assert!(self.ranges.labels_get_raw(&node_bytes).is_none());
 
         let mut edge_labels = Vec::new();
-        let mut edge_nodes = Vec::new();
+        let mut edge_nodes: Vec<NodeDatum> = Vec::new();
 
         for edge in edges {
             edge_labels.push(edge.label.clone());
-            edge_nodes.push(if self.reversed {
-                edge.from.id
+
+            let (node, host) = if self.reversed {
+                (edge.from.id, edge.from.host)
             } else {
-                edge.to.id
-            });
+                (edge.to.id, edge.to.host)
+            };
+
+            let sort_key = self
+                .host_centrality_rank_store
+                .as_ref()
+                .map(|store| store.get(&host).unwrap().unwrap_or(u64::MAX))
+                .unwrap_or(0);
+
+            let datum = NodeDatum::new(node, sort_key);
+            edge_nodes.push(datum);
         }
 
         let edge_labels: Vec<_> = edge_labels
@@ -342,10 +355,19 @@ impl FinalEdgeStoreWriter {
             end: last_label_offset.unwrap().start + last_label_offset.unwrap().num_bytes,
         };
 
-        let node_range = Range {
-            start: first_node_offset.unwrap().start,
-            end: last_node_offset.unwrap().start + last_node_offset.unwrap().num_bytes,
-        };
+        let sort_key = self
+            .host_centrality_rank_store
+            .as_ref()
+            .map(|store| store.get(&node.host).unwrap().unwrap_or(u64::MAX))
+            .unwrap_or(0);
+
+        let node_range: NodeRange = NodeRange::new(
+            Range {
+                start: first_node_offset.unwrap().start,
+                end: last_node_offset.unwrap().start + last_node_offset.unwrap().num_bytes,
+            },
+            sort_key,
+        );
 
         self.ranges.insert_raw_node(
             node_bytes.to_vec(),
@@ -362,7 +384,10 @@ impl FinalEdgeStoreWriter {
     ///
     /// **IMPORTANT** The edges must be sorted by
     /// either the from or to node, depending on the value of `reversed`.
-    pub fn build_store(&mut self, edges: impl Iterator<Item = InnerEdge<String>>) -> EdgeStore {
+    pub fn build_store(
+        &mut self,
+        edges: impl Iterator<Item = InsertableEdge<String>>,
+    ) -> EdgeStore {
         let mut inserts_since_last_flush = 0;
 
         // create batches of consecutive edges with the same from/to node
@@ -374,7 +399,7 @@ impl FinalEdgeStoreWriter {
                     || (!self.reversed && edge.from.id != last_node)
                 {
                     batch.sort_unstable_by_key(
-                        |e: &InnerEdge<_>| if self.reversed { e.from.id } else { e.to.id },
+                        |e: &InsertableEdge<_>| if self.reversed { e.from.id } else { e.to.id },
                     );
                     batch.dedup_by_key(|e| if self.reversed { e.from.id } else { e.to.id });
                     let batch_len = batch.len();
@@ -399,7 +424,7 @@ impl FinalEdgeStoreWriter {
 
         if !batch.is_empty() {
             batch.sort_unstable_by_key(
-                |e: &InnerEdge<_>| if self.reversed { e.from.id } else { e.to.id },
+                |e: &InsertableEdge<_>| if self.reversed { e.from.id } else { e.to.id },
             );
             batch.dedup_by_key(|e| if self.reversed { e.from.id } else { e.to.id });
             self.put_store(&mut batch);
