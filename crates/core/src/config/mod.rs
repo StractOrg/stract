@@ -74,6 +74,9 @@ pub struct WebgraphConstructConfig {
     pub batch_size: Option<usize>,
     pub canonical_index_path: Option<String>,
     pub host_centrality_rank_store_path: Option<String>,
+
+    #[serde(default = "defaults::Webgraph::merge_all_segments")]
+    pub merge_all_segments: bool,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]

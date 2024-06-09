@@ -22,11 +22,13 @@ use std::{fs, io};
 use itertools::Itertools;
 use rand::seq::{IteratorRandom, SliceRandom};
 use rayon::prelude::*;
+use uuid::Uuid;
 
 use self::id_node_db::Id2NodeDb;
 use self::segment::Segment;
 use crate::executor::Executor;
 
+use crate::Result;
 pub use builder::WebgraphBuilder;
 pub use compression::Compression;
 pub use edge::*;
@@ -39,6 +41,7 @@ pub mod centrality;
 mod compression;
 mod edge;
 mod id_node_db;
+mod merge;
 mod node;
 pub mod remote;
 mod segment;
@@ -168,6 +171,23 @@ impl Webgraph {
         }
 
         fs::remove_dir_all(other_folder)?;
+
+        self.save_metadata();
+
+        Ok(())
+    }
+
+    pub fn merge_all_segments(&mut self, compression: Compression) -> Result<()> {
+        let segments = std::mem::take(&mut self.segments);
+
+        let id = Uuid::new_v4().to_string();
+        let path = Path::new(&self.path).join("segments");
+
+        Segment::merge(segments, compression, &path, id.clone())?;
+        let new_segment = Segment::open(path, id.clone());
+
+        self.segments.push(new_segment);
+        self.meta.comitted_segments = vec![id];
 
         self.save_metadata();
 
@@ -538,6 +558,13 @@ pub mod tests {
         for other in graphs {
             graph.merge(other).unwrap();
         }
+
+        assert_eq!(
+            graph.distances(Node::from("A")).get(&Node::from("C")),
+            Some(&2)
+        );
+
+        graph.merge_all_segments(Compression::default()).unwrap();
 
         assert_eq!(
             graph.distances(Node::from("A")).get(&Node::from("C")),

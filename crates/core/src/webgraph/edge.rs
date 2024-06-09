@@ -16,7 +16,7 @@
 
 use utoipa::ToSchema;
 
-use super::{store::NodeDatum, FullNodeID, Node, NodeID};
+use super::{merge::NodeDatum, FullNodeID, Node, NodeID};
 
 pub const MAX_LABEL_LENGTH: usize = 1024;
 
@@ -106,8 +106,8 @@ pub struct SegmentEdge<L>
 where
     L: EdgeLabel,
 {
-    pub from: NodeDatum,
-    pub to: NodeDatum,
+    pub from: NodeDatum<()>,
+    pub to: NodeDatum<()>,
     pub label: L,
 }
 

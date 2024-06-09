@@ -342,11 +342,7 @@ where
     I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
 {
     fn eq(&self, other: &Self) -> bool {
-        match (self.iter.peek(), other.iter.peek()) {
-            (Some((a, _)), Some((b, _))) => a == b && self.segment_ord == other.segment_ord,
-            (None, None) => true,
-            _ => false,
-        }
+        self.iter == other.iter && self.segment_ord == other.segment_ord
     }
 }
 

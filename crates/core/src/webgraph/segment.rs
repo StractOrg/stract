@@ -17,12 +17,14 @@
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
+    thread,
 };
 
 use super::{
     store::EdgeStore, store_writer::EdgeStoreWriter, Compression, EdgeLimit, InsertableEdge,
     NodeID, SegmentEdge,
 };
+use crate::Result;
 
 const ADJACENCY_STORE: &str = "adjacency";
 const REVERSED_ADJACENCY_STORE: &str = "reversed_adjacency";
@@ -108,6 +110,44 @@ impl Segment {
                 .to_string(),
             id,
         }
+    }
+
+    pub fn merge<P: AsRef<Path>>(
+        segments: Vec<Self>,
+        label_compression: Compression,
+        folder: P,
+        id: String,
+    ) -> Result<()> {
+        let old_paths = segments.iter().map(|s| s.path()).collect::<Vec<_>>();
+
+        let (adjacency, reversed_adjacency) = segments
+            .into_iter()
+            .map(|s| (s.adjacency, s.reversed_adjacency))
+            .unzip();
+
+        let adjacency_path = folder.as_ref().join(&id).join(ADJACENCY_STORE);
+        let adjacency =
+            thread::spawn(move || EdgeStore::merge(adjacency, label_compression, adjacency_path));
+
+        let reversed_adjacency_path = folder.as_ref().join(&id).join(REVERSED_ADJACENCY_STORE);
+        let reversed_adjacency = thread::spawn(move || {
+            EdgeStore::merge(
+                reversed_adjacency,
+                label_compression,
+                reversed_adjacency_path,
+            )
+        });
+
+        adjacency.join().unwrap()?;
+        reversed_adjacency.join().unwrap()?;
+
+        for path in old_paths {
+            if Path::new(&path).exists() {
+                std::fs::remove_dir_all(path)?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn outgoing_edges_with_label(

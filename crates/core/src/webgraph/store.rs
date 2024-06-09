@@ -14,16 +14,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{ops::Range, path::Path};
+use std::{fs::File, ops::Range, path::Path};
 
+use crate::{
+    webgraph::merge::{MergeIter, NodeDatumMerger},
+    Result,
+};
+use anyhow::bail;
 use file_store::{
-    iterable::{ConstIterableStoreReader, IterableStoreReader},
+    iterable::{
+        ConstIterableStoreReader, ConstIterableStoreWriter, IterableStoreReader,
+        IterableStoreWriter,
+    },
     ConstSerializable,
 };
 use fst::Automaton;
 use itertools::Itertools;
 
-use super::{Compression, EdgeLimit, FullNodeID, NodeID, SegmentEdge};
+use super::{
+    merge::{MergeNode, MergeSegmentOrd, NodeDatum},
+    Compression, EdgeLimit, FullNodeID, NodeID, SegmentEdge,
+};
 
 #[derive(
     Debug,
@@ -86,6 +97,10 @@ impl HostDb {
     pub fn flush(&mut self) {
         self.db.commit().unwrap();
     }
+
+    fn merge(&mut self, other: HostDb) {
+        self.db.merge(other.db).unwrap();
+    }
 }
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
@@ -123,6 +138,10 @@ impl RangesDb {
         self.labels.merge_all_segments().unwrap();
     }
 
+    fn uncommitted_node_inserts(&self) -> usize {
+        self.nodes.uncommitted_inserts()
+    }
+
     pub fn commit(&mut self) {
         self.nodes.commit().unwrap();
         self.labels.commit().unwrap();
@@ -149,29 +168,26 @@ impl RangesDb {
     pub fn insert_raw_label(&mut self, node: Vec<u8>, range: Vec<u8>) {
         self.labels.insert_raw(node, range);
     }
-}
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct NodeDatum {
-    id: NodeID,
-    sort_key: u64,
-}
+    fn merge_nodes(&self) -> impl Iterator<Item = MergeNode> + '_ {
+        self.nodes.iter_raw().zip_eq(self.labels.iter_raw()).map(
+            move |((key_node, val), (key_label, labels))| {
+                debug_assert_eq!(key_node, key_label);
 
-impl NodeDatum {
-    pub fn new(node: NodeID, sort_key: u64) -> Self {
-        Self { id: node, sort_key }
-    }
+                let node = NodeID::deserialize(key_node.as_bytes());
+                let range = NodeRange::deserialize(val.as_bytes());
 
-    #[inline]
-    pub fn node(&self) -> NodeID {
-        self.id
-    }
+                let labels = {
+                    let range = Range::deserialize(labels.as_bytes());
+                    range.start..range.end
+                };
 
-    #[inline]
-    pub fn sort_key(&self) -> u64 {
-        self.sort_key
+                MergeNode::new(node, range, labels)
+            },
+        )
     }
 }
+
 impl ConstSerializable for NodeID {
     const BYTES: usize = std::mem::size_of::<NodeID>();
 
@@ -189,15 +205,33 @@ impl ConstSerializable for NodeDatum {
     const BYTES: usize = std::mem::size_of::<NodeDatum>();
 
     fn serialize(&self, buf: &mut [u8]) {
-        self.id.serialize(&mut buf[..NodeID::BYTES]);
-        self.sort_key.serialize(&mut buf[NodeID::BYTES..]);
+        self.node().serialize(&mut buf[..NodeID::BYTES]);
+        self.sort_key().serialize(&mut buf[NodeID::BYTES..]);
     }
 
     fn deserialize(buf: &[u8]) -> Self {
         let node = NodeID::deserialize(&buf[..NodeID::BYTES]);
         let sort_key = u64::deserialize(&buf[NodeID::BYTES..]);
 
-        Self { id: node, sort_key }
+        Self::new(node, sort_key)
+    }
+}
+
+impl ConstSerializable for NodeRange {
+    const BYTES: usize = std::mem::size_of::<NodeRange>();
+
+    fn serialize(&self, buf: &mut [u8]) {
+        const RANGE_BYTES: usize = std::mem::size_of::<u64>() * 2;
+        self.range.serialize(&mut buf[..RANGE_BYTES]);
+        self.sort_key.serialize(&mut buf[RANGE_BYTES..]);
+    }
+
+    fn deserialize(buf: &[u8]) -> Self {
+        const RANGE_BYTES: usize = std::mem::size_of::<u64>() * 2;
+        let range: Range<u64> = Range::deserialize(&buf[..RANGE_BYTES]);
+        let sort_key = u64::deserialize(&buf[RANGE_BYTES..]);
+
+        Self { range, sort_key }
     }
 }
 
@@ -269,6 +303,175 @@ impl EdgeStore {
         self.hosts.optimize_read();
     }
 
+    fn merge_postings_for_node<'a>(
+        buf: &[MergeNode<MergeSegmentOrd>],
+        stores: &'a [EdgeStore],
+    ) -> NodeDatumMerger<'a> {
+        let mut edges = Vec::new();
+
+        for node in buf {
+            let store = &stores[node.ord().as_usize()];
+            let edge_nodes = store
+                .edge_nodes
+                .slice(usize_range(node.range().range.clone()));
+            let edge_labels = store
+                .edge_labels
+                .slice(usize_range(node.labels()))
+                .map(|r| r.unwrap().decompress())
+                .flat_map(|block| block.labels.into_iter());
+
+            edges.push(
+                edge_nodes
+                    .zip_eq(edge_labels)
+                    .map(|(node, label)| node.with_label(label)),
+            );
+        }
+
+        NodeDatumMerger::new(edges)
+    }
+
+    fn merge_postings<P: AsRef<Path>>(
+        stores: &[EdgeStore],
+        label_compression: Compression,
+        path: P,
+    ) -> Result<Self> {
+        let reversed = stores[0].reversed;
+        let mut ranges = RangesDb::open(path.as_ref().join("ranges"));
+
+        let edge_labels_file = File::options()
+            .read(true)
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(path.as_ref().join("labels"))
+            .unwrap();
+        let mut edge_labels = IterableStoreWriter::new(edge_labels_file);
+
+        let edge_nodes_file = File::options()
+            .read(true)
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(path.as_ref().join("nodes"))
+            .unwrap();
+        let mut edge_nodes = ConstIterableStoreWriter::new(edge_nodes_file);
+
+        let mut merge_iter = MergeIter::new(
+            stores
+                .iter()
+                .map(|store| store.ranges.merge_nodes())
+                .collect(),
+        );
+
+        let mut buf = Vec::new();
+
+        while merge_iter.advance(&mut buf) {
+            if buf.is_empty() {
+                continue;
+            }
+
+            let edges = Self::merge_postings_for_node(&buf, stores);
+
+            // write postings
+            let node_sort_key = buf[0].range().sort_key;
+            let node_id = buf[0].id();
+            let mut first_label_offset = None;
+            let mut last_label_offset = None;
+            let mut first_node_offset = None;
+            let mut last_node_offset = None;
+
+            for chunk in edges.chunks(NUM_LABELS_PER_BLOCK).into_iter() {
+                let (labels, nodes): (Vec<_>, Vec<_>) = chunk
+                    .map(|edge| (edge.label().clone(), edge.with_label(())))
+                    .unzip();
+
+                let label_block = LabelBlock::new(labels).compress(label_compression);
+
+                let label_offset = edge_labels.write(&label_block).unwrap();
+
+                if first_label_offset.is_none() {
+                    first_label_offset = Some(label_offset);
+                }
+
+                last_label_offset = Some(label_offset);
+
+                for node in nodes {
+                    let offset = edge_nodes.write(&node).unwrap();
+
+                    if first_node_offset.is_none() {
+                        first_node_offset = Some(offset);
+                    }
+
+                    last_node_offset = Some(offset);
+                }
+            }
+
+            let label_range = Range {
+                start: first_label_offset.unwrap().start,
+                end: last_label_offset.unwrap().start + last_label_offset.unwrap().num_bytes,
+            };
+
+            let node_range: NodeRange = NodeRange::new(
+                Range {
+                    start: first_node_offset.unwrap().start,
+                    end: last_node_offset.unwrap().start + last_node_offset.unwrap().num_bytes,
+                },
+                node_sort_key,
+            );
+            let node_range_bytes = node_range.serialize_to_vec();
+
+            let node_bytes = node_id.serialize_to_vec();
+            ranges.insert_raw_node(node_bytes.clone(), node_range_bytes);
+
+            let label_range_bytes = label_range.serialize_to_vec();
+
+            ranges.insert_raw_label(node_bytes, label_range_bytes);
+
+            if ranges.uncommitted_node_inserts() > 100_000_000 {
+                ranges.commit();
+                edge_nodes.flush().unwrap();
+                edge_labels.flush().unwrap();
+            }
+        }
+
+        if ranges.uncommitted_node_inserts() > 0 {
+            ranges.commit();
+            edge_nodes.flush().unwrap();
+            edge_labels.flush().unwrap();
+        }
+
+        Ok(Self::open(path, reversed))
+    }
+
+    pub fn merge<P: AsRef<Path>>(
+        stores: Vec<EdgeStore>,
+        label_compression: Compression,
+        path: P,
+    ) -> Result<()> {
+        if stores.is_empty() {
+            return Ok(());
+        }
+
+        if !path.as_ref().exists() {
+            std::fs::create_dir_all(&path)?;
+        }
+
+        let reversed = stores[0].reversed;
+        if !stores.iter().all(|store| store.reversed == reversed) {
+            bail!("Cannot merge stores with different reversed flags");
+        }
+
+        let mut res = Self::merge_postings(&stores, label_compression, path)?;
+
+        for store in stores {
+            res.hosts.merge(store.hosts);
+        }
+
+        res.optimize_read();
+
+        Ok(())
+    }
+
     pub fn get_with_label(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<SegmentEdge<String>> {
         let node_bytes = node.as_u64().to_le_bytes();
 
@@ -277,16 +480,8 @@ impl EdgeStore {
             self.ranges.labels.get_raw(&node_bytes),
         ) {
             (Some(node_range_bytes), Some(edge_range_bytes)) => {
-                let (node_range, _) = bincode::decode_from_slice::<NodeRange, _>(
-                    node_range_bytes.as_bytes(),
-                    bincode::config::standard(),
-                )
-                .unwrap();
-                let (edge_range, _) = bincode::decode_from_slice::<Range<u64>, _>(
-                    edge_range_bytes.as_bytes(),
-                    bincode::config::standard(),
-                )
-                .unwrap();
+                let node_range = NodeRange::deserialize(node_range_bytes.as_bytes());
+                let edge_range: Range<u64> = Range::deserialize(edge_range_bytes.as_bytes());
 
                 let edge_labels = self
                     .edge_labels
@@ -327,11 +522,7 @@ impl EdgeStore {
 
         match self.ranges.nodes.get_raw(&node_bytes) {
             Some(node_range_bytes) => {
-                let (node_range, _) = bincode::decode_from_slice::<NodeRange, _>(
-                    node_range_bytes.as_bytes(),
-                    bincode::config::standard(),
-                )
-                .unwrap();
+                let node_range = NodeRange::deserialize(node_range_bytes.as_bytes());
 
                 let edge_nodes = self.edge_nodes.slice(usize_range(node_range.range));
 
@@ -369,11 +560,7 @@ impl EdgeStore {
             let node = u64::from_le_bytes((key.as_bytes()).try_into().unwrap());
             let node = NodeID::from(node);
 
-            let (node_range, _) = bincode::decode_from_slice::<NodeRange, _>(
-                val.as_bytes(),
-                bincode::config::standard(),
-            )
-            .unwrap();
+            let node_range = NodeRange::deserialize(val.as_bytes());
 
             let edge_nodes = self
                 .edge_nodes

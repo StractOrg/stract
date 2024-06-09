@@ -261,6 +261,11 @@ impl Webgraph {
             page_graph.merge(other_page)?;
         }
 
+        if config.merge_all_segments {
+            host_graph.merge_all_segments(Default::default())?;
+            page_graph.merge_all_segments(Default::default())?;
+        }
+
         host_graph.optimize_read();
         page_graph.optimize_read();
 

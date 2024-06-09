@@ -27,14 +27,19 @@ use std::{
 use itertools::Itertools;
 
 use crate::{
-    webgraph::store::{NodeDatum, NodeRange, NUM_LABELS_PER_BLOCK},
+    webgraph::store::{NodeRange, NUM_LABELS_PER_BLOCK},
     Result,
 };
-use file_store::iterable::{
-    ConstIterableStoreWriter, IterableStoreReader, IterableStoreWriter, SortedIterableStoreReader,
+use file_store::{
+    iterable::{
+        ConstIterableStoreWriter, IterableStoreReader, IterableStoreWriter,
+        SortedIterableStoreReader,
+    },
+    ConstSerializable,
 };
 
 use super::{
+    merge::NodeDatum,
     store::{CompressedLabelBlock, EdgeStore, HostDb, LabelBlock, RangesDb},
     Compression, EdgeLabel, InsertableEdge, NodeID,
 };
@@ -291,7 +296,7 @@ impl FinalEdgeStoreWriter {
         }
 
         self.hosts.insert(&node);
-        let node_bytes = node.id.as_u64().to_le_bytes();
+        let node_bytes = node.id.serialize_to_vec();
 
         debug_assert!(self.ranges.nodes_get_raw(&node_bytes).is_none());
         debug_assert!(self.ranges.labels_get_raw(&node_bytes).is_none());
@@ -368,16 +373,14 @@ impl FinalEdgeStoreWriter {
             },
             sort_key,
         );
+        let node_range_bytes = node_range.serialize_to_vec();
 
-        self.ranges.insert_raw_node(
-            node_bytes.to_vec(),
-            bincode::encode_to_vec(node_range, bincode::config::standard()).unwrap(),
-        );
+        self.ranges
+            .insert_raw_node(node_bytes.clone(), node_range_bytes);
 
-        self.ranges.insert_raw_label(
-            node_bytes.to_vec(),
-            bincode::encode_to_vec(label_range, bincode::config::standard()).unwrap(),
-        );
+        let label_range_bytes = label_range.serialize_to_vec();
+
+        self.ranges.insert_raw_label(node_bytes, label_range_bytes);
     }
 
     /// Build a new edge store from a set of edges.

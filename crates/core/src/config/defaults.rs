@@ -200,3 +200,10 @@ impl ApproxHarmonic {
         false
     }
 }
+
+pub struct Webgraph;
+impl Webgraph {
+    pub fn merge_all_segments() -> bool {
+        true
+    }
+}

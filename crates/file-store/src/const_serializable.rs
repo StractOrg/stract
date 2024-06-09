@@ -23,11 +23,34 @@
 //     fn deserialize(bytes: [u8; Self::BYTES]) -> Self;
 // }
 
+use std::ops::Range;
+
 pub trait ConstSerializable {
     const BYTES: usize;
 
     fn serialize(&self, buf: &mut [u8]);
     fn deserialize(buf: &[u8]) -> Self;
+
+    fn serialize_to_vec(&self) -> Vec<u8> {
+        let mut buf = vec![0; Self::BYTES];
+        self.serialize(&mut buf);
+        buf
+    }
+}
+
+impl ConstSerializable for Range<u64> {
+    const BYTES: usize = std::mem::size_of::<u64>() * 2;
+
+    fn serialize(&self, buf: &mut [u8]) {
+        self.start.serialize(&mut buf[..std::mem::size_of::<u64>()]);
+        self.end.serialize(&mut buf[std::mem::size_of::<u64>()..]);
+    }
+
+    fn deserialize(buf: &[u8]) -> Self {
+        let start = u64::deserialize(&buf[..std::mem::size_of::<u64>()]);
+        let end = u64::deserialize(&buf[std::mem::size_of::<u64>()..]);
+        start..end
+    }
 }
 
 macro_rules! impl_const_serializable_num {

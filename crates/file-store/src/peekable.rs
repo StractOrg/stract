@@ -57,3 +57,54 @@ where
         peeked
     }
 }
+
+impl<I, T> Ord for Peekable<I>
+where
+    I: Iterator<Item = T>,
+    T: Ord,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self.peek(), other.peek()) {
+            (Some(a), Some(b)) => a.cmp(b),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+    }
+}
+
+impl<I, T> PartialOrd for Peekable<I>
+where
+    I: Iterator<Item = T>,
+    T: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self.peek(), other.peek()) {
+            (Some(a), Some(b)) => a.partial_cmp(b),
+            (Some(_), None) => Some(std::cmp::Ordering::Less),
+            (None, Some(_)) => Some(std::cmp::Ordering::Greater),
+            (None, None) => Some(std::cmp::Ordering::Equal),
+        }
+    }
+}
+
+impl<I, T> PartialEq for Peekable<I>
+where
+    I: Iterator<Item = T>,
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        match (self.peek(), other.peek()) {
+            (Some(a), Some(b)) => a == b,
+            (None, None) => true,
+            _ => false,
+        }
+    }
+}
+
+impl<I, T> Eq for Peekable<I>
+where
+    I: Iterator<Item = T>,
+    T: Eq,
+{
+}

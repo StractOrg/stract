@@ -90,7 +90,7 @@ impl Mapper for ApproxCentralityMapper {
     ) {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(usize::from(std::thread::available_parallelism().unwrap()))
-            .stack_size(800_000_000)
+            .stack_size(80_000_000)
             .thread_name(move |num| format!("approx-harmonic-mapper-{num}"))
             .build()
             .unwrap();
@@ -114,6 +114,8 @@ impl Mapper for ApproxCentralityMapper {
             ApproxCentralityMapper::ApproximateCentrality => {
                 let workers = Workers::new(worker.clone());
                 let num_samples = dht.next().meta.get(()).unwrap().num_samples_per_worker;
+
+                tracing::info!("Sampling {} nodes", num_samples);
 
                 let sampled = worker
                     .graph()
