@@ -17,6 +17,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use itertools::Itertools;
 use tracing::info;
 use utoipa::ToSchema;
 
@@ -56,11 +57,12 @@ sonic_service!(
         RawIngoingEdges,
         RawOutgoingEdges,
         RawIngoingEdgesWithLabels,
-        RawOutgoingEdgesWithLabels
+        RawOutgoingEdgesWithLabels,
+        PagesByHosts
     ]
 );
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct GetNode {
     pub node: NodeID,
 }
@@ -73,7 +75,7 @@ impl Message<WebGraphService> for GetNode {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct IngoingEdges {
     pub node: Node,
     pub limit: EdgeLimit,
@@ -87,7 +89,7 @@ impl Message<WebGraphService> for IngoingEdges {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct OutgoingEdges {
     pub node: Node,
     pub limit: EdgeLimit,
@@ -101,7 +103,7 @@ impl Message<WebGraphService> for OutgoingEdges {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct RawIngoingEdges {
     pub node: NodeID,
     pub limit: EdgeLimit,
@@ -115,7 +117,7 @@ impl Message<WebGraphService> for RawIngoingEdges {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct RawOutgoingEdges {
     pub node: NodeID,
     pub limit: EdgeLimit,
@@ -129,7 +131,7 @@ impl Message<WebGraphService> for RawOutgoingEdges {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct RawIngoingEdgesWithLabels {
     pub node: NodeID,
     pub limit: EdgeLimit,
@@ -145,7 +147,7 @@ impl Message<WebGraphService> for RawIngoingEdgesWithLabels {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct RawOutgoingEdgesWithLabels {
     pub node: NodeID,
     pub limit: EdgeLimit,
@@ -158,6 +160,23 @@ impl Message<WebGraphService> for RawOutgoingEdgesWithLabels {
         server
             .graph
             .raw_outgoing_edges_with_labels(&self.node, self.limit)
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct PagesByHosts {
+    pub hosts: Vec<NodeID>,
+}
+
+impl Message<WebGraphService> for PagesByHosts {
+    type Response = Vec<NodeID>;
+
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        self.hosts
+            .iter()
+            .flat_map(|host| server.graph.pages_by_host(host))
+            .unique()
+            .collect()
     }
 }
 

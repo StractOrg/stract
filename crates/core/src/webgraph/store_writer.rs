@@ -183,7 +183,7 @@ impl EdgeStoreWriter {
             .iter()
             .map(|p| IterableStoreReader::open(p).unwrap())
             .collect();
-        let file_reader = SortedIterableStoreReader::new(readers).map(|r| r.unwrap());
+        let file_reader = SortedIterableStoreReader::new(readers);
 
         let edges = std::mem::take(&mut self.edges);
 
@@ -212,7 +212,9 @@ impl EdgeStoreWriter {
 
 impl Drop for EdgeStoreWriter {
     fn drop(&mut self) {
-        std::fs::remove_dir_all(self.path.join("writer")).unwrap();
+        if self.path.join("writer").exists() {
+            std::fs::remove_dir_all(self.path.join("writer")).unwrap();
+        }
     }
 }
 

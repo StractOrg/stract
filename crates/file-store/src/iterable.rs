@@ -27,6 +27,7 @@
 
 use crate::{owned_bytes::OwnedBytes, ConstSerializable, Result};
 use std::{
+    cmp::Reverse,
     io::{self, Write},
     ops::Range,
     path::Path,
@@ -167,7 +168,7 @@ impl<T> Iterator for IterableStoreReader<T>
 where
     T: bincode::Decode,
 {
-    type Item = Result<T>;
+    type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.offset + IterableHeader::serialized_size() > self.data.len() {
@@ -185,13 +186,10 @@ where
         let serialized = &self.data[self.offset..self.offset + header.num_upcoming_bytes as usize];
 
         self.offset += header.num_upcoming_bytes as usize;
+        let (item, _) =
+            bincode::decode_from_slice(serialized, bincode::config::standard()).unwrap();
 
-        Some(
-            match bincode::decode_from_slice(serialized, bincode::config::standard()) {
-                Ok((item, _)) => Ok(item),
-                Err(err) => Err(err.into()),
-            },
-        )
+        Some(item)
     }
 }
 
@@ -213,11 +211,13 @@ impl<T> io::Seek for IterableStoreReader<T> {
     }
 }
 
+type MinHeap<T> = std::collections::BinaryHeap<Reverse<T>>;
+
 pub struct SortedIterableStoreReader<T>
 where
     T: bincode::Decode,
 {
-    readers: Vec<Peekable<IterableStoreReader<T>>>,
+    readers: MinHeap<Peekable<IterableStoreReader<T>>>,
 }
 
 impl<T> SortedIterableStoreReader<T>
@@ -225,7 +225,11 @@ where
     T: Ord + bincode::Decode,
 {
     pub fn new(readers: Vec<IterableStoreReader<T>>) -> Self {
-        let readers = readers.into_iter().map(Peekable::new).collect::<Vec<_>>();
+        let readers = readers
+            .into_iter()
+            .map(Peekable::new)
+            .map(Reverse)
+            .collect();
 
         Self { readers }
     }
@@ -235,41 +239,10 @@ impl<T> Iterator for SortedIterableStoreReader<T>
 where
     T: Ord + bincode::Decode,
 {
-    type Item = Result<T>;
+    type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut min_index = None;
-
-        let num_readers = self.readers.len();
-        for i in 0..num_readers {
-            let reader = &self.readers[i];
-            if let Some(item) = reader.peek() {
-                match item {
-                    Ok(item) => match min_index {
-                        Some(cur_min) => {
-                            let cur_min_reader: &Peekable<IterableStoreReader<T>> =
-                                &self.readers[cur_min];
-
-                            match cur_min_reader.peek().unwrap().as_ref() {
-                                Ok(cur_min_item) => {
-                                    if item < cur_min_item {
-                                        min_index = Some(i);
-                                    }
-                                }
-                                Err(err) => return Some(Err(anyhow::anyhow!("{err}"))),
-                            }
-                        }
-                        None => min_index = Some(i),
-                    },
-                    Err(err) => return Some(Err(anyhow::anyhow!("{err}"))),
-                }
-            }
-        }
-
-        match min_index {
-            Some(min_index) => Some(self.readers[min_index].next().unwrap()),
-            None => None,
-        }
+        self.readers.peek_mut().and_then(|mut item| item.0.next())
     }
 }
 
@@ -412,7 +385,7 @@ mod tests {
 
         let reader = IterableStoreReader::from_bytes(writer);
 
-        let items: Vec<i32> = reader.map(|item| item.unwrap()).collect();
+        let items: Vec<i32> = reader.collect();
         assert_eq!(items, vec![1, 2, 3]);
     }
 
@@ -436,7 +409,7 @@ mod tests {
 
         let reader = SortedIterableStoreReader::new(vec![reader1, reader2]);
 
-        let items: Vec<i32> = reader.map(|item| item.unwrap()).collect();
+        let items: Vec<i32> = reader.collect();
         assert_eq!(items, vec![1, 2, 3, 4, 5, 6]);
     }
 

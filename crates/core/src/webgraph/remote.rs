@@ -33,8 +33,8 @@ use crate::{
         },
     },
     entrypoint::webgraph_server::{
-        GetNode, IngoingEdges, OutgoingEdges, RawIngoingEdges, RawIngoingEdgesWithLabels,
-        RawOutgoingEdges, RawOutgoingEdgesWithLabels, WebGraphService,
+        GetNode, IngoingEdges, OutgoingEdges, PagesByHosts, RawIngoingEdges,
+        RawIngoingEdgesWithLabels, RawOutgoingEdges, RawOutgoingEdgesWithLabels, WebGraphService,
     },
     Result,
 };
@@ -393,5 +393,28 @@ impl RemoteWebgraph {
         }
 
         Ok(edges)
+    }
+
+    pub async fn pages_by_hosts(&self, hosts: &[NodeID]) -> Result<Vec<NodeID>> {
+        let res = self
+            .conn()
+            .await
+            .send(
+                PagesByHosts {
+                    hosts: hosts.to_vec(),
+                },
+                &AllShardsSelector,
+                &RandomReplicaSelector,
+            )
+            .await?;
+
+        Ok(res
+            .into_iter()
+            .flat_map(|(_, reps)| {
+                debug_assert!(reps.len() <= 1);
+                reps.into_iter().flat_map(|(_, rep)| rep)
+            })
+            .unique()
+            .collect())
     }
 }

@@ -317,7 +317,7 @@ impl EdgeStore {
             let edge_labels = store
                 .edge_labels
                 .slice(usize_range(node.labels()))
-                .map(|r| r.unwrap().decompress())
+                .map(|r| r.decompress())
                 .flat_map(|block| block.labels.into_iter());
 
             edges.push(
@@ -333,17 +333,17 @@ impl EdgeStore {
     fn merge_postings<P: AsRef<Path>>(
         stores: &[EdgeStore],
         label_compression: Compression,
-        path: P,
+        folder: P,
     ) -> Result<Self> {
         let reversed = stores[0].reversed;
-        let mut ranges = RangesDb::open(path.as_ref().join("ranges"));
+        let mut ranges = RangesDb::open(folder.as_ref().join("ranges"));
 
         let edge_labels_file = File::options()
             .read(true)
             .create(true)
             .truncate(false)
             .write(true)
-            .open(path.as_ref().join("labels"))
+            .open(folder.as_ref().join("labels"))
             .unwrap();
         let mut edge_labels = IterableStoreWriter::new(edge_labels_file);
 
@@ -352,7 +352,7 @@ impl EdgeStore {
             .create(true)
             .truncate(false)
             .write(true)
-            .open(path.as_ref().join("nodes"))
+            .open(folder.as_ref().join("nodes"))
             .unwrap();
         let mut edge_nodes = ConstIterableStoreWriter::new(edge_nodes_file);
 
@@ -440,7 +440,7 @@ impl EdgeStore {
             edge_labels.flush().unwrap();
         }
 
-        Ok(Self::open(path, reversed))
+        Ok(Self::open(folder, reversed))
     }
 
     pub fn merge<P: AsRef<Path>>(
@@ -486,7 +486,7 @@ impl EdgeStore {
                 let edge_labels = self
                     .edge_labels
                     .slice(usize_range(edge_range))
-                    .map(|r| r.unwrap().decompress())
+                    .map(|r| r.decompress())
                     .flat_map(|block| block.labels.into_iter());
 
                 let edge_labels = limit.apply(edge_labels);
