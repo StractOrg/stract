@@ -118,6 +118,16 @@ impl Segment {
         folder: P,
         id: String,
     ) -> Result<()> {
+        if segments.is_empty() {
+            return Ok(());
+        }
+
+        if segments.len() == 1 {
+            let segment = &segments[0];
+            std::fs::rename(segment.path(), folder.as_ref().join(&id))?;
+            return Ok(());
+        }
+
         let old_paths = segments.iter().map(|s| s.path()).collect::<Vec<_>>();
 
         let (adjacency, reversed_adjacency) = segments

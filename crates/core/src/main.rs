@@ -343,6 +343,7 @@ fn main() -> Result<()> {
                 }
 
                 if merge_all_segments {
+                    webgraph.optimize_read(); // save space in id2node db
                     webgraph.merge_all_segments(Default::default())?;
                 }
 

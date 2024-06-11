@@ -267,6 +267,8 @@ impl Webgraph {
         }
 
         if config.merge_all_segments {
+            host_graph.optimize_read(); // save space in id2node db
+            page_graph.optimize_read(); // save space in id2node db
             host_graph.merge_all_segments(Default::default())?;
             page_graph.merge_all_segments(Default::default())?;
         }
