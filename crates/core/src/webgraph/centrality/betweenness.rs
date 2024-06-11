@@ -165,7 +165,7 @@ impl Betweenness {
 mod tests {
     use maplit::hashmap;
 
-    use crate::webgraph::WebgraphWriter;
+    use crate::{webgraph::WebgraphWriter, webpage::html::links::RelFlags};
 
     use super::*;
 
@@ -182,6 +182,7 @@ mod tests {
                 Node::from(i.to_string()),
                 Node::from((i + 1).to_string()),
                 String::new(),
+                RelFlags::default(),
             );
         }
 

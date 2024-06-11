@@ -32,7 +32,7 @@ pub use fn_cache::FnCache;
 
 mod fn_cache;
 mod into_tantivy;
-mod links;
+pub mod links;
 mod microformats;
 mod parse_text;
 mod robots_meta;
@@ -476,6 +476,8 @@ mod tests {
 
     use std::collections::HashMap;
 
+    use tests::links::RelFlags;
+
     use crate::{schema::create_schema, webpage::Link};
 
     use super::*;
@@ -509,7 +511,8 @@ mod tests {
             vec![Link {
                 source: Url::parse("https://www.example.com/whatever").unwrap(),
                 destination: Url::parse("https://example.com").unwrap(),
-                text: "Link to example".to_string()
+                text: "Link to example".to_string(),
+                rel: RelFlags::empty(),
             }]
         );
         assert_eq!(webpage.clean_text(), Some(&CONTENT.to_string()));
@@ -952,7 +955,8 @@ mod tests {
             vec![Link {
                 source: Url::parse("https://www.example.com/whatever").unwrap(),
                 destination: Url::parse("https://example.com").unwrap(),
-                text: "Link to example".to_string()
+                text: "Link to example".to_string(),
+                rel: RelFlags::empty(),
             },]
         );
     }

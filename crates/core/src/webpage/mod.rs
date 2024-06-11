@@ -33,6 +33,7 @@ pub mod region;
 pub mod safety_classifier;
 pub mod schema_org;
 pub mod url_ext;
+use self::html::links::RelFlags;
 pub use self::html::Html;
 
 pub use region::Region;
@@ -151,6 +152,7 @@ struct Script {
 pub struct Link {
     pub source: Url,
     pub destination: Url,
+    pub rel: RelFlags,
     pub text: String,
 }
 

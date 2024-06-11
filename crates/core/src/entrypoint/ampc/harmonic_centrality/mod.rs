@@ -86,6 +86,7 @@ mod tests {
         executor::Executor,
         free_socket_addr,
         webgraph::{centrality::harmonic::HarmonicCentrality, Compression, WebgraphWriter},
+        webpage::html::links::RelFlags,
     };
 
     use super::*;
@@ -115,12 +116,12 @@ mod tests {
         let edges = crate::webgraph::tests::test_edges();
 
         for (i, (from, to, label)) in edges.into_iter().enumerate() {
-            combined.insert(from.clone(), to.clone(), label.clone());
+            combined.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
 
             if i % 2 == 0 {
-                a.insert(from, to, label);
+                a.insert(from, to, label, RelFlags::default());
             } else {
-                b.insert(from, to, label);
+                b.insert(from, to, label, RelFlags::default());
             }
         }
 
@@ -154,8 +155,6 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(2)); // Wait for worker to start
 
         let b = RemoteCentralityWorker::new(2.into(), worker_addr).unwrap();
-
-        // assert_eq!(a.num_nodes() + b.num_nodes(), num_nodes as u64);
 
         let (dht_shard, dht_addr) = crate::entrypoint::ampc::dht::tests::setup();
         let res = coordinator::build(&[(dht_shard, dht_addr)], vec![a, b])

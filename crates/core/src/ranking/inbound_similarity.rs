@@ -150,7 +150,7 @@ mod tests {
             api::ApiSearcher, live::LiveSearcher, LocalSearchClient, LocalSearcher, SearchQuery,
         },
         webgraph::{EdgeLimit, Node, Webgraph, WebgraphWriter},
-        webpage::{Html, Webpage},
+        webpage::{html::links::RelFlags, Html, Webpage},
     };
 
     use super::*;
@@ -174,15 +174,55 @@ mod tests {
             None,
         );
 
-        wrt.insert(Node::from("a.com"), Node::from("b.com"), String::new());
-        wrt.insert(Node::from("c.com"), Node::from("d.com"), String::new());
-        wrt.insert(Node::from("a.com"), Node::from("e.com"), String::new());
+        wrt.insert(
+            Node::from("a.com"),
+            Node::from("b.com"),
+            String::new(),
+            RelFlags::default(),
+        );
+        wrt.insert(
+            Node::from("c.com"),
+            Node::from("d.com"),
+            String::new(),
+            RelFlags::default(),
+        );
+        wrt.insert(
+            Node::from("a.com"),
+            Node::from("e.com"),
+            String::new(),
+            RelFlags::default(),
+        );
 
-        wrt.insert(Node::from("z.com"), Node::from("a.com"), String::new());
-        wrt.insert(Node::from("z.com"), Node::from("b.com"), String::new());
-        wrt.insert(Node::from("z.com"), Node::from("c.com"), String::new());
-        wrt.insert(Node::from("z.com"), Node::from("d.com"), String::new());
-        wrt.insert(Node::from("z.com"), Node::from("e.com"), String::new());
+        wrt.insert(
+            Node::from("z.com"),
+            Node::from("a.com"),
+            String::new(),
+            RelFlags::default(),
+        );
+        wrt.insert(
+            Node::from("z.com"),
+            Node::from("b.com"),
+            String::new(),
+            RelFlags::default(),
+        );
+        wrt.insert(
+            Node::from("z.com"),
+            Node::from("c.com"),
+            String::new(),
+            RelFlags::default(),
+        );
+        wrt.insert(
+            Node::from("z.com"),
+            Node::from("d.com"),
+            String::new(),
+            RelFlags::default(),
+        );
+        wrt.insert(
+            Node::from("z.com"),
+            Node::from("e.com"),
+            String::new(),
+            RelFlags::default(),
+        );
 
         let graph = wrt.finalize();
 
@@ -202,10 +242,30 @@ mod tests {
             None,
         );
 
-        wrt.insert(Node::from("b.com"), Node::from("a.com"), String::new());
-        wrt.insert(Node::from("c.com"), Node::from("d.com"), String::new());
-        wrt.insert(Node::from("b.com"), Node::from("e.com"), String::new());
-        wrt.insert(Node::from("c.com"), Node::from("b.com"), String::new());
+        wrt.insert(
+            Node::from("b.com"),
+            Node::from("a.com"),
+            String::new(),
+            RelFlags::default(),
+        );
+        wrt.insert(
+            Node::from("c.com"),
+            Node::from("d.com"),
+            String::new(),
+            RelFlags::default(),
+        );
+        wrt.insert(
+            Node::from("b.com"),
+            Node::from("e.com"),
+            String::new(),
+            RelFlags::default(),
+        );
+        wrt.insert(
+            Node::from("c.com"),
+            Node::from("b.com"),
+            String::new(),
+            RelFlags::default(),
+        );
 
         let graph = wrt.finalize();
 

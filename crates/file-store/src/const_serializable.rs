@@ -59,12 +59,12 @@ macro_rules! impl_const_serializable_num {
             const BYTES: usize = $n;
 
             fn serialize(&self, buf: &mut [u8]) {
-                buf.copy_from_slice(&self.to_le_bytes());
+                buf[..Self::BYTES].copy_from_slice(&self.to_le_bytes());
             }
 
             fn deserialize(buf: &[u8]) -> Self {
-                let mut bytes = [0; $n];
-                bytes.copy_from_slice(&buf[..$n]);
+                let mut bytes = [0; Self::BYTES];
+                bytes.copy_from_slice(&buf[..Self::BYTES]);
                 <$t>::from_le_bytes(bytes)
             }
         }

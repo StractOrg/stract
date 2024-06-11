@@ -257,6 +257,7 @@ impl Webgraph {
                 from: e.from.node(),
                 to: e.to.node(),
                 label: e.label,
+                rel: e.rel,
             })
             .collect()
     }
@@ -283,6 +284,7 @@ impl Webgraph {
                 from: e.from.node(),
                 to: e.to.node(),
                 label: e.label,
+                rel: e.rel,
             })
             .collect()
     }
@@ -310,6 +312,7 @@ impl Webgraph {
                 from: e.from.node(),
                 to: e.to.node(),
                 label: e.label,
+                rel: e.rel,
             })
             .collect()
     }
@@ -351,6 +354,7 @@ impl Webgraph {
                 from: e.from.node(),
                 to: e.to.node(),
                 label: e.label,
+                rel: e.rel,
             })
             .collect()
     }
@@ -423,6 +427,8 @@ impl Webgraph {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::webpage::html::links::RelFlags;
+
     use super::*;
 
     pub fn test_edges() -> Vec<(Node, Node, String)> {
@@ -455,7 +461,7 @@ pub mod tests {
         );
 
         for (from, to, label) in test_edges() {
-            graph.insert(from, to, label);
+            graph.insert(from, to, label, RelFlags::default());
         }
 
         graph.commit();
@@ -516,7 +522,7 @@ pub mod tests {
                 Compression::default(),
                 None,
             );
-            wrt.insert(from.clone(), to.clone(), label.clone());
+            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
             graphs.push(wrt.finalize());
         }
 
@@ -549,7 +555,7 @@ pub mod tests {
                 Compression::default(),
                 None,
             );
-            wrt.insert(from.clone(), to.clone(), label.clone());
+            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
             graphs.push(wrt.finalize());
         }
 
@@ -604,6 +610,7 @@ pub mod tests {
             Node::from("A"),
             Node::from("B"),
             "a".repeat(MAX_LABEL_LENGTH + 1),
+            RelFlags::default(),
         );
 
         let graph = writer.finalize();
@@ -644,7 +651,7 @@ pub mod tests {
                 Compression::default(),
                 None,
             );
-            wrt.insert(from.clone(), to.clone(), label.clone());
+            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
             graphs.push(wrt.finalize());
         }
 
@@ -692,5 +699,29 @@ pub mod tests {
 
         let n = Node::from("http://www.example.com/abc#123");
         assert_eq!(n.as_str(), "example.com/abc");
+    }
+
+    #[test]
+    fn test_rel_flags() {
+        let mut writer = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            Executor::single_thread(),
+            Compression::default(),
+            None,
+        );
+
+        writer.insert(
+            Node::from("A"),
+            Node::from("B"),
+            String::new(),
+            RelFlags::IS_IN_FOOTER | RelFlags::TAG,
+        );
+
+        let graph = writer.finalize();
+
+        assert_eq!(
+            graph.raw_outgoing_edges(&Node::from("A").id(), EdgeLimit::Unlimited)[0].rel,
+            RelFlags::IS_IN_FOOTER | RelFlags::TAG,
+        );
     }
 }

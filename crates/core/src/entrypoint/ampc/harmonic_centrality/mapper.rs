@@ -28,7 +28,7 @@ use crate::{
         DhtConn,
     },
     hyperloglog::HyperLogLog,
-    webgraph,
+    webgraph::{self, centrality::harmonic::SKIPPED_REL},
 };
 
 use super::{CentralityJob, CentralityTables, CentralityWorker};
@@ -269,6 +269,7 @@ impl CentralityMapper {
             for edge in worker
                 .graph()
                 .edges()
+                .filter(|e| !e.rel_flags().intersects(*SKIPPED_REL))
                 .filter(|e| changed_nodes.contains(e.from.as_u64()))
             {
                 batch.push(edge);

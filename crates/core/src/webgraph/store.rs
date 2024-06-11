@@ -17,7 +17,8 @@
 use std::{fs::File, ops::Range, path::Path};
 
 use crate::{
-    webgraph::merge::{MergeIter, NodeDatumMerger},
+    webgraph::merge::{EdgeMerger, MergeIter},
+    webpage::html::links::RelFlags,
     Result,
 };
 use anyhow::bail;
@@ -33,7 +34,7 @@ use itertools::Itertools;
 
 use super::{
     merge::{MergeNode, MergeSegmentOrd, NodeDatum},
-    Compression, EdgeLimit, FullNodeID, NodeID, SegmentEdge,
+    Compression, EdgeLimit, FullNodeID, NodeID, SegmentEdge, StoredEdge,
 };
 
 #[derive(
@@ -104,12 +105,12 @@ impl HostDb {
 }
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct NodeRange {
+pub struct EdgeRange {
     range: std::ops::Range<u64>,
     sort_key: u64,
 }
 
-impl NodeRange {
+impl EdgeRange {
     pub fn new(range: std::ops::Range<u64>, sort_key: u64) -> Self {
         Self { range, sort_key }
     }
@@ -121,37 +122,37 @@ fn usize_range(range: std::ops::Range<u64>) -> std::ops::Range<usize> {
 }
 
 pub struct RangesDb {
-    nodes: speedy_kv::Db<NodeID, NodeRange>,
+    edges: speedy_kv::Db<NodeID, EdgeRange>,
     labels: speedy_kv::Db<NodeID, std::ops::Range<u64>>,
 }
 
 impl RangesDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let nodes = speedy_kv::Db::open_or_create(path.as_ref().join("nodes")).unwrap();
+        let edges = speedy_kv::Db::open_or_create(path.as_ref().join("edges")).unwrap();
         let labels = speedy_kv::Db::open_or_create(path.as_ref().join("labels")).unwrap();
 
-        Self { nodes, labels }
+        Self { edges, labels }
     }
 
     pub fn optimize_read(&mut self) {
-        self.nodes.merge_all_segments().unwrap();
+        self.edges.merge_all_segments().unwrap();
         self.labels.merge_all_segments().unwrap();
     }
 
     fn uncommitted_node_inserts(&self) -> usize {
-        self.nodes.uncommitted_inserts()
+        self.edges.uncommitted_inserts()
     }
 
     pub fn commit(&mut self) {
-        self.nodes.commit().unwrap();
+        self.edges.commit().unwrap();
         self.labels.commit().unwrap();
     }
 
     pub fn nodes_get_raw<'a>(
         &'a self,
         key: &'a [u8],
-    ) -> Option<speedy_kv::SerializedRef<'a, NodeRange>> {
-        self.nodes.get_raw(key)
+    ) -> Option<speedy_kv::SerializedRef<'a, EdgeRange>> {
+        self.edges.get_raw(key)
     }
 
     pub fn labels_get_raw<'a>(
@@ -162,7 +163,7 @@ impl RangesDb {
     }
 
     pub fn insert_raw_node(&mut self, node: Vec<u8>, range: Vec<u8>) {
-        self.nodes.insert_raw(node, range);
+        self.edges.insert_raw(node, range);
     }
 
     pub fn insert_raw_label(&mut self, node: Vec<u8>, range: Vec<u8>) {
@@ -170,12 +171,12 @@ impl RangesDb {
     }
 
     fn merge_nodes(&self) -> impl Iterator<Item = MergeNode> + '_ {
-        self.nodes.iter_raw().zip_eq(self.labels.iter_raw()).map(
+        self.edges.iter_raw().zip_eq(self.labels.iter_raw()).map(
             move |((key_node, val), (key_label, labels))| {
                 debug_assert_eq!(key_node, key_label);
 
                 let node = NodeID::deserialize(key_node.as_bytes());
-                let range = NodeRange::deserialize(val.as_bytes());
+                let range = EdgeRange::deserialize(val.as_bytes());
 
                 let labels = {
                     let range = Range::deserialize(labels.as_bytes());
@@ -201,6 +202,18 @@ impl ConstSerializable for NodeID {
     }
 }
 
+impl ConstSerializable for RelFlags {
+    const BYTES: usize = std::mem::size_of::<RelFlags>();
+
+    fn serialize(&self, buf: &mut [u8]) {
+        self.as_u32().serialize(buf);
+    }
+
+    fn deserialize(buf: &[u8]) -> Self {
+        u32::deserialize(buf).into()
+    }
+}
+
 impl ConstSerializable for NodeDatum {
     const BYTES: usize = std::mem::size_of::<NodeDatum>();
 
@@ -217,8 +230,8 @@ impl ConstSerializable for NodeDatum {
     }
 }
 
-impl ConstSerializable for NodeRange {
-    const BYTES: usize = std::mem::size_of::<NodeRange>();
+impl ConstSerializable for EdgeRange {
+    const BYTES: usize = std::mem::size_of::<EdgeRange>();
 
     fn serialize(&self, buf: &mut [u8]) {
         const RANGE_BYTES: usize = std::mem::size_of::<u64>() * 2;
@@ -232,6 +245,22 @@ impl ConstSerializable for NodeRange {
         let sort_key = u64::deserialize(&buf[RANGE_BYTES..]);
 
         Self { range, sort_key }
+    }
+}
+
+impl ConstSerializable for StoredEdge {
+    const BYTES: usize = std::mem::size_of::<StoredEdge>();
+
+    fn serialize(&self, buf: &mut [u8]) {
+        self.other.serialize(&mut buf[..NodeDatum::BYTES]);
+        self.rel.serialize(&mut buf[NodeDatum::BYTES..]);
+    }
+
+    fn deserialize(buf: &[u8]) -> Self {
+        let other = NodeDatum::deserialize(&buf[..NodeDatum::BYTES]);
+        let rel = RelFlags::deserialize(&buf[NodeDatum::BYTES..]);
+
+        Self::new(other, rel)
     }
 }
 
@@ -278,7 +307,7 @@ pub struct EdgeStore {
     hosts: HostDb,
 
     edge_labels: IterableStoreReader<CompressedLabelBlock>,
-    edge_nodes: ConstIterableStoreReader<NodeDatum>,
+    edges: ConstIterableStoreReader<StoredEdge>,
 }
 
 impl EdgeStore {
@@ -287,13 +316,13 @@ impl EdgeStore {
 
         let edge_labels = IterableStoreReader::open(path.as_ref().join("labels")).unwrap();
 
-        let edge_nodes = ConstIterableStoreReader::open(path.as_ref().join("nodes")).unwrap();
+        let edges = ConstIterableStoreReader::open(path.as_ref().join("edges")).unwrap();
 
         Self {
             ranges,
             hosts: HostDb::open(path.as_ref().join("hosts")),
             edge_labels,
-            edge_nodes,
+            edges,
             reversed,
         }
     }
@@ -306,14 +335,12 @@ impl EdgeStore {
     fn merge_postings_for_node<'a>(
         buf: &[MergeNode<MergeSegmentOrd>],
         stores: &'a [EdgeStore],
-    ) -> NodeDatumMerger<'a> {
+    ) -> EdgeMerger<'a> {
         let mut edges = Vec::new();
 
         for node in buf {
             let store = &stores[node.ord().as_usize()];
-            let edge_nodes = store
-                .edge_nodes
-                .slice(usize_range(node.range().range.clone()));
+            let edge_nodes = store.edges.slice(usize_range(node.range().range.clone()));
             let edge_labels = store
                 .edge_labels
                 .slice(usize_range(node.labels()))
@@ -323,11 +350,11 @@ impl EdgeStore {
             edges.push(
                 edge_nodes
                     .zip_eq(edge_labels)
-                    .map(|(node, label)| node.with_label(label)),
+                    .map(|(edge, label)| edge.with_label(label)),
             );
         }
 
-        NodeDatumMerger::new(edges)
+        EdgeMerger::new(edges)
     }
 
     fn merge_postings<P: AsRef<Path>>(
@@ -338,23 +365,24 @@ impl EdgeStore {
         let reversed = stores[0].reversed;
         let mut ranges = RangesDb::open(folder.as_ref().join("ranges"));
 
-        let edge_labels_file = File::options()
+        let labels_file = File::options()
             .read(true)
             .create(true)
             .truncate(false)
             .write(true)
             .open(folder.as_ref().join("labels"))
             .unwrap();
-        let mut edge_labels = IterableStoreWriter::new(edge_labels_file);
+        let mut labels_store = IterableStoreWriter::new(labels_file);
 
-        let edge_nodes_file = File::options()
+        let edges_file = File::options()
             .read(true)
             .create(true)
             .truncate(false)
             .write(true)
-            .open(folder.as_ref().join("nodes"))
+            .open(folder.as_ref().join("edges"))
             .unwrap();
-        let mut edge_nodes = ConstIterableStoreWriter::new(edge_nodes_file);
+        let mut edges_store: ConstIterableStoreWriter<StoredEdge, File> =
+            ConstIterableStoreWriter::new(edges_file);
 
         let mut merge_iter = MergeIter::new(
             stores
@@ -381,13 +409,13 @@ impl EdgeStore {
             let mut last_node_offset = None;
 
             for chunk in edges.chunks(NUM_LABELS_PER_BLOCK).into_iter() {
-                let (labels, nodes): (Vec<_>, Vec<_>) = chunk
+                let (labels, edges): (Vec<_>, Vec<_>) = chunk
                     .map(|edge| (edge.label().clone(), edge.with_label(())))
                     .unzip();
 
                 let label_block = LabelBlock::new(labels).compress(label_compression);
 
-                let label_offset = edge_labels.write(&label_block).unwrap();
+                let label_offset = labels_store.write(&label_block).unwrap();
 
                 if first_label_offset.is_none() {
                     first_label_offset = Some(label_offset);
@@ -395,8 +423,8 @@ impl EdgeStore {
 
                 last_label_offset = Some(label_offset);
 
-                for node in nodes {
-                    let offset = edge_nodes.write(&node).unwrap();
+                for edge in edges {
+                    let offset = edges_store.write(&edge).unwrap();
 
                     if first_node_offset.is_none() {
                         first_node_offset = Some(offset);
@@ -411,7 +439,7 @@ impl EdgeStore {
                 end: last_label_offset.unwrap().start + last_label_offset.unwrap().num_bytes,
             };
 
-            let node_range: NodeRange = NodeRange::new(
+            let node_range: EdgeRange = EdgeRange::new(
                 Range {
                     start: first_node_offset.unwrap().start,
                     end: last_node_offset.unwrap().start + last_node_offset.unwrap().num_bytes,
@@ -429,15 +457,15 @@ impl EdgeStore {
 
             if ranges.uncommitted_node_inserts() > 100_000_000 {
                 ranges.commit();
-                edge_nodes.flush().unwrap();
-                edge_labels.flush().unwrap();
+                edges_store.flush().unwrap();
+                labels_store.flush().unwrap();
             }
         }
 
         if ranges.uncommitted_node_inserts() > 0 {
             ranges.commit();
-            edge_nodes.flush().unwrap();
-            edge_labels.flush().unwrap();
+            edges_store.flush().unwrap();
+            labels_store.flush().unwrap();
         }
 
         Ok(Self::open(folder, reversed))
@@ -476,37 +504,39 @@ impl EdgeStore {
         let node_bytes = node.as_u64().to_le_bytes();
 
         match (
-            self.ranges.nodes.get_raw(&node_bytes),
+            self.ranges.edges.get_raw(&node_bytes),
             self.ranges.labels.get_raw(&node_bytes),
         ) {
             (Some(node_range_bytes), Some(edge_range_bytes)) => {
-                let node_range = NodeRange::deserialize(node_range_bytes.as_bytes());
+                let node_range = EdgeRange::deserialize(node_range_bytes.as_bytes());
                 let edge_range: Range<u64> = Range::deserialize(edge_range_bytes.as_bytes());
 
-                let edge_labels = self
+                let labels = self
                     .edge_labels
                     .slice(usize_range(edge_range))
                     .map(|r| r.decompress())
                     .flat_map(|block| block.labels.into_iter());
 
-                let edge_labels = limit.apply(edge_labels);
+                let labels = limit.apply(labels);
 
-                let edge_nodes = self.edge_nodes.slice(usize_range(node_range.range));
-                let edge_nodes = limit.apply(edge_nodes);
+                let edges = self.edges.slice(usize_range(node_range.range));
+                let edges = limit.apply(edges);
 
-                edge_labels
-                    .zip_eq(edge_nodes)
-                    .map(|(label, other)| {
+                labels
+                    .zip_eq(edges)
+                    .map(|(label, edge)| {
                         if self.reversed {
                             SegmentEdge {
-                                from: other,
+                                from: edge.other,
                                 to: NodeDatum::new(*node, node_range.sort_key),
+                                rel: edge.rel,
                                 label,
                             }
                         } else {
                             SegmentEdge {
                                 from: NodeDatum::new(*node, node_range.sort_key),
-                                to: other,
+                                to: edge.other,
+                                rel: edge.rel,
                                 label,
                             }
                         }
@@ -520,27 +550,29 @@ impl EdgeStore {
     pub fn get_without_label(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<SegmentEdge<()>> {
         let node_bytes = node.as_u64().to_le_bytes();
 
-        match self.ranges.nodes.get_raw(&node_bytes) {
+        match self.ranges.edges.get_raw(&node_bytes) {
             Some(node_range_bytes) => {
-                let node_range = NodeRange::deserialize(node_range_bytes.as_bytes());
+                let edge_range = EdgeRange::deserialize(node_range_bytes.as_bytes());
 
-                let edge_nodes = self.edge_nodes.slice(usize_range(node_range.range));
+                let edges = self.edges.slice(usize_range(edge_range.range));
 
-                let edge_nodes = limit.apply(edge_nodes);
+                let edges = limit.apply(edges);
 
-                edge_nodes
+                edges
                     .into_iter()
-                    .map(|other| {
+                    .map(|edge| {
                         if self.reversed {
                             SegmentEdge {
-                                from: other,
-                                to: NodeDatum::new(*node, node_range.sort_key),
+                                from: edge.other,
+                                to: NodeDatum::new(*node, edge_range.sort_key),
+                                rel: edge.rel,
                                 label: (),
                             }
                         } else {
                             SegmentEdge {
-                                from: NodeDatum::new(*node, node_range.sort_key),
-                                to: other,
+                                from: NodeDatum::new(*node, edge_range.sort_key),
+                                to: edge.other,
+                                rel: edge.rel,
                                 label: (),
                             }
                         }
@@ -556,28 +588,30 @@ impl EdgeStore {
     }
 
     pub fn iter_without_label(&self) -> impl Iterator<Item = SegmentEdge<()>> + '_ + Send + Sync {
-        self.ranges.nodes.iter_raw().flat_map(move |(key, val)| {
+        self.ranges.edges.iter_raw().flat_map(move |(key, val)| {
             let node = u64::from_le_bytes((key.as_bytes()).try_into().unwrap());
             let node = NodeID::from(node);
 
-            let node_range = NodeRange::deserialize(val.as_bytes());
+            let edge_range = EdgeRange::deserialize(val.as_bytes());
 
-            let edge_nodes = self
-                .edge_nodes
-                .slice(usize_range(node_range.range))
+            let edges = self
+                .edges
+                .slice(usize_range(edge_range.range))
                 .collect::<Vec<_>>();
 
-            edge_nodes.into_iter().map(move |other| {
+            edges.into_iter().map(move |edge| {
                 if self.reversed {
                     SegmentEdge {
-                        from: other,
-                        to: NodeDatum::new(node, node_range.sort_key),
+                        from: edge.other,
+                        to: NodeDatum::new(node, edge_range.sort_key),
+                        rel: edge.rel,
                         label: (),
                     }
                 } else {
                     SegmentEdge {
-                        from: NodeDatum::new(node, node_range.sort_key),
-                        to: other,
+                        from: NodeDatum::new(node, edge_range.sort_key),
+                        to: edge.other,
+                        rel: edge.rel,
                         label: (),
                     }
                 }
@@ -613,6 +647,7 @@ mod tests {
                 host: NodeID::from(0_u64),
             },
             label: "test".to_string(),
+            rel: RelFlags::default(),
         };
 
         kv.put(e.clone());
@@ -652,6 +687,7 @@ mod tests {
                 host: NodeID::from(0_u64),
             },
             label: "test".to_string(),
+            rel: RelFlags::default(),
         };
 
         kv.put(e.clone());
@@ -686,6 +722,7 @@ mod tests {
                     host: NodeID::from(0_u64),
                 },
                 label: "test".to_string(),
+                rel: RelFlags::default(),
             };
 
             kv.put(e.clone());
@@ -725,6 +762,7 @@ mod tests {
                 host: NodeID::from(0_u64),
             },
             label: "1".to_string(),
+            rel: RelFlags::default(),
         };
 
         let e2 = InsertableEdge {
@@ -737,6 +775,7 @@ mod tests {
                 host: NodeID::from(0_u64),
             },
             label: "2".to_string(),
+            rel: RelFlags::default(),
         };
 
         let e3 = InsertableEdge {
@@ -749,6 +788,7 @@ mod tests {
                 host: NodeID::from(0_u64),
             },
             label: "3".to_string(),
+            rel: RelFlags::default(),
         };
 
         kv.put(e1.clone());

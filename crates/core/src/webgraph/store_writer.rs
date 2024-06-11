@@ -27,7 +27,7 @@ use std::{
 use itertools::Itertools;
 
 use crate::{
-    webgraph::store::{NodeRange, NUM_LABELS_PER_BLOCK},
+    webgraph::store::{EdgeRange, NUM_LABELS_PER_BLOCK},
     Result,
 };
 use file_store::{
@@ -41,7 +41,7 @@ use file_store::{
 use super::{
     merge::NodeDatum,
     store::{CompressedLabelBlock, EdgeStore, HostDb, LabelBlock, RangesDb},
-    Compression, EdgeLabel, InsertableEdge, NodeID,
+    Compression, EdgeLabel, InsertableEdge, NodeID, StoredEdge,
 };
 
 #[derive(bincode::Encode, bincode::Decode)]
@@ -223,7 +223,7 @@ struct FinalEdgeStoreWriter {
     hosts: HostDb,
 
     edge_labels: IterableStoreWriter<CompressedLabelBlock, File>,
-    edge_nodes: ConstIterableStoreWriter<NodeDatum, File>,
+    edge_nodes: ConstIterableStoreWriter<StoredEdge, File>,
 
     host_centrality_rank_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
 
@@ -256,7 +256,7 @@ impl FinalEdgeStoreWriter {
             .create(true)
             .truncate(false)
             .write(true)
-            .open(path.as_ref().join("nodes"))
+            .open(path.as_ref().join("edges"))
             .unwrap();
         let edge_nodes = ConstIterableStoreWriter::new(edge_nodes_file);
 
@@ -304,7 +304,7 @@ impl FinalEdgeStoreWriter {
         debug_assert!(self.ranges.labels_get_raw(&node_bytes).is_none());
 
         let mut edge_labels = Vec::new();
-        let mut edge_nodes: Vec<NodeDatum> = Vec::new();
+        let mut edge_nodes: Vec<StoredEdge> = Vec::new();
 
         for edge in edges {
             edge_labels.push(edge.label.clone());
@@ -322,7 +322,8 @@ impl FinalEdgeStoreWriter {
                 .unwrap_or(0);
 
             let datum = NodeDatum::new(node, sort_key);
-            edge_nodes.push(datum);
+            let rel = edge.rel;
+            edge_nodes.push(StoredEdge::new(datum, rel));
         }
 
         let edge_labels: Vec<_> = edge_labels
@@ -368,7 +369,7 @@ impl FinalEdgeStoreWriter {
             .map(|store| store.get(&node.host).unwrap().unwrap_or(u64::MAX))
             .unwrap_or(0);
 
-        let node_range: NodeRange = NodeRange::new(
+        let node_range: EdgeRange = EdgeRange::new(
             Range {
                 start: first_node_offset.unwrap().start,
                 end: last_node_offset.unwrap().start + last_node_offset.unwrap().num_bytes,

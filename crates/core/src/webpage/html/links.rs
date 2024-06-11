@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use kuchiki::iter::NodeEdge;
+use bitflags::bitflags;
+use kuchiki::{iter::NodeEdge, Attributes};
 use url::Url;
 
 use crate::webpage::{url_ext::UrlExt, Link};
@@ -34,6 +35,133 @@ pub struct ImageLink {
     pub url: Url,
     pub title: Option<String>,
     pub description: Option<String>,
+}
+
+/// Flags for the `rel` attribute of the `a` element.
+/// See https://html.spec.whatwg.org/multipage/links.html#linkTypes
+#[derive(Default, Debug, Clone, Copy, bincode::Encode, bincode::Decode, PartialEq, Eq, Hash)]
+pub struct RelFlags(u32);
+
+impl RelFlags {
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
+
+    fn from_html(url: &Url, attributes: &Attributes, location: &Location) -> Self {
+        let mut res = RelFlags::empty();
+
+        if let Some(rel) = attributes.get("rel") {
+            for rel in rel.split_whitespace() {
+                match rel {
+                    "alternate" => res |= RelFlags::ALTERNATE,
+                    "author" => res |= RelFlags::AUTHOR,
+                    "canonical" => res |= RelFlags::CANONICAL,
+                    "help" => res |= RelFlags::HELP,
+                    "icon" => res |= RelFlags::ICON,
+                    "license" => res |= RelFlags::LICENSE,
+                    "me" => res |= RelFlags::ME,
+                    "next" => res |= RelFlags::NEXT,
+                    "nofollow" => res |= RelFlags::NOFOLLOW,
+                    "prev" => res |= RelFlags::PREV,
+                    "privacy-policy" => res |= RelFlags::PRIVACY_POLICY,
+                    "search" => res |= RelFlags::SEARCH,
+                    "stylesheet" => res |= RelFlags::STYLESHEET,
+                    "tag" => res |= RelFlags::TAG,
+                    "terms-of-service" => res |= RelFlags::TERMS_OF_SERVICE,
+                    "sponsored" => res |= RelFlags::SPONSORED,
+                    _ => {}
+                }
+            }
+        }
+
+        if let Some(mut path) = url.path_segments() {
+            if path.any(|segment| {
+                matches!(
+                    segment,
+                    "tags" | "tag" | "tagged" | "topic" | "topics" | "category" | "categories"
+                )
+            }) {
+                res |= RelFlags::TAG;
+            }
+        }
+
+        res |= location.as_rel();
+
+        res
+    }
+}
+
+impl From<u32> for RelFlags {
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
+}
+
+bitflags! {
+    impl RelFlags: u32 {
+        const ALTERNATE = 1 << 0;
+        const AUTHOR = 1 << 1;
+        const CANONICAL = 1 << 2;
+        const HELP = 1 << 3;
+        const ICON = 1 << 4;
+        const LICENSE = 1 << 5;
+        const ME = 1 << 6;
+        const NEXT = 1 << 7;
+        const NOFOLLOW = 1 << 8;
+        const PREV = 1 << 9;
+        const PRIVACY_POLICY = 1 << 10;
+        const SEARCH = 1 << 11;
+        const STYLESHEET = 1 << 12;
+        const TAG = 1 << 13;
+        const TERMS_OF_SERVICE = 1 << 14;
+        // Custom flags
+        const SPONSORED = 1 << 15;
+        const IS_IN_FOOTER = 1 << 16;
+        const IS_IN_NAVIGATION = 1 << 17;
+        const LINK_TAG = 1 << 18;
+        const SCRIPT_TAG = 1 << 19;
+        const META_TAG = 1 << 20;
+    }
+}
+
+struct Location(u8);
+
+impl Location {
+    pub fn as_rel(&self) -> RelFlags {
+        let mut res = RelFlags::empty();
+
+        if self.contains(Location::FOOTER) {
+            res |= RelFlags::IS_IN_FOOTER;
+        }
+
+        if self.contains(Location::NAVIGATION) {
+            res |= RelFlags::IS_IN_NAVIGATION;
+        }
+
+        if self.contains(Location::LINK) {
+            res |= RelFlags::LINK_TAG;
+        }
+
+        if self.contains(Location::SCRIPT) {
+            res |= RelFlags::SCRIPT_TAG;
+        }
+
+        if self.contains(Location::META) {
+            res |= RelFlags::META_TAG;
+        }
+
+        res
+    }
+}
+
+bitflags! {
+    impl Location: u8 {
+        const FOOTER = 1 << 0;
+        const NAVIGATION = 1 << 1;
+        const LINK = 1 << 2;
+        const SCRIPT = 1 << 3;
+        const META = 1 << 4;
+    }
 }
 
 impl Html {
@@ -124,6 +252,7 @@ impl Html {
 
         let mut links = Vec::new();
         let mut open_links = Vec::new();
+        let mut location = Location::empty();
 
         for edge in self.root.traverse() {
             match edge {
@@ -131,6 +260,10 @@ impl Html {
                     if let Some(element) = node.as_element() {
                         if &element.name.local == "a" {
                             open_links.push((String::new(), element.attributes.clone()));
+                        } else if &element.name.local == "footer" {
+                            location |= Location::FOOTER;
+                        } else if &element.name.local == "nav" {
+                            location |= Location::NAVIGATION;
                         }
                     }
                 }
@@ -148,12 +281,21 @@ impl Html {
                                     {
                                         links.push(Link {
                                             source: self.url().clone(),
-                                            destination: dest,
                                             text: text.trim().to_string(),
+                                            rel: RelFlags::from_html(
+                                                &dest,
+                                                &attributes.borrow(),
+                                                &location,
+                                            ),
+                                            destination: dest,
                                         });
                                     }
                                 }
                             }
+                        } else if &element.name.local == "footer" {
+                            location.remove(Location::FOOTER);
+                        } else if &element.name.local == "nav" {
+                            location.remove(Location::NAVIGATION);
                         }
                     }
 
@@ -187,6 +329,7 @@ impl Html {
                 if let Ok(dest) = Url::parse(dest).or_else(|_| self.url().join(dest)) {
                     links.push(Link {
                         source: self.url().clone(),
+                        rel: RelFlags::from_html(&dest, &attributes.borrow(), &location),
                         destination: dest,
                         text: text.trim().to_string(),
                     });
@@ -200,12 +343,19 @@ impl Html {
     fn links_tag(&self) -> Vec<Link> {
         let mut links = Vec::new();
 
+        let location = Location::LINK;
+
         for node in self.root.select("link").unwrap() {
             if let Some(element) = node.as_node().as_element() {
                 if let Some(href) = element.attributes.borrow().get("href") {
                     if let Ok(href) = Url::parse(href).or_else(|_| self.url().join(href)) {
                         links.push(Link {
                             source: self.url().clone(),
+                            rel: RelFlags::from_html(
+                                &href,
+                                &element.attributes.borrow(),
+                                &location,
+                            ),
                             destination: href,
                             text: String::new(),
                         });
@@ -218,6 +368,8 @@ impl Html {
     }
 
     fn metadata_links(&self) -> Vec<Link> {
+        let location = Location::META;
+
         self.metadata()
             .into_iter()
             .filter_map(|metadata| {
@@ -243,6 +395,7 @@ impl Html {
                                     source: self.url().clone(),
                                     destination,
                                     text: String::new(),
+                                    rel: location.as_rel(),
                                 });
                             }
                         }
@@ -267,6 +420,7 @@ impl Html {
                                     source: self.url().clone(),
                                     destination,
                                     text: String::new(),
+                                    rel: location.as_rel(),
                                 });
                             }
                         }
@@ -293,6 +447,7 @@ impl Html {
                             source: self.url().clone(),
                             destination: script_url,
                             text: String::new(),
+                            rel: Location::SCRIPT.as_rel(),
                         })
                     } else {
                         None
@@ -458,6 +613,94 @@ mod tests {
                 title: None,
                 description: None
             })
+        );
+    }
+
+    #[test]
+    fn test_rel() {
+        let raw = r#"
+            <html>
+                <head>
+                    <title>Best website</title>
+                </head>
+                <body>
+                    <a href="https://example.com/tags/example" rel="tag">Example</a>
+                    <a href="https://example.com/tags/example" rel="tag nofollow">Example</a>
+                    <a href="https://example.com/tags/example" rel="tag sponsored">Example</a>
+                    <a href="https://example.com/authors/example" rel="author">Example</a>
+
+                    <footer>
+                        <a href="https://example.com/terms-of-service" rel="terms-of-service">Terms of service</a>
+                        <a href="https://example.com/privacy-policy" rel="privacy-policy">Privacy policy</a>
+                    </footer>
+                </body>
+            </html>
+        "#;
+
+        let webpage = Html::parse(raw, "https://www.example.com/whatever").unwrap();
+
+        let links = webpage.all_links();
+
+        assert_eq!(links.len(), 6);
+
+        assert_eq!(
+            links[0],
+            Link {
+                source: Url::parse("https://www.example.com/whatever").unwrap(),
+                destination: Url::parse("https://example.com/tags/example").unwrap(),
+                text: "Example".to_string(),
+                rel: RelFlags::TAG
+            }
+        );
+
+        assert_eq!(
+            links[1],
+            Link {
+                source: Url::parse("https://www.example.com/whatever").unwrap(),
+                destination: Url::parse("https://example.com/tags/example").unwrap(),
+                text: "Example".to_string(),
+                rel: RelFlags::TAG | RelFlags::NOFOLLOW
+            }
+        );
+
+        assert_eq!(
+            links[2],
+            Link {
+                source: Url::parse("https://www.example.com/whatever").unwrap(),
+                destination: Url::parse("https://example.com/tags/example").unwrap(),
+                text: "Example".to_string(),
+                rel: RelFlags::TAG | RelFlags::SPONSORED
+            }
+        );
+
+        assert_eq!(
+            links[3],
+            Link {
+                source: Url::parse("https://www.example.com/whatever").unwrap(),
+                destination: Url::parse("https://example.com/authors/example").unwrap(),
+                text: "Example".to_string(),
+                rel: RelFlags::AUTHOR
+            }
+        );
+
+        assert_eq!(
+            links[4],
+            Link {
+                source: Url::parse("https://www.example.com/whatever").unwrap(),
+                destination: Url::parse("https://example.com/terms-of-service").unwrap(),
+                text: "Terms of service".to_string(),
+                rel: RelFlags::TERMS_OF_SERVICE | RelFlags::IS_IN_FOOTER
+            }
+        );
+
+        assert_eq!(
+            links[5],
+            Link {
+                source: Url::parse("https://www.example.com/whatever").unwrap(),
+                destination: Url::parse("https://example.com/privacy-policy").unwrap(),
+                text: "Privacy policy".to_string(),
+                rel: RelFlags::PRIVACY_POLICY | RelFlags::IS_IN_FOOTER
+            }
         );
     }
 }

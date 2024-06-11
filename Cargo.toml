@@ -33,6 +33,7 @@ bincode = {git = "https://github.com/bincode-org/bincode", rev = "8f65c60", feat
   "serde",
 ]}
 bindgen = "0.69.2"
+bitflags = "2.5.0"
 bitvec = {version = "1.0.1", features = ["serde"]}
 bytecount = "0.6.7"
 bytemuck = {version = "1.13.1", features = ["derive"]}

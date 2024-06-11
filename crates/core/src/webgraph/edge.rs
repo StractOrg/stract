@@ -16,6 +16,8 @@
 
 use utoipa::ToSchema;
 
+use crate::webpage::html::links::RelFlags;
+
 use super::{merge::NodeDatum, FullNodeID, Node, NodeID};
 
 pub const MAX_LABEL_LENGTH: usize = 1024;
@@ -55,7 +57,17 @@ where
 {
     pub from: NodeID,
     pub to: NodeID,
+    pub rel: RelFlags,
     pub label: L,
+}
+
+impl<L> Edge<L>
+where
+    L: EdgeLabel,
+{
+    pub fn rel_flags(&self) -> RelFlags {
+        self.rel
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, bincode::Encode, bincode::Decode)]
@@ -65,6 +77,7 @@ where
 {
     pub from: FullNodeID,
     pub to: FullNodeID,
+    pub rel: RelFlags,
     pub label: L,
 }
 
@@ -77,6 +90,7 @@ where
         Edge {
             from: edge.from.id,
             to: edge.to.id,
+            rel: edge.rel,
             label: edge.label,
         }
     }
@@ -106,8 +120,9 @@ pub struct SegmentEdge<L>
 where
     L: EdgeLabel,
 {
-    pub from: NodeDatum<()>,
-    pub to: NodeDatum<()>,
+    pub from: NodeDatum,
+    pub to: NodeDatum,
+    pub rel: RelFlags,
     pub label: L,
 }
 
@@ -119,6 +134,7 @@ where
         Edge {
             from: edge.from.node(),
             to: edge.to.node(),
+            rel: edge.rel,
             label: edge.label,
         }
     }
@@ -133,6 +149,7 @@ where
         SegmentEdge {
             from: NodeDatum::new(edge.from, 0),
             to: NodeDatum::new(edge.to, 0),
+            rel: edge.rel,
             label: edge.label,
         }
     }
@@ -147,7 +164,49 @@ where
         SegmentEdge {
             from: NodeDatum::new(edge.from.id, 0),
             to: NodeDatum::new(edge.to.id, 0),
+            rel: edge.rel,
             label: edge.label,
         }
+    }
+}
+
+pub struct StoredEdge<L = ()> {
+    pub other: NodeDatum,
+    pub rel: RelFlags,
+    pub label: L,
+}
+
+impl StoredEdge<()> {
+    pub fn new(other: NodeDatum, rel: RelFlags) -> Self {
+        StoredEdge {
+            other,
+            rel,
+            label: (),
+        }
+    }
+}
+
+impl<L> StoredEdge<L> {
+    pub fn with_label<L2>(self, label: L2) -> StoredEdge<L2> {
+        StoredEdge {
+            other: self.other,
+            rel: self.rel,
+            label,
+        }
+    }
+
+    #[inline]
+    pub fn label(&self) -> &L {
+        &self.label
+    }
+
+    #[inline]
+    pub fn other(&self) -> NodeID {
+        self.other.node()
+    }
+
+    #[inline]
+    pub fn rel(&self) -> RelFlags {
+        self.rel
     }
 }

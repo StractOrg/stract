@@ -16,7 +16,7 @@
 
 use std::{fs, path::Path, sync::Arc};
 
-use crate::executor::Executor;
+use crate::{executor::Executor, webpage::html::links::RelFlags};
 
 use super::{
     id_node_db::Id2NodeDb, segment::SegmentWriter, Compression, FullNodeID, InsertableEdge, Meta,
@@ -85,7 +85,7 @@ impl WebgraphWriter {
         id
     }
 
-    pub fn insert(&mut self, from: Node, to: Node, label: String) {
+    pub fn insert(&mut self, from: Node, to: Node, label: String, rel: RelFlags) {
         if from == to {
             return;
         }
@@ -99,6 +99,7 @@ impl WebgraphWriter {
             from: from_id,
             to: to_id,
             label: label.chars().take(MAX_LABEL_LENGTH).collect(),
+            rel,
         };
 
         self.segment.insert(edge);

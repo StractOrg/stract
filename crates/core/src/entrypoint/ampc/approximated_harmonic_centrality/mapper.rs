@@ -20,12 +20,15 @@ use std::{cmp, collections::BTreeMap};
 
 use super::{worker::ApproxCentralityWorker, ApproxCentralityJob, Mapper};
 use crate::{
-    ampc::dht::upsert, entrypoint::ampc::approximated_harmonic_centrality::DhtTable,
-    kahan_sum::KahanSum, webgraph,
+    ampc::dht::upsert,
+    entrypoint::ampc::approximated_harmonic_centrality::DhtTable,
+    kahan_sum::KahanSum,
+    webgraph::{self, centrality::harmonic::SKIPPED_REL},
 };
 use rayon::prelude::*;
 
 const BATCH_SIZE: usize = 1024;
+const MAX_OUTGOING_EDGES: usize = 128;
 
 #[derive(Debug, Clone, bincode::Decode, bincode::Encode)]
 pub enum ApproxCentralityMapper {
@@ -57,8 +60,9 @@ impl Workers {
             for outgoing in self
                 .worker
                 .graph()
-                .raw_outgoing_edges(&node, webgraph::EdgeLimit::Unlimited)
+                .raw_outgoing_edges(&node, webgraph::EdgeLimit::Limit(MAX_OUTGOING_EDGES))
                 .into_iter()
+                .filter(|e| !e.rel_flags().intersects(*SKIPPED_REL))
                 .map(|e| e.to)
             {
                 let d = dist + 1;

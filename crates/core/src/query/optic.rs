@@ -286,7 +286,7 @@ mod tests {
             LocalSearchClient, LocalSearcher, SearchQuery,
         },
         webgraph::{Node, WebgraphWriter},
-        webpage::{Html, Webpage},
+        webpage::{html::links::RelFlags, Html, Webpage},
     };
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
@@ -640,28 +640,33 @@ mod tests {
             Node::from("https://www.e.com").into_host(),
             Node::from("https://www.a.com").into_host(),
             String::new(),
+            RelFlags::default()
         );
         writer.insert(
             Node::from("https://www.a.com").into_host(),
             Node::from("https://www.e.com").into_host(),
             String::new(),
+            RelFlags::default()
         );
 
         writer.insert(
             Node::from("https://www.c.com").into_host(),
             Node::from("https://www.c.com").into_host(),
             String::new(),
+            RelFlags::default()
         );
 
         writer.insert(
             Node::from("https://www.b.com").into_host(),
             Node::from("https://www.e.com").into_host(),
             String::new(),
+            RelFlags::default()
         );
         writer.insert(
             Node::from("https://www.e.com").into_host(),
             Node::from("https://www.b.com").into_host(),
             String::new(),
+            RelFlags::default()
         );
 
         let graph = writer.finalize();

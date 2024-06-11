@@ -26,7 +26,7 @@ mod tests {
             api::ApiSearcher, live::LiveSearcher, LocalSearchClient, LocalSearcher, SearchQuery,
         },
         webgraph::{Node, WebgraphWriter},
-        webpage::{Html, Webpage},
+        webpage::{html::links::RelFlags, Html, Webpage},
     };
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
@@ -46,41 +46,49 @@ mod tests {
             Node::from("https://www.first.com").into_host(),
             Node::from("https://www.nan.com").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         wrt.insert(
             Node::from("https://www.nan.com").into_host(),
             Node::from("https://www.first.com").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         wrt.insert(
             Node::from("https://www.third.com").into_host(),
             Node::from("https://www.third.com").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         wrt.insert(
             Node::from("https://www.nan.com").into_host(),
             Node::from("https://www.second.com").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         wrt.insert(
             Node::from("https://www.second.com").into_host(),
             Node::from("https://www.nan.com").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         wrt.insert(
             Node::from("https://www.second.com").into_host(),
             Node::from("https://www.third.com").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         wrt.insert(
             Node::from("https://www.extra.com").into_host(),
             Node::from("https://www.first.com").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         wrt.insert(
             Node::from("https://www.second.com").into_host(),
             Node::from("https://www.extra.com").into_host(),
             String::new(),
+            RelFlags::default(),
         );
 
         let graph = wrt.finalize();

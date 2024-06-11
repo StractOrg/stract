@@ -99,9 +99,9 @@ fn build_graphs_if_not_exist(warc_path: &str, graph_path: &str) -> anyhow::Resul
 
             if dest_domain.is_some() && source_domain.is_some() && dest_domain != source_domain {
                 if i <= num_records / 2 {
-                    a.insert(source, destination, link.text);
+                    a.insert(source, destination, link.text, link.rel);
                 } else {
-                    b.insert(source, destination, link.text);
+                    b.insert(source, destination, link.text, link.rel);
                 }
             }
         }

@@ -198,7 +198,10 @@ impl Segment {
 
 #[cfg(test)]
 mod test {
-    use crate::webgraph::{Edge, FullNodeID};
+    use crate::{
+        webgraph::{Edge, FullNodeID},
+        webpage::html::links::RelFlags,
+    };
 
     use super::*;
 
@@ -238,21 +241,25 @@ mod test {
             from: a.clone(),
             to: b.clone(),
             label: String::new(),
+            rel: RelFlags::default(),
         });
         edges.push(InsertableEdge {
             from: b.clone(),
             to: c.clone(),
             label: String::new(),
+            rel: RelFlags::default(),
         });
         edges.push(InsertableEdge {
             from: c.clone(),
             to: a.clone(),
             label: String::new(),
+            rel: RelFlags::default(),
         });
         edges.push(InsertableEdge {
             from: a.clone(),
             to: c.clone(),
             label: String::new(),
+            rel: RelFlags::default(),
         });
 
         for edge in &edges {
@@ -270,13 +277,15 @@ mod test {
                 Edge {
                     from: a.id,
                     to: b.id,
-                    label: ()
+                    label: (),
+                    rel: RelFlags::default(),
                 }
                 .into(),
                 Edge {
                     from: a.id,
                     to: c.id,
-                    label: ()
+                    label: (),
+                    rel: RelFlags::default(),
                 }
                 .into(),
             ]
@@ -289,7 +298,8 @@ mod test {
             vec![Edge {
                 from: b.id,
                 to: c.id,
-                label: ()
+                label: (),
+                rel: RelFlags::default(),
             }
             .into(),]
         );
@@ -301,7 +311,8 @@ mod test {
             vec![Edge {
                 from: c.id,
                 to: a.id,
-                label: ()
+                label: (),
+                rel: RelFlags::default(),
             }
             .into(),]
         );
@@ -312,7 +323,8 @@ mod test {
             vec![Edge {
                 from: c.id,
                 to: a.id,
-                label: ()
+                label: (),
+                rel: RelFlags::default(),
             }
             .into(),]
         );
@@ -323,7 +335,8 @@ mod test {
             vec![Edge {
                 from: a.id,
                 to: b.id,
-                label: ()
+                label: (),
+                rel: RelFlags::default(),
             }
             .into(),]
         );
@@ -336,13 +349,15 @@ mod test {
                 Edge {
                     from: a.id,
                     to: c.id,
-                    label: ()
+                    label: (),
+                    rel: RelFlags::default(),
                 }
                 .into(),
                 Edge {
                     from: b.id,
                     to: c.id,
-                    label: ()
+                    label: (),
+                    rel: RelFlags::default(),
                 }
                 .into(),
             ]

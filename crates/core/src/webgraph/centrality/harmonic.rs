@@ -28,9 +28,22 @@ use crate::{
     hyperloglog::HyperLogLog,
     kahan_sum::KahanSum,
     webgraph::{EdgeLimit, NodeID, Webgraph},
+    webpage::html::links::RelFlags,
 };
 
 const HYPERLOGLOG_COUNTERS: usize = 64;
+
+pub static SKIPPED_REL: once_cell::sync::Lazy<RelFlags> = once_cell::sync::Lazy::new(|| {
+    RelFlags::TAG
+        | RelFlags::NOFOLLOW
+        | RelFlags::IS_IN_FOOTER
+        | RelFlags::IS_IN_NAVIGATION
+        | RelFlags::PRIVACY_POLICY
+        | RelFlags::TERMS_OF_SERVICE
+        | RelFlags::SEARCH
+        | RelFlags::LINK_TAG
+        | RelFlags::SCRIPT_TAG
+});
 
 type Counter = BTreeMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>>;
 
@@ -66,7 +79,11 @@ fn update_changed_counters(
     let has_changes = AtomicBool::new(false);
 
     exact_changed_nodes.iter().for_each(|changed_node| {
-        for edge in graph.raw_outgoing_edges(changed_node, EdgeLimit::Unlimited) {
+        for edge in graph
+            .raw_outgoing_edges(changed_node, EdgeLimit::Unlimited)
+            .into_iter()
+            .filter(|e| !e.rel_flags().intersects(*SKIPPED_REL))
+        {
             if let (Some(counter_to), Some(counter_from)) =
                 (counters.new.get_mut(&edge.to), counters.old.get(&edge.from))
             {
@@ -105,29 +122,32 @@ fn update_all_counters(
         **exact_changed_nodes = BTreeSet::default();
     }
 
-    graph.edges().for_each(|edge| {
-        if changed_nodes.contains(edge.from.as_u64()) {
-            if let (Some(counter_to), Some(counter_from)) =
-                (counters.new.get_mut(&edge.to), counters.old.get(&edge.from))
-            {
-                if counter_to
-                    .registers()
-                    .iter()
-                    .zip(counter_from.registers().iter())
-                    .any(|(to, from)| *from > *to)
+    graph
+        .edges()
+        .filter(|e| !e.rel_flags().intersects(*SKIPPED_REL))
+        .for_each(|edge| {
+            if changed_nodes.contains(edge.from.as_u64()) {
+                if let (Some(counter_to), Some(counter_from)) =
+                    (counters.new.get_mut(&edge.to), counters.old.get(&edge.from))
                 {
-                    counter_to.merge(counter_from);
-                    new_changed_nodes.insert(edge.to.as_u64());
+                    if counter_to
+                        .registers()
+                        .iter()
+                        .zip(counter_from.registers().iter())
+                        .any(|(to, from)| *from > *to)
+                    {
+                        counter_to.merge(counter_from);
+                        new_changed_nodes.insert(edge.to.as_u64());
 
-                    if let Some(exact_changed_nodes) = &mut exact_changed_nodes {
-                        exact_changed_nodes.insert(edge.to);
+                        if let Some(exact_changed_nodes) = &mut exact_changed_nodes {
+                            exact_changed_nodes.insert(edge.to);
+                        }
+
+                        has_changes.store(true, Ordering::Relaxed);
                     }
-
-                    has_changes.store(true, Ordering::Relaxed);
                 }
             }
-        }
-    });
+        });
 
     has_changes.load(Ordering::Relaxed)
 }
@@ -289,7 +309,10 @@ impl HarmonicCentrality {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::webgraph::{Node, WebgraphWriter};
+    use crate::{
+        webgraph::{Node, WebgraphWriter},
+        webpage::html::links::RelFlags,
+    };
 
     fn test_edges() -> Vec<(Node, Node, String)> {
         //     ┌────┐
@@ -320,7 +343,7 @@ mod tests {
         );
 
         for (from, to, label) in test_edges() {
-            writer.insert(from, to, label);
+            writer.insert(from, to, label, RelFlags::default());
         }
 
         writer.finalize()
@@ -339,71 +362,85 @@ mod tests {
             Node::from("A.com/1").into_host(),
             Node::from("A.com/2").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/1").into_host(),
             Node::from("A.com/3").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/1").into_host(),
             Node::from("A.com/4").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/2").into_host(),
             Node::from("A.com/1").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/2").into_host(),
             Node::from("A.com/3").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/2").into_host(),
             Node::from("A.com/4").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/3").into_host(),
             Node::from("A.com/1").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/3").into_host(),
             Node::from("A.com/2").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/3").into_host(),
             Node::from("A.com/4").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/4").into_host(),
             Node::from("A.com/1").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/4").into_host(),
             Node::from("A.com/2").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("A.com/4").into_host(),
             Node::from("A.com/3").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("C.com").into_host(),
             Node::from("B.com").into_host(),
             String::new(),
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("D.com").into_host(),
             Node::from("B.com").into_host(),
             String::new(),
+            RelFlags::default(),
         );
 
         let graph = writer.finalize();
@@ -445,22 +482,57 @@ mod tests {
         );
 
         for (from, to, label) in test_edges() {
-            other.insert(from, to, label);
+            other.insert(from, to, label, RelFlags::default());
         }
 
-        other.insert(Node::from("A"), Node::from("B"), "1".to_string());
+        other.insert(
+            Node::from("A"),
+            Node::from("B"),
+            "1".to_string(),
+            RelFlags::default(),
+        );
         other.commit();
-        other.insert(Node::from("A"), Node::from("B"), "2".to_string());
+        other.insert(
+            Node::from("A"),
+            Node::from("B"),
+            "2".to_string(),
+            RelFlags::default(),
+        );
         other.commit();
-        other.insert(Node::from("A"), Node::from("B"), "3".to_string());
+        other.insert(
+            Node::from("A"),
+            Node::from("B"),
+            "3".to_string(),
+            RelFlags::default(),
+        );
         other.commit();
-        other.insert(Node::from("A"), Node::from("B"), "4".to_string());
+        other.insert(
+            Node::from("A"),
+            Node::from("B"),
+            "4".to_string(),
+            RelFlags::default(),
+        );
         other.commit();
-        other.insert(Node::from("A"), Node::from("B"), "5".to_string());
+        other.insert(
+            Node::from("A"),
+            Node::from("B"),
+            "5".to_string(),
+            RelFlags::default(),
+        );
         other.commit();
-        other.insert(Node::from("A"), Node::from("B"), "6".to_string());
+        other.insert(
+            Node::from("A"),
+            Node::from("B"),
+            "6".to_string(),
+            RelFlags::default(),
+        );
         other.commit();
-        other.insert(Node::from("A"), Node::from("B"), "7".to_string());
+        other.insert(
+            Node::from("A"),
+            Node::from("B"),
+            "7".to_string(),
+            RelFlags::default(),
+        );
         other.commit();
 
         let mut graph = other.finalize();
@@ -469,5 +541,25 @@ mod tests {
         let centrality_extra = HarmonicCentrality::calculate(&graph);
 
         assert_eq!(centrality.0, centrality_extra.0);
+    }
+
+    #[test]
+    fn test_rel_flag_ignored() {
+        let mut graph = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            crate::executor::Executor::single_thread(),
+            crate::webgraph::Compression::default(),
+            None,
+        );
+
+        for (from, to, label) in test_edges() {
+            graph.insert(from, to, label, RelFlags::TAG);
+        }
+
+        let graph = graph.finalize();
+
+        let centrality = HarmonicCentrality::calculate(&graph);
+
+        assert!(centrality.0.values().all(|&v| v == 0.0));
     }
 }
