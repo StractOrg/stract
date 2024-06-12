@@ -234,6 +234,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::too_many_lines)]
     async fn it_ranks_search_results() {
         let mut wrt = WebgraphWriter::new(
             crate::gen_temp_path(),
