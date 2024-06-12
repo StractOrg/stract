@@ -222,8 +222,8 @@ struct FinalEdgeStoreWriter {
     ranges: RangesDb,
     hosts: HostDb,
 
-    edge_labels: IterableStoreWriter<CompressedLabelBlock, File>,
-    edge_nodes: ConstIterableStoreWriter<StoredEdge, File>,
+    labels: IterableStoreWriter<CompressedLabelBlock, File>,
+    edges: ConstIterableStoreWriter<StoredEdge, File>,
 
     host_centrality_rank_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
 
@@ -242,29 +242,29 @@ impl FinalEdgeStoreWriter {
     ) -> Self {
         let ranges = RangesDb::open(path.as_ref().join("ranges"));
 
-        let edge_labels_file = File::options()
+        let labels_file = File::options()
             .read(true)
             .create(true)
             .truncate(false)
             .write(true)
             .open(path.as_ref().join("labels"))
             .unwrap();
-        let edge_labels = IterableStoreWriter::new(edge_labels_file);
+        let labels = IterableStoreWriter::new(labels_file);
 
-        let edge_nodes_file = File::options()
+        let edges_file = File::options()
             .read(true)
             .create(true)
             .truncate(false)
             .write(true)
             .open(path.as_ref().join("edges"))
             .unwrap();
-        let edge_nodes = ConstIterableStoreWriter::new(edge_nodes_file);
+        let edges = ConstIterableStoreWriter::new(edges_file);
 
         Self {
             ranges,
             hosts: HostDb::open(path.as_ref().join("hosts")),
-            edge_labels,
-            edge_nodes,
+            labels,
+            edges,
             reversed,
             compression,
             path: path.as_ref().to_path_buf(),
@@ -304,7 +304,7 @@ impl FinalEdgeStoreWriter {
         debug_assert!(self.ranges.labels_get_raw(&node_bytes).is_none());
 
         let mut edge_labels = Vec::new();
-        let mut edge_nodes: Vec<StoredEdge> = Vec::new();
+        let mut stored_edges: Vec<StoredEdge> = Vec::new();
 
         for edge in edges {
             edge_labels.push(edge.label.clone());
@@ -323,7 +323,7 @@ impl FinalEdgeStoreWriter {
 
             let datum = NodeDatum::new(node, sort_key);
             let rel = edge.rel;
-            edge_nodes.push(StoredEdge::new(datum, rel));
+            stored_edges.push(StoredEdge::new(datum, rel));
         }
 
         let edge_labels: Vec<_> = edge_labels
@@ -339,7 +339,7 @@ impl FinalEdgeStoreWriter {
         let mut last_node_offset = None;
 
         for block in &edge_labels {
-            let offset = self.edge_labels.write(block).unwrap();
+            let offset = self.labels.write(block).unwrap();
 
             if first_label_offset.is_none() {
                 first_label_offset = Some(offset);
@@ -348,8 +348,8 @@ impl FinalEdgeStoreWriter {
             last_label_offset = Some(offset);
         }
 
-        for node in &edge_nodes {
-            let offset = self.edge_nodes.write(node).unwrap();
+        for node in &stored_edges {
+            let offset = self.edges.write(node).unwrap();
 
             if first_node_offset.is_none() {
                 first_node_offset = Some(offset);
@@ -446,7 +446,7 @@ impl FinalEdgeStoreWriter {
 
         self.ranges.commit();
 
-        self.edge_nodes.flush().unwrap();
-        self.edge_labels.flush().unwrap();
+        self.edges.flush().unwrap();
+        self.labels.flush().unwrap();
     }
 }

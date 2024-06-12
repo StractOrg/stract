@@ -17,6 +17,7 @@
 use std::{cmp::Reverse, collections::BinaryHeap};
 
 use super::{store::EdgeRange, NodeID, StoredEdge};
+use std::hash::Hash;
 
 pub struct MergeNode<O = ()> {
     node: NodeID,
@@ -178,12 +179,14 @@ impl<'a, L> Iterator for EdgeMerger<'a, L> {
 
         if let Some(edge) = &res {
             while let Some(mut peek) = self.iters.peek_mut() {
-                if peek.0.peek().map(|x| x.other.sort_key) == Some(edge.other.sort_key) {
+                if peek.0.peek().map(|x| x.other.id) == Some(edge.other.id) {
                     peek.0.next().unwrap();
                 } else {
                     break;
                 }
             }
+        } else {
+            debug_assert!(self.iters.iter().all(|p| p.0.peek().is_none()));
         }
 
         res
@@ -217,6 +220,13 @@ impl PartialEq for NodeDatum {
 }
 
 impl Eq for NodeDatum {}
+
+impl Hash for NodeDatum {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        self.sort_key.hash(state);
+    }
+}
 
 impl NodeDatum {
     pub fn new(node: NodeID, sort_key: u64) -> Self {
@@ -255,6 +265,12 @@ impl<L> PartialEq for StoredEdge<L> {
 }
 
 impl<L> Eq for StoredEdge<L> {}
+
+impl<L> Hash for StoredEdge<L> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.other.hash(state);
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -304,6 +320,38 @@ mod tests {
     }
 
     #[test]
+    fn test_merge_nodes_unequal_len() {
+        let a = vec![
+            MergeNode::new(1u64.into(), EdgeRange::new(0..10, 1), 0..10),
+            MergeNode::new(4u64.into(), EdgeRange::new(0..10, 2), 0..10),
+            MergeNode::new(5u64.into(), EdgeRange::new(0..10, 3), 0..10),
+        ];
+
+        let b = vec![MergeNode::new(2u64.into(), EdgeRange::new(0..10, 4), 0..10)];
+
+        let mut merger = MergeIter::new(vec![a.into_iter(), b.into_iter()]);
+        let mut buf = Vec::new();
+
+        assert!(merger.advance(&mut buf));
+        assert_eq!(buf.len(), 1);
+        assert_eq!(buf[0].id(), 1u64.into());
+
+        assert!(merger.advance(&mut buf));
+        assert_eq!(buf.len(), 1);
+        assert_eq!(buf[0].id(), 2u64.into());
+
+        assert!(merger.advance(&mut buf));
+        assert_eq!(buf.len(), 1);
+        assert_eq!(buf[0].id(), 4u64.into());
+
+        assert!(merger.advance(&mut buf));
+        assert_eq!(buf.len(), 1);
+        assert_eq!(buf[0].id(), 5u64.into());
+
+        assert!(!merger.advance(&mut buf));
+    }
+
+    #[test]
     fn test_datum_merge() {
         let a = vec![
             StoredEdge::new(NodeDatum::new(1u64.into(), 1), RelFlags::default()),
@@ -322,6 +370,28 @@ mod tests {
         assert_eq!(merger.next().unwrap().other.sort_key(), 1);
         assert_eq!(merger.next().unwrap().other.sort_key(), 2);
         assert_eq!(merger.next().unwrap().other.sort_key(), 3);
+        assert_eq!(merger.next().unwrap().other.sort_key(), 4);
+        assert_eq!(merger.next().unwrap().other.sort_key(), 5);
+        assert!(merger.next().is_none());
+    }
+
+    #[test]
+    fn test_datum_merge_unequal_len() {
+        let a = vec![
+            StoredEdge::new(NodeDatum::new(1u64.into(), 1), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(2u64.into(), 4), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(3u64.into(), 5), RelFlags::default()),
+        ];
+
+        let b = vec![StoredEdge::new(
+            NodeDatum::new(4u64.into(), 2),
+            RelFlags::default(),
+        )];
+
+        let mut merger = EdgeMerger::new(vec![a.into_iter(), b.into_iter()]);
+
+        assert_eq!(merger.next().unwrap().other.sort_key(), 1);
+        assert_eq!(merger.next().unwrap().other.sort_key(), 2);
         assert_eq!(merger.next().unwrap().other.sort_key(), 4);
         assert_eq!(merger.next().unwrap().other.sort_key(), 5);
         assert!(merger.next().is_none());

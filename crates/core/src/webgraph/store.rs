@@ -340,16 +340,16 @@ impl EdgeStore {
 
         for node in buf {
             let store = &stores[node.ord().as_usize()];
-            let edge_nodes = store.edges.slice(usize_range(node.range().range.clone()));
-            let edge_labels = store
+            let stored_edges = store.edges.slice(usize_range(node.range().range.clone()));
+            let labels = store
                 .edge_labels
                 .slice(usize_range(node.labels()))
                 .map(|r| r.decompress())
                 .flat_map(|block| block.labels.into_iter());
 
             edges.push(
-                edge_nodes
-                    .zip_eq(edge_labels)
+                stored_edges
+                    .zip_eq(labels)
                     .map(|(edge, label)| edge.with_label(label)),
             );
         }

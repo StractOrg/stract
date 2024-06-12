@@ -442,12 +442,12 @@ pub mod tests {
     }
 
     pub fn test_graph() -> Webgraph {
-        //     ┌------┐
-        //     │      │
+        //     ┌-----┐
+        //     │     │
         // ┌───A◄─┐  │
-        // │       │  │
+        // │      │  │
         // ▼      │  │
-        // B─────►C◄┘
+        // B─────►C◄-┘
         //        ▲
         //        │
         //        │
@@ -505,7 +505,7 @@ pub mod tests {
     }
 
     #[test]
-    fn merge() {
+    fn merge_path() {
         let mut graphs = Vec::new();
         for (from, to, label) in &[
             (Node::from("A"), Node::from("B"), String::new()),
@@ -532,12 +532,82 @@ pub mod tests {
             graph.merge(other).unwrap();
         }
 
+        graph.merge_all_segments(Compression::default()).unwrap();
         graph.optimize_read();
 
         assert_eq!(
             graph.distances(Node::from("A")).get(&Node::from("H")),
             Some(&7)
         );
+    }
+
+    #[test]
+    fn merge_simple() {
+        let mut graphs = Vec::new();
+        for (from, to, label) in test_edges() {
+            let mut wrt = WebgraphWriter::new(
+                crate::gen_temp_path(),
+                Executor::single_thread(),
+                Compression::default(),
+                None,
+            );
+            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
+            graphs.push(wrt.finalize());
+        }
+
+        let mut graph = graphs.pop().unwrap();
+
+        for other in graphs {
+            graph.merge(other).unwrap();
+        }
+
+        graph.merge_all_segments(Compression::default()).unwrap();
+        graph.optimize_read();
+
+        let mut res = graph.outgoing_edges(Node::from("A"), EdgeLimit::Unlimited);
+        res.sort_by(|a, b| a.to.cmp(&b.to));
+        assert_eq!(res.len(), 2);
+
+        assert_eq!(res[0].to, Node::from("B"));
+        assert_eq!(res[1].to, Node::from("C"));
+
+        let mut res = graph.outgoing_edges(Node::from("B"), EdgeLimit::Unlimited);
+        res.sort_by(|a, b| a.to.cmp(&b.to));
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].to, Node::from("C"));
+
+        let mut res = graph.outgoing_edges(Node::from("C"), EdgeLimit::Unlimited);
+        res.sort_by(|a, b| a.to.cmp(&b.to));
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].to, Node::from("A"));
+
+        let mut res = graph.outgoing_edges(Node::from("D"), EdgeLimit::Unlimited);
+        res.sort_by(|a, b| a.to.cmp(&b.to));
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].to, Node::from("C"));
+
+        let mut res = graph.ingoing_edges(Node::from("A"), EdgeLimit::Unlimited);
+        res.sort_by(|a, b| a.from.cmp(&b.from));
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].from, Node::from("C"));
+
+        let mut res = graph.ingoing_edges(Node::from("B"), EdgeLimit::Unlimited);
+        res.sort_by(|a, b| a.from.cmp(&b.from));
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].from, Node::from("A"));
+
+        let mut res = graph.ingoing_edges(Node::from("C"), EdgeLimit::Unlimited);
+        res.sort_by(|a, b| a.from.cmp(&b.from));
+
+        assert_eq!(res.len(), 3);
+        assert_eq!(res[0].from, Node::from("A"));
+        assert_eq!(res[1].from, Node::from("B"));
+        assert_eq!(res[2].from, Node::from("D"));
     }
 
     #[test]
@@ -575,6 +645,97 @@ pub mod tests {
         assert_eq!(
             graph.distances(Node::from("A")).get(&Node::from("C")),
             Some(&2)
+        );
+
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("A"), EdgeLimit::Unlimited)
+                .len(),
+            1
+        );
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("B"), EdgeLimit::Unlimited)
+                .len(),
+            1
+        );
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("C"), EdgeLimit::Unlimited)
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn merge_star() {
+        let mut graphs = Vec::new();
+        for (from, to, label) in &[
+            (Node::from("A"), Node::from("B"), String::new()),
+            (Node::from("A"), Node::from("C"), String::new()),
+            (Node::from("A"), Node::from("D"), String::new()),
+            (Node::from("A"), Node::from("E"), String::new()),
+        ] {
+            let mut wrt = WebgraphWriter::new(
+                crate::gen_temp_path(),
+                Executor::single_thread(),
+                Compression::default(),
+                None,
+            );
+            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
+            graphs.push(wrt.finalize());
+        }
+
+        let mut graph = graphs.pop().unwrap();
+
+        for other in graphs {
+            graph.merge(other).unwrap();
+        }
+
+        graph.merge_all_segments(Compression::default()).unwrap();
+        graph.optimize_read();
+
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("A"), EdgeLimit::Unlimited)
+                .len(),
+            4
+        );
+    }
+
+    #[test]
+    fn merge_reverse_star() {
+        let mut graphs = Vec::new();
+        for (from, to, label) in &[
+            (Node::from("B"), Node::from("A"), String::new()),
+            (Node::from("C"), Node::from("A"), String::new()),
+            (Node::from("D"), Node::from("A"), String::new()),
+            (Node::from("E"), Node::from("A"), String::new()),
+        ] {
+            let mut wrt = WebgraphWriter::new(
+                crate::gen_temp_path(),
+                Executor::single_thread(),
+                Compression::default(),
+                None,
+            );
+            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
+            graphs.push(wrt.finalize());
+        }
+
+        let mut graph = graphs.pop().unwrap();
+
+        for other in graphs {
+            graph.merge(other).unwrap();
+        }
+
+        graph.merge_all_segments(Compression::default()).unwrap();
+        graph.optimize_read();
+
+        assert_eq!(
+            graph
+                .ingoing_edges(Node::from("A"), EdgeLimit::Unlimited)
+                .len(),
+            4
         );
     }
 
