@@ -131,7 +131,7 @@ impl Node {
                 text: SimpleOrPhrase::Simple(SimpleTerm::from(s)),
                 field: text_field::UrlForSiteOperator.into(),
             }),
-            ParserTerm::LinksTo(s) => Node::Term(Term {
+            ParserTerm::LinkTo(s) => Node::Term(Term {
                 text: SimpleOrPhrase::Simple(SimpleTerm::from(s)),
                 field: text_field::Links.into(),
             }),

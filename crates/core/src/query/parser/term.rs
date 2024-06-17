@@ -98,7 +98,7 @@ impl std::fmt::Display for SimpleOrPhrase {
 pub enum Term {
     SimpleOrPhrase(SimpleOrPhrase),
     Site(String),
-    LinksTo(String),
+    LinkTo(String),
     Title(SimpleOrPhrase),
     Body(SimpleOrPhrase),
     Url(SimpleOrPhrase),
@@ -112,7 +112,7 @@ impl std::fmt::Display for Term {
             Term::SimpleOrPhrase(term) => write!(f, "{}", term),
             Term::Not(term) => write!(f, "-{}", term),
             Term::Site(site) => write!(f, "site:{}", site),
-            Term::LinksTo(site) => write!(f, "linksto:{}", site),
+            Term::LinkTo(site) => write!(f, "linkto:{}", site),
             Term::Title(title) => write!(f, "intitle:{}", title),
             Term::Body(body) => write!(f, "inbody:{}", body),
             Term::Url(url) => write!(f, "inurl:{}", url),
@@ -133,7 +133,7 @@ impl Term {
         match self {
             Term::SimpleOrPhrase(s) => Term::SimpleOrPhrase(s.truncate()),
             Term::Site(s) => Term::Site(s),
-            Term::LinksTo(s) => Term::LinksTo(s),
+            Term::LinkTo(s) => Term::LinkTo(s),
             Term::Title(s) => Term::Title(s.truncate()),
             Term::Body(s) => Term::Body(s.truncate()),
             Term::Url(s) => Term::Url(s.truncate()),

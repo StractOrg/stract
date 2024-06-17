@@ -533,7 +533,7 @@ mod tests {
         assert_eq!(result.webpages[0].url, "https://www.second.com/example/abc");
 
         let query = SearchQuery {
-            query: "test linksto:www.first.com".to_string(),
+            query: "test linkto:www.first.com".to_string(),
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
@@ -541,7 +541,7 @@ mod tests {
         assert_eq!(result.webpages[0].url, "https://www.second.com/example/abc");
 
         let query = SearchQuery {
-            query: "test -linksto:first.com".to_string(),
+            query: "test -linkto:first.com".to_string(),
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
@@ -549,7 +549,7 @@ mod tests {
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
         let query = SearchQuery {
-            query: "test linksto:second.com".to_string(),
+            query: "test linkto:second.com".to_string(),
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
@@ -557,7 +557,7 @@ mod tests {
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
         let query = SearchQuery {
-            query: "test linksto:www.second.com".to_string(),
+            query: "test linkto:www.second.com".to_string(),
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
@@ -565,7 +565,7 @@ mod tests {
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
         let query = SearchQuery {
-            query: "test linksto:second.com/example".to_string(),
+            query: "test linkto:second.com/example".to_string(),
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
@@ -627,7 +627,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let query = SearchQuery {
-            query: "test linksto:second.com".to_string(),
+            query: "test linkto:second.com".to_string(),
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");
