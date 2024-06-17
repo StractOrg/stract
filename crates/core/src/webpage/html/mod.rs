@@ -18,6 +18,7 @@ use crate::{enum_map::EnumSet, Result};
 use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
 use kuchiki::{traits::TendrilSink, NodeRef};
+use mime::Mime;
 use regex::Regex;
 use url::Url;
 use whatlang::Lang;
@@ -89,6 +90,23 @@ impl Html {
         res.robots = res.parse_robots_meta();
 
         Ok(res)
+    }
+
+    pub fn content_type(&self) -> Option<String> {
+        self.metadata()
+            .into_iter()
+            .find(|m| matches!(m.get("http-equiv"), Some(t) if t == "Content-Type"))
+            .and_then(|m| m.get("content").cloned())
+    }
+
+    pub fn mime(&self) -> Option<Mime> {
+        self.content_type()
+            .and_then(|content_type| content_type.parse().ok())
+    }
+
+    pub fn charset(&self) -> Option<String> {
+        self.mime()
+            .and_then(|mime| mime.get_param("charset").map(|s| s.to_string()))
     }
 
     pub fn lang(&self) -> Option<&'_ Lang> {
