@@ -74,7 +74,7 @@ impl Html {
     pub fn pretokenize_url_for_site_operator(&self) -> PreTokenizedString {
         self.pretokenize_string_with(
             self.url().to_string(),
-            tokenizer::Tokenizer::SiteOperator(tokenizer::SiteOperatorUrlTokenizer),
+            tokenizer::Tokenizer::Url(tokenizer::UrlTokenizer),
         )
     }
 

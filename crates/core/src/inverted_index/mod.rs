@@ -49,7 +49,7 @@ use crate::schema::text_field::TextField;
 use crate::schema::{fast_field, text_field, FastFieldEnum, Field, TextFieldEnum};
 use crate::snippet::TextSnippet;
 use crate::tokenizer::{
-    BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Stemmed, TrigramTokenizer,
+    BigramTokenizer, Identity, JsonField, Stemmed, TrigramTokenizer, UrlTokenizer,
 };
 use crate::webpage::region::Region;
 
@@ -124,7 +124,7 @@ fn register_tokenizers(manager: &TokenizerManager) {
     let tokenizer = Tokenizer::Trigram(TrigramTokenizer::default());
     manager.register(tokenizer.as_str(), tokenizer);
 
-    let tokenizer = Tokenizer::SiteOperator(SiteOperatorUrlTokenizer);
+    let tokenizer = Tokenizer::Url(UrlTokenizer);
     manager.register(tokenizer.as_str(), tokenizer);
 
     let tokenizer = Tokenizer::Json(JsonField);

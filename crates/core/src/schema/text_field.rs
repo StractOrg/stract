@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use enum_dispatch::enum_dispatch;
+use itertools::Itertools;
 use strum::{EnumDiscriminants, VariantArray};
 use tantivy::{
     schema::{IndexRecordOption, TextFieldIndexing, TextOptions},
@@ -28,8 +29,7 @@ use crate::{
     enum_dispatch_from_discriminant,
     enum_map::InsertEnumMapKey,
     tokenizer::{
-        self, BigramTokenizer, Identity, JsonField, SiteOperatorUrlTokenizer, Tokenizer,
-        TrigramTokenizer,
+        self, BigramTokenizer, Identity, JsonField, Tokenizer, TrigramTokenizer, UrlTokenizer,
     },
     webpage::Html,
     Result,
@@ -184,6 +184,7 @@ pub enum TextFieldEnum {
     InsertionTimestamp,
     RecipeFirstIngredientTagId,
     Keywords,
+    Links,
 }
 
 enum_dispatch_from_discriminant!(TextFieldEnumDiscriminants => TextFieldEnum,
@@ -220,6 +221,7 @@ enum_dispatch_from_discriminant!(TextFieldEnumDiscriminants => TextFieldEnum,
     InsertionTimestamp,
     RecipeFirstIngredientTagId,
     Keywords,
+    Links,
 ]);
 
 impl TextFieldEnum {
@@ -584,7 +586,7 @@ impl TextField for UrlForSiteOperator {
     }
 
     fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::SiteOperator(SiteOperatorUrlTokenizer)
+        Tokenizer::Url(UrlTokenizer)
     }
 
     fn add_html_tantivy(
@@ -1539,6 +1541,41 @@ impl TextField for Keywords {
             self.tantivy_field(schema)
                 .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
             webpage.keywords.join("\n"),
+        );
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Links;
+impl TextField for Links {
+    fn name(&self) -> &str {
+        "links"
+    }
+
+    fn has_pos(&self) -> bool {
+        true
+    }
+
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
+        Tokenizer::Url(UrlTokenizer)
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            html.anchor_links()
+                .into_iter()
+                .map(|l| l.destination.as_str().to_string())
+                .join("\n"),
         );
 
         Ok(())

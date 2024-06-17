@@ -63,7 +63,7 @@ pub enum Tokenizer {
     Bigram(BigramTokenizer),
     Trigram(TrigramTokenizer),
     Json(JsonField),
-    SiteOperator(SiteOperatorUrlTokenizer),
+    Url(UrlTokenizer),
 }
 
 impl Tokenizer {
@@ -75,7 +75,7 @@ impl Tokenizer {
             Tokenizer::Bigram(_) => BigramTokenizer::as_str(),
             Tokenizer::Trigram(_) => TrigramTokenizer::as_str(),
             Tokenizer::Json(_) => JsonField::as_str(),
-            Tokenizer::SiteOperator(_) => SiteOperatorUrlTokenizer::as_str(),
+            Tokenizer::Url(_) => UrlTokenizer::as_str(),
         }
     }
 }
@@ -187,7 +187,7 @@ impl tantivy::tokenizer::Tokenizer for Tokenizer {
             Tokenizer::Json(tokenizer) => tokenizer.token_stream(text),
             Tokenizer::Bigram(tokenizer) => tokenizer.token_stream(text),
             Tokenizer::Trigram(tokenizer) => tokenizer.token_stream(text),
-            Tokenizer::SiteOperator(tokenizer) => tokenizer.token_stream(text),
+            Tokenizer::Url(tokenizer) => tokenizer.token_stream(text),
         }
     }
 }
@@ -620,19 +620,15 @@ struct ParsedUrl {
 }
 
 #[derive(Debug, Clone)]
-pub struct SiteOperatorUrlTokenizer;
+pub struct UrlTokenizer;
 
-impl SiteOperatorUrlTokenizer {
+impl UrlTokenizer {
     pub fn as_str() -> &'static str {
-        "site_operator_url_tokenizer"
+        "url_tokenizer"
     }
-}
 
-impl tantivy::tokenizer::Tokenizer for SiteOperatorUrlTokenizer {
-    type TokenStream<'a> = BoxTokenStream<'a>;
-
-    fn token_stream<'a>(&mut self, text: &'a str) -> Self::TokenStream<'a> {
-        let parsed_url = url::Url::parse(text)
+    fn parse_url(text: &str) -> ParsedUrl {
+        url::Url::parse(text)
             .or_else(|_| url::Url::parse(&format!("http://{}", text)))
             .map(|url| {
                 let domain = Some(
@@ -668,23 +664,46 @@ impl tantivy::tokenizer::Tokenizer for SiteOperatorUrlTokenizer {
                     }
                 }
             })
-            .unwrap_or_default();
+            .unwrap_or_default()
+    }
+}
 
-        BoxTokenStream::new(SiteOperatorUrlTokenStream {
-            url: parsed_url,
-            token: tantivy::tokenizer::Token::default(),
-        })
+impl tantivy::tokenizer::Tokenizer for UrlTokenizer {
+    type TokenStream<'a> = BoxTokenStream<'a>;
+
+    fn token_stream<'a>(&mut self, text: &'a str) -> Self::TokenStream<'a> {
+        debug_assert_eq!(text.chars().filter(|c| *c == ' ').count(), 0);
+
+        let urls = text
+            .split('\n')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_lowercase())
+            .map(|s| Self::parse_url(&s))
+            .collect();
+
+        BoxTokenStream::new(SiteOperatorUrlTokenStream::new(urls))
     }
 }
 
 pub struct SiteOperatorUrlTokenStream {
-    url: ParsedUrl,
+    urls: VecDeque<ParsedUrl>,
+    current_url: ParsedUrl,
     token: tantivy::tokenizer::Token,
 }
 
-impl tantivy::tokenizer::TokenStream for SiteOperatorUrlTokenStream {
-    fn advance(&mut self) -> bool {
-        if let Some(protocol) = self.url.protocol.as_mut() {
+impl SiteOperatorUrlTokenStream {
+    fn new(mut urls: VecDeque<ParsedUrl>) -> Self {
+        let current_url = urls.pop_front().unwrap_or_default();
+
+        Self {
+            urls,
+            current_url,
+            token: tantivy::tokenizer::Token::default(),
+        }
+    }
+
+    fn advance_current_url(&mut self) -> bool {
+        if let Some(protocol) = self.current_url.protocol.as_mut() {
             self.token.position = self.token.position.wrapping_add(1);
             self.token.text.clear();
 
@@ -697,13 +716,13 @@ impl tantivy::tokenizer::TokenStream for SiteOperatorUrlTokenStream {
                 self.token.text.push_str("://");
                 self.token.offset_to += self.token.text.len();
 
-                self.url.protocol = None;
+                self.current_url.protocol = None;
             }
 
             return true;
         }
 
-        if let Some(domain) = self.url.domain.as_mut() {
+        if let Some(domain) = self.current_url.domain.as_mut() {
             if let Some(s) = domain.pop_front() {
                 self.token.text.clear();
                 self.token.position = self.token.position.wrapping_add(1);
@@ -716,7 +735,7 @@ impl tantivy::tokenizer::TokenStream for SiteOperatorUrlTokenStream {
             }
         }
 
-        if let Some(s) = self.url.path.pop_front() {
+        if let Some(s) = self.current_url.path.pop_front() {
             self.token.text.clear();
             self.token.position = self.token.position.wrapping_add(1);
 
@@ -728,6 +747,33 @@ impl tantivy::tokenizer::TokenStream for SiteOperatorUrlTokenStream {
         }
 
         false
+    }
+
+    fn next_url(&mut self) -> bool {
+        if let Some(url) = self.urls.pop_front() {
+            self.current_url = url;
+
+            self.token.position = self.token.position.wrapping_add(1);
+            self.token.text.clear();
+            self.token.text.push('\n');
+
+            self.token.offset_from = self.token.offset_to;
+            self.token.offset_to += self.token.text.len();
+
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl tantivy::tokenizer::TokenStream for SiteOperatorUrlTokenStream {
+    fn advance(&mut self) -> bool {
+        if self.advance_current_url() {
+            return true;
+        }
+
+        self.next_url()
     }
 
     fn token(&self) -> &tantivy::tokenizer::Token {
@@ -796,7 +842,7 @@ mod tests {
 
     fn tokenize_url(s: &str) -> Vec<String> {
         let mut res = Vec::new();
-        let mut tokenizer = SiteOperatorUrlTokenizer;
+        let mut tokenizer = UrlTokenizer;
         let mut stream = tokenizer.token_stream(s);
 
         while let Some(token) = stream.next() {
@@ -1071,6 +1117,30 @@ key1.key2="this\" is @ a # test""#;
         );
 
         assert_eq!(tokenize_url(".com"), vec![".", "com ",])
+    }
+
+    #[test]
+    fn multiple_urls() {
+        assert_eq!(
+            tokenize_url("https://www.example.com\nhttps://www.example.com"),
+            vec!["www", ".", "example", ".", "com ", "\n", "www", ".", "example", ".", "com ",]
+        );
+
+        assert_eq!(
+            tokenize_url("https://www.example.com/test\nhttps://www.abcd.com"),
+            vec![
+                "www", ".", "example", ".", "com ", "/", "test", "\n", "www", ".", "abcd", ".",
+                "com ",
+            ]
+        );
+
+        assert_eq!(
+            tokenize_url("https://example.com/test\nhttps://www.abcd.com/test"),
+            vec![
+                "example", ".", "com ", "/", "test", "\n", "www", ".", "abcd", ".", "com ", "/",
+                "test",
+            ]
+        );
     }
 
     #[test]

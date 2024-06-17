@@ -480,6 +480,162 @@ mod tests {
     }
 
     #[test]
+    fn links_to_query() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(
+                &Webpage::test_parse(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                This is a test website
+                                <a href="https://www.second.com/example/abc">Second</a>
+                            </body>
+                        </html>
+                    "#,
+                    "https://www.first.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index
+            .insert(
+                &Webpage::test_parse(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This test page does not contain the forbidden word
+                                <a href="https://www.first.com">First</a>
+                            </body>
+                        </html>
+                    "#,
+                    "https://www.second.com/example/abc",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+
+        let query = SearchQuery {
+            query: "test linksto:first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.second.com/example/abc");
+
+        let query = SearchQuery {
+            query: "test linksto:www.first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.second.com/example/abc");
+
+        let query = SearchQuery {
+            query: "test -linksto:first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+
+        let query = SearchQuery {
+            query: "test linksto:second.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+
+        let query = SearchQuery {
+            query: "test linksto:www.second.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+
+        let query = SearchQuery {
+            query: "test linksto:second.com/example".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+
+        let query = SearchQuery {
+            query: "test linksto:second.com/example/abc".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+    }
+
+    #[test]
+    fn links_to_uppercase() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(
+                &Webpage::test_parse(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                This is a test website
+                                <a href="https://www.SeCoNd.CoM/eXaMpLe/AbC">Second</a>
+                            </body>
+                        </html>
+                    "#,
+                    "https://www.first.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index
+            .insert(
+                &Webpage::test_parse(
+                    r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This test page does not contain the forbidden word
+                                <a href="https://www.first.com">First</a>
+                            </body>
+                        </html>
+                    "#,
+                    "https://www.second.com/example/AbC",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+
+        let query = SearchQuery {
+            query: "test linksto:second.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(result.webpages[0].url, "https://www.first.com/");
+    }
+
+    #[test]
     fn title_query() {
         let mut index = Index::temporary().expect("Unable to open index");
 
