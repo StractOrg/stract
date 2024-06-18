@@ -13,7 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use encoding_rs::{Encoding, UTF_8};
 use hashbrown::HashSet;
 use mime::Mime;
@@ -535,6 +535,10 @@ impl<S: DatumStream> JobExecutor<S> {
     }
 
     async fn crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
+        if self.crawled_urls.contains(&url) {
+            bail!("url already crawled: {}", url);
+        }
+
         let start = Instant::now();
         let res = self.fetch_with_https_priority(url.clone()).await;
         let fetch_time = start.elapsed();
