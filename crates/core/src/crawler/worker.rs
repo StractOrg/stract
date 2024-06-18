@@ -133,6 +133,7 @@ pub struct JobExecutor<S: DatumStream> {
     sitemap_urls: HashSet<Url>,
     config: Arc<CrawlerConfig>,
     wander_prioritiser: WanderPrioritiser,
+    wandered_urls: u64,
     job: WorkerJob,
 }
 
@@ -153,6 +154,7 @@ impl<S: DatumStream> JobExecutor<S> {
             client,
             crawled_urls: HashSet::new(),
             crawled_sitemaps: HashSet::new(),
+            wandered_urls: 0,
             sitemap_urls: HashSet::new(),
             config,
             wander_prioritiser: WanderPrioritiser::new(),
@@ -165,7 +167,9 @@ impl<S: DatumStream> JobExecutor<S> {
 
         self.scheduled_urls().await;
 
-        if self.job.wandering_urls > 0 {
+        while self.wandered_urls < self.job.wandering_urls
+            && self.wander_prioritiser.known_urls() > 0
+        {
             self.wander().await;
         }
     }
@@ -178,9 +182,13 @@ impl<S: DatumStream> JobExecutor<S> {
     async fn wander(&mut self) {
         let mut urls: Vec<(Url, f64)> = self
             .wander_prioritiser
-            .top_and_clear(self.job.wandering_urls as usize)
+            .top_and_clear(self.job.wandering_urls.saturating_sub(self.wandered_urls) as usize)
             .into_iter()
             .chain(self.sitemap_urls.drain().map(|url| (url.clone(), 0.0)))
+            .map(|(mut url, score)| {
+                url.normalize();
+                (url, score)
+            })
             .filter(|(url, _)| !self.crawled_urls.contains(url))
             .filter(|(url, _)| self.job.domain == Domain::from(url))
             .filter(|(_, score)| score.is_finite())
@@ -191,13 +199,15 @@ impl<S: DatumStream> JobExecutor<S> {
 
         urls.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 
-        let urls = urls
+        let urls: VecDeque<_> = urls
             .into_iter()
-            .take(self.job.wandering_urls as usize)
+            .take(self.job.wandering_urls.saturating_sub(self.wandered_urls) as usize)
             .map(|(url, _)| url)
             .map(|url| WeightedUrl { url, weight: 0.0 })
             .map(RetrieableUrl::from)
             .collect();
+
+        self.wandered_urls += urls.len() as u64;
 
         self.process_urls(urls, false).await;
     }
@@ -291,16 +301,21 @@ impl<S: DatumStream> JobExecutor<S> {
         tracing::warn!("politeness factor increased to {}", self.politeness_factor);
     }
 
-    fn new_urls(html: &Html) -> Vec<Url> {
-        html.all_links()
+    fn new_urls(&self, html: &Html) -> Vec<Url> {
+        html.anchor_links()
             .into_iter()
             .map(|link| link.destination)
+            .map(|mut url| {
+                url.normalize();
+                url
+            })
             .filter(|url| url.as_str().len() <= MAX_URL_LEN_BYTES)
             .filter(|url| {
                 IGNORED_EXTENSIONS
                     .iter()
                     .all(|ext| !url.as_str().ends_with(ext))
             })
+            .filter(|url| !self.crawled_urls.contains(url))
             .collect()
     }
 
@@ -314,7 +329,7 @@ impl<S: DatumStream> JobExecutor<S> {
 
                     match Html::parse(&datum.body, datum.url.as_str()) {
                         Ok(html) => {
-                            let new_urls = Self::new_urls(&html);
+                            let new_urls = self.new_urls(&html);
                             let url_res = UrlResponse::Success { url: datum.url };
                             ProcessedUrl {
                                 new_urls,
@@ -519,7 +534,7 @@ impl<S: DatumStream> JobExecutor<S> {
         Ok(text.to_string())
     }
 
-    async fn crawl_url(&self, url: Url) -> Result<CrawlDatum> {
+    async fn crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
         let start = Instant::now();
         let res = self.fetch_with_https_priority(url.clone()).await;
         let fetch_time = start.elapsed();
@@ -536,7 +551,11 @@ impl<S: DatumStream> JobExecutor<S> {
 
         let status_code = res.status().as_u16();
 
-        let res_url = res.url().clone();
+        let mut res_url = res.url().clone();
+        res_url.normalize();
+
+        self.crawled_urls.insert(res_url.clone());
+
         let body = self.encoded_body(res).await?;
 
         Ok(CrawlDatum {

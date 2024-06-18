@@ -56,4 +56,8 @@ impl WanderPrioritiser {
 
         res
     }
+
+    pub fn known_urls(&self) -> usize {
+        self.url_weights.len()
+    }
 }
