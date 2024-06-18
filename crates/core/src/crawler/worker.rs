@@ -201,8 +201,13 @@ impl<S: DatumStream> JobExecutor<S> {
 
         let urls: VecDeque<_> = urls
             .into_iter()
-            .take(self.job.wandering_urls.saturating_sub(self.wandered_urls) as usize)
             .map(|(url, _)| url)
+            .map(|mut url| {
+                url.normalize();
+                url
+            })
+            .filter(|url| !self.crawled_urls.contains(url))
+            .take(self.job.wandering_urls.saturating_sub(self.wandered_urls) as usize)
             .map(|url| WeightedUrl { url, weight: 0.0 })
             .map(RetrieableUrl::from)
             .collect();
@@ -535,6 +540,9 @@ impl<S: DatumStream> JobExecutor<S> {
     }
 
     async fn crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
+        let mut url = url;
+        url.normalize();
+
         if self.crawled_urls.contains(&url) {
             bail!("url already crawled: {}", url);
         }
