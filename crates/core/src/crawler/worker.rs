@@ -555,6 +555,7 @@ impl<S: DatumStream> JobExecutor<S> {
         // we want to delay before returning the error
         let res = res?;
 
+        self.crawled_urls.insert(url.clone());
         let payload_type = self.check_headers(&res)?;
 
         if let Some(datum) = self.redirect_datum(&res, &url, payload_type, fetch_time)? {
