@@ -55,22 +55,13 @@ impl RobotsTxtManager {
         }
     }
 
-    async fn fetch_robots_txt(&self, site: &Site) -> Result<RobotsTxt> {
-        let mut res = self
+    async fn fetch_robots_txt_from_url(&self, url: &str) -> Result<RobotsTxt> {
+        let res = self
             .client
-            .get(&format!("http://{}/robots.txt", site.0))
+            .get(url)
             .timeout(Duration::from_secs(60))
             .send()
             .await;
-
-        if res.is_err() {
-            res = self
-                .client
-                .get(&format!("https://{}/robots.txt", site.0))
-                .timeout(Duration::from_secs(60))
-                .send()
-                .await;
-        }
 
         let res = res?;
 
@@ -92,6 +83,29 @@ impl RobotsTxtManager {
         match panic::catch_unwind(|| RobotsTxt::new(body)) {
             Ok(r) => Ok(r),
             Err(_) => Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into()),
+        }
+    }
+
+    async fn fetch_robots_txt(&self, site: &Site) -> Result<RobotsTxt> {
+        if let Ok(robots_txt) = self
+            .fetch_robots_txt_from_url(&format!("http://{}/robots.txt", site.0))
+            .await
+        {
+            return Ok(robots_txt);
+        }
+
+        match self
+            .fetch_robots_txt_from_url(&format!("https://{}/robots.txt", site.0))
+            .await
+        {
+            Ok(robots_txt) => Ok(robots_txt),
+            _ if !site.0.starts_with("www.")
+                && site.0.chars().filter(|&c| c == '.').count() == 1 =>
+            {
+                self.fetch_robots_txt_from_url(&format!("https://www.{}/robots.txt", &site.0))
+                    .await
+            }
+            Err(err) => Err(err),
         }
     }
 
