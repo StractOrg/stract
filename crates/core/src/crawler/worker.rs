@@ -332,6 +332,10 @@ impl<S: DatumStream> JobExecutor<S> {
                 200 => {
                     self.save_datum(datum.clone()).await;
 
+                    if datum.url != url {
+                        // todo: we might want to save the redirected url
+                    }
+
                     match Html::parse(&datum.body, datum.url.as_str()) {
                         Ok(html) => {
                             let new_urls = self.new_urls(&html);

@@ -8,6 +8,7 @@ use tantivy::{Score, Searcher, Term};
 
 const K1: Score = 1.2;
 const B: Score = 0.75;
+const DELTA: Score = 1.0;
 
 pub(crate) fn idf(doc_freq: u64, doc_count: u64) -> Score {
     assert!(doc_count >= doc_freq, "{doc_count} >= {doc_freq}");
@@ -135,7 +136,7 @@ impl Bm25Weight {
     }
 
     pub(crate) fn new(idf_explain: Explanation, average_fieldnorm: Score) -> Bm25Weight {
-        let weight = idf_explain.value() * (1.0 + K1);
+        let weight = idf_explain.value();
         Bm25Weight {
             idf_explain,
             weight,
@@ -146,14 +147,14 @@ impl Bm25Weight {
 
     #[inline]
     pub fn score(&self, fieldnorm_id: u8, term_freq: u32) -> Score {
-        self.weight * self.tf_factor(fieldnorm_id, term_freq)
+        self.weight * (self.tf_factor(fieldnorm_id, term_freq) + DELTA)
     }
 
     #[inline]
     pub(crate) fn tf_factor(&self, fieldnorm_id: u8, term_freq: u32) -> Score {
         let term_freq = term_freq as Score;
         let norm = self.cache[fieldnorm_id as usize];
-        term_freq / (term_freq + norm)
+        (term_freq * (K1 + 1.0)) / (term_freq + norm)
     }
 
     pub fn explain(&self, fieldnorm_id: u8, term_freq: u32) -> Explanation {
