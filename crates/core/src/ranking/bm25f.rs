@@ -17,7 +17,7 @@
 use itertools::Itertools;
 use tantivy::{Score, Searcher, Term};
 
-use super::bm25::{compute_tf_cache, idf, DELTA, K1};
+use super::bm25::{compute_tf_cache, idf, K1};
 
 /// A BM25F weight that uses the same IDF weight for all fields.
 /// The idea is that the term 'the' might not appear very frequently e.g. in the title field,
@@ -126,7 +126,7 @@ impl Bm25FWeight {
 
     #[inline]
     pub fn score(&self, coefficient: Score, fieldnorm_id: u8, term_freq: u32) -> Score {
-        self.weight * (self.tf_factor(coefficient, fieldnorm_id, term_freq) + DELTA)
+        self.weight * (self.tf_factor(coefficient, fieldnorm_id, term_freq))
     }
 
     #[inline]

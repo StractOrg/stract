@@ -35,7 +35,7 @@ use super::{Signal, SignalComputer};
 pub struct Bm25F;
 impl Signal for Bm25F {
     fn default_coefficient(&self) -> f64 {
-        0.002
+        0.1
     }
 
     fn as_field(&self) -> Option<Field> {

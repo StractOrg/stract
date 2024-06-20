@@ -7,7 +7,6 @@ use tantivy::{Score, Searcher, Term};
 
 pub const K1: Score = 1.2;
 pub const B: Score = 0.75;
-pub const DELTA: Score = 1.0;
 
 pub fn idf(doc_freq: u64, doc_count: u64) -> Score {
     assert!(doc_count >= doc_freq, "{doc_count} >= {doc_freq}");
@@ -111,7 +110,7 @@ impl Bm25Weight {
 
     #[inline]
     pub fn score(&self, fieldnorm_id: u8, term_freq: u32) -> Score {
-        self.weight * (self.tf_factor(fieldnorm_id, term_freq) + DELTA)
+        self.weight * self.tf_factor(fieldnorm_id, term_freq)
     }
 
     #[inline]
