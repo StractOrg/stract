@@ -15,50 +15,44 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
 use crate::schema::{self, Field};
-use itertools::Itertools;
 
-use tantivy::DocSet;
-use tantivy::{DocId, Postings};
+use tantivy::DocId;
 
-use super::computer::TextFieldData;
 use super::{Signal, SignalComputer};
 
-fn bm25(field: &mut TextFieldData, doc: DocId) -> f64 {
-    if field.postings.is_empty() {
-        return 0.0;
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
+pub struct Bm25F;
+impl Signal for Bm25F {
+    fn default_coefficient(&self) -> f64 {
+        0.002
     }
 
-    let fieldnorm_id = field.fieldnorm_reader.fieldnorm_id(doc);
-
-    field
-        .weight
-        .score(field.postings.iter_mut().map(move |posting| {
-            if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
-                (fieldnorm_id, posting.term_freq())
-            } else {
-                (fieldnorm_id, 0)
-            }
-        })) as f64
-}
-
-fn idf_sum(field: &mut TextFieldData, doc: DocId) -> f64 {
-    if field.postings.is_empty() {
-        return 0.0;
+    fn as_field(&self) -> Option<Field> {
+        None
     }
-    let idf = field.weight.idf();
 
-    field
-        .postings
-        .iter_mut()
-        .zip_eq(idf)
-        .filter_map(|(posting, idf)| {
-            if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
-                Some(idf)
-            } else {
-                None
-            }
-        })
-        .sum::<f32>() as f64
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
+
+        Some(
+            seg_reader
+                .text_fields_mut()
+                .values_mut()
+                .map(|field| field.bm25f(doc))
+                .sum(),
+        )
+    }
 }
 
 #[derive(
@@ -89,7 +83,7 @@ impl Signal for Bm25Title {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -121,7 +115,7 @@ impl Signal for Bm25TitleBigrams {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -153,7 +147,7 @@ impl Signal for Bm25TitleTrigrams {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -185,7 +179,7 @@ impl Signal for Bm25CleanBody {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -217,7 +211,7 @@ impl Signal for Bm25CleanBodyBigrams {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -249,7 +243,7 @@ impl Signal for Bm25CleanBodyTrigrams {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -281,7 +275,7 @@ impl Signal for Bm25StemmedTitle {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -313,7 +307,7 @@ impl Signal for Bm25StemmedCleanBody {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -345,7 +339,7 @@ impl Signal for Bm25AllBody {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -377,7 +371,7 @@ impl Signal for Bm25Keywords {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -409,7 +403,7 @@ impl Signal for Bm25BacklinkText {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| bm25(field, doc))
+            .map(|field| field.bm25(doc))
     }
 }
 
@@ -441,7 +435,7 @@ impl Signal for IdfSumUrl {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| idf_sum(field, doc))
+            .map(|field| field.idf_sum(doc))
     }
 }
 
@@ -473,7 +467,7 @@ impl Signal for IdfSumSite {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| idf_sum(field, doc))
+            .map(|field| field.idf_sum(doc))
     }
 }
 
@@ -505,7 +499,7 @@ impl Signal for IdfSumDomain {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| idf_sum(field, doc))
+            .map(|field| field.idf_sum(doc))
     }
 }
 
@@ -537,7 +531,7 @@ impl Signal for IdfSumSiteNoTokenizer {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| idf_sum(field, doc))
+            .map(|field| field.idf_sum(doc))
     }
 }
 
@@ -569,7 +563,7 @@ impl Signal for IdfSumDomainNoTokenizer {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| idf_sum(field, doc))
+            .map(|field| field.idf_sum(doc))
     }
 }
 
@@ -603,7 +597,7 @@ impl Signal for IdfSumDomainNameNoTokenizer {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| idf_sum(field, doc))
+            .map(|field| field.idf_sum(doc))
     }
 }
 
@@ -635,7 +629,7 @@ impl Signal for IdfSumDomainIfHomepage {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| idf_sum(field, doc))
+            .map(|field| field.idf_sum(doc))
     }
 }
 
@@ -669,7 +663,7 @@ impl Signal for IdfSumDomainNameIfHomepageNoTokenizer {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| idf_sum(field, doc))
+            .map(|field| field.idf_sum(doc))
     }
 }
 
@@ -703,7 +697,7 @@ impl Signal for IdfSumDomainIfHomepageNoTokenizer {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| idf_sum(field, doc))
+            .map(|field| field.idf_sum(doc))
     }
 }
 
@@ -735,7 +729,7 @@ impl Signal for IdfSumTitleIfHomepage {
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| idf_sum(field, doc))
+            .map(|field| field.idf_sum(doc))
     }
 }
 

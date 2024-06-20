@@ -84,6 +84,10 @@
         title: 'Link Density',
         description: 'The page has a low number of links compared to the amount of text',
       }))
+      .with('combinedText', () => ({
+        title: 'Combined Text',
+        description: 'An overall score of how well the text on the page matches the query',
+      }))
       .exhaustive();
   };
 </script>

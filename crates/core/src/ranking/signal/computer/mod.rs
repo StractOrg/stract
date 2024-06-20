@@ -16,6 +16,7 @@
 
 use crate::query::optic::AsSearchableRule;
 use crate::query::{Query, MAX_TERMS_FOR_NGRAM_LOOKUPS};
+use crate::ranking::bm25f::MultiBm25FWeight;
 use crate::schema::text_field::TextField;
 use crate::Result;
 use crate::{enum_map::EnumMap, fastfield_reader, schema::TextFieldEnum, webpage::Webpage};
@@ -24,13 +25,14 @@ use std::cell::RefCell;
 
 use std::sync::Arc;
 
+use itertools::Itertools;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
 use tantivy::query::{Query as _, Scorer};
 use tantivy::tokenizer::Tokenizer as _;
 
-use tantivy::DocId;
 use tantivy::DocSet;
+use tantivy::{DocId, Postings};
 
 use crate::webpage::region::RegionCount;
 
@@ -44,11 +46,69 @@ pub use order::SignalComputeOrder;
 
 #[derive(Clone)]
 pub struct TextFieldData {
-    pub(super) postings: Vec<SegmentPostings>,
-    pub(super) weight: MultiBm25Weight,
-    pub(super) fieldnorm_reader: FieldNormReader,
+    postings: Vec<SegmentPostings>,
+    bm25: MultiBm25Weight,
+    bm25f: MultiBm25FWeight,
+    fieldnorm_reader: FieldNormReader,
+    signal_coefficient: f64,
 }
 
+impl TextFieldData {
+    pub fn bm25(&mut self, doc: DocId) -> f64 {
+        if self.postings.is_empty() {
+            return 0.0;
+        }
+
+        let fieldnorm_id = self.fieldnorm_reader.fieldnorm_id(doc);
+
+        self.bm25
+            .score(self.postings.iter_mut().map(move |posting| {
+                if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
+                    (fieldnorm_id, posting.term_freq())
+                } else {
+                    (fieldnorm_id, 0)
+                }
+            })) as f64
+    }
+
+    pub fn idf_sum(&mut self, doc: DocId) -> f64 {
+        if self.postings.is_empty() {
+            return 0.0;
+        }
+        let idf = self.bm25.idf();
+
+        self.postings
+            .iter_mut()
+            .zip_eq(idf)
+            .filter_map(|(posting, idf)| {
+                if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
+                    Some(idf)
+                } else {
+                    None
+                }
+            })
+            .sum::<f32>() as f64
+    }
+
+    pub fn bm25f(&mut self, doc: DocId) -> f64 {
+        if self.postings.is_empty() {
+            return 0.0;
+        }
+
+        let fieldnorm_id = self.fieldnorm_reader.fieldnorm_id(doc);
+
+        self.bm25f.score(
+            self.signal_coefficient as f32,
+            self.postings.iter_mut().map(move |posting| {
+                if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
+                    (fieldnorm_id, posting.term_freq())
+                } else {
+                    (fieldnorm_id, 0)
+                }
+            }),
+        ) as f64
+    }
+}
 pub struct RuleBoost {
     docset: Box<dyn Scorer>,
     boost: f64,
@@ -229,14 +289,17 @@ impl SignalComputer {
                                 matching_terms.push(term.clone());
                             }
                         }
-                        let weight = MultiBm25Weight::for_terms(tv_searcher, &matching_terms)?;
+                        let bm25 = MultiBm25Weight::for_terms(tv_searcher, &matching_terms)?;
+                        let bm25f = MultiBm25FWeight::for_terms(tv_searcher, &matching_terms);
 
                         text_fields.insert(
                             text_field,
                             TextFieldData {
                                 postings,
-                                weight,
+                                bm25,
+                                bm25f,
                                 fieldnorm_reader,
+                                signal_coefficient: self.coefficient(&signal),
                             },
                         );
                     }

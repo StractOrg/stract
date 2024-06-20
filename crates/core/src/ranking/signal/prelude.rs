@@ -78,6 +78,7 @@ pub trait Signal:
 ))]
 #[strum_discriminants(serde(rename_all = "snake_case"))]
 pub enum SignalEnum {
+    Bm25F,
     Bm25Title,
     Bm25TitleBigrams,
     Bm25TitleTrigrams,
@@ -122,6 +123,7 @@ pub enum SignalEnum {
 
 enum_dispatch_from_discriminant!(SignalEnumDiscriminants => SignalEnum,
 [
+    Bm25F,
     Bm25Title,
     Bm25TitleBigrams,
     Bm25TitleTrigrams,

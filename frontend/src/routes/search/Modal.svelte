@@ -1,5 +1,6 @@
 <script context="module" lang="ts">
   export type SignalLabel =
+    | 'combinedText'
     | 'title'
     | 'body'
     | 'keywords'
@@ -86,6 +87,7 @@
       .with('link_density', () => 'linkDensity' as const)
       .with('title_embedding_similarity', () => 'title' as const)
       .with('keyword_embedding_similarity', () => 'keywords' as const)
+      .with('bm25_f', () => 'combinedText' as const)
       .exhaustive();
   };
 

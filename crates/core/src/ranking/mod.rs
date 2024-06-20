@@ -16,6 +16,7 @@
 
 pub mod bitvec_similarity;
 pub mod bm25;
+pub mod bm25f;
 pub mod inbound_similarity;
 pub mod initial;
 pub mod models;

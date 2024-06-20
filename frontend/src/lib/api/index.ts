@@ -122,13 +122,6 @@ export const api = {
     requestJson<HighlightedSpellCorrection>('POST', `/beta/api/search/spellcheck`, body, options),
   searchWidget: (body: WidgetQuery, options?: ApiOptions) =>
     requestJson<Widget>('POST', `/beta/api/search/widget`, body, options),
-  summarize: (
-    query: {
-      query: string;
-      url: string;
-    },
-    options?: ApiOptions,
-  ) => sse<string>('GET', `/beta/api/summarize?${new URLSearchParams(query)}`, options),
   webgraphHostIngoing: (
     query: {
       host: string;
@@ -378,6 +371,7 @@ export type SidebarQuery = {
   query: string;
 };
 export type SignalEnumDiscriminants =
+  | 'bm25_f'
   | 'bm25_title'
   | 'bm25_title_bigrams'
   | 'bm25_title_trigrams'
@@ -419,6 +413,7 @@ export type SignalEnumDiscriminants =
   | 'title_embedding_similarity'
   | 'keyword_embedding_similarity';
 export const SIGNAL_ENUM_DISCRIMINANTS = [
+  'bm25_f',
   'bm25_title',
   'bm25_title_bigrams',
   'bm25_title_trigrams',
