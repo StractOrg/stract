@@ -5,8 +5,20 @@ use itertools::Itertools;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::{Score, Searcher, Term};
 
-pub const K1: Score = 1.2;
-pub const B: Score = 0.75;
+const K1: Score = 1.2;
+const B: Score = 0.75;
+
+#[derive(Clone, Copy)]
+pub struct Bm25Constants {
+    pub k1: Score,
+    pub b: Score,
+}
+
+impl Default for Bm25Constants {
+    fn default() -> Self {
+        Bm25Constants { k1: K1, b: B }
+    }
+}
 
 pub fn idf(doc_freq: u64, doc_count: u64) -> Score {
     assert!(doc_count >= doc_freq, "{doc_count} >= {doc_freq}");
@@ -14,15 +26,19 @@ pub fn idf(doc_freq: u64, doc_count: u64) -> Score {
     (1.0 + x).ln()
 }
 
-fn cached_tf_component(fieldnorm: u32, average_fieldnorm: Score) -> Score {
-    K1 * (1.0 - B + B * fieldnorm as Score / average_fieldnorm)
+fn cached_tf_component(
+    fieldnorm: u32,
+    average_fieldnorm: Score,
+    constants: Bm25Constants,
+) -> Score {
+    constants.k1 * (1.0 - constants.b + constants.b * fieldnorm as Score / average_fieldnorm)
 }
 
-pub fn compute_tf_cache(average_fieldnorm: Score) -> [Score; 256] {
+pub fn compute_tf_cache(average_fieldnorm: Score, constants: Bm25Constants) -> [Score; 256] {
     let mut cache: [Score; 256] = [0.0; 256];
     for (fieldnorm_id, cache_mut) in cache.iter_mut().enumerate() {
         let fieldnorm = FieldNormReader::id_to_fieldnorm(fieldnorm_id as u8);
-        *cache_mut = cached_tf_component(fieldnorm, average_fieldnorm);
+        *cache_mut = cached_tf_component(fieldnorm, average_fieldnorm, constants);
     }
     cache
 }
@@ -33,7 +49,11 @@ pub struct MultiBm25Weight {
 }
 
 impl MultiBm25Weight {
-    pub fn for_terms(searcher: &Searcher, terms: &[Term]) -> tantivy::Result<Self> {
+    pub fn for_terms(
+        searcher: &Searcher,
+        terms: &[Term],
+        constants: Bm25Constants,
+    ) -> tantivy::Result<Self> {
         if terms.is_empty() {
             return Ok(Self {
                 weights: Vec::new(),
@@ -66,6 +86,7 @@ impl MultiBm25Weight {
                 term_doc_freq,
                 total_num_docs,
                 average_fieldnorm,
+                constants,
             ));
         }
 
@@ -88,6 +109,7 @@ impl MultiBm25Weight {
 #[derive(Clone)]
 pub struct Bm25Weight {
     weight: Score,
+    constants: Bm25Constants,
     cache: [Score; 256],
 }
 
@@ -96,15 +118,17 @@ impl Bm25Weight {
         term_doc_freq: u64,
         total_num_docs: u64,
         avg_fieldnorm: Score,
+        constants: Bm25Constants,
     ) -> Bm25Weight {
         let idf = idf(term_doc_freq, total_num_docs);
-        Bm25Weight::new(idf, avg_fieldnorm)
+        Bm25Weight::new(idf, avg_fieldnorm, constants)
     }
 
-    pub fn new(weight: Score, average_fieldnorm: Score) -> Bm25Weight {
+    pub fn new(weight: Score, average_fieldnorm: Score, constants: Bm25Constants) -> Bm25Weight {
         Bm25Weight {
             weight,
-            cache: compute_tf_cache(average_fieldnorm),
+            cache: compute_tf_cache(average_fieldnorm, constants),
+            constants,
         }
     }
 
@@ -117,7 +141,7 @@ impl Bm25Weight {
     pub fn tf_factor(&self, fieldnorm_id: u8, term_freq: u32) -> Score {
         let term_freq = term_freq as Score;
         let norm = self.cache[fieldnorm_id as usize];
-        (term_freq * (K1 + 1.0)) / (term_freq + norm)
+        (term_freq * (self.constants.k1 + 1.0)) / (term_freq + norm)
     }
 }
 
@@ -130,10 +154,11 @@ mod tests {
         // assume the query is something like 'the end'
         // 'the' appears in almost all docs (98)
         // 'end' appears in a smalle subset (20)
+        let constants = Bm25Constants::default();
         let weight = MultiBm25Weight {
             weights: vec![
-                Bm25Weight::for_one_term(98, 100, 1.0),
-                Bm25Weight::for_one_term(20, 100, 1.0),
+                Bm25Weight::for_one_term(98, 100, 1.0, constants),
+                Bm25Weight::for_one_term(20, 100, 1.0, constants),
             ],
         };
 

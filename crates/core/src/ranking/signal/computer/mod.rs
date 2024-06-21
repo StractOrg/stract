@@ -289,8 +289,16 @@ impl SignalComputer {
                                 matching_terms.push(term.clone());
                             }
                         }
-                        let bm25 = MultiBm25Weight::for_terms(tv_searcher, &matching_terms)?;
-                        let bm25f = MultiBm25FWeight::for_terms(tv_searcher, &matching_terms);
+                        let bm25 = MultiBm25Weight::for_terms(
+                            tv_searcher,
+                            &matching_terms,
+                            text_field.bm25_constants(),
+                        )?;
+                        let bm25f = MultiBm25FWeight::for_terms(
+                            tv_searcher,
+                            &matching_terms,
+                            text_field.bm25_constants(),
+                        );
 
                         text_fields.insert(
                             text_field,

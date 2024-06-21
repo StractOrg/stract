@@ -17,7 +17,7 @@
 use itertools::Itertools;
 use tantivy::{Score, Searcher, Term};
 
-use super::bm25::{compute_tf_cache, idf, K1};
+use super::bm25::{compute_tf_cache, idf, Bm25Constants};
 
 /// A BM25F weight that uses the same IDF weight for all fields.
 /// The idea is that the term 'the' might not appear very frequently e.g. in the title field,
@@ -39,7 +39,7 @@ pub struct MultiBm25FWeight {
 }
 
 impl MultiBm25FWeight {
-    pub fn for_terms(searcher: &Searcher, terms: &[Term]) -> Self {
+    pub fn for_terms(searcher: &Searcher, terms: &[Term], constants: Bm25Constants) -> Self {
         if terms.is_empty() {
             return Self {
                 weights: Vec::new(),
@@ -84,6 +84,7 @@ impl MultiBm25FWeight {
                 term_doc_freq,
                 total_num_docs,
                 average_fieldnorm,
+                constants,
             ));
         }
 
@@ -105,6 +106,7 @@ impl MultiBm25FWeight {
 pub struct Bm25FWeight {
     weight: Score,
     cache: [Score; 256],
+    constants: Bm25Constants,
 }
 
 impl Bm25FWeight {
@@ -112,15 +114,17 @@ impl Bm25FWeight {
         term_doc_freq: u64,
         total_num_docs: u64,
         avg_fieldnorm: Score,
+        constants: Bm25Constants,
     ) -> Bm25FWeight {
         let idf = idf(term_doc_freq, total_num_docs);
-        Bm25FWeight::new(idf, avg_fieldnorm)
+        Bm25FWeight::new(idf, avg_fieldnorm, constants)
     }
 
-    pub fn new(weight: Score, average_fieldnorm: Score) -> Bm25FWeight {
+    pub fn new(weight: Score, average_fieldnorm: Score, constants: Bm25Constants) -> Bm25FWeight {
         Bm25FWeight {
             weight,
-            cache: compute_tf_cache(average_fieldnorm),
+            cache: compute_tf_cache(average_fieldnorm, constants),
+            constants,
         }
     }
 
@@ -133,6 +137,6 @@ impl Bm25FWeight {
     pub fn tf_factor(&self, coefficient: Score, fieldnorm_id: u8, term_freq: u32) -> Score {
         let term_freq = term_freq as Score * coefficient;
         let norm = self.cache[fieldnorm_id as usize];
-        (term_freq * (K1 + 1.0)) / (term_freq + norm)
+        (term_freq * (self.constants.k1 + 1.0)) / (term_freq + norm)
     }
 }

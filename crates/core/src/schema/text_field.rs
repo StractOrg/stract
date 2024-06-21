@@ -28,6 +28,7 @@ use whatlang::Lang;
 use crate::{
     enum_dispatch_from_discriminant,
     enum_map::InsertEnumMapKey,
+    ranking::bm25::Bm25Constants,
     tokenizer::{
         self, BigramTokenizer, Identity, JsonField, Tokenizer, TrigramTokenizer, UrlTokenizer,
     },
@@ -139,6 +140,10 @@ pub trait TextField:
 
     fn tantivy_field(&self, schema: &tantivy::schema::Schema) -> Option<tantivy::schema::Field> {
         schema.get_field(self.name()).ok()
+    }
+
+    fn bm25_constants(&self) -> Bm25Constants {
+        Bm25Constants::default()
     }
 }
 
