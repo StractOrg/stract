@@ -22,13 +22,13 @@ pub async fn main() {
     };
 
     let config = ApiConfig {
-        queries_csv_path: "data/queries_us.csv".to_string(),
+        queries_csv_path: Some("data/queries_us.csv".to_string()),
         host: "0.0.0.0:8000".parse().unwrap(),
         prometheus_host: "0.0.0.0:8001".parse().unwrap(),
         crossencoder_model_path: None,
         lambda_model_path: None,
         dual_encoder_model_path: None,
-        bangs_path: "data/bangs.json".to_string(),
+        bangs_path: Some("data/bangs.json".to_string()),
         query_store_db_host: None,
         cluster_id: "api".to_string(),
         gossip_seed_nodes: None,
@@ -47,10 +47,11 @@ pub async fn main() {
         max_similar_hosts: defaults::Api::max_similar_hosts(),
     };
 
-    let mut queries = stract::autosuggest::Autosuggest::load_csv(&config.queries_csv_path)
-        .unwrap()
-        .all()
-        .unwrap();
+    let mut queries =
+        stract::autosuggest::Autosuggest::load_csv(config.queries_csv_path.as_ref().unwrap())
+            .unwrap()
+            .all()
+            .unwrap();
 
     queries.shuffle(&mut rand::thread_rng());
 
@@ -61,7 +62,7 @@ pub async fn main() {
         max_considered_words: Some(10_000),
         ..Default::default()
     });
-    let bangs = Bangs::from_path(&config.bangs_path);
+    let bangs = Bangs::from_path(config.bangs_path.as_ref().unwrap());
 
     let searcher = stract::searcher::LocalSearchClient::from(searcher);
 

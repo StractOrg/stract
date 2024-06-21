@@ -155,11 +155,7 @@ fn calculate_centrality() {
 fn create_inverted_index() -> Result<()> {
     debug!("Creating inverted index");
     let out_path = Path::new(DATA_PATH).join("index");
-    let out_path_tmp = Path::new(DATA_PATH).join("index_tmp");
 
-    if out_path_tmp.exists() {
-        std::fs::remove_dir_all(&out_path_tmp)?;
-    }
     if out_path.exists() {
         std::fs::remove_dir_all(&out_path)?;
     }
@@ -172,7 +168,7 @@ fn create_inverted_index() -> Result<()> {
             names: vec![warc_path.to_str().unwrap().to_string()],
         }),
         warc_path: warc_path.to_str().unwrap().to_string(),
-        base_path: out_path_tmp.to_str().unwrap().to_string(),
+        base_path: out_path.to_str().unwrap().to_string(),
         settings: JobSettings {
             host_centrality_threshold: None,
             minimum_clean_words: None,
@@ -199,7 +195,7 @@ fn create_inverted_index() -> Result<()> {
                 .unwrap()
                 .to_string(),
         ),
-        output_path: out_path_tmp.to_str().unwrap().to_string(),
+        output_path: out_path.to_str().unwrap().to_string(),
         limit_warc_files: None,
         skip_warc_files: None,
         warc_source: job.source_config.clone(),
@@ -215,8 +211,7 @@ fn create_inverted_index() -> Result<()> {
     });
 
     let index = job.process(&worker);
-    std::fs::rename(index.path, out_path)?;
-    std::fs::remove_dir_all(&out_path_tmp)?;
+    crate::mv(index.path(), &out_path)?;
 
     Ok(())
 }

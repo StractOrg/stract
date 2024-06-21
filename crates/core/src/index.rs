@@ -16,7 +16,7 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
@@ -37,7 +37,7 @@ const REGION_COUNT_FILE_NAME: &str = "region_count.json";
 pub struct Index {
     pub inverted_index: InvertedIndex,
     pub region_count: Mutex<RegionCount>,
-    pub path: String,
+    path: String,
 }
 
 impl Index {
@@ -56,6 +56,10 @@ impl Index {
             region_count: Mutex::new(region_count),
             path: path.as_ref().to_str().unwrap().to_string(),
         })
+    }
+
+    pub fn path(&self) -> PathBuf {
+        PathBuf::from(&self.path)
     }
 
     pub fn set_auto_merge_policy(&mut self) {

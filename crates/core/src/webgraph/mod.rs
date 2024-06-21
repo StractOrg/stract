@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{fs, io};
 
@@ -120,6 +120,10 @@ pub struct Webgraph {
 impl Webgraph {
     pub fn builder<P: AsRef<Path>>(path: P) -> WebgraphBuilder {
         WebgraphBuilder::new(path)
+    }
+
+    pub fn path(&self) -> PathBuf {
+        PathBuf::from(&self.path)
     }
 
     fn meta<P: AsRef<Path>>(path: P) -> Meta {

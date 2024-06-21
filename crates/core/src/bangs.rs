@@ -122,7 +122,6 @@ pub struct Bangs {
 }
 
 impl Bangs {
-    #[cfg(test)]
     pub fn empty() -> Self {
         Self {
             bangs: HashMap::new(),

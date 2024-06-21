@@ -148,7 +148,10 @@ fn build_router(state: Arc<State>) -> Router {
 }
 
 pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
-    let autosuggest = Autosuggest::load_csv(&config.queries_csv_path)?;
+    let autosuggest = match &config.queries_csv_path {
+        Some(queries_csv_path) => Autosuggest::load_csv(queries_csv_path)?,
+        None => Autosuggest::empty(),
+    };
 
     let lambda_model = match &config.lambda_model_path {
         Some(path) => Some(LambdaMART::open(path)?),
@@ -166,7 +169,10 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         query_store_queue
     });
 
-    let bangs = Bangs::from_path(&config.bangs_path);
+    let bangs = match &config.bangs_path {
+        Some(bangs_path) => Bangs::from_path(bangs_path),
+        None => Bangs::empty(),
+    };
 
     let cluster = Arc::new(
         Cluster::join(

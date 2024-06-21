@@ -225,13 +225,13 @@ pub struct ApiSpellCheck {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ApiConfig {
-    pub queries_csv_path: String,
+    pub queries_csv_path: Option<String>,
     pub host: SocketAddr,
     pub prometheus_host: SocketAddr,
     pub crossencoder_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
     pub dual_encoder_model_path: Option<String>,
-    pub bangs_path: String,
+    pub bangs_path: Option<String>,
     pub query_store_db_host: Option<String>,
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
@@ -245,6 +245,7 @@ pub struct ApiConfig {
     #[serde(default)]
     pub thresholds: ApiThresholds,
 
+    #[serde(default)]
     pub widgets: WidgetsConfig,
 
     #[serde(default)]

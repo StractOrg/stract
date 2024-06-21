@@ -401,3 +401,28 @@ where
     top_k.truncate(k);
     top_k
 }
+
+/// Recursively move a file or directory to a new location.
+/// Intended to be similar to the `mv` command in Unix.
+pub fn mv<P1: AsRef<std::path::Path>, P2: AsRef<std::path::Path>>(
+    from: P1,
+    to: P2,
+) -> std::io::Result<()> {
+    let from = from.as_ref();
+    let to = to.as_ref();
+
+    if from.is_dir() {
+        std::fs::create_dir_all(to)?;
+        for entry in std::fs::read_dir(from)? {
+            let entry = entry?;
+            let new_from = entry.path();
+            let new_to = to.join(entry.file_name());
+            mv(new_from, new_to)?;
+        }
+        std::fs::remove_dir(from)?;
+    } else {
+        std::fs::rename(from, to)?;
+    }
+
+    Ok(())
+}

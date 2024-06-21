@@ -276,6 +276,9 @@ impl Webgraph {
         host_graph.optimize_read();
         page_graph.optimize_read();
 
+        crate::mv(host_graph.path(), &config.host_graph_base_path)?;
+        crate::mv(page_graph.path(), &config.page_graph_base_path)?;
+
         Ok(())
     }
 }

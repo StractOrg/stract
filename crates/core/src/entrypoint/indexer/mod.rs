@@ -62,14 +62,16 @@ pub fn run(config: &config::IndexingLocalConfig) -> Result<()> {
                 autocommit_after_num_inserts: config.autocommit_after_num_inserts,
             },
         })
-        .map(|job| IndexPointer(job.process(&worker).path))
+        .map(|job| IndexPointer(job.process(&worker).path().as_os_str().to_str().unwrap().to_string()))
         .collect();
 
-    merge(indexes)?;
+    let index = merge(indexes)?;
+    crate::mv(index.path(), &config.output_path)?;
+
     Ok(())
 }
 
-pub fn merge(indexes: Vec<IndexPointer>) -> Result<()> {
+pub fn merge(indexes: Vec<IndexPointer>) -> Result<Index> {
     let num_indexes = indexes.len();
     let mut it = indexes.into_iter();
     let num_cores = usize::from(std::thread::available_parallelism()?);
@@ -114,12 +116,12 @@ pub fn merge(indexes: Vec<IndexPointer>) -> Result<()> {
     let mut index = it.next().unwrap();
 
     for other in it {
-        let other_path = other.path.clone();
+        let other_path = other.path();
         index = index.merge(other);
         std::fs::remove_dir_all(other_path).unwrap();
     }
 
     index.inverted_index.merge_into_max_segments(1).unwrap();
 
-    Ok(())
+    Ok(index)
 }

@@ -47,6 +47,12 @@ impl Autosuggest {
         Ok(Self { queries })
     }
 
+    pub fn empty() -> Self {
+        Self {
+            queries: fst::Set::default(),
+        }
+    }
+
     pub fn suggestions(&self, query: &str) -> Result<Vec<String>> {
         let query = query.to_ascii_lowercase();
         let q = Str::new(query.as_str()).starts_with();
