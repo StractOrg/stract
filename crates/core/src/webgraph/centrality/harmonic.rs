@@ -43,6 +43,7 @@ pub static SKIPPED_REL: once_cell::sync::Lazy<RelFlags> = once_cell::sync::Lazy:
         | RelFlags::SEARCH
         | RelFlags::LINK_TAG
         | RelFlags::SCRIPT_TAG
+        | RelFlags::SAME_ICANN_DOMAIN
 });
 
 type Counter = BTreeMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>>;
@@ -554,6 +555,26 @@ mod tests {
 
         for (from, to, label) in test_edges() {
             graph.insert(from, to, label, RelFlags::TAG);
+        }
+
+        let graph = graph.finalize();
+
+        let centrality = HarmonicCentrality::calculate(&graph);
+
+        assert!(centrality.0.values().all(|&v| v == 0.0));
+    }
+
+    #[test]
+    fn test_same_icann_domain_ignored() {
+        let mut graph = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            crate::executor::Executor::single_thread(),
+            crate::webgraph::Compression::default(),
+            None,
+        );
+
+        for (from, to, label) in test_edges() {
+            graph.insert(from, to, label, RelFlags::SAME_ICANN_DOMAIN);
         }
 
         let graph = graph.finalize();

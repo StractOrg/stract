@@ -530,7 +530,7 @@ mod tests {
                 source: Url::parse("https://www.example.com/whatever").unwrap(),
                 destination: Url::parse("https://example.com").unwrap(),
                 text: "Link to example".to_string(),
-                rel: RelFlags::empty(),
+                rel: RelFlags::SAME_ICANN_DOMAIN,
             }]
         );
         assert_eq!(webpage.clean_text(), Some(&CONTENT.to_string()));
@@ -974,7 +974,7 @@ mod tests {
                 source: Url::parse("https://www.example.com/whatever").unwrap(),
                 destination: Url::parse("https://example.com").unwrap(),
                 text: "Link to example".to_string(),
-                rel: RelFlags::empty(),
+                rel: RelFlags::SAME_ICANN_DOMAIN,
             },]
         );
     }

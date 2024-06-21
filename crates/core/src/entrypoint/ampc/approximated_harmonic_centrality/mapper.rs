@@ -20,15 +20,25 @@ use std::{cmp, collections::BTreeMap};
 
 use super::{worker::ApproxCentralityWorker, ApproxCentralityJob, Mapper};
 use crate::{
-    ampc::dht::upsert,
-    entrypoint::ampc::approximated_harmonic_centrality::DhtTable,
-    kahan_sum::KahanSum,
-    webgraph::{self, centrality::harmonic::SKIPPED_REL},
+    ampc::dht::upsert, entrypoint::ampc::approximated_harmonic_centrality::DhtTable,
+    kahan_sum::KahanSum, webgraph, webpage::html::links::RelFlags,
 };
 use rayon::prelude::*;
 
 const BATCH_SIZE: usize = 1024;
 const MAX_OUTGOING_EDGES: usize = 128;
+
+pub static SKIPPED_REL: once_cell::sync::Lazy<RelFlags> = once_cell::sync::Lazy::new(|| {
+    RelFlags::TAG
+        | RelFlags::NOFOLLOW
+        | RelFlags::IS_IN_FOOTER
+        | RelFlags::IS_IN_NAVIGATION
+        | RelFlags::PRIVACY_POLICY
+        | RelFlags::TERMS_OF_SERVICE
+        | RelFlags::SEARCH
+        | RelFlags::LINK_TAG
+        | RelFlags::SCRIPT_TAG
+});
 
 #[derive(Debug, Clone, bincode::Decode, bincode::Encode)]
 pub enum ApproxCentralityMapper {

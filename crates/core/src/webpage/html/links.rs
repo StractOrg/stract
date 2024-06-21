@@ -121,6 +121,7 @@ bitflags! {
         const LINK_TAG = 1 << 18;
         const SCRIPT_TAG = 1 << 19;
         const META_TAG = 1 << 20;
+        const SAME_ICANN_DOMAIN = 1 << 21;
     }
 }
 
@@ -254,6 +255,8 @@ impl Html {
         let mut open_links = Vec::new();
         let mut location = Location::empty();
 
+        let icann_domain = self.url().icann_domain();
+
         for edge in self.root.traverse() {
             match edge {
                 NodeEdge::Start(node) => {
@@ -279,14 +282,20 @@ impl Html {
                                     if let Ok(dest) =
                                         Url::parse(dest).or_else(|_| self.url().join(dest))
                                     {
+                                        let mut rel = RelFlags::from_html(
+                                            &dest,
+                                            &attributes.borrow(),
+                                            &location,
+                                        );
+
+                                        if icann_domain == dest.icann_domain() {
+                                            rel |= RelFlags::SAME_ICANN_DOMAIN;
+                                        }
+
                                         links.push(Link {
                                             source: self.url().clone(),
                                             text: text.trim().to_string(),
-                                            rel: RelFlags::from_html(
-                                                &dest,
-                                                &attributes.borrow(),
-                                                &location,
-                                            ),
+                                            rel,
                                             destination: dest,
                                         });
                                     }
@@ -327,10 +336,16 @@ impl Html {
                 }
 
                 if let Ok(dest) = Url::parse(dest).or_else(|_| self.url().join(dest)) {
+                    let mut rel = RelFlags::from_html(&dest, &attributes.borrow(), &location);
+
+                    if icann_domain == dest.icann_domain() {
+                        rel |= RelFlags::SAME_ICANN_DOMAIN;
+                    }
+
                     links.push(Link {
                         source: self.url().clone(),
-                        rel: RelFlags::from_html(&dest, &attributes.borrow(), &location),
                         destination: dest,
+                        rel,
                         text: text.trim().to_string(),
                     });
                 }
@@ -344,18 +359,22 @@ impl Html {
         let mut links = Vec::new();
 
         let location = Location::LINK;
+        let icann_domain = self.url().icann_domain();
 
         for node in self.root.select("link").unwrap() {
             if let Some(element) = node.as_node().as_element() {
                 if let Some(href) = element.attributes.borrow().get("href") {
                     if let Ok(href) = Url::parse(href).or_else(|_| self.url().join(href)) {
+                        let mut rel =
+                            RelFlags::from_html(&href, &element.attributes.borrow(), &location);
+
+                        if icann_domain == href.icann_domain() {
+                            rel |= RelFlags::SAME_ICANN_DOMAIN;
+                        }
+
                         links.push(Link {
                             source: self.url().clone(),
-                            rel: RelFlags::from_html(
-                                &href,
-                                &element.attributes.borrow(),
-                                &location,
-                            ),
+                            rel,
                             destination: href,
                             text: String::new(),
                         });
@@ -369,6 +388,7 @@ impl Html {
 
     fn metadata_links(&self) -> Vec<Link> {
         let location = Location::META;
+        let icann_domain = self.url().icann_domain();
 
         self.metadata()
             .into_iter()
@@ -391,11 +411,17 @@ impl Html {
                             if let Ok(destination) = Url::parse(content.as_str())
                                 .or_else(|_| self.url().join(content.as_str()))
                             {
+                                let mut rel = location.as_rel();
+
+                                if destination.icann_domain() == icann_domain {
+                                    rel |= RelFlags::SAME_ICANN_DOMAIN;
+                                }
+
                                 return Some(Link {
                                     source: self.url().clone(),
                                     destination,
                                     text: String::new(),
-                                    rel: location.as_rel(),
+                                    rel,
                                 });
                             }
                         }
@@ -416,11 +442,17 @@ impl Html {
                             if let Ok(destination) = Url::parse(content.as_str())
                                 .or_else(|_| self.url().join(content.as_str()))
                             {
+                                let mut rel = location.as_rel();
+
+                                if destination.icann_domain() == icann_domain {
+                                    rel |= RelFlags::SAME_ICANN_DOMAIN;
+                                }
+
                                 return Some(Link {
                                     source: self.url().clone(),
                                     destination,
                                     text: String::new(),
-                                    rel: location.as_rel(),
+                                    rel,
                                 });
                             }
                         }
@@ -434,6 +466,8 @@ impl Html {
 
     pub fn all_links(&self) -> Vec<Link> {
         let mut links = self.anchor_links();
+        let icann_domain = self.url().icann_domain();
+        let root_domain = self.url().root_domain();
 
         links.extend(self.scripts().into_iter().filter_map(|script| {
             match script.attributes.get("src") {
@@ -442,12 +476,18 @@ impl Html {
                         .or_else(|_| self.url().join(url.as_str()))
                         .ok()?;
 
-                    if script_url.root_domain() != self.url().root_domain() {
+                    if script_url.root_domain() != root_domain {
+                        let mut rel = Location::SCRIPT.as_rel();
+
+                        if script_url.icann_domain() == icann_domain {
+                            rel |= RelFlags::SAME_ICANN_DOMAIN;
+                        }
+
                         Some(Link {
                             source: self.url().clone(),
                             destination: script_url,
                             text: String::new(),
-                            rel: Location::SCRIPT.as_rel(),
+                            rel,
                         })
                     } else {
                         None
@@ -649,7 +689,7 @@ mod tests {
                 source: Url::parse("https://www.example.com/whatever").unwrap(),
                 destination: Url::parse("https://example.com/tags/example").unwrap(),
                 text: "Example".to_string(),
-                rel: RelFlags::TAG
+                rel: RelFlags::TAG | RelFlags::SAME_ICANN_DOMAIN
             }
         );
 
@@ -659,7 +699,7 @@ mod tests {
                 source: Url::parse("https://www.example.com/whatever").unwrap(),
                 destination: Url::parse("https://example.com/tags/example").unwrap(),
                 text: "Example".to_string(),
-                rel: RelFlags::TAG | RelFlags::NOFOLLOW
+                rel: RelFlags::TAG | RelFlags::NOFOLLOW | RelFlags::SAME_ICANN_DOMAIN
             }
         );
 
@@ -669,7 +709,7 @@ mod tests {
                 source: Url::parse("https://www.example.com/whatever").unwrap(),
                 destination: Url::parse("https://example.com/tags/example").unwrap(),
                 text: "Example".to_string(),
-                rel: RelFlags::TAG | RelFlags::SPONSORED
+                rel: RelFlags::TAG | RelFlags::SPONSORED | RelFlags::SAME_ICANN_DOMAIN
             }
         );
 
@@ -679,7 +719,7 @@ mod tests {
                 source: Url::parse("https://www.example.com/whatever").unwrap(),
                 destination: Url::parse("https://example.com/authors/example").unwrap(),
                 text: "Example".to_string(),
-                rel: RelFlags::AUTHOR
+                rel: RelFlags::AUTHOR | RelFlags::SAME_ICANN_DOMAIN
             }
         );
 
@@ -689,7 +729,9 @@ mod tests {
                 source: Url::parse("https://www.example.com/whatever").unwrap(),
                 destination: Url::parse("https://example.com/terms-of-service").unwrap(),
                 text: "Terms of service".to_string(),
-                rel: RelFlags::TERMS_OF_SERVICE | RelFlags::IS_IN_FOOTER
+                rel: RelFlags::TERMS_OF_SERVICE
+                    | RelFlags::IS_IN_FOOTER
+                    | RelFlags::SAME_ICANN_DOMAIN
             }
         );
 
@@ -699,7 +741,9 @@ mod tests {
                 source: Url::parse("https://www.example.com/whatever").unwrap(),
                 destination: Url::parse("https://example.com/privacy-policy").unwrap(),
                 text: "Privacy policy".to_string(),
-                rel: RelFlags::PRIVACY_POLICY | RelFlags::IS_IN_FOOTER
+                rel: RelFlags::PRIVACY_POLICY
+                    | RelFlags::IS_IN_FOOTER
+                    | RelFlags::SAME_ICANN_DOMAIN
             }
         );
     }
