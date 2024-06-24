@@ -40,7 +40,7 @@ impl From<String> for IndexPointer {
     }
 }
 
-pub fn run(config: &config::IndexingLocalConfig) -> Result<()> {
+pub fn run(config: &config::IndexerConfig) -> Result<()> {
     let warc_paths = config.warc_source.paths()?;
 
     let job_config: WarcSource = config.warc_source.clone();
@@ -62,7 +62,16 @@ pub fn run(config: &config::IndexingLocalConfig) -> Result<()> {
                 autocommit_after_num_inserts: config.autocommit_after_num_inserts,
             },
         })
-        .map(|job| IndexPointer(job.process(&worker).path().as_os_str().to_str().unwrap().to_string()))
+        .map(|job| {
+            IndexPointer(
+                job.process(&worker)
+                    .path()
+                    .as_os_str()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+            )
+        })
         .collect();
 
     let index = merge(indexes)?;

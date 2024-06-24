@@ -17,13 +17,14 @@
 use chrono::Utc;
 use itertools::Itertools;
 use std::path::Path;
+use std::sync::Mutex;
 
 use tracing::debug;
 
 pub use super::indexable_webpage::IndexableWebpage;
 pub use super::job::{Job, JobSettings};
 use crate::config::{
-    IndexingDualEncoderConfig, IndexingGraphConfig, IndexingLocalConfig, LiveIndexConfig,
+    IndexerConfig, IndexerDualEncoderConfig, IndexerGraphConfig, LiveIndexConfig,
     WebgraphGranularity,
 };
 use crate::models::dual_encoder::DualEncoder as DualEncoderModel;
@@ -40,14 +41,14 @@ use crate::webpage::{safety_classifier, Html, Webpage};
 pub struct Config {
     pub host_centrality_store_path: String,
     pub page_centrality_store_path: Option<String>,
-    pub page_webgraph: Option<IndexingGraphConfig>,
+    pub page_webgraph: Option<IndexerGraphConfig>,
     pub topics_path: Option<String>,
     pub safety_classifier_path: Option<String>,
-    pub dual_encoder: Option<IndexingDualEncoderConfig>,
+    pub dual_encoder: Option<IndexerDualEncoderConfig>,
 }
 
-impl From<IndexingLocalConfig> for Config {
-    fn from(config: IndexingLocalConfig) -> Self {
+impl From<IndexerConfig> for Config {
+    fn from(config: IndexerConfig) -> Self {
         Self {
             host_centrality_store_path: config.host_centrality_store_path,
             page_centrality_store_path: config.page_centrality_store_path,
@@ -141,14 +142,14 @@ impl Webgraph {
 }
 
 impl Webgraph {
-    fn new(config: &IndexingGraphConfig) -> Self {
+    fn new(config: &IndexerGraphConfig) -> Self {
         match config {
-            IndexingGraphConfig::Local { path } => Self::Local(
+            IndexerGraphConfig::Local { path } => Self::Local(
                 webgraph::WebgraphBuilder::new(path)
                     .single_threaded()
                     .open(),
             ),
-            IndexingGraphConfig::Remote { gossip } => {
+            IndexerGraphConfig::Remote { gossip } => {
                 let cluster = crate::start_gossip_cluster_thread(gossip.clone(), None);
                 Self::Remote(crate::block_on(RemoteWebgraph::new(
                     cluster,
@@ -170,6 +171,7 @@ pub struct IndexingWorker {
     job_settings: Option<JobSettings>,
     rake: RakeModel,
     dual_encoder: Option<DualEncoder>,
+    seen_urls: Mutex<bloom::BytesBloomFilter<String>>,
 }
 
 impl IndexingWorker {
@@ -216,6 +218,7 @@ impl IndexingWorker {
                     page_centrality_rank_threshold: dual_encoder.page_centrality_rank_threshold,
                 }
             }),
+            seen_urls: Mutex::new(bloom::BytesBloomFilter::new(10_000_000_000, 0.05)),
         }
     }
 
@@ -227,7 +230,20 @@ impl IndexingWorker {
         self.page_webgraph.as_ref()
     }
 
-    pub fn process(&self, job: &Job) -> Index {
+    /// Returns false if the URL has not been seen before and marks it as seen.
+    /// Returns true if the URL has been seen before.
+    pub(super) fn see(&self, url: &String) -> bool {
+        let mut seen_urls = self.seen_urls.lock().unwrap();
+
+        if seen_urls.contains(url) {
+            true
+        } else {
+            seen_urls.insert(url);
+            false
+        }
+    }
+
+    pub fn process(&mut self, job: &Job) -> Index {
         job.process(self)
     }
 
@@ -395,7 +411,7 @@ impl IndexingWorker {
                 .map(|w| Node::from(w.html.url()).id())
                 .collect::<Vec<_>>();
 
-            let backlinks = graph.batch_raw_ingoing_edges_with_labels(ids, EdgeLimit::Limit(256));
+            let backlinks = graph.batch_raw_ingoing_edges_with_labels(ids, EdgeLimit::Limit(512));
 
             for (page, backlink) in pages.iter_mut().zip_eq(backlinks) {
                 page.backlink_labels = backlink;
@@ -495,13 +511,13 @@ mod tests {
     use super::*;
 
     fn setup_worker(data_path: &Path, threshold: Option<u64>) -> IndexingWorker {
-        IndexingWorker::new(IndexingLocalConfig {
+        IndexingWorker::new(IndexerConfig {
             host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
             page_centrality_store_path: None,
             page_webgraph: None,
             topics_path: None,
             safety_classifier_path: None,
-            dual_encoder: Some(IndexingDualEncoderConfig {
+            dual_encoder: Some(IndexerDualEncoderConfig {
                 model_path: data_path.to_str().unwrap().to_string(),
                 page_centrality_rank_threshold: threshold,
             }),

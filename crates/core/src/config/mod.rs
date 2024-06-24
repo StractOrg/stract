@@ -26,12 +26,12 @@ use std::io::{self, BufRead};
 use std::net::SocketAddr;
 
 #[derive(Debug, serde::Deserialize, Clone)]
-pub struct IndexingLocalConfig {
+pub struct IndexerConfig {
     pub output_path: String,
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,
     pub warc_source: WarcSource,
-    pub page_webgraph: Option<IndexingGraphConfig>,
+    pub page_webgraph: Option<IndexerGraphConfig>,
     pub host_centrality_threshold: Option<f64>,
     pub topics_path: Option<String>,
     pub host_centrality_store_path: String,
@@ -45,18 +45,18 @@ pub struct IndexingLocalConfig {
     #[serde(default = "defaults::Indexing::autocommit_after_num_inserts")]
     pub autocommit_after_num_inserts: usize,
 
-    pub dual_encoder: Option<IndexingDualEncoderConfig>,
+    pub dual_encoder: Option<IndexerDualEncoderConfig>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 #[serde(tag = "type")]
-pub enum IndexingGraphConfig {
+pub enum IndexerGraphConfig {
     Local { path: String },
     Remote { gossip: GossipConfig },
 }
 
 #[derive(Debug, serde::Deserialize, Clone)]
-pub struct IndexingDualEncoderConfig {
+pub struct IndexerDualEncoderConfig {
     pub model_path: String,
 
     /// Only compute embeddings for pages that has a
@@ -479,7 +479,7 @@ pub struct LiveIndexConfig {
 
     // indexer
     pub host_centrality_store_path: String,
-    pub page_webgraph: Option<IndexingGraphConfig>,
+    pub page_webgraph: Option<IndexerGraphConfig>,
     pub page_centrality_store_path: Option<String>,
     pub safety_classifier_path: Option<String>,
     pub host_centrality_threshold: Option<f64>,

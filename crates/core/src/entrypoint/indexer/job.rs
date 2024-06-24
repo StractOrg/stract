@@ -68,14 +68,16 @@ impl Job {
         for file in warc_files.by_ref() {
             let mut batch = Vec::with_capacity(self.settings.batch_size);
 
-            for chunk in &file
+            for chunk in file
                 .records()
                 .flatten()
                 .filter(|record| match &record.response.payload_type {
                     Some(payload_type) => matches!(payload_type, PayloadType::Html),
                     None => true,
                 })
+                .filter(|record| !worker.see(&record.request.url))
                 .chunks(self.settings.batch_size)
+                .into_iter()
             {
                 batch.clear();
 

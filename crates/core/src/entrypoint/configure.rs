@@ -20,7 +20,7 @@ use tokio_stream::StreamExt;
 use tracing::{debug, info};
 
 use crate::config::{
-    defaults, IndexingDualEncoderConfig, IndexingGraphConfig, IndexingLocalConfig, LocalConfig,
+    defaults, IndexerConfig, IndexerDualEncoderConfig, IndexerGraphConfig, LocalConfig,
     WebSpellConfig,
 };
 use crate::entrypoint::indexer::JobSettings;
@@ -180,12 +180,12 @@ fn create_inverted_index() -> Result<()> {
     let webgraph_path = Path::new(DATA_PATH).join("webgraph_page");
     let centrality_path = Path::new(DATA_PATH).join("centrality");
     let page_centrality_path = Path::new(DATA_PATH).join("centrality_page");
-    let dual_encoder_path = Path::new(DATA_PATH).join("summarizer").join("dual_encoder");
+    let dual_encoder_path = Path::new(DATA_PATH).join("dual_encoder");
 
-    let worker = indexer::IndexingWorker::new(IndexingLocalConfig {
+    let worker = indexer::IndexingWorker::new(IndexerConfig {
         host_centrality_store_path: centrality_path.to_str().unwrap().to_string(),
         page_centrality_store_path: Some(page_centrality_path.to_str().unwrap().to_string()),
-        page_webgraph: Some(IndexingGraphConfig::Local {
+        page_webgraph: Some(IndexerGraphConfig::Local {
             path: webgraph_path.to_str().unwrap().to_string(),
         }),
         topics_path: Some(
@@ -204,7 +204,7 @@ fn create_inverted_index() -> Result<()> {
         minimum_clean_words: None,
         batch_size: defaults::Indexing::batch_size(),
         autocommit_after_num_inserts: defaults::Indexing::autocommit_after_num_inserts(),
-        dual_encoder: Some(IndexingDualEncoderConfig {
+        dual_encoder: Some(IndexerDualEncoderConfig {
             model_path: dual_encoder_path.to_str().unwrap().to_string(),
             page_centrality_rank_threshold: Some(100_000),
         }),

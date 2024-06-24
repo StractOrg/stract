@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use clap::Parser;
-use stract::config::{IndexingGraphConfig, IndexingLocalConfig};
+use stract::config::{IndexerConfig, IndexerGraphConfig};
 
 #[derive(Parser)]
 struct Args {
@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
 
     println!("Indexing...");
     let start = std::time::Instant::now();
-    stract::entrypoint::indexer::run(&IndexingLocalConfig {
+    stract::entrypoint::indexer::run(&IndexerConfig {
         output_path: path.to_str().unwrap().to_string(),
         limit_warc_files: None,
         skip_warc_files: None,
@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
                 .unwrap()
                 .to_string()],
         }),
-        page_webgraph: Some(IndexingGraphConfig::Local {
+        page_webgraph: Some(IndexerGraphConfig::Local {
             path: data_path
                 .join("webgraph_page")
                 .to_str()
@@ -56,7 +56,7 @@ fn main() -> anyhow::Result<()> {
             stract::config::defaults::Indexing::autocommit_after_num_inserts(),
         dual_encoder: args
             .dual_encoder_path
-            .map(|p| stract::config::IndexingDualEncoderConfig {
+            .map(|p| stract::config::IndexerDualEncoderConfig {
                 model_path: p,
                 page_centrality_rank_threshold: Some(1_000_000),
             }),

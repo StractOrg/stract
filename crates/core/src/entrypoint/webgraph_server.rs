@@ -183,6 +183,10 @@ impl Message<WebGraphService> for PagesByHosts {
 pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
 
+    let graph = Arc::new(WebgraphBuilder::new(config.graph_path).open());
+
+    let server = WebGraphService { graph }.bind(addr).await.unwrap();
+
     // dropping the handle leaves the cluster
     let _cluster = Arc::new(
         Cluster::join(
@@ -199,10 +203,6 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
         )
         .await?,
     );
-
-    let graph = Arc::new(WebgraphBuilder::new(config.graph_path).open());
-
-    let server = WebGraphService { graph }.bind(addr).await.unwrap();
 
     info!("webgraph server is ready to accept requests on {}", addr);
 
