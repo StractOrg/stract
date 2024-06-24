@@ -190,11 +190,12 @@ impl IndexingWorker {
                 Path::new(&config.host_centrality_store_path).join("harmonic_rank"),
             )
             .unwrap(),
-            page_centrality_store: config.page_centrality_store_path.as_ref().map(|p| {
-                speedy_kv::Db::open_or_create(Path::new(&p).join("approx_harmonic")).unwrap()
-            }),
+            page_centrality_store: config
+                .page_centrality_store_path
+                .as_ref()
+                .map(|p| speedy_kv::Db::open_or_create(Path::new(&p).join("harmonic")).unwrap()),
             page_centrality_rank_store: config.page_centrality_store_path.as_ref().map(|p| {
-                speedy_kv::Db::open_or_create(Path::new(&p).join("approx_harmonic_rank")).unwrap()
+                speedy_kv::Db::open_or_create(Path::new(&p).join("harmonic_rank")).unwrap()
             }),
             page_webgraph: config.page_webgraph.as_ref().map(Webgraph::new),
             topics: config

@@ -61,10 +61,9 @@ impl Centrality {
 
         let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
 
-        let approx = ApproxHarmonic::build(&graph, base_output.as_ref().join("approx_harmonic"));
+        let approx = ApproxHarmonic::build(&graph, base_output.as_ref().join("harmonic"));
         let mut approx_rank: speedy_kv::Db<crate::webgraph::NodeID, u64> =
-            speedy_kv::Db::open_or_create(base_output.as_ref().join("approx_harmonic_rank"))
-                .unwrap();
+            speedy_kv::Db::open_or_create(base_output.as_ref().join("harmonic_rank")).unwrap();
 
         let mut top_nodes = Vec::new();
 
@@ -94,7 +93,7 @@ impl Centrality {
         approx_rank.commit().unwrap();
         approx_rank.merge_all_segments().unwrap();
 
-        store_csv(top_nodes, base_output.as_ref().join("approx_harmonic.csv"));
+        store_csv(top_nodes, base_output.as_ref().join("harmonic.csv"));
 
         Ok(())
     }
