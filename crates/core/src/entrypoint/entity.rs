@@ -228,6 +228,7 @@ impl EntityIndexer {
         }
 
         index.commit();
+        index.merge_into_max_segments(1)?;
 
         Ok(())
     }

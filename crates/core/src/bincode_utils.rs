@@ -214,15 +214,6 @@ mod de_owned {
             visitor.visit_char(Decode::decode(&mut self.de)?)
         }
 
-        #[cfg(feature = "alloc")]
-        fn deserialize_str<V>(mut self, visitor: V) -> Result<V::Value, Self::Error>
-        where
-            V: serde::de::Visitor<'de>,
-        {
-            visitor.visit_string(Decode::decode(&mut self.de)?)
-        }
-
-        #[cfg(not(feature = "alloc"))]
         fn deserialize_str<V>(self, _: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'de>,

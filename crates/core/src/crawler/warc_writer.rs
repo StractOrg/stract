@@ -75,7 +75,8 @@ async fn commit(writer: warc::DeduplicatedWarcWriter, s3: config::S3Config) {
         Ok(bucket) => {
             let bucket = bucket
                 .with_path_style()
-                .with_request_timeout(Duration::from_secs(30 * 60));
+                .with_request_timeout(Duration::from_secs(30 * 60))
+                .unwrap();
 
             if let Err(err) = bucket
                 .put_object_with_content_type(

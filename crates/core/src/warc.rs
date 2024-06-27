@@ -191,7 +191,7 @@ impl WarcFile {
             },
         )?
         .with_path_style()
-        .with_request_timeout(Duration::from_secs(30 * 60));
+        .with_request_timeout(Duration::from_secs(30 * 60))?;
 
         let res = bucket.get_object_blocking(warc_path)?;
 

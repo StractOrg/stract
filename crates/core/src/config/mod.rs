@@ -361,9 +361,6 @@ pub struct CrawlerConfig {
     #[serde(default = "defaults::Crawler::max_redirects")]
     pub max_redirects: usize,
 
-    #[serde(default = "defaults::Crawler::dry_run")]
-    pub dry_run: bool,
-
     pub timeout_seconds: u64,
     pub s3: S3Config,
     pub router_hosts: Vec<String>,

@@ -121,14 +121,9 @@ impl Html {
                 if let Some(rel) = element.attributes.borrow().get("rel") {
                     if rel == "canonical" {
                         if let Some(href) = element.attributes.borrow().get("href") {
-                            match Url::parse(href) {
-                                Ok(url) => canonical_url = Some(url),
-                                Err(_) => {
-                                    if let Ok(url) = self.url().join(href) {
-                                        canonical_url = Some(url);
-                                    }
-                                }
-                            };
+                            if let Ok(url) = Url::parse_with_base_url(self.url(), href) {
+                                canonical_url = Some(url);
+                            }
                         }
                     }
                 }
@@ -223,15 +218,13 @@ impl Html {
             if let Some(link) = script
                 .attributes
                 .get("src")
-                .and_then(|link| Url::parse(link).or_else(|_| self.url().join(link)).ok())
+                .and_then(|link| Url::parse_with_base_url(self.url(), link).ok())
             {
                 links.push(link);
             }
 
             for res in URL_REGEX.find_iter(&script.content) {
-                if let Ok(link) =
-                    Url::parse(res.as_str()).or_else(|_| self.url().join(res.as_str()))
-                {
+                if let Ok(link) = Url::parse_with_base_url(self.url(), res.as_str()) {
                     links.push(link);
                 }
             }
@@ -242,7 +235,7 @@ impl Html {
                 .attributes
                 .borrow()
                 .get("href")
-                .and_then(|link| Url::parse(link).or_else(|_| self.url().join(link)).ok())
+                .and_then(|link| Url::parse_with_base_url(self.url(), link).ok())
             {
                 links.push(link);
             }
@@ -376,7 +369,7 @@ impl Html {
                         .many()
                         .into_iter()
                         .filter_map(|url| url.try_into_string())
-                        .filter_map(|url| Url::parse(&url).or_else(|_| self.url().join(&url)).ok())
+                        .filter_map(|url| Url::parse_with_base_url(self.url(), &url).ok())
                 })
             })
             .flatten()

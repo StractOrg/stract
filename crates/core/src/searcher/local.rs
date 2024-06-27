@@ -253,6 +253,10 @@ where
         })
     }
 
+    pub fn index(&self) -> &I {
+        &self.index
+    }
+
     pub fn search_initial(
         &self,
         query: &SearchQuery,

@@ -14,7 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, fs, path::Path, sync::Arc};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use base64::{prelude::BASE64_STANDARD as BASE64_ENGINE, Engine};
 
@@ -28,6 +33,7 @@ use tantivy::{
 
 use crate::{
     image_store::{EntityImageStore, Image, ImageStore},
+    inverted_index::merge_tantivy_segments,
     tokenizer::Normal,
     Result,
 };
@@ -133,6 +139,7 @@ pub struct EntityIndex {
     tv_index: tantivy::Index,
     schema: Arc<Schema>,
     stopwords: HashSet<String>,
+    path: PathBuf,
 }
 
 impl EntityIndex {
@@ -172,6 +179,7 @@ impl EntityIndex {
             tv_index: tantivy_index,
             schema: Arc::new(schema),
             stopwords,
+            path: path.as_ref().to_path_buf(),
         })
     }
 
@@ -420,6 +428,22 @@ impl EntityIndex {
 
     pub fn insert_image(&mut self, name: String, image: Image) {
         self.image_store.insert(name, image);
+    }
+
+    pub fn merge_into_max_segments(&mut self, max_num_segments: u64) -> Result<()> {
+        self.image_store.merge_all_segments();
+        self.prepare_writer();
+        let base_path = Path::new(&self.path);
+        let segments: Vec<_> = self.tv_index.load_metas()?.segments.into_iter().collect();
+
+        merge_tantivy_segments(
+            self.writer.as_mut().expect("writer has not been prepared"),
+            segments,
+            base_path,
+            max_num_segments,
+        )?;
+
+        Ok(())
     }
 }
 

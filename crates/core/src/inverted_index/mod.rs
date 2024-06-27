@@ -31,7 +31,7 @@ mod search;
 
 pub use indexing::merge_tantivy_segments;
 
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime};
 
 use tantivy::directory::MmapDirectory;
 
@@ -285,7 +285,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
                         if timestamp == 0 {
                             None
                         } else {
-                            NaiveDateTime::from_timestamp_opt(timestamp, 0)
+                            DateTime::from_timestamp(timestamp, 0).map(|dt| dt.naive_utc())
                         }
                     }
                 }

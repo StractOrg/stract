@@ -116,6 +116,10 @@ impl BaseImageStore {
         self.flush();
         self.store.merge_all_segments().unwrap();
     }
+
+    fn merge_all_segments(&mut self) {
+        self.store.merge_all_segments().unwrap();
+    }
 }
 
 trait ImageFilter: Send + Sync {
@@ -155,6 +159,10 @@ impl EntityImageStore {
         );
 
         Self { store }
+    }
+
+    pub fn merge_all_segments(&mut self) {
+        self.store.merge_all_segments();
     }
 }
 

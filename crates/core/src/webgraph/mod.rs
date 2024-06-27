@@ -167,7 +167,7 @@ impl Webgraph {
         for segment in other.segments {
             let id = segment.id();
             let new_path = Path::new(&self.path).join("segments");
-            std::fs::rename(segment.path(), &new_path.join(segment.id())).unwrap();
+            std::fs::rename(segment.path(), new_path.join(segment.id())).unwrap();
 
             self.meta.comitted_segments.push(segment.id());
             drop(segment);

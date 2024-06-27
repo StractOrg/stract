@@ -9,6 +9,8 @@ members = [
   "crates/optics",
   "crates/speedy-kv",
   "crates/zimba",
+  "crates/robotstxt",
+  "fuzz",
 ]
 resolver = "2"
 
@@ -90,6 +92,7 @@ openraft = {version = "0.9.1", features = [
   "serde",
   "tracing-log",
 ]}
+percent-encoding = "2.3.0"
 postcard = {version = "1.0.8", features = ["experimental-derive", "alloc"]}
 proptest = "1.2.0"
 proptest-derive = "0.4.0"
@@ -104,13 +107,12 @@ ring = "0.17.3"
 rio_api = "0.8.4"
 rio_turtle = "0.8.4"
 rkyv = {version = "0.7.44", features = ["validation", "bytecheck"]}
-robotstxt-with-cache = "0.4.0"
 rusqlite = {version = "0.29.0", features = [
   "bundled",
   "modern-full",
   "buildtime_bindgen",
 ]}
-rust-s3 = {version = "0.33.0", features = ["blocking", "tokio"]}
+rust-s3 = {version = "0.34.0", features = ["blocking", "tokio"]}
 rust-stemmers = "1.2.0"
 rustc-hash = "1.1"
 safetensors = "0.3.1"
@@ -133,7 +135,6 @@ tracing = {version = "0.1.34", features = ["release_max_level_info"]}
 tracing-subscriber = {version = "0.3.11", features = ["env-filter"]}
 tracing-test = "0.2.4"
 url = {version = "2.4.0", features = ["serde"]}
-urlencoding = "2.1.2"
 utoipa = {version = "4.2.3", features = ["axum_extras"]}
 utoipa-swagger-ui = {version = "7.0.0", features = ["axum"]}
 uuid = "1.1.2"

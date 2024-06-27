@@ -150,6 +150,7 @@ impl<S: DatumStream> JobExecutor<S> {
             robotstxt: RobotsTxtManager::new(
                 client.clone(),
                 Duration::from_secs(config.robots_txt_cache_sec),
+                &config.user_agent.token,
             ),
             client,
             crawled_urls: HashSet::new(),
@@ -237,12 +238,7 @@ impl<S: DatumStream> JobExecutor<S> {
                 continue;
             }
 
-            if !self.config.dry_run
-                && !self
-                    .robotstxt
-                    .is_allowed(retryable_url.url(), &self.config.user_agent.token)
-                    .await
-            {
+            if !self.robotstxt.is_allowed(retryable_url.url()).await {
                 continue;
             }
 
@@ -253,10 +249,12 @@ impl<S: DatumStream> JobExecutor<S> {
                     .unwrap_or_default()
                     .to_string(),
             );
-            if !self.config.dry_run && fetch_sitemap && !self.crawled_sitemaps.contains(&site) {
+            if fetch_sitemap && !self.crawled_sitemaps.contains(&site) {
                 self.crawled_sitemaps.insert(site.clone());
 
-                if let Some(sitemap) = self.robotstxt.sitemap(retryable_url.url()).await {
+                let sitemaps = self.robotstxt.sitemaps(retryable_url.url()).await;
+
+                for sitemap in sitemaps {
                     self.sitemap_urls
                         .extend(self.urls_from_sitemap(sitemap, 5).await);
                 }
@@ -404,11 +402,6 @@ impl<S: DatumStream> JobExecutor<S> {
     }
 
     async fn fetch(&self, url: Url) -> Result<reqwest::Response> {
-        if self.config.dry_run {
-            tracing::debug!("dry run: {}", url);
-            return Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into());
-        }
-
         self.client
             .get(url.to_string())
             .send()

@@ -1,0 +1,41 @@
+[package]
+edition = "2021"
+name = "stract-fuzz"
+publish = false
+version = "0.0.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+robotstxt = {path = "../crates/robotstxt"}
+stract = {path = "../crates/core"}
+
+[[bin]]
+bench = false
+doc = false
+name = "robotstxt"
+path = "fuzz_targets/robotstxt.rs"
+test = false
+
+[[bin]]
+bench = false
+doc = false
+name = "query-parser"
+path = "fuzz_targets/query_parser.rs"
+test = false
+
+[[bin]]
+bench = false
+doc = false
+name = "rss"
+path = "fuzz_targets/rss.rs"
+test = false
+
+[[bin]]
+bench = false
+doc = false
+name = "atom"
+path = "fuzz_targets/atom.rs"
+test = false

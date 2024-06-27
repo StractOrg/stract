@@ -1,0 +1,9 @@
+# source: https://github.com/Smerity/texting_robots
+# Suggestions for the fuzzer targeting robots.txt
+
+allow="allow:"
+disallow="disallow:"
+sitemap="sitemap:"
+delay="crawl-delay:"
+ua="user-agent:"
+comment="#comment"

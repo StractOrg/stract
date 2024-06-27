@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::Result;
 use publicsuffix::Psl;
 
 static PUBLIC_SUFFIX_LIST: once_cell::sync::Lazy<publicsuffix::List> =
@@ -29,6 +30,9 @@ static ICANN_LIST: once_cell::sync::Lazy<publicsuffix::List> = once_cell::sync::
 });
 
 pub trait UrlExt {
+    fn parse_with_base_url(base_url: &url::Url, url: &str) -> Result<url::Url> {
+        url::Url::parse(url).or_else(|_| base_url.join(url).map_err(|e| e.into()))
+    }
     fn icann_domain(&self) -> Option<&str>;
     fn root_domain(&self) -> Option<&str>;
     fn normalized_host(&self) -> Option<&str>;
@@ -80,6 +84,14 @@ impl UrlExt for url::Url {
 
         if self.query().unwrap_or_default().is_empty() {
             self.set_query(None);
+        }
+
+        if !self.username().is_empty() {
+            let _ = self.set_username("");
+        }
+
+        if self.password().is_some() {
+            let _ = self.set_password(None);
         }
     }
 

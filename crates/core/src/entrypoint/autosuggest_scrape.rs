@@ -29,7 +29,7 @@ use crate::Result;
 fn suggestions(query: &str, gl: &str) -> Result<Vec<String>> {
     let url = format!(
         "https://www.google.com/complete/search?q={}&gl={}&client=gws-wiz&xssi=t",
-        urlencoding::encode(query),
+        crate::urlencode(query),
         gl
     );
 

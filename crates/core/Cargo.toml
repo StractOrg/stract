@@ -80,6 +80,7 @@ num-rational.workspace = true
 once_cell.workspace = true
 openraft.workspace = true
 optics = {path = "../optics"}
+percent-encoding.workspace = true
 postcard.workspace = true
 publicsuffix.workspace = true
 quick-xml.workspace = true
@@ -92,7 +93,7 @@ ring.workspace = true
 rio_api.workspace = true
 rio_turtle.workspace = true
 rkyv.workspace = true
-robotstxt-with-cache.workspace = true
+robotstxt = {path = "../robotstxt"}
 rust-s3.workspace = true
 rust-stemmers.workspace = true
 rustc-hash.workspace = true
@@ -114,7 +115,6 @@ tower.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 url.workspace = true
-urlencoding.workspace = true
 utoipa-swagger-ui.workspace = true
 utoipa.workspace = true
 uuid.workspace = true

@@ -69,7 +69,6 @@ impl From<&LiveIndexConfig> for CrawlerConfig {
             max_politeness_factor: live.max_politeness_factor,
             max_url_slowdown_retry: live.max_url_slowdown_retry,
             max_redirects: live.max_redirects,
-            dry_run: false,
             timeout_seconds: live.timeout_seconds,
             // no impact
             s3: crate::config::S3Config {
