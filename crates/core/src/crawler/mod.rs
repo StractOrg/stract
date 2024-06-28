@@ -19,6 +19,7 @@ use std::{collections::VecDeque, future::Future, net::SocketAddr, sync::Arc, tim
 type HashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
 use anyhow::anyhow;
+use futures::StreamExt;
 use url::Url;
 
 use crate::{config::CrawlerConfig, warc, webpage::url_ext::UrlExt};
@@ -39,11 +40,9 @@ mod worker;
 pub use coordinator::CrawlCoordinator;
 
 pub const MAX_URL_LEN_BYTES: usize = 8192;
-pub const MAX_URLS_FOR_DOMAIN_PER_INSERT: usize = 256;
-/// Number of new domains that can be discovered for each domain crawled.
-pub const MAX_DOMAIN_DISCOVERY_FACTOR: usize = 4;
 
-pub const MAX_OUTGOING_URLS_PER_PAGE: usize = 200;
+pub const MAX_OUTGOING_URLS_PER_PAGE: usize = 512;
+pub const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -319,4 +318,38 @@ pub fn reqwest_client(config: &CrawlerConfig) -> Result<reqwest::Client> {
         .user_agent(&config.user_agent.full)
         .build()
         .map_err(|e| Error::from(anyhow!(e)))
+}
+
+pub async fn encoded_body(res: reqwest::Response) -> Result<String> {
+    let content_type = res
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<mime::Mime>().ok());
+    let encoding_name = content_type
+        .as_ref()
+        .and_then(|mime| mime.get_param("charset").map(|charset| charset.as_str()))
+        .unwrap_or("utf-8");
+    let encoding =
+        encoding_rs::Encoding::for_label(encoding_name.as_bytes()).unwrap_or(encoding_rs::UTF_8);
+
+    let mut bytes = Vec::new();
+
+    let mut stream = res.bytes_stream();
+    while let Some(b) = stream.next().await {
+        if b.is_err() {
+            return Err(Error::ContentTooLarge);
+        }
+
+        let b = b.unwrap();
+
+        bytes.extend_from_slice(&b);
+
+        if bytes.len() > MAX_CONTENT_LENGTH {
+            return Err(Error::ContentTooLarge);
+        }
+    }
+
+    let (text, _, _) = encoding.decode(&bytes);
+    Ok(text.to_string())
 }

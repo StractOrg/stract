@@ -14,12 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::anyhow;
-use encoding_rs::{Encoding, UTF_8};
 use hashbrown::HashSet;
-use mime::Mime;
 use quick_xml::events::Event;
 use rand::seq::SliceRandom;
-use tokio_stream::StreamExt;
 
 use std::{
     collections::VecDeque,
@@ -40,11 +37,11 @@ use crate::{
 };
 
 use super::{
-    reqwest_client, robots_txt::RobotsTxtManager, wander_prirotiser::WanderPrioritiser, CrawlDatum,
-    DatumStream, Domain, Error, Result, RetrieableUrl, Site, WarcWriter, WeightedUrl, WorkerJob,
+    encoded_body, reqwest_client, robots_txt::RobotsTxtManager,
+    wander_prirotiser::WanderPrioritiser, CrawlDatum, DatumStream, Domain, Error, Result,
+    RetrieableUrl, Site, WarcWriter, WeightedUrl, WorkerJob, MAX_CONTENT_LENGTH,
+    MAX_OUTGOING_URLS_PER_PAGE,
 };
-
-const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
 
 const IGNORED_EXTENSIONS: [&str; 27] = [
     ".pdf", ".jpg", ".zip", ".png", ".css", ".js", ".json", ".jsonp", ".woff2", ".woff", ".ttf",
@@ -372,6 +369,7 @@ impl<S: DatumStream> JobExecutor<S> {
                     .new_urls(&html)
                     .into_iter()
                     .filter(|new_url| new_url.root_domain() == root_domain)
+                    .take(MAX_OUTGOING_URLS_PER_PAGE)
                     .collect();
                 Ok(ProcessedUrl { new_urls })
             }
@@ -495,39 +493,6 @@ impl<S: DatumStream> JobExecutor<S> {
         }
     }
 
-    async fn encoded_body(&self, res: reqwest::Response) -> Result<String> {
-        let content_type = res
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.parse::<Mime>().ok());
-        let encoding_name = content_type
-            .as_ref()
-            .and_then(|mime| mime.get_param("charset").map(|charset| charset.as_str()))
-            .unwrap_or("utf-8");
-        let encoding = Encoding::for_label(encoding_name.as_bytes()).unwrap_or(UTF_8);
-
-        let mut bytes = Vec::new();
-
-        let mut stream = res.bytes_stream();
-        while let Some(b) = stream.next().await {
-            if b.is_err() {
-                return Err(Error::ContentTooLarge);
-            }
-
-            let b = b.unwrap();
-
-            bytes.extend_from_slice(&b);
-
-            if bytes.len() > MAX_CONTENT_LENGTH {
-                return Err(Error::ContentTooLarge);
-            }
-        }
-
-        let (text, _, _) = encoding.decode(&bytes);
-        Ok(text.to_string())
-    }
-
     async fn crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
         let mut url = url;
         url.normalize();
@@ -565,7 +530,7 @@ impl<S: DatumStream> JobExecutor<S> {
 
         self.crawled_urls.insert(res_url.clone());
 
-        let body = self.encoded_body(res).await?;
+        let body = encoded_body(res).await?;
 
         Ok(CrawlDatum {
             url: res_url,
@@ -584,7 +549,7 @@ impl<S: DatumStream> JobExecutor<S> {
                 continue;
             }
 
-            let res = self.fetch(url).await;
+            let res = self.fetch_with_https_priority(url).await;
             tokio::time::sleep(self.delay_duration()).await;
 
             if res.is_err() {

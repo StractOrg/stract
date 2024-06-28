@@ -20,7 +20,7 @@ use url::Url;
 
 use crate::{config::CrawlerConfig, crawler};
 
-use super::{Result, Site};
+use super::{encoded_body, Result, Site};
 
 enum Lookup<T> {
     Found(T),
@@ -90,7 +90,7 @@ impl RobotsTxtManager {
                     }
                 }
 
-                let body = match res.text().await {
+                let body = match encoded_body(res).await {
                     Ok(body) => body,
                     Err(_) => return Lookup::Unreachable,
                 };
