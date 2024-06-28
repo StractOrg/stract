@@ -13,7 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use encoding_rs::{Encoding, UTF_8};
 use hashbrown::HashSet;
 use mime::Mime;
@@ -41,8 +41,7 @@ use crate::{
 
 use super::{
     reqwest_client, robots_txt::RobotsTxtManager, wander_prirotiser::WanderPrioritiser, CrawlDatum,
-    DatumStream, Domain, Error, Result, RetrieableUrl, Site, UrlResponse, WarcWriter, WeightedUrl,
-    WorkerJob,
+    DatumStream, Domain, Error, Result, RetrieableUrl, Site, WarcWriter, WeightedUrl, WorkerJob,
 };
 
 const MAX_CONTENT_LENGTH: usize = 32 * 1024 * 1024; // 32 MB
@@ -53,9 +52,13 @@ const IGNORED_EXTENSIONS: [&str; 27] = [
     ".flac", ".aac", ".ogg", ".m4a", ".m4v",
 ];
 
+enum UrlVisit {
+    Skip,
+    CanCrawl,
+}
+
 struct ProcessedUrl {
     new_urls: Vec<Url>,
-    response: UrlResponse,
 }
 
 pub struct WorkerThread {
@@ -86,12 +89,13 @@ impl WorkerThread {
 
         let router = *self.router_hosts.choose(&mut rand::thread_rng()).unwrap();
 
-        Ok(sonic::service::Connection::create_with_timeout_retry(
+        sonic::service::Connection::create_with_timeout_retry(
             router,
             Duration::from_secs(90),
             retry,
         )
-        .await?)
+        .await
+        .map_err(|e| Error::from(anyhow!(e)))
     }
 
     pub async fn run(self) {
@@ -131,7 +135,10 @@ pub struct JobExecutor<S: DatumStream> {
     crawled_urls: HashSet<Url>,
     crawled_sitemaps: HashSet<Site>,
     sitemap_urls: HashSet<Url>,
-    config: Arc<CrawlerConfig>,
+    min_crawl_delay: Duration,
+    max_crawl_delay: Duration,
+    max_url_slowdown_retry: u8,
+    max_politeness_factor: f32,
     wander_prioritiser: WanderPrioritiser,
     wandered_urls: u64,
     job: WorkerJob,
@@ -147,17 +154,16 @@ impl<S: DatumStream> JobExecutor<S> {
         Self {
             writer,
             politeness_factor: config.politeness_factor,
-            robotstxt: RobotsTxtManager::new(
-                client.clone(),
-                Duration::from_secs(config.robots_txt_cache_sec),
-                &config.user_agent.token,
-            ),
+            robotstxt: RobotsTxtManager::new(&config),
             client,
             crawled_urls: HashSet::new(),
             crawled_sitemaps: HashSet::new(),
             wandered_urls: 0,
             sitemap_urls: HashSet::new(),
-            config,
+            min_crawl_delay: Duration::from_millis(config.min_crawl_delay_ms),
+            max_crawl_delay: Duration::from_millis(config.max_crawl_delay_ms),
+            max_url_slowdown_retry: config.max_url_slowdown_retry,
+            max_politeness_factor: config.max_politeness_factor,
             wander_prioritiser: WanderPrioritiser::new(),
             job,
         }
@@ -165,7 +171,6 @@ impl<S: DatumStream> JobExecutor<S> {
 
     pub async fn run(mut self) {
         tracing::info!("Processing job: {:?}", self.job.domain);
-
         self.scheduled_urls().await;
 
         while self.wandered_urls < self.job.wandering_urls
@@ -218,28 +223,48 @@ impl<S: DatumStream> JobExecutor<S> {
         self.process_urls(urls, false).await;
     }
 
+    async fn verify_url(&mut self, retryable_url: &RetrieableUrl) -> UrlVisit {
+        if Domain::from(retryable_url.url()) != self.job.domain {
+            return UrlVisit::Skip;
+        }
+
+        if self.crawled_urls.contains(retryable_url.url()) {
+            return UrlVisit::Skip;
+        }
+
+        if retryable_url.retries > self.max_url_slowdown_retry {
+            return UrlVisit::Skip;
+        }
+
+        if retryable_url.url().host_str().is_none()
+            || !matches!(retryable_url.url().scheme(), "http" | "https")
+        {
+            return UrlVisit::Skip;
+        }
+
+        if !self.robotstxt.is_allowed(retryable_url.url()).await {
+            return UrlVisit::Skip;
+        }
+
+        if let Some(port) = retryable_url.url().port() {
+            if port != 80 && port != 443 {
+                return UrlVisit::Skip;
+            }
+        }
+
+        UrlVisit::CanCrawl
+    }
+
     async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>, fetch_sitemap: bool) {
         while let Some(retryable_url) = urls.pop_front() {
-            if Domain::from(retryable_url.url()) != self.job.domain {
+            if let UrlVisit::Skip = self.verify_url(&retryable_url).await {
                 continue;
             }
 
-            if self.crawled_urls.contains(retryable_url.url()) {
-                continue;
-            }
-
-            if retryable_url.retries > self.config.max_url_slowdown_retry {
-                continue;
-            }
-
-            if retryable_url.url().host_str().is_none()
-                || !matches!(retryable_url.url().scheme(), "http" | "https")
-            {
-                continue;
-            }
-
-            if !self.robotstxt.is_allowed(retryable_url.url()).await {
-                continue;
+            if let Some(delay) = self.robotstxt.crawl_delay(retryable_url.url()).await {
+                if delay > self.min_crawl_delay {
+                    self.min_crawl_delay = delay.min(self.max_crawl_delay);
+                }
             }
 
             let site = Site(
@@ -262,8 +287,8 @@ impl<S: DatumStream> JobExecutor<S> {
 
             let res = self.process_url(retryable_url.url().clone()).await;
 
-            match res.response {
-                UrlResponse::Success { url: _ } => {
+            match res {
+                Ok(res) => {
                     let weight = retryable_url.weighted_url.weight;
 
                     for new_url in res.new_urls {
@@ -278,18 +303,32 @@ impl<S: DatumStream> JobExecutor<S> {
                         self.wander_prioritiser.inc(new_url, weight);
                     }
                 }
-                UrlResponse::Failed {
-                    url: _,
+                Err(Error::FetchFailed {
                     status_code,
-                } => {
-                    if matches!(status_code, Some(429)) {
-                        let mut retryable_url = retryable_url;
-                        retryable_url.retries += 1;
-                        urls.push_back(retryable_url);
-                        continue;
+                    headers,
+                }) if status_code == 429 => {
+                    if headers.contains_key("retry-after") {
+                        let retry_after = headers["retry-after"]
+                            .to_str()
+                            .ok()
+                            .and_then(|s| s.parse::<u64>().ok())
+                            .map(Duration::from_secs);
+
+                        if let Some(retry_after) = retry_after {
+                            if retry_after > self.max_crawl_delay {
+                                return; // don't crawl anymore from this site
+                            }
+
+                            tokio::time::sleep(retry_after).await;
+                        }
                     }
+
+                    self.increase_politeness();
+                    let mut retryable_url = retryable_url;
+                    retryable_url.retries += 1;
+                    urls.push_back(retryable_url);
                 }
-                UrlResponse::Redirected { url: _, new_url: _ } => {}
+                Err(_) => {}
             }
         }
     }
@@ -297,8 +336,8 @@ impl<S: DatumStream> JobExecutor<S> {
     fn increase_politeness(&mut self) {
         self.politeness_factor *= 2.0;
 
-        if self.politeness_factor > self.config.max_politeness_factor {
-            self.politeness_factor = self.config.max_politeness_factor;
+        if self.politeness_factor > self.max_politeness_factor {
+            self.politeness_factor = self.max_politeness_factor;
         }
 
         tracing::warn!("politeness factor increased to {}", self.politeness_factor);
@@ -322,82 +361,25 @@ impl<S: DatumStream> JobExecutor<S> {
             .collect()
     }
 
-    async fn process_url(&mut self, url: Url) -> ProcessedUrl {
-        let fetch = self.crawl_url(url.clone()).await;
+    async fn process_url(&mut self, url: Url) -> Result<ProcessedUrl> {
+        let datum = self.crawl_url(url.clone()).await?;
+        self.save_datum(datum.clone()).await;
 
-        match fetch {
-            Ok(datum) => match datum.status_code {
-                200 => {
-                    self.save_datum(datum.clone()).await;
-
-                    if datum.url != url {
-                        // todo: we might want to save the redirected url
-                    }
-
-                    match Html::parse(&datum.body, datum.url.as_str()) {
-                        Ok(html) => {
-                            let new_urls = self.new_urls(&html);
-                            let url_res = UrlResponse::Success { url: datum.url };
-                            ProcessedUrl {
-                                new_urls,
-                                response: url_res,
-                            }
-                        }
-                        Err(_) => ProcessedUrl {
-                            new_urls: Vec::new(),
-                            response: UrlResponse::Failed {
-                                url,
-                                status_code: None,
-                            },
-                        },
-                    }
-                }
-                301 | 302 => {
-                    let url_res = UrlResponse::Redirected {
-                        url,
-                        new_url: datum.url,
-                    };
-
-                    ProcessedUrl {
-                        new_urls: Vec::new(),
-                        response: url_res,
-                    }
-                }
-
-                _ => {
-                    if datum.status_code == 429 {
-                        self.increase_politeness();
-                    }
-
-                    tracing::debug!("failed to fetch url ({}): {}", &url, datum.status_code);
-                    ProcessedUrl {
-                        new_urls: Vec::new(),
-                        response: UrlResponse::Failed {
-                            url,
-                            status_code: Some(datum.status_code),
-                        },
-                    }
-                }
-            },
-            Err(err) => {
-                tracing::debug!("failed to fetch url ({}): {}", &url, err);
-
-                ProcessedUrl {
-                    new_urls: Vec::new(),
-                    response: UrlResponse::Failed {
-                        url,
-                        status_code: None,
-                    },
-                }
+        match Html::parse(&datum.body, datum.url.as_str()) {
+            Ok(html) => {
+                let root_domain = datum.url.root_domain();
+                let new_urls = self
+                    .new_urls(&html)
+                    .into_iter()
+                    .filter(|new_url| new_url.root_domain() == root_domain)
+                    .collect();
+                Ok(ProcessedUrl { new_urls })
             }
+            Err(_) => Err(Error::InvalidHtml),
         }
     }
 
     async fn save_datum(&self, datum: CrawlDatum) {
-        if datum.status_code != 200 {
-            return;
-        }
-
         self.writer.write(datum).await.ok();
     }
 
@@ -406,7 +388,7 @@ impl<S: DatumStream> JobExecutor<S> {
             .get(url.to_string())
             .send()
             .await
-            .map_err(|e| e.into())
+            .map_err(|e| Error::from(anyhow!(e)))
     }
 
     async fn fetch_with_https_priority(&self, url: Url) -> Result<reqwest::Response> {
@@ -419,7 +401,7 @@ impl<S: DatumStream> JobExecutor<S> {
             match self.fetch(https).await {
                 Ok(res) => Ok(res),
                 Err(_) => {
-                    tokio::time::sleep(Duration::from_millis(self.config.min_crawl_delay_ms)).await;
+                    tokio::time::sleep(self.delay_duration()).await;
                     self.fetch(url.clone()).await
                 }
             }
@@ -428,17 +410,28 @@ impl<S: DatumStream> JobExecutor<S> {
         }
     }
 
+    fn delay_duration(&self) -> Duration {
+        let mut delay = self.min_crawl_delay;
+        delay = delay.mul_f32(self.politeness_factor);
+
+        if delay > self.max_crawl_delay {
+            delay = self.max_crawl_delay;
+        }
+
+        delay
+    }
+
     async fn politeness_delay(&self, fetch_time: Duration) {
         let mut delay = fetch_time;
 
-        if delay < Duration::from_millis(self.config.min_crawl_delay_ms) {
-            delay = Duration::from_millis(self.config.min_crawl_delay_ms);
+        if delay < self.min_crawl_delay {
+            delay = self.min_crawl_delay;
         }
 
         delay = delay.mul_f32(self.politeness_factor);
 
-        if delay > Duration::from_millis(self.config.max_crawl_delay_ms) {
-            delay = Duration::from_millis(self.config.max_crawl_delay_ms);
+        if delay > self.max_crawl_delay {
+            delay = self.max_crawl_delay;
         }
 
         tokio::time::sleep(delay).await;
@@ -453,7 +446,7 @@ impl<S: DatumStream> JobExecutor<S> {
             .and_then(|value| value.parse::<usize>().ok())
         {
             if content_length > MAX_CONTENT_LENGTH {
-                return Err(Error::ContentTooLarge.into());
+                return Err(Error::ContentTooLarge);
             }
         }
 
@@ -466,7 +459,7 @@ impl<S: DatumStream> JobExecutor<S> {
             Some(ct) if ct.contains("text/html") => Ok(warc::PayloadType::Html),
             Some(ct) if ct.contains("application/rss") => Ok(warc::PayloadType::Rss),
             Some(ct) if ct.contains("application/atom") => Ok(warc::PayloadType::Atom),
-            ct => Err(Error::InvalidContentType(format!("{ct:?}")).into()),
+            ct => Err(Error::InvalidContentType(format!("{ct:?}"))),
         }
     }
 
@@ -493,7 +486,6 @@ impl<S: DatumStream> JobExecutor<S> {
 
             Ok(Some(CrawlDatum {
                 url,
-                status_code,
                 payload_type,
                 body: String::new(),
                 fetch_time_ms: fetch_time.as_millis() as u64,
@@ -520,7 +512,7 @@ impl<S: DatumStream> JobExecutor<S> {
         let mut stream = res.bytes_stream();
         while let Some(b) = stream.next().await {
             if b.is_err() {
-                return Err(Error::ContentTooLarge.into());
+                return Err(Error::ContentTooLarge);
             }
 
             let b = b.unwrap();
@@ -528,7 +520,7 @@ impl<S: DatumStream> JobExecutor<S> {
             bytes.extend_from_slice(&b);
 
             if bytes.len() > MAX_CONTENT_LENGTH {
-                return Err(Error::ContentTooLarge.into());
+                return Err(Error::ContentTooLarge);
             }
         }
 
@@ -541,7 +533,7 @@ impl<S: DatumStream> JobExecutor<S> {
         url.normalize();
 
         if self.crawled_urls.contains(&url) {
-            bail!("url already crawled: {}", url);
+            return Err(Error::from(anyhow!("url already crawled: {}", url)));
         }
 
         let start = Instant::now();
@@ -559,7 +551,14 @@ impl<S: DatumStream> JobExecutor<S> {
             return Ok(datum);
         }
 
-        let status_code = res.status().as_u16();
+        let status_code = res.status();
+
+        if status_code != reqwest::StatusCode::OK {
+            return Err(Error::FetchFailed {
+                status_code,
+                headers: res.headers().clone(),
+            });
+        }
 
         let mut res_url = res.url().clone();
         res_url.normalize();
@@ -570,7 +569,6 @@ impl<S: DatumStream> JobExecutor<S> {
 
         Ok(CrawlDatum {
             url: res_url,
-            status_code,
             body,
             payload_type,
             fetch_time_ms: fetch_time.as_millis() as u64,
@@ -587,7 +585,7 @@ impl<S: DatumStream> JobExecutor<S> {
             }
 
             let res = self.fetch(url).await;
-            tokio::time::sleep(Duration::from_millis(self.config.min_crawl_delay_ms)).await;
+            tokio::time::sleep(self.delay_duration()).await;
 
             if res.is_err() {
                 continue;

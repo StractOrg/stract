@@ -121,8 +121,8 @@ impl Crawler {
         5
     }
 
-    pub fn dry_run() -> bool {
-        false
+    pub fn timeout_seconds() -> u64 {
+        60
     }
 }
 

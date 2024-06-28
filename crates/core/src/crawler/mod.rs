@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, future::Future, sync::Arc, time::Duration};
+use std::{collections::VecDeque, future::Future, net::SocketAddr, sync::Arc, time::Duration};
 
 type HashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
+use anyhow::anyhow;
 use url::Url;
 
 use crate::{config::CrawlerConfig, warc, webpage::url_ext::UrlExt};
@@ -49,8 +50,11 @@ pub enum Error {
     #[error("invalid content type: {0}")]
     InvalidContentType(String),
 
-    #[error("fetch failed: {0}")]
-    FetchFailed(reqwest::StatusCode),
+    #[error("fetch failed: {status_code}")]
+    FetchFailed {
+        status_code: reqwest::StatusCode,
+        headers: reqwest::header::HeaderMap,
+    },
 
     #[error("content too large")]
     ContentTooLarge,
@@ -60,9 +64,15 @@ pub enum Error {
 
     #[error("invalid redirect")]
     InvalidRedirect,
+
+    #[error("couldn't parse html")]
+    InvalidHtml,
+
+    #[error("an error occurred: {0}")]
+    Anyhow(#[from] anyhow::Error),
 }
 
-type Result<T, E = anyhow::Error> = std::result::Result<T, E>;
+type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(
     Clone,
@@ -146,25 +156,6 @@ pub struct Job {
     pub domain: Domain,
     pub urls: VecDeque<WeightedUrl>,
     pub wandering_urls: u64,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
-pub enum UrlResponse {
-    Success {
-        #[bincode(with_serde)]
-        url: Url,
-    },
-    Failed {
-        #[bincode(with_serde)]
-        url: Url,
-        status_code: Option<u16>,
-    },
-    Redirected {
-        #[bincode(with_serde)]
-        url: Url,
-        #[bincode(with_serde)]
-        new_url: Url,
-    },
 }
 
 #[derive(
@@ -257,7 +248,6 @@ impl From<Job> for WorkerJob {
 #[derive(Debug, Clone)]
 pub struct CrawlDatum {
     pub url: Url,
-    pub status_code: u16,
     pub payload_type: warc::PayloadType,
     pub body: String,
     pub fetch_time_ms: u64,
@@ -275,7 +265,10 @@ impl Crawler {
         let mut router_hosts = Vec::new();
 
         for host in &config.router_hosts {
-            router_hosts.push(host.parse()?);
+            router_hosts.push(
+                host.parse::<SocketAddr>()
+                    .map_err(|e| Error::from(anyhow!(e)))?,
+            );
         }
 
         for _ in 0..config.num_worker_threads {
@@ -317,12 +310,13 @@ pub fn reqwest_client(config: &CrawlerConfig) -> Result<reqwest::Client> {
         reqwest::header::HeaderValue::from_static("en-US,en;q=0.9,*;q=0.8"),
     );
 
-    Ok(reqwest::Client::builder()
+    reqwest::Client::builder()
         .timeout(timeout)
         .connect_timeout(timeout)
         .http2_keep_alive_interval(None)
         .default_headers(headers)
         .redirect(reqwest::redirect::Policy::limited(config.max_redirects))
         .user_agent(&config.user_agent.full)
-        .build()?)
+        .build()
+        .map_err(|e| Error::from(anyhow!(e)))
 }

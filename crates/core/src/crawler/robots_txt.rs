@@ -18,7 +18,9 @@ use std::{collections::BTreeMap, panic, time::Duration};
 
 use url::Url;
 
-use super::{Error, Result, Site};
+use crate::{config::CrawlerConfig, crawler};
+
+use super::{Result, Site};
 
 enum Lookup<T> {
     Found(T),
@@ -34,16 +36,26 @@ pub struct RobotsTxtManager {
     client: reqwest::Client,
     cache_expiration: Duration,
     user_agent: String,
+    min_crawl_delay: Duration,
+    max_crawl_delay: Duration,
 }
 
 impl RobotsTxtManager {
-    pub fn new(client: reqwest::Client, cache_expiration: Duration, user_agent: &str) -> Self {
+    pub fn new(config: &CrawlerConfig) -> Self {
+        let client = crawler::reqwest_client(config).unwrap();
+        let cache_expiration = Duration::from_secs(config.robots_txt_cache_sec);
+        let user_agent = config.user_agent.token.clone();
+        let min_crawl_delay = Duration::from_millis(config.min_crawl_delay_ms);
+        let max_crawl_delay = Duration::from_millis(config.max_crawl_delay_ms);
+
         Self {
             client,
             cache_expiration,
             last_prune: std::time::Instant::now(),
             cache: BTreeMap::new(),
             user_agent: user_agent.to_string(),
+            min_crawl_delay,
+            max_crawl_delay,
         }
     }
 
@@ -55,59 +67,89 @@ impl RobotsTxtManager {
         }
     }
 
-    async fn fetch_robots_txt_from_url(&self, url: &str) -> Result<RobotsTxt> {
-        let res = self
+    pub async fn crawl_delay(&mut self, url: &Url) -> Option<Duration> {
+        match self.get_mut(url).await {
+            Lookup::Found(robots_txt) => robots_txt.robots.crawl_delay(),
+            Lookup::Unavailable | Lookup::Unreachable => None,
+        }
+    }
+
+    async fn fetch_robots_txt_from_url(&self, url: &str) -> Lookup<RobotsTxt> {
+        let res = match self
             .client
             .get(url)
             .timeout(Duration::from_secs(60))
             .send()
-            .await;
-
-        let res = res?;
-
-        if res.status() != reqwest::StatusCode::OK {
-            return Err(Error::FetchFailed(res.status()).into());
-        }
-
-        if !res
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .map(|h| h.to_str().unwrap_or_default().starts_with("text/plain"))
-            .unwrap_or(false)
+            .await
         {
-            return Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into());
-        }
+            Ok(res) => {
+                if res.status() != reqwest::StatusCode::OK {
+                    match res.status() {
+                        reqwest::StatusCode::NOT_FOUND => return Lookup::Unavailable,
+                        _ => return Lookup::Unreachable,
+                    }
+                }
 
-        let body = res.text().await?;
+                let body = match res.text().await {
+                    Ok(body) => body,
+                    Err(_) => return Lookup::Unreachable,
+                };
 
-        let self_user_agent = self.user_agent.clone();
-        match panic::catch_unwind(|| RobotsTxt::new(&self_user_agent, body)) {
-            Ok(Ok(r)) => Ok(r),
-            _ => Err(Error::FetchFailed(reqwest::StatusCode::IM_A_TEAPOT).into()),
-        }
+                let self_user_agent = self.user_agent.clone();
+                match panic::catch_unwind(|| RobotsTxt::new(&self_user_agent, body)) {
+                    Ok(Ok(r)) => Lookup::Found(r),
+                    _ => Lookup::Unreachable,
+                }
+            }
+            Err(_) => Lookup::Unreachable,
+        };
+
+        tokio::time::sleep(self.min_crawl_delay).await;
+
+        res
     }
 
-    async fn fetch_robots_txt(&self, site: &Site) -> Result<RobotsTxt> {
-        if let Ok(robots_txt) = self
+    async fn fetch_robots_txt_without_retry(&self, site: &Site) -> Lookup<RobotsTxt> {
+        match self
             .fetch_robots_txt_from_url(&format!("http://{}/robots.txt", site.0))
             .await
         {
-            return Ok(robots_txt);
+            Lookup::Unavailable => {
+                match self
+                    .fetch_robots_txt_from_url(&format!("https://{}/robots.txt", site.0))
+                    .await
+                {
+                    Lookup::Found(robots_txt) => Lookup::Found(robots_txt),
+                    Lookup::Unreachable => Lookup::Unreachable,
+                    Lookup::Unavailable
+                        if !site.0.starts_with("www.")
+                            && site.0.chars().filter(|&c| c == '.').count() == 1 =>
+                    {
+                        self.fetch_robots_txt_from_url(&format!(
+                            "https://www.{}/robots.txt",
+                            &site.0
+                        ))
+                        .await
+                    }
+                    Lookup::Unavailable => Lookup::Unavailable,
+                }
+            }
+            res => res,
+        }
+    }
+
+    async fn fetch_robots_txt(&self, site: &Site) -> Lookup<RobotsTxt> {
+        for _ in 0..3 {
+            match self.fetch_robots_txt_without_retry(site).await {
+                Lookup::Found(robots_txt) => return Lookup::Found(robots_txt),
+                Lookup::Unavailable => return Lookup::Unavailable,
+                Lookup::Unreachable => {}
+            }
+
+            tokio::time::sleep(self.max_crawl_delay).await;
         }
 
-        match self
-            .fetch_robots_txt_from_url(&format!("https://{}/robots.txt", site.0))
-            .await
-        {
-            Ok(robots_txt) => Ok(robots_txt),
-            _ if !site.0.starts_with("www.")
-                && site.0.chars().filter(|&c| c == '.').count() == 1 =>
-            {
-                self.fetch_robots_txt_from_url(&format!("https://www.{}/robots.txt", &site.0))
-                    .await
-            }
-            Err(err) => Err(err),
-        }
+        Lookup::Unreachable
     }
 
     fn maybe_prune(&mut self) {
@@ -134,22 +176,8 @@ impl RobotsTxtManager {
         };
 
         if cache_should_update {
-            match self.fetch_robots_txt(&site).await {
-                Ok(robots_txt) => {
-                    self.cache.insert(site.clone(), Lookup::Found(robots_txt));
-                }
-                Err(err) => match err.downcast_ref() {
-                    Some(Error::FetchFailed(status))
-                        if *status == reqwest::StatusCode::NOT_FOUND =>
-                    {
-                        self.cache.insert(site.clone(), Lookup::Unavailable);
-                    }
-                    _ => {
-                        self.cache.insert(site.clone(), Lookup::Unreachable);
-                        tracing::warn!("failed to fetch robots.txt for {}: {}", site.0, err);
-                    }
-                },
-            }
+            self.cache
+                .insert(site.clone(), self.fetch_robots_txt(&site).await);
         }
 
         self.cache.get_mut(&site).unwrap()

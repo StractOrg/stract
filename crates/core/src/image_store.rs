@@ -150,13 +150,7 @@ impl EntityImageStore {
         self.store.prepare_writer();
     }
     pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let store = BaseImageStore::open_with_filters(
-            path,
-            vec![Box::new(MaxSizeFilter {
-                width: 400,
-                height: 400,
-            })],
-        );
+        let store = BaseImageStore::open_with_filters(path, vec![]);
 
         Self { store }
     }
@@ -206,8 +200,10 @@ impl Image {
     }
 
     pub(crate) fn as_raw_bytes(&self) -> Vec<u8> {
+        let img = self.0.clone().into_rgba8();
+
         let mut wrt = BufWriter::new(Cursor::new(Vec::new()));
-        self.0.write_to(&mut wrt, image::ImageFormat::Png).unwrap();
+        img.write_to(&mut wrt, image::ImageFormat::WebP).unwrap();
         wrt.flush().unwrap();
 
         let mut cursor = wrt.into_inner().unwrap();
@@ -239,7 +235,12 @@ mod tests {
     #[test]
     fn serialize_deserialize_image() {
         let image = Image(
-            ImageBuffer::from_pixel(2, 2, image::Rgb::<u16>([u16::MAX, u16::MAX, u16::MAX])).into(),
+            ImageBuffer::from_pixel(
+                2,
+                2,
+                image::Rgba::<u8>([u8::MAX, u8::MAX, u8::MAX, u8::MAX]),
+            )
+            .into(),
         );
 
         let bytes = bincode::encode_to_vec(&image, bincode::config::standard()).unwrap();
@@ -252,7 +253,12 @@ mod tests {
     #[test]
     fn store_and_load_image() {
         let image = Image(
-            ImageBuffer::from_pixel(2, 2, image::Rgb::<u16>([u16::MAX, u16::MAX, u16::MAX])).into(),
+            ImageBuffer::from_pixel(
+                2,
+                2,
+                image::Rgba::<u8>([u8::MAX, u8::MAX, u8::MAX, u8::MAX]),
+            )
+            .into(),
         );
         let key = "test".to_string();
         let mut store = BaseImageStore::open(crate::gen_temp_path());
@@ -267,8 +273,12 @@ mod tests {
     #[test]
     fn resize_filter() {
         let image = Image(
-            ImageBuffer::from_pixel(32, 32, image::Rgb::<u16>([u16::MAX, u16::MAX, u16::MAX]))
-                .into(),
+            ImageBuffer::from_pixel(
+                32,
+                32,
+                image::Rgba::<u8>([u8::MAX, u8::MAX, u8::MAX, u8::MAX]),
+            )
+            .into(),
         );
         assert_eq!(image.0.width(), 32);
         assert_eq!(image.0.height(), 32);

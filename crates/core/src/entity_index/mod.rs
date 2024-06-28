@@ -430,9 +430,8 @@ impl EntityIndex {
         self.image_store.insert(name, image);
     }
 
-    pub fn merge_into_max_segments(&mut self, max_num_segments: u64) -> Result<()> {
+    pub fn merge_all_segments(&mut self) -> Result<()> {
         self.image_store.merge_all_segments();
-        self.prepare_writer();
         let base_path = Path::new(&self.path);
         let segments: Vec<_> = self.tv_index.load_metas()?.segments.into_iter().collect();
 
@@ -440,7 +439,7 @@ impl EntityIndex {
             self.writer.as_mut().expect("writer has not been prepared"),
             segments,
             base_path,
-            max_num_segments,
+            1,
         )?;
 
         Ok(())

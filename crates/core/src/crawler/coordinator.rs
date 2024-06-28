@@ -29,6 +29,10 @@ impl CrawlCoordinator {
     }
 
     pub fn sample_job(&self) -> Result<Option<Job>> {
-        self.jobs.lock().unwrap_or_else(|e| e.into_inner()).pop()
+        self.jobs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .pop()
+            .map_err(Into::into)
     }
 }

@@ -292,8 +292,8 @@ pub async fn entity_image(
             let bytes = result.as_raw_bytes();
 
             Ok((
-                ([(axum::http::header::CONTENT_TYPE, "image/png")]),
-                axum::response::AppendHeaders([(axum::http::header::CONTENT_TYPE, "image/png")]),
+                ([(axum::http::header::CONTENT_TYPE, "image/webp")]),
+                axum::response::AppendHeaders([(axum::http::header::CONTENT_TYPE, "image/webp")]),
                 bytes,
             ))
         }

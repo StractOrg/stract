@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use crate::{
     config::LiveIndexConfig,
-    crawler::{CrawlDatum, DatumStream},
+    crawler::{self, CrawlDatum, DatumStream},
     entrypoint::indexer::IndexingWorker,
     Result,
 };
@@ -72,7 +72,7 @@ impl Indexer {
 }
 
 impl DatumStream for Indexer {
-    async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
+    async fn write(&self, crawl_datum: CrawlDatum) -> Result<(), crawler::Error> {
         self.write_batch
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -83,7 +83,7 @@ impl DatumStream for Indexer {
         Ok(())
     }
 
-    async fn finish(&self) -> Result<()> {
+    async fn finish(&self) -> Result<(), crawler::Error> {
         self.write_batch_to_index();
 
         self.search_index

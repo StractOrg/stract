@@ -196,12 +196,18 @@ impl EntityIndexer {
         let mut index = EntityIndex::open(output_path)?;
         index.prepare_writer();
 
+        let mut image_bloom = bloom::BytesBloomFilter::new(1_000_000_000, 0.05);
+
         let mut inserts = 0;
 
         for entity in EntityIterator::new(&zim)?
             .filter(|e| !e.is_disambiguation)
             .filter(|e| !e.article_url.starts_with("Portal:"))
         {
+            if let Some(image) = entity.image.as_ref() {
+                image_bloom.insert(image);
+            }
+
             index.insert(entity);
             inserts += 1;
 
@@ -216,6 +222,10 @@ impl EntityIndexer {
 
         for image in zim.images()? {
             if let Ok(decoded_image) = Image::from_bytes(image.bytes()) {
+                if !image_bloom.contains(&image.url) {
+                    continue;
+                }
+
                 index.insert_image(image.url, decoded_image);
 
                 inserts += 1;
@@ -228,7 +238,7 @@ impl EntityIndexer {
         }
 
         index.commit();
-        index.merge_into_max_segments(1)?;
+        index.merge_all_segments()?;
 
         Ok(())
     }

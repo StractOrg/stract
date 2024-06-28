@@ -21,7 +21,8 @@ use crate::{
     warc,
 };
 
-use super::{CrawlDatum, DatumStream, Result};
+use super::{CrawlDatum, DatumStream, Error, Result};
+use anyhow::anyhow;
 
 /// The WarcWriter is responsible for storing the crawl datums
 /// as WARC files on S3.
@@ -31,13 +32,19 @@ pub struct WarcWriter {
 
 impl DatumStream for WarcWriter {
     async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
-        self.tx.send(WarcWriterMessage::Crawl(crawl_datum)).await?;
+        self.tx
+            .send(WarcWriterMessage::Crawl(crawl_datum))
+            .await
+            .map_err(|e| Error::from(anyhow!(e)))?;
 
         Ok(())
     }
 
     async fn finish(&self) -> Result<()> {
-        self.tx.send(WarcWriterMessage::Finish).await?;
+        self.tx
+            .send(WarcWriterMessage::Finish)
+            .await
+            .map_err(|e| Error::from(anyhow!(e)))?;
         self.tx.closed().await;
 
         Ok(())
