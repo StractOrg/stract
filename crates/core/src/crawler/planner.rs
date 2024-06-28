@@ -548,11 +548,15 @@ impl CrawlPlanner {
 
         let total_scheduled_urls: u64 = stats.iter().map(|d| d.scheduled_urls).sum();
         let total_wander_budget: u64 = stats.iter().map(|d| d.wander_budget).sum();
+        let total_num_hosts: u64 = stats.iter().map(|d| d.num_hosts as u64).sum();
+        let total_num_domains: u64 = stats.len() as u64;
 
         let metadata = Metadata {
             stats,
             total_scheduled_urls,
             total_wander_budget,
+            total_num_hosts,
+            total_num_domains,
         };
 
         tracing::info!("total scheduled urls: {}", metadata.total_scheduled_urls);
@@ -614,5 +618,7 @@ impl DomainStats {
 struct Metadata {
     total_scheduled_urls: u64,
     total_wander_budget: u64,
+    total_num_hosts: u64,
+    total_num_domains: u64,
     stats: Vec<DomainStats>,
 }
