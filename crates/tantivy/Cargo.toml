@@ -53,7 +53,6 @@ rust-stemmers = "1.2.0"
 rustc-hash = "1.1.0"
 serde = {version = "1.0.136", features = ["derive"]}
 serde_json = "1.0.79"
-sketches-ddsketch = {version = "0.3.0", features = ["use_serde"]}
 smallvec = "1.8.0"
 tantivy-fst = "0.5"
 tempfile = {version = "3.3.0", optional = true}
@@ -79,7 +78,6 @@ pretty_assertions = "1.2.1"
 proptest = "1.0.0"
 rand = "0.8.5"
 rand_distr = "0.4.3"
-test-log = "0.2.10"
 time = {version = "0.3.10", features = ["serde-well-known", "macros"]}
 zipf = "7.0.0"
 
