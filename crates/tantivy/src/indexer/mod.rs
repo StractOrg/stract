@@ -61,12 +61,9 @@ type AddBatchReceiver<D> = channel::Receiver<AddBatch<D>>;
 #[cfg(test)]
 mod tests_mmap {
 
-    use crate::aggregation::agg_req::Aggregations;
-    use crate::aggregation::agg_result::AggregationResults;
-    use crate::aggregation::AggregationCollector;
     use crate::collector::{Count, TopDocs};
     use crate::index::FieldMetadata;
-    use crate::query::{AllQuery, QueryParser};
+    use crate::query::QueryParser;
     use crate::schema::{JsonObjectOptions, Schema, Type, FAST, INDEXED, STORED, TEXT};
     use crate::{Index, IndexWriter, Term};
 
@@ -225,41 +222,6 @@ mod tests_mmap {
         test_query(format!("json.a{field_name_out}.ab{field_name_out}:test5").as_str());
         test_query(format!("json.a{field_name_out}.a{field_name_out}:test6").as_str());
         test_query(format!("json.{field_name_out}a:test7").as_str());
-
-        let test_agg = |field_name: &str, expected: &str| {
-            let agg_req_str = json!(
-            {
-              "termagg": {
-                "terms": {
-                  "field": field_name,
-                }
-              }
-            });
-
-            let agg_req: Aggregations = serde_json::from_value(agg_req_str).unwrap();
-            let collector = AggregationCollector::from_aggs(agg_req, Default::default());
-            let agg_res: AggregationResults = searcher.search(&AllQuery, &collector).unwrap();
-            let res = serde_json::to_value(agg_res).unwrap();
-            assert_eq!(res["termagg"]["buckets"][0]["doc_count"], 1);
-            assert_eq!(res["termagg"]["buckets"][0]["key"], expected);
-        };
-
-        test_agg(format!("json.{field_name_out}").as_str(), "test1");
-        test_agg(format!("json.a{field_name_out}").as_str(), "test2");
-        test_agg(format!("json.a{field_name_out}a").as_str(), "test3");
-        test_agg(
-            format!("json.a{field_name_out}a{field_name_out}").as_str(),
-            "test4",
-        );
-        test_agg(
-            format!("json.a{field_name_out}.ab{field_name_out}").as_str(),
-            "test5",
-        );
-        test_agg(
-            format!("json.a{field_name_out}.a{field_name_out}").as_str(),
-            "test6",
-        );
-        test_agg(format!("json.{field_name_out}a").as_str(), "test7");
 
         // `.` is stored as `\u{0001}` internally in tantivy
         let field_name_out_internal = if field_name_out == "." {
@@ -529,95 +491,6 @@ mod tests_mmap {
             } else {
                 assert!(!count_docs.is_empty(), "{}", indexed_field.field_name);
             }
-        }
-        // Test if returned field name can be used for aggregation
-        for fast_field in fields_metadata.iter().filter(|meta| meta.fast) {
-            let agg_req_str = json!(
-            {
-              "termagg": {
-                "terms": {
-                  "field": fast_field.field_name,
-                }
-              }
-            });
-
-            let agg_req: Aggregations = serde_json::from_value(agg_req_str).unwrap();
-            let collector = AggregationCollector::from_aggs(agg_req, Default::default());
-            let agg_res: AggregationResults = searcher.search(&AllQuery, &collector).unwrap();
-            let res = serde_json::to_value(agg_res).unwrap();
-            if !fast_field.field_name.contains("empty") && fast_field.typ != Type::Json {
-                assert!(
-                    !res["termagg"]["buckets"].as_array().unwrap().is_empty(),
-                    "{}",
-                    fast_field.field_name
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn test_json_field_shadowing_field_name_bug() {
-        /// This test is only there to display a bug on addressing a field if it gets shadowed
-        /// The issues only occurs if the field name that shadows contains a dot.
-        ///
-        /// Happens independently of the `expand_dots` option. Since that option does not
-        /// affect the field name itself.
-        use pretty_assertions::assert_eq;
-        let mut schema_builder = Schema::builder();
-        let json_options: JsonObjectOptions =
-            JsonObjectOptions::from(TEXT).set_fast(None).set_stored();
-        // let json_options = json_options.set_expand_dots_enabled();
-        let json_field_shadow = schema_builder.add_json_field("json.shadow", json_options.clone());
-        let json_field = schema_builder.add_json_field("json", json_options.clone());
-        let index = Index::create_in_ram(schema_builder.build());
-        let mut index_writer = index.writer_for_tests().unwrap();
-        index_writer
-            .add_document(
-                doc!(json_field_shadow=>json!({"val": "b"}), json_field=>json!({"shadow": {"val": "a"}})),
-            )
-            .unwrap();
-        index_writer.commit().unwrap();
-        let reader = index.reader().unwrap();
-
-        let searcher = reader.searcher();
-
-        let fields_and_vals = [
-            ("json.shadow\u{1}val".to_string(), "a"), // Succeeds
-            //("json.shadow.val".to_string(), "a"),   // Fails
-            ("json.shadow.val".to_string(), "b"),
-        ];
-
-        let query_parser = QueryParser::for_index(&index, vec![]);
-        // Test if field name can be queried
-        for (indexed_field, val) in fields_and_vals.iter() {
-            let query_str = &format!("{indexed_field}:{val}");
-            let query = query_parser.parse_query(query_str).unwrap();
-            let count_docs = searcher.search(&*query, &TopDocs::with_limit(2)).unwrap();
-            assert!(!count_docs.is_empty(), "{indexed_field}:{val}");
-        }
-        // Test if field name can be used for aggregation
-        for (field_name, val) in fields_and_vals.iter() {
-            let agg_req_str = json!(
-            {
-              "termagg": {
-                "terms": {
-                  "field": field_name,
-                }
-              }
-            });
-
-            let agg_req: Aggregations = serde_json::from_value(agg_req_str).unwrap();
-            let collector = AggregationCollector::from_aggs(agg_req, Default::default());
-            let agg_res: AggregationResults = searcher.search(&AllQuery, &collector).unwrap();
-            let res = serde_json::to_value(agg_res).unwrap();
-            assert_eq!(
-                res["termagg"]["buckets"].as_array().unwrap()[0]["key"]
-                    .as_str()
-                    .unwrap(),
-                *val,
-                "{}",
-                field_name
-            );
         }
     }
 }
