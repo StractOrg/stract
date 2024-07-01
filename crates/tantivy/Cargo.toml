@@ -30,6 +30,7 @@ fail = {version = "0.5.0", optional = true}
 fastdivide = "0.4.0"
 fnv = "1.0.7"
 fs4 = {version = "0.8.0", optional = true}
+fst.workspace = true
 futures-util = {version = "0.3.28", optional = true}
 htmlescape = "0.3.1"
 itertools = "0.13.0"
@@ -54,7 +55,6 @@ rustc-hash = "1.1.0"
 serde = {version = "1.0.136", features = ["derive"]}
 serde_json = "1.0.79"
 smallvec = "1.8.0"
-tantivy-fst = "0.5"
 tempfile = {version = "3.3.0", optional = true}
 thiserror = "1.0.30"
 time = {version = "0.3.10", features = ["serde-well-known"]}

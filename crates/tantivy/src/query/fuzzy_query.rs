@@ -1,6 +1,6 @@
+use fst::Automaton;
 use levenshtein_automata::{Distance, LevenshteinAutomatonBuilder, DFA};
 use once_cell::sync::OnceCell;
-use tantivy_fst::Automaton;
 
 use crate::query::{AutomatonWeight, EnableScoring, Query, Weight};
 use crate::schema::{Term, Type};

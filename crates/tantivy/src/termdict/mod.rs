@@ -31,7 +31,7 @@ use std::io;
 
 use crate::common::file_slice::FileSlice;
 use crate::common::BinarySerializable;
-use tantivy_fst::Automaton;
+use fst::Automaton;
 
 use self::termdict::{
     TermDictionary as InnerTermDict, TermDictionaryBuilder as InnerTermDictBuilder,

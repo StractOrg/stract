@@ -1,6 +1,6 @@
-use tantivy_fst::map::{OpBuilder, Union};
-use tantivy_fst::raw::IndexedValue;
-use tantivy_fst::Streamer;
+use fst::map::{OpBuilder, Union};
+use fst::raw::IndexedValue;
+use fst::Streamer;
 
 use super::termdict::TermDictionary;
 use crate::postings::TermInfo;

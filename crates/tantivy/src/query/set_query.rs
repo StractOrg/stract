@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use tantivy_fst::raw::CompiledAddr;
-use tantivy_fst::{Automaton, Map};
+use fst::raw::CompiledAddr;
+use fst::{Automaton, Map};
 
 use crate::query::score_combiner::DoNothingCombiner;
 use crate::query::{AutomatonWeight, BooleanWeight, EnableScoring, Occur, Query, Weight};

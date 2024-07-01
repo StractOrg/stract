@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use crate::bitpacker::{compute_num_bits, BitPacker};
 use crate::common::{BinarySerializable, FixedSize, OwnedBytes};
-use tantivy_fst::raw::Fst;
-use tantivy_fst::{IntoStreamer, Map, MapBuilder, Streamer};
+use fst::raw::Fst;
+use fst::{IntoStreamer, Map, MapBuilder, Streamer};
 
 use super::{common_prefix_len, SSTableDataCorruption, TermOrdinal};
 
@@ -303,10 +303,10 @@ impl SSTableIndexBuilder {
     }
 }
 
-fn fst_error_to_io_error(error: tantivy_fst::Error) -> io::Error {
+fn fst_error_to_io_error(error: fst::Error) -> io::Error {
     match error {
-        tantivy_fst::Error::Fst(fst_error) => io::Error::new(io::ErrorKind::Other, fst_error),
-        tantivy_fst::Error::Io(ioerror) => ioerror,
+        fst::Error::Fst(fst_error) => io::Error::new(io::ErrorKind::Other, fst_error),
+        fst::Error::Io(ioerror) => ioerror,
     }
 }
 

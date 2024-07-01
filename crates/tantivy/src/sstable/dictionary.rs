@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use crate::common::file_slice::FileSlice;
 use crate::common::{BinarySerializable, OwnedBytes};
-use tantivy_fst::automaton::AlwaysMatch;
-use tantivy_fst::Automaton;
+use fst::automaton::AlwaysMatch;
+use fst::Automaton;
 
 use super::sstable_index_v3::SSTableIndexV3Empty;
 use super::streamer::{Streamer, StreamerBuilder};

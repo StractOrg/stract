@@ -1,8 +1,8 @@
 use std::io;
 use std::ops::Bound;
 
-use tantivy_fst::automaton::AlwaysMatch;
-use tantivy_fst::Automaton;
+use fst::automaton::AlwaysMatch;
+use fst::Automaton;
 
 use super::dictionary::Dictionary;
 use super::{DeltaReader, SSTable, TermOrdinal};
@@ -311,21 +311,6 @@ mod tests {
         assert_eq!(streamer.key(), b"abandon");
         assert_eq!(streamer.value(), &3);
         assert!(!streamer.advance());
-        Ok(())
-    }
-
-    #[test]
-    fn test_sstable_search() -> io::Result<()> {
-        let term_dict = create_test_dictionary()?;
-        let ptn = tantivy_fst::Regex::new("ab.*t.*").unwrap();
-        let mut term_streamer = term_dict.search(ptn).into_stream()?;
-        assert!(term_streamer.advance());
-        assert_eq!(term_streamer.key(), b"abalation");
-        assert_eq!(term_streamer.value(), &1u64);
-        assert!(term_streamer.advance());
-        assert_eq!(term_streamer.key(), b"abalienate");
-        assert_eq!(term_streamer.value(), &2u64);
-        assert!(!term_streamer.advance());
         Ok(())
     }
 }

@@ -2,7 +2,7 @@ use std::io;
 use std::sync::Arc;
 
 use crate::common::BitSet;
-use tantivy_fst::Automaton;
+use fst::Automaton;
 
 use super::phrase_prefix_query::prefix_end;
 use crate::index::SegmentReader;
@@ -111,7 +111,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use tantivy_fst::Automaton;
+    use fst::Automaton;
 
     use super::AutomatonWeight;
     use crate::docset::TERMINATED;
