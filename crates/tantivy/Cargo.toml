@@ -97,8 +97,6 @@ lz4-compression = ["lz4_flex"]
 
 failpoints = ["fail", "fail/failpoints"]
 
-quickwit = ["futures-util"]
-
 # Following the "fail" crate best practises, we isolate
 # tests that define specific behavior in fail check points
 # in a different binary.

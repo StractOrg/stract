@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-#[cfg(feature = "quickwit")]
-use futures_util::{future::Either, FutureExt};
-
 use crate::TantivyError;
 
 /// Executor makes it possible to run tasks in single thread or
@@ -13,13 +10,6 @@ pub enum Executor {
     SingleThread,
     /// Thread pool variant of an Executor
     ThreadPool(Arc<rayon::ThreadPool>),
-}
-
-#[cfg(feature = "quickwit")]
-impl From<Arc<rayon::ThreadPool>> for Executor {
-    fn from(thread_pool: Arc<rayon::ThreadPool>) -> Self {
-        Executor::ThreadPool(thread_pool)
-    }
 }
 
 impl Executor {
@@ -97,32 +87,6 @@ impl Executor {
             }
         }
     }
-
-    /// Spawn a task on the pool, returning a future completing on task success.
-    ///
-    /// If the task panic, returns `Err(())`.
-    #[cfg(feature = "quickwit")]
-    pub fn spawn_blocking<T: Send + 'static>(
-        &self,
-        cpu_intensive_task: impl FnOnce() -> T + Send + 'static,
-    ) -> impl std::future::Future<Output = Result<T, ()>> {
-        match self {
-            Executor::SingleThread => Either::Left(std::future::ready(Ok(cpu_intensive_task()))),
-            Executor::ThreadPool(pool) => {
-                let (sender, receiver) = oneshot::channel();
-                pool.spawn(|| {
-                    if sender.is_closed() {
-                        return;
-                    }
-                    let task_result = cpu_intensive_task();
-                    let _ = sender.send(task_result);
-                });
-
-                let res = receiver.map(|res| res.map_err(|_| ()));
-                Either::Right(res)
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -177,63 +141,5 @@ mod tests {
         for i in 0..10 {
             assert_eq!(result[i], i * 2);
         }
-    }
-
-    #[cfg(feature = "quickwit")]
-    #[test]
-    fn test_cancel_cpu_intensive_tasks() {
-        use std::sync::atomic::{AtomicU64, Ordering};
-        use std::sync::Arc;
-
-        let counter: Arc<AtomicU64> = Default::default();
-
-        let other_counter: Arc<AtomicU64> = Default::default();
-
-        let mut futures = Vec::new();
-        let mut other_futures = Vec::new();
-
-        let (tx, rx) = crossbeam_channel::bounded::<()>(0);
-        let rx = Arc::new(rx);
-        let executor = Executor::multi_thread(3, "search-test").unwrap();
-        for _ in 0..1000 {
-            let counter_clone: Arc<AtomicU64> = counter.clone();
-            let other_counter_clone: Arc<AtomicU64> = other_counter.clone();
-
-            let rx_clone = rx.clone();
-            let rx_clone2 = rx.clone();
-            let fut = executor.spawn_blocking(move || {
-                counter_clone.fetch_add(1, Ordering::SeqCst);
-                let _ = rx_clone.recv();
-            });
-            futures.push(fut);
-            let other_fut = executor.spawn_blocking(move || {
-                other_counter_clone.fetch_add(1, Ordering::SeqCst);
-                let _ = rx_clone2.recv();
-            });
-            other_futures.push(other_fut);
-        }
-
-        // We execute 100 futures.
-        for _ in 0..100 {
-            tx.send(()).unwrap();
-        }
-
-        let counter_val = counter.load(Ordering::SeqCst);
-        let other_counter_val = other_counter.load(Ordering::SeqCst);
-        assert!(counter_val >= 30);
-        assert!(other_counter_val >= 30);
-
-        drop(other_futures);
-
-        // We execute 100 futures.
-        for _ in 0..100 {
-            tx.send(()).unwrap();
-        }
-
-        let counter_val2 = counter.load(Ordering::SeqCst);
-        assert!(counter_val2 >= counter_val + 100 - 6);
-
-        let other_counter_val2 = other_counter.load(Ordering::SeqCst);
-        assert!(other_counter_val2 <= other_counter_val + 6);
     }
 }

@@ -47,11 +47,7 @@ enum DictionaryType {
     SSTable = 2,
 }
 
-#[cfg(not(feature = "quickwit"))]
 const CURRENT_TYPE: DictionaryType = DictionaryType::Fst;
-
-#[cfg(feature = "quickwit")]
-const CURRENT_TYPE: DictionaryType = DictionaryType::SSTable;
 
 // TODO in the future this should become an enum of supported dictionaries
 /// A TermDictionary wrapping either an FST based dictionary or a SSTable based one.
