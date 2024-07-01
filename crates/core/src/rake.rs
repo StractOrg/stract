@@ -48,7 +48,7 @@ fn phrases<'a>(
         .0
         .split_whitespace()
         .map(|word| word.replace(|c: char| matches!(c, ',' | '.'), ""))
-        .group_by(|word| !stopwords.contains(word))
+        .chunk_by(|word| !stopwords.contains(word))
         .into_iter()
         .filter_map(move |(is_keyword, words)| {
             if is_keyword {

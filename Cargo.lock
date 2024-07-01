@@ -3306,7 +3306,7 @@ name = "optics"
 version = "0.1.0"
 dependencies = [
  "bincode",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "lalrpop",
  "lalrpop-util",
  "logos",
@@ -4274,7 +4274,7 @@ name = "robotstxt"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "nom",
  "percent-encoding",
  "proptest",
@@ -4913,7 +4913,7 @@ dependencies = [
  "async-stream",
  "axum",
  "axum-macros",
- "base64 0.21.7",
+ "base64 0.22.1",
  "bincode",
  "bitflags 2.6.0",
  "bitvec",
@@ -4945,7 +4945,7 @@ dependencies = [
  "image",
  "indicatif 0.17.8",
  "insta",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "kuchiki",
  "log",
  "logos",
@@ -5204,7 +5204,6 @@ dependencies = [
  "byteorder 1.5.0",
  "census",
  "crc32fast",
- "criterion",
  "crossbeam-channel",
  "downcast-rs",
  "fail",
@@ -5247,7 +5246,6 @@ dependencies = [
  "thiserror",
  "time",
  "uuid",
- "winapi",
  "zipf",
  "zstd 0.13.1",
 ]
