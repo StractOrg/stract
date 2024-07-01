@@ -98,8 +98,8 @@ pub fn open_column_u128_as_compact_u64(bytes: OwnedBytes) -> io::Result<Column<u
 }
 
 pub fn open_column_bytes(data: OwnedBytes) -> io::Result<BytesColumn> {
-    let (body, dictionary_len_bytes) = data.rsplit(4);
-    let dictionary_len = u32::from_le_bytes(dictionary_len_bytes.as_slice().try_into().unwrap());
+    let (body, dictionary_len_bytes) = data.rsplit(8);
+    let dictionary_len = u64::from_le_bytes(dictionary_len_bytes.as_slice().try_into().unwrap());
     let (dictionary_bytes, column_bytes) = body.split(dictionary_len as usize);
     let dictionary = Arc::new(Dictionary::from_bytes(dictionary_bytes)?);
     let term_ord_column = crate::columnar::column::open_column_u64::<u64>(column_bytes)?;

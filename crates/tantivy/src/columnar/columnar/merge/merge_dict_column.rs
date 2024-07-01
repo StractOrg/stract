@@ -9,7 +9,7 @@ use crate::columnar::column_index::SerializableColumnIndex;
 use crate::columnar::iterable::Iterable;
 use crate::columnar::{BytesColumn, MergeRowOrder, ShuffleMergeOrder};
 
-// Serialize [Dictionary, Column, dictionary num bytes U32::LE]
+// Serialize [Dictionary, Column, dictionary num bytes U64::LE]
 // Column: [Column Index, Column Values, column index num bytes U32::LE]
 pub fn merge_bytes_or_str_column(
     column_index: SerializableColumnIndex<'_>,
@@ -21,7 +21,7 @@ pub fn merge_bytes_or_str_column(
     let mut output = CountingWriter::wrap(output);
     // TODO !!! Remove useless terms.
     let term_ord_mapping = serialize_merged_dict(bytes_columns, merge_row_order, &mut output)?;
-    let dictionary_num_bytes: u32 = output.written_bytes() as u32;
+    let dictionary_num_bytes: u64 = output.written_bytes();
     let output = output.finish();
     let remapped_term_ordinals_values = RemappedTermOrdinalsValues {
         bytes_columns,
