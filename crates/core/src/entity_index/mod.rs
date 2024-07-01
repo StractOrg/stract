@@ -26,7 +26,7 @@ use base64::{prelude::BASE64_STANDARD as BASE64_ENGINE, Engine};
 use tantivy::{
     collector::TopDocs,
     query::{BooleanQuery, BoostQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
-    schema::{BytesOptions, IndexRecordOption, Schema, TextFieldIndexing, TextOptions},
+    schema::{BytesOptions, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value},
     tokenizer::Tokenizer,
     DocAddress, IndexReader, IndexWriter, Searcher, TantivyDocument, Term,
 };
@@ -95,11 +95,11 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> Tantiv
     );
     doc.add_bytes(
         schema.get_field("info").unwrap(),
-        bincode::encode_to_vec(&entity.info, bincode::config::standard()).unwrap(),
+        &bincode::encode_to_vec(&entity.info, bincode::config::standard()).unwrap(),
     );
     doc.add_bytes(
         schema.get_field("links").unwrap(),
-        bincode::encode_to_vec(&entity.page_abstract.links, bincode::config::standard()).unwrap(),
+        &bincode::encode_to_vec(&entity.page_abstract.links, bincode::config::standard()).unwrap(),
     );
     let has_image = if entity.image.is_some() {
         "true"
@@ -333,28 +333,17 @@ impl EntityIndex {
         let doc: TantivyDocument = searcher.doc(doc_address).unwrap();
         let title = doc
             .get_first(title)
-            .and_then(|val| match val {
-                tantivy::schema::OwnedValue::Str(string) => Some(string.clone()),
-                _ => None,
-            })
+            .and_then(|val| val.as_str().map(|s| s.to_string()))
             .unwrap();
 
         let entity_abstract = doc
             .get_first(entity_abstract)
-            .and_then(|val| match val {
-                tantivy::schema::OwnedValue::Str(string) => Some(string.clone()),
-                _ => None,
-            })
+            .and_then(|val| val.as_str().map(|s| s.to_string()))
             .unwrap();
 
         let info = if decode_info {
             let (info, _) = bincode::decode_from_slice(
-                doc.get_first(info)
-                    .and_then(|val| match val {
-                        tantivy::schema::OwnedValue::Bytes(bytes) => Some(bytes),
-                        _ => None,
-                    })
-                    .unwrap(),
+                doc.get_first(info).and_then(|val| val.as_bytes()).unwrap(),
                 bincode::config::standard(),
             )
             .unwrap();
@@ -368,10 +357,7 @@ impl EntityIndex {
 
         let image_id = doc
             .get_first(image_field)
-            .and_then(|val| match val {
-                tantivy::schema::OwnedValue::Str(string) => Some(string.clone()),
-                _ => None,
-            })
+            .and_then(|val| val.as_str().map(|s| s.to_string()))
             .unwrap();
 
         let image_id = if !image_id.is_empty() {
@@ -394,12 +380,7 @@ impl EntityIndex {
 
         let links: Vec<Link> = if get_links {
             let (links, _) = bincode::decode_from_slice(
-                doc.get_first(links)
-                    .and_then(|val| match val {
-                        tantivy::schema::OwnedValue::Bytes(bytes) => Some(bytes),
-                        _ => None,
-                    })
-                    .unwrap(),
+                doc.get_first(links).and_then(|val| val.as_bytes()).unwrap(),
                 bincode::config::standard(),
             )
             .unwrap();

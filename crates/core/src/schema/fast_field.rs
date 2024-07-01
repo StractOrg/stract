@@ -1180,9 +1180,9 @@ impl FastField for TitleEmbeddings {
             let mut serialized = Vec::new();
             emb.write_bytes(&mut serialized)?;
 
-            doc.add_bytes(self.tantivy_field(schema), serialized);
+            doc.add_bytes(self.tantivy_field(schema), &serialized);
         } else {
-            doc.add_bytes(self.tantivy_field(schema), Vec::new());
+            doc.add_bytes(self.tantivy_field(schema), &[]);
         }
 
         Ok(())
@@ -1224,9 +1224,9 @@ impl FastField for KeywordEmbeddings {
             let mut serialized = Vec::new();
             emb.write_bytes(&mut serialized)?;
 
-            doc.add_bytes(self.tantivy_field(schema), serialized);
+            doc.add_bytes(self.tantivy_field(schema), &serialized);
         } else {
-            doc.add_bytes(self.tantivy_field(schema), Vec::new());
+            doc.add_bytes(self.tantivy_field(schema), &[]);
         }
 
         Ok(())

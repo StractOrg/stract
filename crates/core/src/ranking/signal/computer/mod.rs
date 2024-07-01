@@ -32,7 +32,7 @@ use tantivy::query::{Query as _, Scorer};
 use tantivy::tokenizer::Tokenizer as _;
 
 use tantivy::DocSet;
-use tantivy::{DocId, Postings};
+use tantivy::{postings::Postings, DocId};
 
 use crate::webpage::region::RegionCount;
 

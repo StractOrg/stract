@@ -17,10 +17,7 @@
 pub mod fast_field;
 pub mod text_field;
 
-use tantivy::{
-    schema::{BytesOptions, NumericOptions, TextOptions},
-    DateOptions,
-};
+use tantivy::schema::{BytesOptions, DateOptions, NumericOptions, TextOptions};
 
 pub use fast_field::{DataType, FastFieldEnum};
 pub use text_field::TextFieldEnum;

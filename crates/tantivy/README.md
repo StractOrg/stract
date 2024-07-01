@@ -1,0 +1,1 @@
+This is a fork of [Tantivy](https://github.com/quickwit-oss/tantivy/) specifically modified for our workloads. It should not be used for anything except internally in Stract. If you need a general search engine library, consider using the fantastic [Tantivy](https://github.com/quickwit-oss/tantivy/) crate.

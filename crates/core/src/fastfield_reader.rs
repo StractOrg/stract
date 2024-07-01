@@ -16,7 +16,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use tantivy::{columnar::ColumnValues, DocId, SegmentId};
+use tantivy::{columnar::ColumnValues, index::SegmentId, DocId};
 
 use crate::{
     enum_map::EnumMap,

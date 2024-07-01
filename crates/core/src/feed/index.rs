@@ -167,7 +167,6 @@ impl FeedIndex {
             let url = doc
                 .get_first(self.schema.get_field("url")?)
                 .unwrap()
-                .as_ref()
                 .as_str()
                 .unwrap();
 
@@ -176,7 +175,6 @@ impl FeedIndex {
             let kind = doc
                 .get_first(self.schema.get_field("kind")?)
                 .unwrap()
-                .as_ref()
                 .as_str()
                 .unwrap();
 

@@ -17,7 +17,9 @@
 use std::sync::Arc;
 
 use tantivy::{
-    postings::SegmentPostings, query::Scorer, DocId, DocSet, Postings, Score, TERMINATED,
+    postings::{Postings, SegmentPostings},
+    query::Scorer,
+    DocId, DocSet, Score, TERMINATED,
 };
 
 use crate::{
@@ -216,7 +218,7 @@ impl NormalPatternScorer {
     pub fn new(
         term_postings_list: Vec<SegmentPostings>,
         pattern: Vec<SmallPatternPart>,
-        segment: tantivy::SegmentId,
+        segment: tantivy::index::SegmentId,
         num_tokens_field: FastFieldEnum,
         fastfield_reader: FastFieldReader,
     ) -> Self {

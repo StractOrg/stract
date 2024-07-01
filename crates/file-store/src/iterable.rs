@@ -25,7 +25,8 @@
 //! If the item type `T` implements `ConstSerializable`, then the `ConstIterableStoreWriter` can be
 //! used to write items to the file without intermediate headers as the size of the serialied item is known upfront.
 
-use crate::{owned_bytes::OwnedBytes, ConstSerializable, Result};
+use crate::{ConstSerializable, Result};
+use ownedbytes::OwnedBytes;
 use std::{
     cmp::Reverse,
     io::{self, Write},

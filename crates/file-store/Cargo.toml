@@ -1,8 +1,8 @@
 [package]
-name = "file_store"
-version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0"
+name = "file_store"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,4 +10,4 @@ license = "AGPL-3.0"
 anyhow.workspace = true
 bincode.workspace = true
 memmap2.workspace = true
-stable_deref_trait.workspace = true
+ownedbytes.workspace = true

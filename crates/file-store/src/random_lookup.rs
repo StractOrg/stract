@@ -19,7 +19,8 @@ use std::{
     path::Path,
 };
 
-use crate::{owned_bytes::OwnedBytes, ConstSerializable};
+use crate::ConstSerializable;
+use ownedbytes::OwnedBytes;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ItemId(u64);

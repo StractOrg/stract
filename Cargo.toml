@@ -5,11 +5,13 @@ members = [
   "crates/client-wasm",
   "crates/core",
   "crates/file-store",
+  "crates/ownedbytes",
   "crates/kuchiki",
   "crates/optics",
   "crates/speedy-kv",
   "crates/zimba",
   "crates/robotstxt",
+  "crates/tantivy",
   "fuzz",
 ]
 resolver = "2"
@@ -92,6 +94,7 @@ openraft = {version = "0.9.1", features = [
   "serde",
   "tracing-log",
 ]}
+ownedbytes = {path = "crates/ownedbytes"}
 percent-encoding = "2.3.0"
 postcard = {version = "1.0.8", features = ["experimental-derive", "alloc"]}
 proptest = "1.2.0"
@@ -122,7 +125,7 @@ serde_json = "1.0.81"
 serde_urlencoded = "0.7.1"
 stable_deref_trait = "1.2.0"
 strum = {version = "0.26.2", features = ["derive"]}
-tantivy = {git = "https://github.com/quickwit-oss/tantivy", rev = "74940e9"}
+tantivy = {path = "crates/tantivy"}
 thiserror = "1.0.31"
 tikv-jemallocator = "0.5"
 tokenizers = "0.13.2"
@@ -144,3 +147,7 @@ zstd = "0.13"
 
 [profile.test.package]
 flate2.opt-level = 3
+
+[profile.test]
+debug-assertions = true
+overflow-checks = true
