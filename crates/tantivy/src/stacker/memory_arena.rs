@@ -113,15 +113,6 @@ impl MemoryArena {
         self.pages.len() * PAGE_SIZE
     }
 
-    /// Returns the number of bytes allocated in the arena.
-    pub fn len(&self) -> usize {
-        self.pages.len().saturating_sub(1) * PAGE_SIZE + self.pages.last().unwrap().len
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     #[inline]
     pub fn write_at<Item: Copy + 'static>(&mut self, addr: Addr, val: Item) {
         let dest = self.slice_mut(addr, std::mem::size_of::<Item>());
@@ -156,11 +147,6 @@ impl MemoryArena {
     pub fn slice_from(&self, addr: Addr) -> &[u8] {
         self.get_page(addr.page_id())
             .slice_from(addr.page_local_addr())
-    }
-    #[inline]
-    pub fn slice_from_mut(&mut self, addr: Addr) -> &mut [u8] {
-        self.get_page_mut(addr.page_id())
-            .slice_from_mut(addr.page_local_addr())
     }
 
     #[inline]
@@ -224,10 +210,6 @@ impl Page {
     #[inline]
     fn slice_from(&self, local_addr: usize) -> &[u8] {
         &self.data[local_addr..]
-    }
-    #[inline]
-    fn slice_from_mut(&mut self, local_addr: usize) -> &mut [u8] {
-        &mut self.data[local_addr..]
     }
 
     #[inline]

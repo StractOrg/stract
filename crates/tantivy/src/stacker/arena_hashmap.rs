@@ -46,11 +46,6 @@ impl ArenaHashMap {
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.shared_arena_hashmap.is_empty()
-    }
-
-    #[inline]
     pub fn len(&self) -> usize {
         self.shared_arena_hashmap.len()
     }
