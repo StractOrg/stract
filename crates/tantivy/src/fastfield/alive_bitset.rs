@@ -157,25 +157,3 @@ mod tests {
         assert_eq!(data, (2..=999).collect::<Vec<_>>());
     }
 }
-
-#[cfg(all(test, feature = "unstable"))]
-mod bench {
-
-    use rand::prelude::IteratorRandom;
-    use rand::thread_rng;
-
-    use super::AliveBitSet;
-
-    fn get_alive() -> Vec<u32> {
-        let mut data = (0..1_000_000_u32).collect::<Vec<u32>>();
-        for _ in 0..1_000_000 / 8 {
-            remove_rand(&mut data);
-        }
-        data
-    }
-
-    fn remove_rand(raw: &mut Vec<u32>) {
-        let i = (0..raw.len()).choose(&mut thread_rng()).unwrap();
-        raw.remove(i);
-    }
-}

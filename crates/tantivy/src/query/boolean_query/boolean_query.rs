@@ -8,11 +8,11 @@ use crate::schema::{IndexRecordOption, Term};
 /// The documents matched by the boolean query are
 /// those which
 /// * match all of the sub queries associated with the
-/// `Must` occurrence
+///     `Must` occurrence
 /// * match none of the sub queries associated with the
-/// `MustNot` occurrence.
+///     `MustNot` occurrence.
 /// * match at least one of the sub queries associated
-/// with the `Must` or `Should` occurrence.
+///     with the `Must` or `Should` occurrence.
 ///
 ///
 /// You can combine other query types and their `Occur`ances into one `BooleanQuery`

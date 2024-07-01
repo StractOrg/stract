@@ -80,7 +80,7 @@ impl ValueWriter for RangeValueWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    #[allow(clippy::single_range_in_vec_init)]
     #[test]
     fn test_range_reader_writer() {
         crate::sstable::value::tests::test_value_reader_writer::<

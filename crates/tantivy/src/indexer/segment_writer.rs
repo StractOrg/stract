@@ -81,8 +81,8 @@ impl SegmentWriter {
     /// The arguments are defined as follows
     ///
     /// - memory_budget: most of the segment writer data (terms, and postings lists recorders)
-    /// is stored in a memory arena. This makes it possible for the user to define
-    /// the flushing behavior as a memory limit.
+    ///     is stored in a memory arena. This makes it possible for the user to define
+    ///     the flushing behavior as a memory limit.
     /// - segment: The segment being written
     /// - schema
     pub fn for_segment(memory_budget_in_bytes: usize, segment: Segment) -> crate::Result<Self> {
@@ -177,7 +177,7 @@ impl SegmentWriter {
         let vals_grouped_by_field = doc
             .iter_fields_and_values()
             .sorted_by_key(|(field, _)| *field)
-            .group_by(|(field, _)| *field);
+            .chunk_by(|(field, _)| *field);
 
         for (field, field_values) in &vals_grouped_by_field {
             let values = field_values.map(|el| el.1);
@@ -500,7 +500,6 @@ mod tests {
     };
 
     #[test]
-    #[cfg(not(feature = "compare_hash_only"))]
     fn test_hashmap_size() {
         use super::compute_initial_table_size;
         assert_eq!(compute_initial_table_size(100_000).unwrap(), 1 << 12);

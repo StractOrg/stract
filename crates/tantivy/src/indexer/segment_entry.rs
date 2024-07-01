@@ -11,11 +11,11 @@ use crate::indexer::delete_queue::DeleteCursor;
 /// In addition to segment `meta`,
 /// it contains a few transient states
 /// - `alive_bitset` is a bitset describing
-/// documents that were alive during the commit
-/// itself.
+///     documents that were alive during the commit
+///     itself.
 /// - `delete_cursor` is the position in the delete queue.
-/// Deletes happening before the cursor are reflected either
-/// in the .del file or in the `alive_bitset`.
+///     Deletes happening before the cursor are reflected either
+///     in the .del file or in the `alive_bitset`.
 #[derive(Clone)]
 pub struct SegmentEntry {
     meta: SegmentMeta,

@@ -122,6 +122,3 @@ impl Cardinality {
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod compat_tests;

@@ -31,9 +31,9 @@ const NUM_MERGE_THREADS: usize = 4;
 /// This operation is atomic:
 /// Either
 ///  - it fails, in which case an error is returned,
-/// and the `meta.json` remains untouched,
+///     and the `meta.json` remains untouched,
 /// - it success, and `meta.json` is written
-/// and flushed.
+///     and flushed.
 ///
 /// This method is not part of tantivy's public API
 pub(crate) fn save_metas(metas: &IndexMeta, directory: &dyn Directory) -> crate::Result<()> {

@@ -13,7 +13,7 @@ use crate::schema::{
 /// It consists of
 /// - a field name
 /// - a field type, itself wrapping up options describing
-/// how the field should be indexed.
+///     how the field should be indexed.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FieldEntry {
     name: String,

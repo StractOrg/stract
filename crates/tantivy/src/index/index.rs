@@ -50,9 +50,9 @@ fn load_metas(
 /// This operation is atomic :
 /// Either
 ///  - it fails, in which case an error is returned,
-/// and the `meta.json` remains untouched,
+///     and the `meta.json` remains untouched,
 /// - it succeeds, and `meta.json` is written
-/// and flushed.
+///     and flushed.
 ///
 /// This method is not part of tantivy's public API
 fn save_new_metas(
@@ -554,11 +554,11 @@ impl Index {
     /// it is safe to manually delete the lockfile.
     ///
     /// - `num_threads` defines the number of indexing workers that
-    /// should work at the same time.
+    ///     should work at the same time.
     ///
     /// - `overall_memory_budget_in_bytes` sets the amount of memory
-    /// allocated for all indexing thread.
-    /// Each thread will receive a budget of  `overall_memory_budget_in_bytes / num_threads`.
+    ///     allocated for all indexing thread.
+    ///     Each thread will receive a budget of  `overall_memory_budget_in_bytes / num_threads`.
     ///
     /// # Errors
     /// If the lockfile already exists, returns `Error::DirectoryLockBusy` or an `Error::IoError`.

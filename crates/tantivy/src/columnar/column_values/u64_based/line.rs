@@ -126,8 +126,8 @@ impl Line {
     /// f: i in 0..[ys.num_vals()) -> ys[i].
     ///
     /// - The approximation is always lower than the actual value.
-    /// Or more rigorously, formally `f(i).wrapping_sub(ys[i])` is small
-    /// for any i in [0..ys.len()).
+    ///     Or more rigorously, formally `f(i).wrapping_sub(ys[i])` is small
+    ///     for any i in [0..ys.len()).
     /// - It computes without panicking for any value of it.
     ///
     /// This function is only invariable by translation if all of the

@@ -344,7 +344,7 @@ fn column_value_strategy() -> impl Strategy<Value = ColumnValue> {
             ip_addr_byte
         ))),
         1 => any::<bool>().prop_map(ColumnValue::Bool),
-        1 => (0_679_723_993i64..1_679_723_995i64)
+        1 => (679_723_993i64..1_679_723_995i64)
             .prop_map(|val| { ColumnValue::DateTime(DateTime::from_timestamp_secs(val)) })
     ]
 }

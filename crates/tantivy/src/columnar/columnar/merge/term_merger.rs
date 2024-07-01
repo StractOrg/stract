@@ -36,7 +36,7 @@ impl<'a> Ord for HeapItem<'a> {
 /// The item yield is actually a pair with
 /// - the term
 /// - a slice with the ordinal of the segments containing
-/// the terms.
+///     the terms.
 pub struct TermMerger<'a> {
     heap: BinaryHeap<HeapItem<'a>>,
     current_streamers: Vec<HeapItem<'a>>,

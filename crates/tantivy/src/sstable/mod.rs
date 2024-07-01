@@ -21,7 +21,6 @@ use crate::common::{BinarySerializable, OwnedBytes};
 
 pub use self::block_reader::BlockReader;
 pub use self::delta::{DeltaReader, DeltaWriter};
-pub use self::merge::VoidMerge;
 use self::value::{RangeValueReader, RangeValueWriter};
 use self::value::{U64MonotonicValueReader, U64MonotonicValueWriter, ValueReader, ValueWriter};
 
@@ -325,7 +324,8 @@ mod test {
 
     use crate::common::OwnedBytes;
 
-    use super::{common_prefix_len, MonotonicU64SSTable, SSTable, VoidMerge, VoidSSTable};
+    use super::{common_prefix_len, MonotonicU64SSTable, SSTable, VoidSSTable};
+    use crate::sstable::merge::VoidMerge;
 
     fn aux_test_common_prefix_len(left: &str, right: &str, expect_len: usize) {
         assert_eq!(

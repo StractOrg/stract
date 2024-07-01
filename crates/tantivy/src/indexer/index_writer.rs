@@ -1683,11 +1683,11 @@ mod tests {
                     deleted_ids.remove(id);
                 }
                 IndexingOp::DeleteDoc { id } => {
-                    existing_ids.remove(&id);
+                    existing_ids.remove(id);
                     deleted_ids.insert(*id);
                 }
                 IndexingOp::DeleteDocQuery { id } => {
-                    existing_ids.remove(&id);
+                    existing_ids.remove(id);
                     deleted_ids.insert(*id);
                 }
                 _ => {}
@@ -2356,7 +2356,7 @@ mod tests {
 
     #[test]
     fn test_fast_field_range() {
-        let ops: Vec<_> = (0..1000).map(|id| IndexingOp::add(id)).collect();
+        let ops: Vec<_> = (0..1000).map(IndexingOp::add).collect();
         assert!(test_operation_strategy(&ops, false, true).is_ok());
     }
 

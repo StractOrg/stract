@@ -26,7 +26,7 @@
 //! and should rely on either
 //!
 //! - at the segment level, the
-//! [`SegmentReader`'s `doc` method](../struct.SegmentReader.html#method.doc)
+//!     [`SegmentReader`'s `doc` method](../struct.SegmentReader.html#method.doc)
 //! - at the index level, the [`Searcher::doc()`](crate::Searcher::doc) method
 
 mod compressors;
@@ -35,7 +35,7 @@ mod footer;
 mod index;
 mod reader;
 mod writer;
-pub use self::compressors::{Compressor, ZstdCompressor};
+pub use self::compressors::Compressor;
 pub use self::decompressors::Decompressor;
 pub(crate) use self::reader::DOCSTORE_CACHE_CAPACITY;
 pub use self::reader::{CacheStats, StoreReader};
@@ -47,9 +47,6 @@ pub(crate) const DOC_STORE_VERSION: u32 = 1;
 
 #[cfg(feature = "lz4-compression")]
 mod compression_lz4_block;
-
-#[cfg(feature = "zstd-compression")]
-mod compression_zstd_block;
 
 #[cfg(test)]
 pub mod tests {
@@ -204,16 +201,6 @@ pub mod tests {
         test_store(Compressor::Lz4, BLOCK_SIZE, true)
     }
 
-    #[cfg(feature = "zstd-compression")]
-    #[test]
-    fn test_store_zstd() -> crate::Result<()> {
-        test_store(
-            Compressor::Zstd(ZstdCompressor::default()),
-            BLOCK_SIZE,
-            true,
-        )
-    }
-
     #[test]
     fn test_store_with_delete() -> crate::Result<()> {
         let mut schema_builder = schema::Schema::builder();
@@ -251,69 +238,6 @@ pub mod tests {
                 "deletemenot".to_string()
             );
         }
-        Ok(())
-    }
-
-    #[cfg(feature = "lz4-compression")]
-    #[cfg(feature = "zstd-compression")]
-    #[test]
-    fn test_merge_with_changed_compressor() -> crate::Result<()> {
-        let mut schema_builder = schema::Schema::builder();
-
-        let text_field = schema_builder.add_text_field("text_field", TEXT | STORED);
-        let schema = schema_builder.build();
-        let index_builder = Index::builder().schema(schema);
-
-        let mut index = index_builder.create_in_ram().unwrap();
-        index.settings_mut().docstore_compression = Compressor::Lz4;
-        {
-            let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
-            // put enough data create enough blocks in the doc store to be considered for stacking
-            for _ in 0..200 {
-                index_writer.add_document(doc!(text_field=> LOREM))?;
-            }
-            assert!(index_writer.commit().is_ok());
-            for _ in 0..200 {
-                index_writer.add_document(doc!(text_field=> LOREM))?;
-            }
-            assert!(index_writer.commit().is_ok());
-        }
-        assert_eq!(
-            index.reader().unwrap().searcher().segment_readers()[0]
-                .get_store_reader(10)
-                .unwrap()
-                .decompressor(),
-            Decompressor::Lz4
-        );
-        // Change compressor, this disables stacking on merging
-        let index_settings = index.settings_mut();
-        index_settings.docstore_compression = Compressor::Zstd(Default::default());
-        // Merging the segments
-        {
-            let segment_ids = index
-                .searchable_segment_ids()
-                .expect("Searchable segments failed.");
-            let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
-            assert!(index_writer.merge(&segment_ids).wait().is_ok());
-            assert!(index_writer.wait_merging_threads().is_ok());
-        }
-
-        let searcher = index.reader().unwrap().searcher();
-        assert_eq!(searcher.segment_readers().len(), 1);
-        let reader = searcher.segment_readers().iter().last().unwrap();
-        let store = reader.get_store_reader(10).unwrap();
-
-        for doc in store
-            .iter::<TantivyDocument>(reader.alive_bitset())
-            .take(50)
-        {
-            assert_eq!(
-                *doc?.get_first(text_field).and_then(|v| v.as_str()).unwrap(),
-                LOREM.to_string()
-            );
-        }
-        assert_eq!(store.decompressor(), Decompressor::Zstd);
-
         Ok(())
     }
 

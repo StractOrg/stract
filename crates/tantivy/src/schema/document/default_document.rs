@@ -559,7 +559,7 @@ impl BinarySerializable for ValueType {
     fn deserialize<R: Read>(reader: &mut R) -> io::Result<Self> {
         let num = u8::deserialize(reader)?;
         let type_id = if (0..=12).contains(&num) {
-            unsafe { std::mem::transmute(num) }
+            unsafe { std::mem::transmute::<u8, ValueType>(num) }
         } else {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,

@@ -12,7 +12,7 @@ use crate::termdict::{TermOrdinal, TermStreamer};
 /// The item yielded is actually a pair with
 /// - the term
 /// - a slice with the ordinal of the segments containing
-/// the term.
+///     the term.
 pub struct TermMerger<'a> {
     dictionaries: Vec<&'a TermDictionary>,
     union: Union<'a>,
@@ -90,49 +90,5 @@ impl<'a> TermMerger<'a> {
                     self.dictionaries[iv.index].term_info_from_ord(iv.value),
                 )
             })
-    }
-}
-
-#[cfg(all(test, feature = "unstable"))]
-mod bench {
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
-
-    use super::TermMerger;
-    use crate::directory::FileSlice;
-    use crate::postings::TermInfo;
-    use crate::termdict::{TermDictionary, TermDictionaryBuilder};
-
-    fn make_term_info(term_ord: u64) -> TermInfo {
-        let offset = |term_ord: u64| (term_ord * 100 + term_ord * term_ord) as usize;
-        TermInfo {
-            doc_freq: term_ord as u32,
-            postings_range: offset(term_ord)..offset(term_ord + 1),
-            positions_range: offset(term_ord)..offset(term_ord + 1),
-        }
-    }
-
-    /// Create a dictionary of random strings.
-    fn rand_dict(num_terms: usize) -> std::io::Result<TermDictionary> {
-        let buffer: Vec<u8> = {
-            let mut terms = vec![];
-            for _i in 0..num_terms {
-                let rand_string: String = thread_rng()
-                    .sample_iter(&Alphanumeric)
-                    .take(thread_rng().gen_range(30..42))
-                    .map(char::from)
-                    .collect();
-                terms.push(rand_string);
-            }
-            terms.sort();
-
-            let mut term_dictionary_builder = TermDictionaryBuilder::create(Vec::new())?;
-            for i in 0..num_terms {
-                term_dictionary_builder.insert(terms[i].as_bytes(), &make_term_info(i as u64))?;
-            }
-            term_dictionary_builder.finish()?
-        };
-        let file = FileSlice::from(buffer);
-        TermDictionary::open(file)
     }
 }

@@ -137,7 +137,7 @@ fn trim_ast(logical_ast: LogicalAst) -> Option<LogicalAst> {
 ///   so-called default fields (as set up in the constructor).
 ///
 ///   Assuming that the default fields are `body` and `title`, and the query parser is set with
-/// conjunction   as a default, our query will be interpreted as.
+///     conjunction   as a default, our query will be interpreted as.
 ///   `(body:Barack OR title:Barack) AND (title:Obama OR body:Obama)`.
 ///   By default, all tokenized and indexed fields are default fields.
 ///
@@ -149,7 +149,7 @@ fn trim_ast(logical_ast: LogicalAst) -> Option<LogicalAst> {
 ///
 /// * boolean operators `AND`, `OR`. `AND` takes precedence over `OR`, so that `a AND b OR c` is
 ///   interpreted
-/// as `(a AND b) OR c`.
+///     as `(a AND b) OR c`.
 ///
 /// * In addition to the boolean operators, the `-`, `+` can help define. These operators are
 ///   sufficient to express all queries using boolean operators. For instance `x AND y OR z` can be
@@ -273,7 +273,7 @@ impl QueryParser {
     /// Creates a `QueryParser`, given
     ///  * an index
     ///  * a set of default fields used to search if no field is specifically defined
-    ///   in the query.
+    ///     in the query.
     pub fn for_index(index: &Index, default_fields: Vec<Field>) -> QueryParser {
         QueryParser::new(index.schema(), default_fields, index.tokenizers().clone())
     }
@@ -686,7 +686,7 @@ impl QueryParser {
     /// The terms are identified by a triplet:
     /// - tantivy field
     /// - field_path: tantivy has JSON fields. It is possible to target a member of a JSON
-    /// object by naturally extending the json field name with a "." separated field_path
+    ///     object by naturally extending the json field name with a "." separated field_path
     /// - field_phrase: the phrase that is being searched.
     ///
     /// The literal identifies the targeted field by a so-called *full field path*,

@@ -12,11 +12,7 @@ pub fn compute_table_memory_size(capacity: usize) -> usize {
     capacity * mem::size_of::<KeyValue>()
 }
 
-#[cfg(not(feature = "compare_hash_only"))]
 type HashType = u32;
-
-#[cfg(feature = "compare_hash_only")]
-type HashType = u64;
 
 /// `KeyValue` is the item stored in the hash table.
 /// The key is actually a `BytesRef` object stored in an external memory arena.
@@ -137,20 +133,8 @@ impl SharedArenaHashMap {
         }
     }
 
-    #[inline]
-    #[cfg(not(feature = "compare_hash_only"))]
     fn get_hash(&self, key: &[u8]) -> HashType {
         murmurhash32::murmurhash2(key)
-    }
-
-    #[inline]
-    #[cfg(feature = "compare_hash_only")]
-    fn get_hash(&self, key: &[u8]) -> HashType {
-        /// Since we compare only the hash we need a high quality hash.
-        use std::hash::Hasher;
-        let mut hasher = ahash::AHasher::default();
-        hasher.write(key);
-        hasher.finish() as HashType
     }
 
     #[inline]
@@ -177,8 +161,6 @@ impl SharedArenaHashMap {
         (key_bytes, addr.offset(2 + key_bytes_len as u32))
     }
 
-    #[inline]
-    #[cfg(not(feature = "compare_hash_only"))]
     fn get_value_addr_if_key_match(
         &self,
         target_key: &[u8],
@@ -193,23 +175,6 @@ impl SharedArenaHashMap {
         } else {
             None
         }
-    }
-    #[inline]
-    #[cfg(feature = "compare_hash_only")]
-    fn get_value_addr_if_key_match(
-        &self,
-        _target_key: &[u8],
-        addr: Addr,
-        memory_arena: &MemoryArena,
-    ) -> Option<Addr> {
-        // For the compare_hash_only feature, it would make sense to store the keys at a different
-        // memory location. Here they will just pollute the cache.
-        let data = memory_arena.slice_from(addr);
-        let key_bytes_len_bytes = &data[..2];
-        let key_bytes_len = u16::from_le_bytes(key_bytes_len_bytes.try_into().unwrap());
-        let value_addr = addr.offset(2 + key_bytes_len as u32);
-
-        Some(value_addr)
     }
 
     #[inline]

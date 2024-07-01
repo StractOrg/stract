@@ -103,9 +103,9 @@ fn retry_policy(is_blocking: bool) -> RetryPolicy {
 /// There are currently two implementations of `Directory`
 ///
 /// - The [`MMapDirectory`][crate::directory::MmapDirectory], this
-/// should be your default choice.
+///     should be your default choice.
 /// - The [`RamDirectory`][crate::directory::RamDirectory], which
-/// should be used mostly for tests.
+///     should be used mostly for tests.
 pub trait Directory: DirectoryClone + fmt::Debug + Send + Sync + 'static {
     /// Opens a file and returns a boxed `FileHandle`.
     ///
@@ -234,7 +234,8 @@ pub trait DirectoryClone {
 }
 
 impl<T> DirectoryClone for T
-where T: 'static + Directory + Clone
+where
+    T: 'static + Directory + Clone,
 {
     fn box_clone(&self) -> Box<dyn Directory> {
         Box::new(self.clone())

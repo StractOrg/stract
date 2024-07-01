@@ -68,9 +68,9 @@ impl From<ColumnType> for ColumnTypeCategory {
 /// happen:
 /// - If the required column type is compatible with all of the input columnar, the resulsting
 ///   merged
-/// columnar will simply coerce the input column and use the required column type.
+///     columnar will simply coerce the input column and use the required column type.
 /// - If the required column type is incompatible with one of the input columnar, the merged
-/// will fail with an InvalidData error.
+///     will fail with an InvalidData error.
 ///
 /// `merge_row_order` makes it possible to remove or reorder row in the resulting
 /// `Columnar` table.

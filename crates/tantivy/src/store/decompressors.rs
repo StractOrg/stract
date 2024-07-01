@@ -12,9 +12,6 @@ pub enum Decompressor {
     /// Use the lz4 decompressor (block format)
     #[cfg(feature = "lz4-compression")]
     Lz4,
-    /// Use the zstd decompressor
-    #[cfg(feature = "zstd-compression")]
-    Zstd,
 }
 
 impl From<Compressor> for Decompressor {
@@ -23,8 +20,6 @@ impl From<Compressor> for Decompressor {
             Compressor::None => Decompressor::None,
             #[cfg(feature = "lz4-compression")]
             Compressor::Lz4 => Decompressor::Lz4,
-            #[cfg(feature = "zstd-compression")]
-            Compressor::Zstd(_) => Decompressor::Zstd,
         }
     }
 }
@@ -35,8 +30,6 @@ impl Decompressor {
             0 => Decompressor::None,
             #[cfg(feature = "lz4-compression")]
             1 => Decompressor::Lz4,
-            #[cfg(feature = "zstd-compression")]
-            4 => Decompressor::Zstd,
             _ => panic!("unknown compressor id {id:?}"),
         }
     }
@@ -46,8 +39,6 @@ impl Decompressor {
             Self::None => 0,
             #[cfg(feature = "lz4-compression")]
             Self::Lz4 => 1,
-            #[cfg(feature = "zstd-compression")]
-            Self::Zstd => 4,
         }
     }
 
@@ -71,8 +62,6 @@ impl Decompressor {
             }
             #[cfg(feature = "lz4-compression")]
             Self::Lz4 => super::compression_lz4_block::decompress(compressed, decompressed),
-            #[cfg(feature = "zstd-compression")]
-            Self::Zstd => super::compression_zstd_block::decompress(compressed, decompressed),
         }
     }
 }
@@ -86,10 +75,5 @@ mod tests {
         assert_eq!(Decompressor::from(Compressor::None), Decompressor::None);
         #[cfg(feature = "lz4-compression")]
         assert_eq!(Decompressor::from(Compressor::Lz4), Decompressor::Lz4);
-        #[cfg(feature = "zstd-compression")]
-        assert_eq!(
-            Decompressor::from(Compressor::Zstd(Default::default())),
-            Decompressor::Zstd
-        );
     }
 }
