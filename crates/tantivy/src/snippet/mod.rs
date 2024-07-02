@@ -8,46 +8,6 @@
 //! It scans a document and constructs a snippet, which consists of sections where the search terms
 //! have been found, stitched together with "..." in between sections if necessary.
 //!
-//! ## Example
-//!
-//! ```rust
-//! # use tantivy::query::QueryParser;
-//! # use tantivy::schema::{Schema, TEXT};
-//! # use tantivy::{doc, Index};
-//! use tantivy::snippet::SnippetGenerator;
-//!
-//! # fn main() -> tantivy::Result<()> {
-//! #    let mut schema_builder = Schema::builder();
-//! #    let text_field = schema_builder.add_text_field("text", TEXT);
-//! #    let schema = schema_builder.build();
-//! #    let index = Index::create_in_ram(schema);
-//! #    let mut index_writer = index.writer_with_num_threads(1, 20_000_000)?;
-//! #    let doc = doc!(text_field => r#"Comme je descendais des Fleuves impassibles,
-//! #   Je ne me sentis plus guidé par les haleurs :
-//! #  Des Peaux-Rouges criards les avaient pris pour cibles,
-//! #  Les ayant cloués nus aux poteaux de couleurs.
-//! #
-//! #  J'étais insoucieux de tous les équipages,
-//! #  Porteur de blés flamands ou de cotons anglais.
-//! #  Quand avec mes haleurs ont fini ces tapages,
-//! #  Les Fleuves m'ont laissé descendre où je voulais.
-//! #  "#);
-//! #    index_writer.add_document(doc.clone())?;
-//! #    index_writer.commit()?;
-//! #    let query_parser = QueryParser::for_index(&index, vec![text_field]);
-//! // ...
-//! let query = query_parser.parse_query("haleurs flamands").unwrap();
-//! # let reader = index.reader()?;
-//! # let searcher = reader.searcher();
-//! let mut snippet_generator = SnippetGenerator::create(&searcher, &*query, text_field)?;
-//! snippet_generator.set_max_num_chars(100);
-//! let snippet = snippet_generator.snippet_from_doc(&doc);
-//! let snippet_html: String = snippet.to_html();
-//! assert_eq!(snippet_html, "Comme je descendais des Fleuves impassibles,\n  Je ne me sentis plus guidé par les <b>haleurs</b> :\n Des");
-//! #    Ok(())
-//! # }
-//! ```
-//!
 //! You can also specify the maximum number of characters for the snippets generated with the
 //! `set_max_num_chars` method. By default, this limit is set to 150.
 //!
@@ -304,47 +264,6 @@ fn is_sorted(mut it: impl Iterator<Item = usize>) -> bool {
     true
 }
 
-/// `SnippetGenerator`
-///
-/// # Example
-///
-/// ```rust
-/// # use tantivy::query::QueryParser;
-/// # use tantivy::schema::{Schema, TEXT};
-/// # use tantivy::{doc, Index};
-/// use tantivy::snippet::SnippetGenerator;
-///
-/// # fn main() -> tantivy::Result<()> {
-/// #    let mut schema_builder = Schema::builder();
-/// #    let text_field = schema_builder.add_text_field("text", TEXT);
-/// #    let schema = schema_builder.build();
-/// #    let index = Index::create_in_ram(schema);
-/// #    let mut index_writer = index.writer_with_num_threads(1, 20_000_000)?;
-/// #    let doc = doc!(text_field => r#"Comme je descendais des Fleuves impassibles,
-/// #   Je ne me sentis plus guidé par les haleurs :
-/// #  Des Peaux-Rouges criards les avaient pris pour cibles,
-/// #  Les ayant cloués nus aux poteaux de couleurs.
-/// #
-/// #  J'étais insoucieux de tous les équipages,
-/// #  Porteur de blés flamands ou de cotons anglais.
-/// #  Quand avec mes haleurs ont fini ces tapages,
-/// #  Les Fleuves m'ont laissé descendre où je voulais.
-/// #  "#);
-/// #    index_writer.add_document(doc.clone())?;
-/// #    index_writer.commit()?;
-/// #    let query_parser = QueryParser::for_index(&index, vec![text_field]);
-/// // ...
-/// let query = query_parser.parse_query("haleurs flamands").unwrap();
-/// # let reader = index.reader()?;
-/// # let searcher = reader.searcher();
-/// let mut snippet_generator = SnippetGenerator::create(&searcher, &*query, text_field)?;
-/// snippet_generator.set_max_num_chars(100);
-/// let snippet = snippet_generator.snippet_from_doc(&doc);
-/// let snippet_html: String = snippet.to_html();
-/// assert_eq!(snippet_html, "Comme je descendais des Fleuves impassibles,\n  Je ne me sentis plus guidé par les <b>haleurs</b> :\n Des");
-/// #    Ok(())
-/// # }
-/// ```
 pub struct SnippetGenerator {
     terms_text: BTreeMap<String, Score>,
     tokenizer: TextAnalyzer,

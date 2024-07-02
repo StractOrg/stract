@@ -23,46 +23,6 @@ use crate::{DocId, Score, SegmentReader};
 /// - documents with no values are filtered out.
 /// - documents with several values are accepted if at least one value matches the predicate.
 ///
-///
-/// ```rust
-/// use tantivy::collector::{TopDocs, FilterCollector};
-/// use tantivy::query::QueryParser;
-/// use tantivy::schema::{Schema, TEXT, FAST};
-/// use tantivy::{doc, DocAddress, Index};
-///
-/// # fn main() -> tantivy::Result<()> {
-/// let mut schema_builder = Schema::builder();
-/// let title = schema_builder.add_text_field("title", TEXT);
-/// let price = schema_builder.add_u64_field("price", FAST);
-/// let schema = schema_builder.build();
-/// let index = Index::create_in_ram(schema);
-///
-/// let mut index_writer = index.writer_with_num_threads(1, 20_000_000)?;
-/// index_writer.add_document(doc!(title => "The Name of the Wind", price => 30_200u64))?;
-/// index_writer.add_document(doc!(title => "The Diary of Muadib", price => 29_240u64))?;
-/// index_writer.add_document(doc!(title => "A Dairy Cow", price => 21_240u64))?;
-/// index_writer.add_document(doc!(title => "The Diary of a Young Girl", price => 20_120u64))?;
-/// index_writer.commit()?;
-///
-/// let reader = index.reader()?;
-/// let searcher = reader.searcher();
-///
-/// let query_parser = QueryParser::for_index(&index, vec![title]);
-/// let query = query_parser.parse_query("diary")?;
-/// let no_filter_collector = FilterCollector::new("price".to_string(), |value: u64| value > 20_120u64, TopDocs::with_limit(2));
-/// let top_docs = searcher.search(&query, &no_filter_collector)?;
-///
-/// assert_eq!(top_docs.len(), 1);
-/// assert_eq!(top_docs[0].1, DocAddress::new(0, 1));
-///
-/// let filter_all_collector: FilterCollector<_, _, u64> = FilterCollector::new("price".to_string(), |value| value < 5u64, TopDocs::with_limit(2));
-/// let filtered_top_docs = searcher.search(&query, &filter_all_collector)?;
-///
-/// assert_eq!(filtered_top_docs.len(), 0);
-/// # Ok(())
-/// # }
-/// ```
-///
 /// Note that this is limited to fast fields which implement the
 /// [`FastValue`][crate::fastfield::FastValue] trait, e.g. `u64` but not `&[u8]`.
 /// To filter based on a bytes fast field, use a [`BytesFilterCollector`] instead.
@@ -191,41 +151,6 @@ where
 /// In other words,
 /// - documents with no values are filtered out.
 /// - documents with several values are accepted if at least one value matches the predicate.
-///
-/// ```rust
-/// use tantivy::collector::{TopDocs, BytesFilterCollector};
-/// use tantivy::query::QueryParser;
-/// use tantivy::schema::{Schema, TEXT, FAST};
-/// use tantivy::{doc, DocAddress, Index};
-///
-/// # fn main() -> tantivy::Result<()> {
-/// let mut schema_builder = Schema::builder();
-/// let title = schema_builder.add_text_field("title", TEXT);
-/// let barcode = schema_builder.add_bytes_field("barcode", FAST);
-/// let schema = schema_builder.build();
-/// let index = Index::create_in_ram(schema);
-///
-/// let mut index_writer = index.writer_with_num_threads(1, 20_000_000)?;
-/// index_writer.add_document(doc!(title => "The Name of the Wind", barcode => &b"010101"[..]))?;
-/// index_writer.add_document(doc!(title => "The Diary of Muadib", barcode => &b"110011"[..]))?;
-/// index_writer.add_document(doc!(title => "A Dairy Cow", barcode => &b"110111"[..]))?;
-/// index_writer.add_document(doc!(title => "The Diary of a Young Girl", barcode => &b"011101"[..]))?;
-/// index_writer.add_document(doc!(title => "Bridget Jones's Diary"))?;
-/// index_writer.commit()?;
-///
-/// let reader = index.reader()?;
-/// let searcher = reader.searcher();
-///
-/// let query_parser = QueryParser::for_index(&index, vec![title]);
-/// let query = query_parser.parse_query("diary")?;
-/// let filter_collector = BytesFilterCollector::new("barcode".to_string(), |bytes: &[u8]| bytes.starts_with(b"01"), TopDocs::with_limit(2));
-/// let top_docs = searcher.search(&query, &filter_collector)?;
-///
-/// assert_eq!(top_docs.len(), 1);
-/// assert_eq!(top_docs[0].1, DocAddress::new(0, 3));
-/// # Ok(())
-/// # }
-/// ```
 pub struct BytesFilterCollector<TCollector, TPredicate>
 where
     TPredicate: 'static + Clone,

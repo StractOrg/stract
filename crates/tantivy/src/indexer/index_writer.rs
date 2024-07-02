@@ -467,37 +467,6 @@ impl<D: Document> IndexWriter<D> {
     /// Requires `commit`ing
     /// Enables users to rebuild the index,
     /// by clearing and resubmitting necessary documents
-    ///
-    /// ```rust
-    /// use tantivy::collector::TopDocs;
-    /// use tantivy::query::QueryParser;
-    /// use tantivy::schema::*;
-    /// use tantivy::{doc, Index};
-    ///
-    /// fn main() -> tantivy::Result<()> {
-    ///     let mut schema_builder = Schema::builder();
-    ///     let title = schema_builder.add_text_field("title", TEXT | STORED);
-    ///     let schema = schema_builder.build();
-    ///
-    ///     let index = Index::create_in_ram(schema.clone());
-    ///
-    ///     let mut index_writer = index.writer_with_num_threads(1, 50_000_000)?;
-    ///     index_writer.add_document(doc!(title => "The modern Promotheus"))?;
-    ///     index_writer.commit()?;
-    ///
-    ///     let clear_res = index_writer.delete_all_documents().unwrap();
-    ///     // have to commit, otherwise deleted terms remain available
-    ///     index_writer.commit()?;
-    ///
-    ///     let searcher = index.reader()?.searcher();
-    ///     let query_parser = QueryParser::for_index(&index, vec![title]);
-    ///     let query_promo = query_parser.parse_query("Promotheus")?;
-    ///     let top_docs_promo = searcher.search(&query_promo, &TopDocs::with_limit(1))?;
-    ///
-    ///     assert!(top_docs_promo.is_empty());
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn delete_all_documents(&self) -> crate::Result<Opstamp> {
         // Delete segments
         self.segment_updater.remove_all_segments();

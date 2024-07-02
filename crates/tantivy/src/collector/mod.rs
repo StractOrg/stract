@@ -33,35 +33,6 @@
 //! The resulting `Fruit` will then be a typed tuple with each collector's original fruits
 //! in their respective position.
 //!
-//! ```rust
-//! # use tantivy::schema::*;
-//! # use tantivy::*;
-//! # use tantivy::query::*;
-//! use tantivy::collector::{Count, TopDocs};
-//! #
-//! # fn main() -> tantivy::Result<()> {
-//! # let mut schema_builder = Schema::builder();
-//! #     let title = schema_builder.add_text_field("title", TEXT);
-//! #     let schema = schema_builder.build();
-//! #     let index = Index::create_in_ram(schema);
-//! #     let mut index_writer = index.writer(15_000_000)?;
-//! #       index_writer.add_document(doc!(
-//! #       title => "The Name of the Wind",
-//! #      ))?;
-//! #     index_writer.add_document(doc!(
-//! #        title => "The Diary of Muadib",
-//! #     ))?;
-//! #     index_writer.commit()?;
-//! #     let reader = index.reader()?;
-//! #     let searcher = reader.searcher();
-//! #     let query_parser = QueryParser::for_index(&index, vec![title]);
-//! #     let query = query_parser.parse_query("diary")?;
-//! let (doc_count, top_docs): (usize, Vec<(Score, DocAddress)>) =
-//! searcher.search(&query, &(Count, TopDocs::with_limit(2)))?;
-//! #     Ok(())
-//! # }
-//! ```
-//!
 //! The `Collector` trait is implemented for up to 4 collectors.
 //! If you have more than 4 collectors, you can either group them into
 //! tuples of tuples `(a,(b,(c,d)))`, or rely on [`MultiCollector`].

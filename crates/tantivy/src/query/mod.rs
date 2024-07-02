@@ -16,7 +16,6 @@ mod more_like_this;
 mod phrase_prefix_query;
 mod phrase_query;
 mod query;
-mod query_parser;
 mod range_query;
 mod reqopt_scorer;
 mod scorer;
@@ -27,6 +26,9 @@ mod weight;
 
 #[cfg(test)]
 mod vec_docset;
+
+#[cfg(test)]
+mod query_parser;
 
 pub mod grammar;
 pub(crate) mod score_combiner;
@@ -52,6 +54,7 @@ pub use self::more_like_this::{MoreLikeThisQuery, MoreLikeThisQueryBuilder};
 pub use self::phrase_prefix_query::PhrasePrefixQuery;
 pub use self::phrase_query::PhraseQuery;
 pub use self::query::{EnableScoring, Query, QueryClone};
+#[cfg(test)]
 pub use self::query_parser::{QueryParser, QueryParserError};
 pub use self::range_query::{FastFieldRangeWeight, IPFastFieldRangeWeight, RangeQuery};
 pub use self::reqopt_scorer::RequiredOptionalScorer;

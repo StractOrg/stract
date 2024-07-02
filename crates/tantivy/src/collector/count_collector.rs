@@ -4,35 +4,6 @@ use crate::{DocId, Score, SegmentOrdinal, SegmentReader};
 
 /// `CountCollector` collector only counts how many
 /// documents match the query.
-///
-/// ```rust
-/// use tantivy::collector::Count;
-/// use tantivy::query::QueryParser;
-/// use tantivy::schema::{Schema, TEXT};
-/// use tantivy::{doc, Index};
-///
-/// let mut schema_builder = Schema::builder();
-/// let title = schema_builder.add_text_field("title", TEXT);
-/// let schema = schema_builder.build();
-/// let index = Index::create_in_ram(schema);
-///
-/// let mut index_writer = index.writer(15_000_000).unwrap();
-/// index_writer.add_document(doc!(title => "The Name of the Wind")).unwrap();
-/// index_writer.add_document(doc!(title => "The Diary of Muadib")).unwrap();
-/// index_writer.add_document(doc!(title => "A Dairy Cow")).unwrap();
-/// index_writer.add_document(doc!(title => "The Diary of a Young Girl")).unwrap();
-/// assert!(index_writer.commit().is_ok());
-///
-/// let reader = index.reader().unwrap();
-/// let searcher = reader.searcher();
-///
-/// // Here comes the important part
-/// let query_parser = QueryParser::for_index(&index, vec![title]);
-/// let query = query_parser.parse_query("diary").unwrap();
-/// let count = searcher.search(&query, &Count).unwrap();
-///
-/// assert_eq!(count, 2);
-/// ```
 pub struct Count;
 
 impl Collector for Count {
