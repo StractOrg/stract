@@ -4,14 +4,11 @@
 //! documents have exactly one element.
 
 mod merge;
-mod multivalued_index;
-mod optional_index;
 mod serialize;
 
 use std::ops::Range;
 
 pub use merge::merge_column_index;
-pub use optional_index::{OptionalIndex, Set};
 pub use serialize::{open_column_index, serialize_column_index, SerializableColumnIndex};
 
 use super::{Cardinality, DocId, RowId};
