@@ -112,7 +112,7 @@ where
     #[inline]
     fn accept_document(&self, doc_id: DocId) -> bool {
         if let Some(column) = &self.column_opt {
-            for val in column.values_for_doc(doc_id) {
+            if let Some(val) = column.first(doc_id) {
                 if (self.predicate)(val) {
                     return true;
                 }

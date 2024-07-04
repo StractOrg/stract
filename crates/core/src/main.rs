@@ -59,13 +59,6 @@ enum Commands {
         mode: CentralityMode,
     },
 
-    /// Parse the DMOZ dataset. DMOZ contains a list of websites and their categories.
-    /// It can be used to calculate the topic centrality for websites or augments website descriptions during indexing.
-    DmozParser {
-        dmoz_file: String,
-        output_path: String,
-    },
-
     /// Webgraph specific commands.
     Webgraph {
         #[clap(subcommand)]
@@ -394,10 +387,6 @@ fn main() -> Result<()> {
         Commands::Configure { skip_download } => {
             configure::run(skip_download)?;
         }
-        Commands::DmozParser {
-            dmoz_file,
-            output_path,
-        } => entrypoint::dmoz_parser::run(dmoz_file, output_path).unwrap(),
         Commands::Crawler { options } => match options {
             Crawler::Worker { config_path } => {
                 let config: config::CrawlerConfig = load_toml_config(config_path);

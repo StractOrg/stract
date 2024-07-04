@@ -59,9 +59,6 @@ use crate::{DocId, Score, SegmentOrdinal, SegmentReader};
 mod count_collector;
 pub use self::count_collector::Count;
 
-mod histogram_collector;
-pub use histogram_collector::HistogramCollector;
-
 mod multi_collector;
 pub use self::multi_collector::{FruitHandle, MultiCollector, MultiFruit};
 
@@ -76,8 +73,6 @@ pub use self::custom_score_top_collector::{CustomScorer, CustomSegmentScorer};
 
 mod tweak_score_top_collector;
 pub use self::tweak_score_top_collector::{ScoreSegmentTweaker, ScoreTweaker};
-mod facet_collector;
-pub use self::facet_collector::{FacetCollector, FacetCounts};
 use crate::query::Weight;
 
 mod docset_collector;

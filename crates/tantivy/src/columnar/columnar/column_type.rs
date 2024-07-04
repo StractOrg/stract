@@ -1,6 +1,5 @@
 use std::fmt;
 use std::fmt::Debug;
-use std::net::Ipv6Addr;
 
 use serde::{Deserialize, Serialize};
 
@@ -16,10 +15,8 @@ pub enum ColumnType {
     U64 = 1u8,
     F64 = 2u8,
     Bytes = 3u8,
-    Str = 4u8,
-    Bool = 5u8,
-    IpAddr = 6u8,
-    DateTime = 7u8,
+    Bool = 4u8,
+    DateTime = 5u8,
 }
 
 impl fmt::Display for ColumnType {
@@ -29,9 +26,7 @@ impl fmt::Display for ColumnType {
             ColumnType::U64 => "u64",
             ColumnType::F64 => "f64",
             ColumnType::Bytes => "bytes",
-            ColumnType::Str => "str",
             ColumnType::Bool => "bool",
-            ColumnType::IpAddr => "ip",
             ColumnType::DateTime => "datetime",
         };
         write!(f, "{short_str}")
@@ -39,14 +34,12 @@ impl fmt::Display for ColumnType {
 }
 
 // The order needs to match _exactly_ the order in the enum
-const COLUMN_TYPES: [ColumnType; 8] = [
+const COLUMN_TYPES: [ColumnType; 6] = [
     ColumnType::I64,
     ColumnType::U64,
     ColumnType::F64,
     ColumnType::Bytes,
-    ColumnType::Str,
     ColumnType::Bool,
-    ColumnType::IpAddr,
     ColumnType::DateTime,
 ];
 
@@ -79,11 +72,7 @@ impl ColumnType {
             ColumnType::I64 => Some(NumericalType::I64),
             ColumnType::U64 => Some(NumericalType::U64),
             ColumnType::F64 => Some(NumericalType::F64),
-            ColumnType::Bytes
-            | ColumnType::Str
-            | ColumnType::Bool
-            | ColumnType::IpAddr
-            | ColumnType::DateTime => None,
+            ColumnType::Bytes | ColumnType::Bool | ColumnType::DateTime => None,
         }
     }
 }
@@ -142,16 +131,6 @@ impl HasAssociatedColumnType for crate::common::DateTime {
     }
 }
 
-impl HasAssociatedColumnType for Ipv6Addr {
-    fn column_type() -> ColumnType {
-        ColumnType::IpAddr
-    }
-
-    fn default_value() -> Self {
-        Ipv6Addr::from([0u8; 16])
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,6 +157,6 @@ mod tests {
                 num_cardinality += 1;
             }
         }
-        assert_eq!(num_cardinality, 3);
+        assert_eq!(num_cardinality, 1);
     }
 }

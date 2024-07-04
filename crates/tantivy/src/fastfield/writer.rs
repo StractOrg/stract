@@ -2,11 +2,10 @@ use std::io;
 
 use crate::columnar::{ColumnarWriter, NumericalValue};
 use crate::common::{DateTimePrecision, JsonPathWriter};
-use crate::tokenizer_api::Token;
 
 use crate::indexer::doc_id_mapping::DocIdMapping;
 use crate::schema::document::{Document, ReferenceValue, ReferenceValueLeaf, Value};
-use crate::schema::{value_type_to_column_type, Field, FieldType, Schema, Type};
+use crate::schema::{value_type_to_column_type, Field, FieldType, Schema};
 use crate::tokenizer::{TextAnalyzer, TokenizerManager};
 use crate::{DocId, TantivyError};
 
@@ -81,7 +80,7 @@ impl FastFieldsWriter {
                 }
             }
 
-            let sort_values_within_row = value_type == Type::Facet;
+            let sort_values_within_row = false;
             if let Some(column_type) = value_type_to_column_type(value_type) {
                 columnar_writer.record_column_type(
                     field_entry.name(),
@@ -142,19 +141,7 @@ impl FastFieldsWriter {
         match value.as_value() {
             ReferenceValue::Leaf(leaf) => match leaf {
                 ReferenceValueLeaf::Null => {}
-                ReferenceValueLeaf::Str(val) => {
-                    if let Some(tokenizer) =
-                        &mut self.per_field_tokenizer[field.field_id() as usize]
-                    {
-                        let mut token_stream = tokenizer.token_stream(val);
-                        token_stream.process(&mut |token: &Token| {
-                            self.columnar_writer
-                                .record_str(doc_id, field_name, &token.text);
-                        })
-                    } else {
-                        self.columnar_writer.record_str(doc_id, field_name, val);
-                    }
-                }
+                ReferenceValueLeaf::Str(_) => {}
                 ReferenceValueLeaf::U64(val) => {
                     self.columnar_writer.record_numerical(
                         doc_id,
@@ -182,24 +169,14 @@ impl FastFieldsWriter {
                     self.columnar_writer
                         .record_datetime(doc_id, field_name, truncated_datetime);
                 }
-                ReferenceValueLeaf::Facet(val) => {
-                    self.columnar_writer.record_str(doc_id, field_name, val);
-                }
                 ReferenceValueLeaf::Bytes(val) => {
                     self.columnar_writer.record_bytes(doc_id, field_name, val);
                 }
-                ReferenceValueLeaf::IpAddr(val) => {
-                    self.columnar_writer.record_ip_addr(doc_id, field_name, val);
-                }
+                ReferenceValueLeaf::IpAddr(_) => {}
                 ReferenceValueLeaf::Bool(val) => {
                     self.columnar_writer.record_bool(doc_id, field_name, val);
                 }
-                ReferenceValueLeaf::PreTokStr(val) => {
-                    for token in &val.tokens {
-                        self.columnar_writer
-                            .record_str(doc_id, field_name, &token.text);
-                    }
-                }
+                ReferenceValueLeaf::PreTokStr(_) => {}
             },
             ReferenceValue::Array(val) => {
                 // TODO: Check this is the correct behaviour we want.
@@ -285,16 +262,7 @@ fn record_json_value_to_columnar_writer<'a, V: Value<'a>>(
     match json_val.as_value() {
         ReferenceValue::Leaf(leaf) => match leaf {
             ReferenceValueLeaf::Null => {} // TODO: Handle null
-            ReferenceValueLeaf::Str(val) => {
-                if let Some(text_analyzer) = tokenizer.as_mut() {
-                    let mut token_stream = text_analyzer.token_stream(val);
-                    token_stream.process(&mut |token| {
-                        columnar_writer.record_str(doc, json_path_writer.as_str(), &token.text);
-                    })
-                } else {
-                    columnar_writer.record_str(doc, json_path_writer.as_str(), val);
-                }
-            }
+            ReferenceValueLeaf::Str(_) => {}
             ReferenceValueLeaf::U64(val) => {
                 columnar_writer.record_numerical(
                     doc,
@@ -321,9 +289,6 @@ fn record_json_value_to_columnar_writer<'a, V: Value<'a>>(
             }
             ReferenceValueLeaf::Date(val) => {
                 columnar_writer.record_datetime(doc, json_path_writer.as_str(), val);
-            }
-            ReferenceValueLeaf::Facet(_) => {
-                unimplemented!("Facet support in dynamic fields is not yet implemented")
             }
             ReferenceValueLeaf::Bytes(_) => {
                 // TODO: This can be re added once it is added to the JSON Utils section as well.
@@ -361,142 +326,5 @@ fn record_json_value_to_columnar_writer<'a, V: Value<'a>>(
                 tokenizer,
             );
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::columnar::{Column, ColumnarReader, ColumnarWriter, StrColumn};
-    use crate::common::JsonPathWriter;
-
-    use super::record_json_value_to_columnar_writer;
-    use crate::fastfield::writer::JSON_DEPTH_LIMIT;
-    use crate::DocId;
-
-    fn test_columnar_from_jsons_aux(
-        json_docs: &[serde_json::Value],
-        expand_dots: bool,
-    ) -> ColumnarReader {
-        let mut columnar_writer = ColumnarWriter::default();
-        let mut json_path = JsonPathWriter::default();
-        json_path.set_expand_dots(expand_dots);
-        for (doc, json_doc) in json_docs.iter().enumerate() {
-            record_json_value_to_columnar_writer(
-                doc as u32,
-                json_doc,
-                JSON_DEPTH_LIMIT,
-                &mut json_path,
-                &mut columnar_writer,
-                &mut None,
-            );
-        }
-        let mut buffer = Vec::new();
-        columnar_writer
-            .serialize(json_docs.len() as DocId, None, &mut buffer)
-            .unwrap();
-        ColumnarReader::open(buffer).unwrap()
-    }
-
-    #[test]
-    fn test_json_fastfield_record_simple() {
-        let json_doc = serde_json::json!({
-            "float": 1.02,
-            "text": "hello happy tax payer",
-            "nested": {"child": 3, "child2": 5},
-            "arr": ["hello", "happy", "tax", "payer"]
-        });
-        let columnar_reader = test_columnar_from_jsons_aux(&[json_doc], false);
-        let columns = columnar_reader.list_columns().unwrap();
-        {
-            assert_eq!(columns[0].0, "arr");
-            let column_arr_opt: Option<StrColumn> = columns[0].1.open().unwrap().into();
-            assert!(column_arr_opt
-                .unwrap()
-                .term_ords(0)
-                .eq([1, 0, 3, 2].into_iter()));
-        }
-        {
-            assert_eq!(columns[1].0, "float");
-            let column_float_opt: Option<Column<f64>> = columns[1].1.open().unwrap().into();
-            assert!(column_float_opt
-                .unwrap()
-                .values_for_doc(0)
-                .eq([1.02f64].into_iter()));
-        }
-        {
-            assert_eq!(columns[2].0, "nested\u{1}child");
-            let column_nest_child_opt: Option<Column<i64>> = columns[2].1.open().unwrap().into();
-            assert!(column_nest_child_opt
-                .unwrap()
-                .values_for_doc(0)
-                .eq([3].into_iter()));
-        }
-        {
-            assert_eq!(columns[3].0, "nested\u{1}child2");
-            let column_nest_child2_opt: Option<Column<i64>> = columns[3].1.open().unwrap().into();
-            assert!(column_nest_child2_opt
-                .unwrap()
-                .values_for_doc(0)
-                .eq([5].into_iter()));
-        }
-        {
-            assert_eq!(columns[4].0, "text");
-            let column_text_opt: Option<StrColumn> = columns[4].1.open().unwrap().into();
-            assert!(column_text_opt.unwrap().term_ords(0).eq([0].into_iter()));
-        }
-    }
-
-    #[test]
-    fn test_json_fastfield_deep_obj() {
-        let json_doc = serde_json::json!(
-            {"a": {"a": {"a": {"a": {"a":
-            {"a": {"a": {"a": {"a": {"a":
-            {"a": {"a": {"a": {"a": {"a":
-            {"a": {"a": {"a": {"depth_accepted": 19, "a": {  "depth_truncated": 20}
-        }}}}}}}}}}}}}}}}}}});
-        let columnar_reader = test_columnar_from_jsons_aux(&[json_doc], false);
-        let columns = columnar_reader.list_columns().unwrap();
-        assert_eq!(columns.len(), 1);
-        assert!(columns[0].0.ends_with("a\u{1}a\u{1}a\u{1}depth_accepted"));
-    }
-
-    #[test]
-    fn test_json_fastfield_deep_arr() {
-        let json_doc = json!(
-        {"obj":
-        [[[[[,
-        [[[[[,
-        [[[[[,
-        [[18, [19, //< within limits
-        [20]]]]]]]]]]]]]]]]]]]});
-        let columnar_reader = test_columnar_from_jsons_aux(&[json_doc], false);
-        let columns = columnar_reader.list_columns().unwrap();
-        assert_eq!(columns.len(), 1);
-        assert_eq!(columns[0].0, "obj");
-        let dynamic_column = columns[0].1.open().unwrap();
-        let col: Option<Column<i64>> = dynamic_column.into();
-        let vals: Vec<i64> = col.unwrap().values_for_doc(0).collect();
-        assert_eq!(&vals, &[18, 19])
-    }
-
-    #[test]
-    fn test_json_fast_field_do_not_expand_dots() {
-        let json_doc = json!({"field.with.dots": {"child.with.dot": "hello"}});
-        let columnar_reader = test_columnar_from_jsons_aux(&[json_doc], false);
-        let columns = columnar_reader.list_columns().unwrap();
-        assert_eq!(columns.len(), 1);
-        assert_eq!(columns[0].0, "field.with.dots\u{1}child.with.dot");
-    }
-
-    #[test]
-    fn test_json_fast_field_expand_dots() {
-        let json_doc = json!({"field.with.dots": {"child.with.dot": "hello"}});
-        let columnar_reader = test_columnar_from_jsons_aux(&[json_doc], true);
-        let columns = columnar_reader.list_columns().unwrap();
-        assert_eq!(columns.len(), 1);
-        assert_eq!(
-            columns[0].0,
-            "field\u{1}with\u{1}dots\u{1}child\u{1}with\u{1}dot"
-        );
     }
 }

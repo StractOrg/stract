@@ -23,8 +23,8 @@ use crate::config::{
     defaults, IndexerConfig, IndexerDualEncoderConfig, IndexerGraphConfig, LocalConfig,
     WebSpellConfig,
 };
+use crate::entrypoint::indexer;
 use crate::entrypoint::indexer::JobSettings;
-use crate::entrypoint::{dmoz_parser, indexer};
 use crate::Result;
 use std::fs::{self};
 use std::path::Path;
@@ -44,7 +44,6 @@ fn download_files() {
                 "queries_us.csv",
                 "sample.warc.gz",
                 "bangs.json",
-                "content.rdf.u8.gz",
                 "english-wordnet-2022-subset.ttl",
                 "lambdamart.txt",
                 "test.zim",
@@ -188,13 +187,6 @@ fn create_inverted_index() -> Result<()> {
         page_webgraph: Some(IndexerGraphConfig::Local {
             path: webgraph_path.to_str().unwrap().to_string(),
         }),
-        topics_path: Some(
-            Path::new(DATA_PATH)
-                .join("human_annotations")
-                .to_str()
-                .unwrap()
-                .to_string(),
-        ),
         output_path: out_path.to_str().unwrap().to_string(),
         limit_warc_files: None,
         skip_warc_files: None,
@@ -232,17 +224,9 @@ fn create_entity_index() -> Result<()> {
     Ok(())
 }
 
-fn parse_topics() -> Result<()> {
-    let dmoz_path = Path::new(DATA_PATH).join("content.rdf.u8.gz");
-
-    let topics = dmoz_parser::parse(dmoz_path)?;
-    topics.save(Path::new(DATA_PATH).join("human_annotations"))
-}
-
 fn index_files() -> Result<()> {
     create_webgraph()?;
     calculate_centrality();
-    parse_topics()?;
     create_inverted_index()?;
     create_entity_index()?;
     build_spellchecker()?;

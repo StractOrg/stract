@@ -33,7 +33,6 @@ pub struct IndexerConfig {
     pub warc_source: WarcSource,
     pub page_webgraph: Option<IndexerGraphConfig>,
     pub host_centrality_threshold: Option<f64>,
-    pub topics_path: Option<String>,
     pub host_centrality_store_path: String,
     pub page_centrality_store_path: Option<String>,
     pub safety_classifier_path: Option<String>,

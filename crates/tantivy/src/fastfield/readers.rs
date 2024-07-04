@@ -1,10 +1,9 @@
 use std::io;
-use std::net::Ipv6Addr;
 use std::sync::Arc;
 
 use crate::columnar::{
-    BytesColumn, Column, ColumnType, ColumnValues, ColumnarReader, DynamicColumn,
-    DynamicColumnHandle, HasAssociatedColumnType, StrColumn,
+    BytesColumn, Column, ColumnType, ColumnarReader, DynamicColumn, DynamicColumnHandle,
+    HasAssociatedColumnType,
 };
 use crate::common::ByteCount;
 
@@ -139,20 +138,6 @@ impl FastFieldReaders {
             .sum())
     }
 
-    /// Returns a typed column value object.
-    ///
-    /// In that column value:
-    /// - Rows with no value are associated with the default value.
-    /// - Rows with several values are associated with the first value.
-    pub fn column_first_or_default<T>(&self, field: &str) -> crate::Result<Arc<dyn ColumnValues<T>>>
-    where
-        T: PartialOrd + Copy + HasAssociatedColumnType + Send + Sync + 'static,
-        DynamicColumn: Into<Option<Column<T>>>,
-    {
-        let col: Column<T> = self.column(field)?;
-        Ok(col.first_or_default_col(T::default_value()))
-    }
-
     /// Returns a typed column associated to a given field name.
     ///
     /// Returns an error if no column associated with that field_name exists.
@@ -181,24 +166,6 @@ impl FastFieldReaders {
     /// If `field` is not a date fast field, this method returns an Error.
     pub fn date(&self, field: &str) -> crate::Result<Column<crate::common::DateTime>> {
         self.column(field)
-    }
-
-    /// Returns the `ip` fast field reader reader associated to `field`.
-    ///
-    /// If `field` is not a u128 fast field, this method returns an Error.
-    pub fn ip_addr(&self, field: &str) -> crate::Result<Column<Ipv6Addr>> {
-        self.column(field)
-    }
-
-    /// Returns a `str` column.
-    pub fn str(&self, field_name: &str) -> crate::Result<Option<StrColumn>> {
-        let Some(dynamic_column_handle) =
-            self.dynamic_column_handle(field_name, ColumnType::Str)?
-        else {
-            return Ok(None);
-        };
-        let dynamic_column = dynamic_column_handle.open()?;
-        Ok(dynamic_column.into())
     }
 
     /// Returns a `bytes` column.
@@ -460,16 +427,13 @@ mod tests {
         assert_eq!(id_columns.first().unwrap().column_type(), ColumnType::U64);
 
         let foo_columns = fast_fields.dynamic_column_handles("json.foo").unwrap();
-        assert_eq!(foo_columns.len(), 3);
+        assert_eq!(foo_columns.len(), 2);
         assert!(foo_columns
             .iter()
             .any(|column| column.column_type() == ColumnType::I64));
         assert!(foo_columns
             .iter()
             .any(|column| column.column_type() == ColumnType::Bool));
-        assert!(foo_columns
-            .iter()
-            .any(|column| column.column_type() == ColumnType::Str));
 
         println!("*** {:?}", fast_fields.columnar().list_columns());
     }

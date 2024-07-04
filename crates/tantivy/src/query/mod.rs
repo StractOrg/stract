@@ -8,7 +8,6 @@ mod const_score_query;
 mod disjunction_max_query;
 mod empty_query;
 mod exclude;
-mod exist_query;
 mod explanation;
 mod fuzzy_query;
 mod intersection;
@@ -44,7 +43,6 @@ pub use self::const_score_query::{ConstScoreQuery, ConstScorer};
 pub use self::disjunction_max_query::DisjunctionMaxQuery;
 pub use self::empty_query::{EmptyQuery, EmptyScorer, EmptyWeight};
 pub use self::exclude::Exclude;
-pub use self::exist_query::ExistsQuery;
 pub use self::explanation::Explanation;
 #[cfg(test)]
 pub(crate) use self::fuzzy_query::DfaWrapper;
@@ -56,7 +54,7 @@ pub use self::phrase_query::PhraseQuery;
 pub use self::query::{EnableScoring, Query, QueryClone};
 #[cfg(test)]
 pub use self::query_parser::{QueryParser, QueryParserError};
-pub use self::range_query::{FastFieldRangeWeight, IPFastFieldRangeWeight, RangeQuery};
+pub use self::range_query::{FastFieldRangeWeight, RangeQuery};
 pub use self::reqopt_scorer::RequiredOptionalScorer;
 pub use self::score_combiner::{
     DisjunctionMaxCombiner, ScoreCombiner, SumCombiner, SumWithCoordsCombiner,

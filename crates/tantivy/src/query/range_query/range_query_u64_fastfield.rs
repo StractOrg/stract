@@ -140,7 +140,7 @@ pub mod tests {
     use crate::collector::Count;
     use crate::query::range_query::range_query_u64_fastfield::FastFieldRangeWeight;
     use crate::query::{QueryParser, Weight};
-    use crate::schema::{NumericOptions, Schema, SchemaBuilder, FAST, INDEXED, STORED, STRING};
+    use crate::schema::{Schema, SchemaBuilder, FAST, INDEXED, STORED, STRING};
     use crate::{Index, IndexWriter, TERMINATED};
 
     #[derive(Clone, Debug)]
@@ -180,12 +180,6 @@ pub mod tests {
     }
 
     #[test]
-    fn range_regression1_test() {
-        let ops = vec![doc_from_id_1(0)];
-        assert!(test_id_range_for_docs(ops).is_ok());
-    }
-
-    #[test]
     fn test_range_regression2() {
         let ops = vec![
             doc_from_id_1(52),
@@ -194,12 +188,6 @@ pub mod tests {
             doc_from_id_2(91),
             doc_from_id_2(33),
         ];
-        assert!(test_id_range_for_docs(ops).is_ok());
-    }
-
-    #[test]
-    fn test_range_regression3() {
-        let ops = vec![doc_from_id_1(9), doc_from_id_1(0), doc_from_id_1(13)];
         assert!(test_id_range_for_docs(ops).is_ok());
     }
 
@@ -225,34 +213,16 @@ pub mod tests {
     }
 
     #[test]
-    fn range_regression3_test() {
+    fn test_range_regression3() {
         let ops = vec![doc_from_id_1(1), doc_from_id_1(2), doc_from_id_1(3)];
-        assert!(test_id_range_for_docs(ops).is_ok());
-    }
-
-    #[test]
-    fn range_regression4_test() {
-        let ops = vec![doc_from_id_2(100)];
         assert!(test_id_range_for_docs(ops).is_ok());
     }
 
     pub fn create_index_from_docs(docs: &[Doc]) -> Index {
         let mut schema_builder = Schema::builder();
         let id_u64_field = schema_builder.add_u64_field("id", INDEXED | STORED | FAST);
-        let ids_u64_field =
-            schema_builder.add_u64_field("ids", NumericOptions::default().set_fast().set_indexed());
-
         let id_f64_field = schema_builder.add_f64_field("id_f64", INDEXED | STORED | FAST);
-        let ids_f64_field = schema_builder.add_f64_field(
-            "ids_f64",
-            NumericOptions::default().set_fast().set_indexed(),
-        );
-
         let id_i64_field = schema_builder.add_i64_field("id_i64", INDEXED | STORED | FAST);
-        let ids_i64_field = schema_builder.add_i64_field(
-            "ids_i64",
-            NumericOptions::default().set_fast().set_indexed(),
-        );
 
         let text_field = schema_builder.add_text_field("id_name", STRING | STORED);
         let schema = schema_builder.build();
@@ -263,12 +233,6 @@ pub mod tests {
             for doc in docs.iter() {
                 index_writer
                     .add_document(doc!(
-                        ids_i64_field => doc.id as i64,
-                        ids_i64_field => doc.id as i64,
-                        ids_f64_field => doc.id as f64,
-                        ids_f64_field => doc.id as f64,
-                        ids_u64_field => doc.id,
-                        ids_u64_field => doc.id,
                         id_u64_field => doc.id,
                         id_f64_field => doc.id as f64,
                         id_i64_field => doc.id as i64,
@@ -314,9 +278,6 @@ pub mod tests {
             let query = gen_query_inclusive("id", ids[0]..=ids[1]);
             assert_eq!(get_num_hits(query_from_text(&query)), expected_num_hits);
 
-            let query = gen_query_inclusive("ids", ids[0]..=ids[1]);
-            assert_eq!(get_num_hits(query_from_text(&query)), expected_num_hits);
-
             // Exclusive range
             let expected_num_hits = docs
                 .iter()
@@ -326,9 +287,6 @@ pub mod tests {
                 .count();
 
             let query = gen_query_exclusive("id", ids[0]..=ids[1]);
-            assert_eq!(get_num_hits(query_from_text(&query)), expected_num_hits);
-
-            let query = gen_query_exclusive("ids", ids[0]..=ids[1]);
             assert_eq!(get_num_hits(query_from_text(&query)), expected_num_hits);
 
             // Intersection search
@@ -352,27 +310,6 @@ pub mod tests {
             let query = format!(
                 "{} AND id_name:{}",
                 gen_query_inclusive("id_i64", ids[0]..=ids[1]),
-                &id_filter
-            );
-            assert_eq!(get_num_hits(query_from_text(&query)), expected_num_hits);
-
-            // Intersection search on multivalue id field
-            let id_filter = sample_docs[0].id_name.to_string();
-            let query = format!(
-                "{} AND id_name:{}",
-                gen_query_inclusive("ids", ids[0]..=ids[1]),
-                &id_filter
-            );
-            assert_eq!(get_num_hits(query_from_text(&query)), expected_num_hits);
-            let query = format!(
-                "{} AND id_name:{}",
-                gen_query_inclusive("ids_f64", ids[0]..=ids[1]),
-                &id_filter
-            );
-            assert_eq!(get_num_hits(query_from_text(&query)), expected_num_hits);
-            let query = format!(
-                "{} AND id_name:{}",
-                gen_query_inclusive("ids_i64", ids[0]..=ids[1]),
                 &id_filter
             );
             assert_eq!(get_num_hits(query_from_text(&query)), expected_num_hits);

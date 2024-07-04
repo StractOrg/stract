@@ -21,7 +21,7 @@ use crate::common::{u64_to_f64, BinarySerializable, DateTime, VInt};
 use super::se::BinaryObjectSerializer;
 use super::{OwnedValue, Value};
 use crate::schema::document::type_codes;
-use crate::schema::{Facet, Field};
+use crate::schema::Field;
 use crate::tokenizer::PreTokenizedString;
 
 #[derive(Debug, thiserror::Error, Clone)]
@@ -112,9 +112,6 @@ pub trait ValueDeserializer<'de> {
     /// Attempts to deserialize a datetime value from the deserializer.
     fn deserialize_datetime(self) -> Result<DateTime, DeserializeError>;
 
-    /// Attempts to deserialize a facet value from the deserializer.
-    fn deserialize_facet(self) -> Result<Facet, DeserializeError>;
-
     /// Attempts to deserialize a bytes value from the deserializer.
     fn deserialize_bytes(self) -> Result<Vec<u8>, DeserializeError>;
 
@@ -148,8 +145,6 @@ pub enum ValueType {
     F64,
     /// A datetime value.
     DateTime,
-    /// A facet value.
-    Facet,
     /// A bytes value.
     Bytes,
     /// A IP address value.
@@ -222,12 +217,6 @@ pub trait ValueVisitor {
     /// Called when the deserializer visits an IP address value.
     fn visit_ip_address(&self, _val: Ipv6Addr) -> Result<Self::Value, DeserializeError> {
         Err(DeserializeError::UnsupportedType(ValueType::IpAddr))
-    }
-
-    #[inline]
-    /// Called when the deserializer visits a facet value.
-    fn visit_facet(&self, _val: Facet) -> Result<Self::Value, DeserializeError> {
-        Err(DeserializeError::UnsupportedType(ValueType::Facet))
     }
 
     #[inline]
@@ -370,7 +359,6 @@ where
             type_codes::F64_CODE => ValueType::F64,
             type_codes::BOOL_CODE => ValueType::Bool,
             type_codes::DATE_CODE => ValueType::DateTime,
-            type_codes::HIERARCHICAL_FACET_CODE => ValueType::Facet,
             type_codes::BYTES_CODE => ValueType::Bytes,
             type_codes::EXT_CODE => {
                 let ext_type_code = <u8 as BinarySerializable>::deserialize(reader)?;
@@ -452,11 +440,6 @@ where
         <DateTime as BinarySerializable>::deserialize(self.reader).map_err(DeserializeError::from)
     }
 
-    fn deserialize_facet(self) -> Result<Facet, DeserializeError> {
-        self.validate_type(ValueType::Facet)?;
-        <Facet as BinarySerializable>::deserialize(self.reader).map_err(DeserializeError::from)
-    }
-
     fn deserialize_bytes(self) -> Result<Vec<u8>, DeserializeError> {
         self.validate_type(ValueType::Bytes)?;
         <Vec<u8> as BinarySerializable>::deserialize(self.reader).map_err(DeserializeError::from)
@@ -505,10 +488,6 @@ where
             ValueType::DateTime => {
                 let val = self.deserialize_datetime()?;
                 visitor.visit_datetime(val)
-            }
-            ValueType::Facet => {
-                let val = self.deserialize_facet()?;
-                visitor.visit_facet(val)
             }
             ValueType::Bytes => {
                 let val = self.deserialize_bytes()?;
@@ -726,16 +705,6 @@ impl ValueDeserialize for Ipv6Addr {
     }
 }
 
-impl ValueDeserialize for Facet {
-    #[inline]
-    fn deserialize<'de, D>(deserializer: D) -> Result<Self, DeserializeError>
-    where
-        D: ValueDeserializer<'de>,
-    {
-        deserializer.deserialize_facet()
-    }
-}
-
 impl ValueDeserialize for Vec<u8> {
     #[inline]
     fn deserialize<'de, D>(deserializer: D) -> Result<Self, DeserializeError>
@@ -922,11 +891,6 @@ mod tests {
             value,
             crate::schema::OwnedValue::Date(DateTime::from_timestamp_micros(100))
         );
-
-        let facet = Facet::from_text("/hello/world").unwrap();
-        let result = serialize_value(ReferenceValueLeaf::Facet(facet.encoded_str()).into());
-        let value = deserialize_value(result);
-        assert_eq!(value, crate::schema::OwnedValue::Facet(facet));
 
         let pre_tok_str = PreTokenizedString {
             text: "hello, world".to_string(),

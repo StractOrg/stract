@@ -2,7 +2,6 @@ use std::io;
 use std::net::Ipv6Addr;
 use std::ops::{Bound, Range};
 
-use crate::columnar::MonotonicallyMappableToU128;
 use crate::common::{BinarySerializable, BitSet};
 
 use super::map_bound;
@@ -10,8 +9,7 @@ use super::range_query_u64_fastfield::FastFieldRangeWeight;
 use crate::error::TantivyError;
 use crate::index::SegmentReader;
 use crate::query::explanation::does_not_match;
-use crate::query::range_query::range_query_ip_fastfield::IPFastFieldRangeWeight;
-use crate::query::range_query::{is_type_valid_for_fastfield_range_query, map_bound_res};
+use crate::query::range_query::is_type_valid_for_fastfield_range_query;
 use crate::query::{BitSetDocSet, ConstScorer, EnableScoring, Explanation, Query, Scorer, Weight};
 use crate::schema::{Field, IndexRecordOption, Term, Type};
 use crate::termdict::{TermDictionary, TermStreamer};
@@ -324,7 +322,7 @@ pub(crate) fn maps_to_u64_fastfield(typ: Type) -> bool {
     match typ {
         Type::U64 | Type::I64 | Type::F64 | Type::Bool | Type::Date => true,
         Type::IpAddr => false,
-        Type::Str | Type::Facet | Type::Bytes | Type::Json => false,
+        Type::Str | Type::Bytes | Type::Json => false,
     }
 }
 
@@ -345,39 +343,20 @@ impl Query for RangeQuery {
         }
 
         if field_type.is_fast() && is_type_valid_for_fastfield_range_query(self.value_type) {
-            if field_type.is_ip_addr() {
-                let parse_ip_from_bytes = |data: &Vec<u8>| {
-                    let ip_u128_bytes: [u8; 16] = data.as_slice().try_into().map_err(|_| {
-                        crate::TantivyError::InvalidArgument(
-                            "Expected 8 bytes for ip address".to_string(),
-                        )
-                    })?;
-                    let ip_u128 = u128::from_be_bytes(ip_u128_bytes);
-                    crate::Result::<Ipv6Addr>::Ok(Ipv6Addr::from_u128(ip_u128))
-                };
-                let lower_bound = map_bound_res(&self.lower_bound, parse_ip_from_bytes)?;
-                let upper_bound = map_bound_res(&self.upper_bound, parse_ip_from_bytes)?;
-                Ok(Box::new(IPFastFieldRangeWeight::new(
-                    self.field.to_string(),
-                    lower_bound,
-                    upper_bound,
-                )))
-            } else {
-                // We run the range query on u64 value space for performance reasons and simpicity
-                // assert the type maps to u64
-                assert!(maps_to_u64_fastfield(self.value_type));
-                let parse_from_bytes = |data: &Vec<u8>| {
-                    u64::from_be(BinarySerializable::deserialize(&mut &data[..]).unwrap())
-                };
+            // We run the range query on u64 value space for performance reasons and simpicity
+            // assert the type maps to u64
+            assert!(maps_to_u64_fastfield(self.value_type));
+            let parse_from_bytes = |data: &Vec<u8>| {
+                u64::from_be(BinarySerializable::deserialize(&mut &data[..]).unwrap())
+            };
 
-                let lower_bound = map_bound(&self.lower_bound, parse_from_bytes);
-                let upper_bound = map_bound(&self.upper_bound, parse_from_bytes);
-                Ok(Box::new(FastFieldRangeWeight::new_u64_lenient(
-                    self.field.to_string(),
-                    lower_bound,
-                    upper_bound,
-                )))
-            }
+            let lower_bound = map_bound(&self.lower_bound, parse_from_bytes);
+            let upper_bound = map_bound(&self.upper_bound, parse_from_bytes);
+            Ok(Box::new(FastFieldRangeWeight::new_u64_lenient(
+                self.field.to_string(),
+                lower_bound,
+                upper_bound,
+            )))
         } else {
             Ok(Box::new(RangeWeight {
                 field: self.field.to_string(),
@@ -694,166 +673,5 @@ mod tests {
         let top_docs = searcher.search(&query, &TopDocs::with_limit(10))?;
         assert_eq!(top_docs.len(), 1);
         Ok(())
-    }
-
-    #[test]
-    fn search_ip_range_test_posting_list() {
-        search_ip_range_test_opt(false);
-    }
-
-    #[test]
-    fn search_ip_range_test() {
-        search_ip_range_test_opt(true);
-    }
-
-    fn search_ip_range_test_opt(with_fast_field: bool) {
-        let mut schema_builder = Schema::builder();
-        let ip_field = if with_fast_field {
-            schema_builder.add_ip_addr_field("ip", INDEXED | STORED | FAST)
-        } else {
-            schema_builder.add_ip_addr_field("ip", INDEXED | STORED)
-        };
-        let text_field = schema_builder.add_text_field("text", TEXT | STORED);
-        let schema = schema_builder.build();
-        let index = Index::create_in_ram(schema);
-        let ip_addr_1 = IpAddr::from_str("127.0.0.10").unwrap().into_ipv6_addr();
-        let ip_addr_2 = IpAddr::from_str("127.0.0.20").unwrap().into_ipv6_addr();
-
-        {
-            let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
-            for _ in 0..1_000 {
-                index_writer
-                    .add_document(doc!(
-                        ip_field => ip_addr_1,
-                        text_field => "BLUBBER"
-                    ))
-                    .unwrap();
-            }
-            for _ in 0..1_000 {
-                index_writer
-                    .add_document(doc!(
-                        ip_field => ip_addr_2,
-                        text_field => "BLOBBER"
-                    ))
-                    .unwrap();
-            }
-            index_writer.commit().unwrap();
-        }
-        let reader = index.reader().unwrap();
-        let searcher = reader.searcher();
-        assert_eq!(searcher.segment_readers().len(), 1);
-
-        let get_num_hits = |query| {
-            let (_top_docs, count) = searcher
-                .search(&query, &(TopDocs::with_limit(10), Count))
-                .unwrap();
-            count
-        };
-        let query_from_text = |text: &str| {
-            QueryParser::for_index(&index, vec![])
-                .parse_query(text)
-                .unwrap()
-        };
-
-        // Inclusive range
-        assert_eq!(
-            get_num_hits(query_from_text("ip:[127.0.0.1 TO 127.0.0.20]")),
-            2000
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text("ip:[127.0.0.10 TO 127.0.0.20]")),
-            2000
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text("ip:[127.0.0.11 TO 127.0.0.20]")),
-            1000
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text("ip:[127.0.0.11 TO 127.0.0.19]")),
-            0
-        );
-
-        assert_eq!(get_num_hits(query_from_text("ip:[127.0.0.11 TO *]")), 1000);
-        assert_eq!(get_num_hits(query_from_text("ip:[127.0.0.21 TO *]")), 0);
-        assert_eq!(get_num_hits(query_from_text("ip:[* TO 127.0.0.9]")), 0);
-        assert_eq!(get_num_hits(query_from_text("ip:[* TO 127.0.0.10]")), 1000);
-
-        // Exclusive range
-        assert_eq!(
-            get_num_hits(query_from_text("ip:{127.0.0.1 TO 127.0.0.20}")),
-            1000
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text("ip:{127.0.0.1 TO 127.0.0.21}")),
-            2000
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text("ip:{127.0.0.10 TO 127.0.0.20}")),
-            0
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text("ip:{127.0.0.11 TO 127.0.0.20}")),
-            0
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text("ip:{127.0.0.11 TO 127.0.0.19}")),
-            0
-        );
-
-        assert_eq!(get_num_hits(query_from_text("ip:{127.0.0.11 TO *}")), 1000);
-        assert_eq!(get_num_hits(query_from_text("ip:{127.0.0.10 TO *}")), 1000);
-        assert_eq!(get_num_hits(query_from_text("ip:{127.0.0.21 TO *}")), 0);
-        assert_eq!(get_num_hits(query_from_text("ip:{127.0.0.20 TO *}")), 0);
-        assert_eq!(get_num_hits(query_from_text("ip:{127.0.0.19 TO *}")), 1000);
-        assert_eq!(get_num_hits(query_from_text("ip:{* TO 127.0.0.9}")), 0);
-        assert_eq!(get_num_hits(query_from_text("ip:{* TO 127.0.0.10}")), 0);
-        assert_eq!(get_num_hits(query_from_text("ip:{* TO 127.0.0.11}")), 1000);
-
-        // Inclusive/Exclusive range
-        assert_eq!(
-            get_num_hits(query_from_text("ip:[127.0.0.1 TO 127.0.0.20}")),
-            1000
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text("ip:{127.0.0.1 TO 127.0.0.20]")),
-            2000
-        );
-
-        // Intersection
-        assert_eq!(
-            get_num_hits(query_from_text(
-                "text:BLUBBER AND ip:[127.0.0.10 TO 127.0.0.10]"
-            )),
-            1000
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text(
-                "text:BLOBBER AND ip:[127.0.0.10 TO 127.0.0.10]"
-            )),
-            0
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text(
-                "text:BLOBBER AND ip:[127.0.0.20 TO 127.0.0.20]"
-            )),
-            1000
-        );
-
-        assert_eq!(
-            get_num_hits(query_from_text(
-                "text:BLUBBER AND ip:[127.0.0.20 TO 127.0.0.20]"
-            )),
-            0
-        );
     }
 }

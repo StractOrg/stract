@@ -79,7 +79,7 @@ impl ColumnValues for BitpackedReader {
     fn get_row_ids_for_value_range(
         &self,
         range: RangeInclusive<u64>,
-        doc_id_range: Range<u32>,
+        mut doc_id_range: Range<u32>,
         positions: &mut Vec<u32>,
     ) {
         let Some(transformed_range) =
@@ -88,6 +88,8 @@ impl ColumnValues for BitpackedReader {
             positions.clear();
             return;
         };
+        doc_id_range.end = doc_id_range.end.min(self.num_vals());
+
         self.bit_unpacker.get_ids_for_value_range(
             transformed_range,
             doc_id_range,

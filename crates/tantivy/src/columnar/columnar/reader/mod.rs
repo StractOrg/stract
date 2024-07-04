@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn test_list_columns() {
         let mut columnar_writer = ColumnarWriter::default();
-        columnar_writer.record_column_type("col1", ColumnType::Str, false);
+        columnar_writer.record_column_type("col1", ColumnType::U64, false);
         columnar_writer.record_column_type("col2", ColumnType::U64, false);
         let mut buffer = Vec::new();
         columnar_writer.serialize(1, None, &mut buffer).unwrap();
@@ -205,7 +205,7 @@ mod tests {
         let columns = columnar.list_columns().unwrap();
         assert_eq!(columns.len(), 2);
         assert_eq!(&columns[0].0, "col1");
-        assert_eq!(columns[0].1.column_type(), ColumnType::Str);
+        assert_eq!(columns[0].1.column_type(), ColumnType::U64);
         assert_eq!(&columns[1].0, "col2");
         assert_eq!(columns[1].1.column_type(), ColumnType::U64);
     }

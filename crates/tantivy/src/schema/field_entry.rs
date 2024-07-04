@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::ip_options::IpAddrOptions;
 use crate::schema::bytes_options::BytesOptions;
 use crate::schema::{
-    is_valid_field_name, DateOptions, FacetOptions, FieldType, JsonObjectOptions, NumericOptions,
-    TextOptions,
+    is_valid_field_name, DateOptions, FieldType, JsonObjectOptions, NumericOptions, TextOptions,
 };
 
 /// A `FieldEntry` represents a field and its configuration.
@@ -66,11 +65,6 @@ impl FieldEntry {
         Self::new(field_name, FieldType::IpAddr(ip_options))
     }
 
-    /// Creates a field entry for a facet.
-    pub fn new_facet(field_name: String, facet_options: FacetOptions) -> FieldEntry {
-        Self::new(field_name, FieldType::Facet(facet_options))
-    }
-
     /// Creates a field entry for a bytes field
     pub fn new_bytes(field_name: String, bytes_options: BytesOptions) -> FieldEntry {
         Self::new(field_name, FieldType::Bytes(bytes_options))
@@ -126,7 +120,6 @@ impl FieldEntry {
             | FieldType::Bool(ref options) => options.is_stored(),
             FieldType::Date(ref options) => options.is_stored(),
             FieldType::Str(ref options) => options.is_stored(),
-            FieldType::Facet(ref options) => options.is_stored(),
             FieldType::Bytes(ref options) => options.is_stored(),
             FieldType::JsonObject(ref options) => options.is_stored(),
             FieldType::IpAddr(ref options) => options.is_stored(),

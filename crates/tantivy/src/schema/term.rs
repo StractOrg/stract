@@ -10,7 +10,7 @@ use super::date_time_options::DATE_TIME_PRECISION_INDEXED;
 use super::Field;
 use crate::fastfield::FastValue;
 use crate::json_utils::split_json_path;
-use crate::schema::{Facet, Type};
+use crate::schema::Type;
 use crate::DateTime;
 
 /// Term represents the value that the token can take.
@@ -122,12 +122,6 @@ impl Term {
     /// Builds a term given a field, and a `DateTime` value
     pub fn from_field_date(field: Field, val: DateTime) -> Term {
         Term::from_fast_value(field, &val.truncate(DATE_TIME_PRECISION_INDEXED))
-    }
-
-    /// Creates a `Term` given a facet.
-    pub fn from_facet(field: Field, facet: &Facet) -> Term {
-        let facet_encoded_str = facet.encoded_str();
-        Term::with_bytes_and_field_and_payload(Type::Facet, field, facet_encoded_str.as_bytes())
     }
 
     /// Builds a term given a field, and a string value
@@ -401,18 +395,6 @@ where
         str::from_utf8(self.value_bytes()).ok()
     }
 
-    /// Returns the facet associated with the term.
-    ///
-    /// Returns `None` if the field is not of facet type
-    /// or if the bytes are not valid utf-8.
-    pub fn as_facet(&self) -> Option<Facet> {
-        if self.typ() != Type::Facet {
-            return None;
-        }
-        let facet_encode_str = str::from_utf8(self.value_bytes()).ok()?;
-        Some(Facet::from_encoded_string(facet_encode_str.to_string()))
-    }
-
     /// Returns the bytes associated with the term.
     ///
     /// Returns `None` if the field is not of bytes type.
@@ -505,9 +487,6 @@ where
             // TODO pretty print these types too.
             Type::Date => {
                 write_opt(f, self.as_date())?;
-            }
-            Type::Facet => {
-                write_opt(f, self.as_facet())?;
             }
             Type::Bytes => {
                 write_opt(f, self.as_bytes())?;

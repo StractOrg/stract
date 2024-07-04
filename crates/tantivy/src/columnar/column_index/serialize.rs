@@ -3,29 +3,17 @@ use std::io::Write;
 
 use crate::common::{CountingWriter, OwnedBytes};
 
-use super::{Cardinality, RowId};
-use crate::columnar::column_index::multivalued_index::serialize_multivalued_index;
-use crate::columnar::column_index::optional_index::serialize_optional_index;
+use super::Cardinality;
 use crate::columnar::column_index::ColumnIndex;
-use crate::columnar::iterable::Iterable;
 
-pub enum SerializableColumnIndex<'a> {
+pub enum SerializableColumnIndex {
     Full,
-    Optional {
-        non_null_row_ids: Box<dyn Iterable<RowId> + 'a>,
-        num_rows: RowId,
-    },
-    // TODO remove the Arc<dyn> apart from serialization this is not
-    // dynamic at all.
-    Multivalued(Box<dyn Iterable<RowId> + 'a>),
 }
 
-impl<'a> SerializableColumnIndex<'a> {
+impl SerializableColumnIndex {
     pub fn get_cardinality(&self) -> Cardinality {
         match self {
             SerializableColumnIndex::Full => Cardinality::Full,
-            SerializableColumnIndex::Optional { .. } => Cardinality::Optional,
-            SerializableColumnIndex::Multivalued(_) => Cardinality::Multivalued,
         }
     }
 }
@@ -40,13 +28,6 @@ pub fn serialize_column_index(
     output.write_all(&[cardinality])?;
     match column_index {
         SerializableColumnIndex::Full => {}
-        SerializableColumnIndex::Optional {
-            non_null_row_ids,
-            num_rows,
-        } => serialize_optional_index(non_null_row_ids.as_ref(), num_rows, &mut output)?,
-        SerializableColumnIndex::Multivalued(multivalued_index) => {
-            serialize_multivalued_index(&*multivalued_index, &mut output)?
-        }
     }
     let column_index_num_bytes = output.written_bytes() as u32;
     Ok(column_index_num_bytes)
@@ -65,14 +46,6 @@ pub fn open_column_index(mut bytes: OwnedBytes) -> io::Result<ColumnIndex> {
     bytes.advance(1);
     match cardinality {
         Cardinality::Full => Ok(ColumnIndex::Full),
-        Cardinality::Optional => {
-            let optional_index = super::optional_index::open_optional_index(bytes)?;
-            Ok(ColumnIndex::Optional(optional_index))
-        }
-        Cardinality::Multivalued => {
-            let multivalue_index = super::multivalued_index::open_multivalued_index(bytes)?;
-            Ok(ColumnIndex::Multivalued(multivalue_index))
-        }
     }
 }
 

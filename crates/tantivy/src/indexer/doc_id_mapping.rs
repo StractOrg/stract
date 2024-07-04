@@ -467,22 +467,11 @@ mod tests_indexsorting {
         let segment_reader = searcher.segment_reader(0);
         let fast_fields = segment_reader.fast_fields();
 
-        let fast_field = fast_fields
-            .u64("my_number")
-            .unwrap()
-            .first_or_default_col(999);
+        let fast_field = fast_fields.u64("my_number").unwrap().values;
         assert_eq!(fast_field.get_val(0), 10u64);
         assert_eq!(fast_field.get_val(1), 20u64);
         assert_eq!(fast_field.get_val(2), 30u64);
 
-        let multifield = fast_fields.u64("multi_numbers").unwrap();
-        let vals: Vec<u64> = multifield.values_for_doc(0u32).collect();
-        assert_eq!(vals, &[] as &[u64]);
-        let vals: Vec<_> = multifield.values_for_doc(1u32).collect();
-        assert_eq!(vals, &[5, 6]);
-
-        let vals: Vec<_> = multifield.values_for_doc(2u32).collect();
-        assert_eq!(vals, &[3]);
         Ok(())
     }
 
@@ -523,10 +512,7 @@ mod tests_indexsorting {
         let segment_reader = searcher.segment_reader(0);
         let fast_fields = segment_reader.fast_fields();
 
-        let fast_field = fast_fields
-            .date("date")
-            .unwrap()
-            .first_or_default_col(DateTime::from_timestamp_secs(0));
+        let fast_field = fast_fields.date("date").unwrap().values;
         assert_eq!(fast_field.get_val(0), DateTime::from_timestamp_secs(1001));
         assert_eq!(fast_field.get_val(1), DateTime::from_timestamp_secs(1000));
         assert_eq!(fast_field.get_val(2), DateTime::from_timestamp_secs(999));

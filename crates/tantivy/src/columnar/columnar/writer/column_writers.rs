@@ -71,22 +71,15 @@ impl ColumnWriter {
     }
 
     /// Records a change of the document being recorded.
-    ///
-    /// This function will also update the cardinality of the column
-    /// if necessary.
     pub(super) fn record<S: SymbolValue>(&mut self, doc: RowId, value: S, arena: &mut MemoryArena) {
         // Difference between `doc` and the last doc.
         match delta_with_last_doc(self.last_doc_opt, doc) {
-            DocumentStep::Same => {
-                // This is the last encounterred document.
-                self.cardinality = Cardinality::Multivalued;
-            }
+            DocumentStep::Same => {}
             DocumentStep::Next => {
                 self.last_doc_opt = Some(doc);
                 self.write_symbol::<S>(ColumnOperation::NewDoc(doc), arena);
             }
             DocumentStep::Skipped => {
-                self.cardinality = self.cardinality.max(Cardinality::Optional);
                 self.last_doc_opt = Some(doc);
                 self.write_symbol::<S>(ColumnOperation::NewDoc(doc), arena);
             }
@@ -94,15 +87,8 @@ impl ColumnWriter {
         self.write_symbol(ColumnOperation::Value(value), arena);
     }
 
-    // Get the cardinality.
-    // The overall number of docs in the column is necessary to
-    // deal with the case where the all docs contain 1 value, except some documents
-    // at the end of the column.
-    pub(crate) fn get_cardinality(&self, num_docs: RowId) -> Cardinality {
-        match delta_with_last_doc(self.last_doc_opt, num_docs) {
-            DocumentStep::Same | DocumentStep::Next => self.cardinality,
-            DocumentStep::Skipped => self.cardinality.max(Cardinality::Optional),
-        }
+    pub(crate) fn get_cardinality(&self) -> Cardinality {
+        self.cardinality
     }
 
     /// Appends a new symbol to the `ColumnWriter`.
@@ -214,8 +200,8 @@ impl NumericalColumnWriter {
         self.compatible_numerical_types.to_numerical_type()
     }
 
-    pub fn cardinality(&self, num_docs: RowId) -> Cardinality {
-        self.column_writer.get_cardinality(num_docs)
+    pub fn cardinality(&self) -> Cardinality {
+        self.column_writer.get_cardinality()
     }
 
     pub fn record_numerical_value(

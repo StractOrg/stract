@@ -12,7 +12,7 @@ use crate::columnar::{BytesColumn, MergeRowOrder, ShuffleMergeOrder};
 // Serialize [Dictionary, Column, dictionary num bytes U64::LE]
 // Column: [Column Index, Column Values, column index num bytes U32::LE]
 pub fn merge_bytes_or_str_column(
-    column_index: SerializableColumnIndex<'_>,
+    column_index: SerializableColumnIndex,
     bytes_columns: &[Option<BytesColumn>],
     merge_row_order: &MergeRowOrder,
     output: &mut impl Write,
@@ -79,8 +79,15 @@ impl<'a> RemappedTermOrdinalsValues<'a> {
         Box::new(
             shuffle_merge_order
                 .iter_new_to_old_row_addrs()
-                .flat_map(move |old_addr| {
+                .filter_map(move |old_addr| {
                     let segment_ord = self.term_ord_mapping.get_segment(old_addr.segment_ord);
+                    if !segment_ord.is_empty() {
+                        Some((old_addr, segment_ord))
+                    } else {
+                        None
+                    }
+                })
+                .flat_map(|(old_addr, segment_ord)| {
                     self.bytes_columns[old_addr.segment_ord as usize]
                         .as_ref()
                         .into_iter()
@@ -98,7 +105,7 @@ fn compute_term_bitset(column: &BytesColumn, row_bitset: &ReadOnlyBitSet) -> Bit
     let num_terms = column.dictionary().num_terms();
     let mut term_bitset = BitSet::with_max_value(num_terms as u32);
     for row_id in row_bitset.iter() {
-        for term_ord in column.term_ord_column.values_for_doc(row_id) {
+        if let Some(term_ord) = column.term_ord_column.first(row_id) {
             term_bitset.insert(term_ord as u32);
         }
     }

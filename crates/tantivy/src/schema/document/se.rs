@@ -119,11 +119,6 @@ where
                     self.write_type_code(type_codes::DATE_CODE)?;
                     val.serialize(self.writer)
                 }
-                ReferenceValueLeaf::Facet(val) => {
-                    self.write_type_code(type_codes::HIERARCHICAL_FACET_CODE)?;
-
-                    Cow::Borrowed(val).serialize(self.writer)
-                }
                 ReferenceValueLeaf::Bytes(val) => {
                     self.write_type_code(type_codes::BYTES_CODE)?;
 
@@ -312,7 +307,7 @@ mod tests {
 
     use super::*;
     use crate::schema::document::existing_type_impls::JsonObjectIter;
-    use crate::schema::{Facet, Field, FAST, STORED, TEXT};
+    use crate::schema::{Field, FAST, STORED, TEXT};
     use crate::tokenizer::PreTokenizedString;
 
     fn serialize_value<'a>(value: ReferenceValue<'a, &'a serde_json::Value>) -> Vec<u8> {
@@ -421,16 +416,6 @@ mod tests {
         let result = serialize_value(ReferenceValueLeaf::Date(DateTime::MAX).into());
         let expected = binary_repr!(
             type_codes::DATE_CODE => DateTime::MAX,
-        );
-        assert_eq!(
-            result, expected,
-            "Expected serialized value to match the binary representation"
-        );
-
-        let facet = Facet::from_text("/hello/world").unwrap();
-        let result = serialize_value(ReferenceValueLeaf::Facet(facet.encoded_str()).into());
-        let expected = binary_repr!(
-            type_codes::HIERARCHICAL_FACET_CODE => Facet::from_text("/hello/world").unwrap(),
         );
         assert_eq!(
             result, expected,

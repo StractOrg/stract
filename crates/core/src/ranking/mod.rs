@@ -748,7 +748,6 @@ mod tests {
             host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
             page_centrality_store_path: None,
             page_webgraph: None,
-            topics_path: None,
             safety_classifier_path: None,
             dual_encoder: Some(IndexerDualEncoderConfig {
                 model_path: data_path.to_str().unwrap().to_string(),

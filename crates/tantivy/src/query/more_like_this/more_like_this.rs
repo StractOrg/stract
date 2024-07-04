@@ -7,7 +7,7 @@ use crate::query::bm25::idf;
 use crate::query::{BooleanQuery, BoostQuery, Occur, Query, TermQuery};
 use crate::schema::document::{Document, Value};
 use crate::schema::{Field, FieldType, IndexRecordOption, Term};
-use crate::tokenizer::{FacetTokenizer, PreTokenizedStream, TokenStream, Tokenizer};
+use crate::tokenizer::{PreTokenizedStream, TokenStream};
 use crate::{DocAddress, Result, Searcher, TantivyDocument, TantivyError};
 
 #[derive(Debug, PartialEq)]
@@ -176,26 +176,6 @@ impl MoreLikeThis {
 
         // extract the raw value, possibly tokenizing & filtering to update the term frequency map
         match field_entry.field_type() {
-            FieldType::Facet(_) => {
-                let facets: Vec<&str> = values
-                    .iter()
-                    .map(|value| {
-                        value.as_facet().ok_or_else(|| {
-                            TantivyError::InvalidArgument("invalid field value".to_string())
-                        })
-                    })
-                    .collect::<Result<Vec<_>>>()?;
-                for fake_str in facets {
-                    FacetTokenizer::default()
-                        .token_stream(fake_str)
-                        .process(&mut |token| {
-                            if self.is_noise_word(token.text.clone()) {
-                                let term = Term::from_field_text(field, &token.text);
-                                *term_frequencies.entry(term).or_insert(0) += 1;
-                            }
-                        });
-                }
-            }
             FieldType::Str(text_options) => {
                 let mut tokenizer_opt = text_options
                     .get_indexing_options()

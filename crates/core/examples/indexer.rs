@@ -40,7 +40,6 @@ fn main() -> anyhow::Result<()> {
                 .to_string(),
         }),
         host_centrality_threshold: None,
-        topics_path: None,
         host_centrality_store_path: data_path.join("centrality/").to_str().unwrap().to_string(),
         page_centrality_store_path: Some(
             data_path

@@ -14,7 +14,6 @@ use crate::schema::document::{
     ArrayAccess, DeserializeError, ObjectAccess, ReferenceValue, Value, ValueDeserialize,
     ValueDeserializer, ValueVisitor,
 };
-use crate::schema::Facet;
 use crate::tokenizer::PreTokenizedString;
 use crate::DateTime;
 
@@ -39,8 +38,6 @@ pub enum OwnedValue {
     Bool(bool),
     /// Date/time with nanoseconds precision
     Date(DateTime),
-    /// Facet
-    Facet(Facet),
     /// Arbitrarily sized byte array
     Bytes(Vec<u8>),
     /// A set of values.
@@ -72,7 +69,6 @@ impl<'a> Value<'a> for &'a OwnedValue {
             OwnedValue::F64(val) => ReferenceValueLeaf::F64(*val).into(),
             OwnedValue::Bool(val) => ReferenceValueLeaf::Bool(*val).into(),
             OwnedValue::Date(val) => ReferenceValueLeaf::Date(*val).into(),
-            OwnedValue::Facet(val) => ReferenceValueLeaf::Facet(val.encoded_str()).into(),
             OwnedValue::Bytes(val) => ReferenceValueLeaf::Bytes(val).into(),
             OwnedValue::IpAddr(val) => ReferenceValueLeaf::IpAddr(*val).into(),
             OwnedValue::Array(array) => ReferenceValue::Array(array.iter()),
@@ -83,7 +79,9 @@ impl<'a> Value<'a> for &'a OwnedValue {
 
 impl ValueDeserialize for OwnedValue {
     fn deserialize<'de, D>(deserializer: D) -> Result<Self, DeserializeError>
-    where D: ValueDeserializer<'de> {
+    where
+        D: ValueDeserializer<'de>,
+    {
         struct Visitor;
 
         impl ValueVisitor for Visitor {
@@ -121,10 +119,6 @@ impl ValueDeserialize for OwnedValue {
                 Ok(OwnedValue::IpAddr(val))
             }
 
-            fn visit_facet(&self, val: Facet) -> Result<Self::Value, DeserializeError> {
-                Ok(OwnedValue::Facet(val))
-            }
-
             fn visit_bytes(&self, val: Vec<u8>) -> Result<Self::Value, DeserializeError> {
                 Ok(OwnedValue::Bytes(val))
             }
@@ -137,7 +131,9 @@ impl ValueDeserialize for OwnedValue {
             }
 
             fn visit_array<'de, A>(&self, mut access: A) -> Result<Self::Value, DeserializeError>
-            where A: ArrayAccess<'de> {
+            where
+                A: ArrayAccess<'de>,
+            {
                 let mut elements = Vec::with_capacity(access.size_hint());
 
                 while let Some(value) = access.next_element()? {
@@ -148,7 +144,9 @@ impl ValueDeserialize for OwnedValue {
             }
 
             fn visit_object<'de, A>(&self, mut access: A) -> Result<Self::Value, DeserializeError>
-            where A: ObjectAccess<'de> {
+            where
+                A: ObjectAccess<'de>,
+            {
                 let mut elements = Vec::with_capacity(access.size_hint());
 
                 while let Some((key, value)) = access.next_entry()? {
@@ -167,7 +165,9 @@ impl Eq for OwnedValue {}
 
 impl serde::Serialize for OwnedValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         use serde::ser::SerializeMap;
         match *self {
             OwnedValue::Null => serializer.serialize_unit(),
@@ -180,7 +180,6 @@ impl serde::Serialize for OwnedValue {
             OwnedValue::Date(ref date) => {
                 time::serde::rfc3339::serialize(&date.into_utc(), serializer)
             }
-            OwnedValue::Facet(ref facet) => facet.serialize(serializer),
             OwnedValue::Bytes(ref bytes) => serializer.serialize_str(&BASE64.encode(bytes)),
             OwnedValue::Object(ref obj) => {
                 let mut map = serializer.serialize_map(Some(obj.len()))?;
@@ -204,7 +203,9 @@ impl serde::Serialize for OwnedValue {
 
 impl<'de> serde::Deserialize<'de> for OwnedValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
+    where
+        D: serde::Deserializer<'de>,
+    {
         struct ValueVisitor;
 
         impl<'de> serde::de::Visitor<'de> for ValueVisitor {
@@ -239,12 +240,16 @@ impl<'de> serde::Deserialize<'de> for OwnedValue {
             }
 
             fn visit_unit<E>(self) -> Result<Self::Value, E>
-            where E: serde::de::Error {
+            where
+                E: serde::de::Error,
+            {
                 Ok(OwnedValue::Null)
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where A: SeqAccess<'de> {
+            where
+                A: SeqAccess<'de>,
+            {
                 let mut elements = Vec::with_capacity(seq.size_hint().unwrap_or_default());
 
                 while let Some(value) = seq.next_element()? {
@@ -255,7 +260,9 @@ impl<'de> serde::Deserialize<'de> for OwnedValue {
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where A: MapAccess<'de> {
+            where
+                A: MapAccess<'de>,
+            {
                 let mut object = map.size_hint().map(Vec::with_capacity).unwrap_or_default();
                 while let Some((key, value)) = map.next_entry()? {
                     object.push((key, value));
@@ -278,9 +285,6 @@ impl<'a, V: Value<'a>> From<ReferenceValue<'a, V>> for OwnedValue {
                 ReferenceValueLeaf::I64(val) => OwnedValue::I64(val),
                 ReferenceValueLeaf::F64(val) => OwnedValue::F64(val),
                 ReferenceValueLeaf::Date(val) => OwnedValue::Date(val),
-                ReferenceValueLeaf::Facet(val) => {
-                    OwnedValue::Facet(Facet::from_encoded_string(val.to_string()))
-                }
                 ReferenceValueLeaf::Bytes(val) => OwnedValue::Bytes(val.to_vec()),
                 ReferenceValueLeaf::IpAddr(val) => OwnedValue::IpAddr(val),
                 ReferenceValueLeaf::Bool(val) => OwnedValue::Bool(val),
@@ -348,12 +352,6 @@ impl<'a> From<&'a str> for OwnedValue {
 impl<'a> From<&'a [u8]> for OwnedValue {
     fn from(bytes: &'a [u8]) -> OwnedValue {
         OwnedValue::Bytes(bytes.to_vec())
-    }
-}
-
-impl From<Facet> for OwnedValue {
-    fn from(facet: Facet) -> OwnedValue {
-        OwnedValue::Facet(facet)
     }
 }
 

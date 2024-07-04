@@ -13,7 +13,6 @@ use serde_json::Number;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
-use super::facet::Facet;
 use super::ReferenceValueLeaf;
 use crate::schema::document::{
     ArrayAccess, DeserializeError, Document, DocumentDeserialize, DocumentDeserializer,
@@ -80,15 +79,6 @@ impl<'a> Value<'a> for &'a String {
     #[inline]
     fn as_value(&self) -> ReferenceValue<'a, Self> {
         ReferenceValue::Leaf(ReferenceValueLeaf::Str(self))
-    }
-}
-
-impl<'a> Value<'a> for &'a Facet {
-    type ArrayIter = Empty<&'a Facet>;
-    type ObjectIter = Empty<(&'a str, &'a Facet)>;
-    #[inline]
-    fn as_value(&self) -> ReferenceValue<'a, Self> {
-        ReferenceValue::Leaf(ReferenceValueLeaf::Facet(self.encoded_str()))
     }
 }
 

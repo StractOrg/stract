@@ -8,7 +8,7 @@
 //! - the field name (may contain any characted, can't start with a `-` and can't be empty. Some
 //!   characters may require escaping when using the query parser).
 //! - the type of the field (currently `text`, `u64`, `i64`, `f64`, `bool`, `date`, `IpAddr`,
-//!   facets, bytes and json are supported)
+//!   bytes and json are supported)
 //! - how the field should be indexed / stored.
 //!
 //! This very last point is critical as it will enable / disable some of the functionality
@@ -107,8 +107,6 @@
 //! ```
 
 pub mod document;
-mod facet;
-mod facet_options;
 mod schema;
 pub(crate) mod term;
 
@@ -131,9 +129,6 @@ use crate::columnar::ColumnType;
 pub use self::bytes_options::BytesOptions;
 pub use self::date_time_options::{DateOptions, DateTimePrecision, DATE_TIME_PRECISION_INDEXED};
 pub use self::document::{DocParsingError, Document, OwnedValue, TantivyDocument, Value};
-pub(crate) use self::facet::FACET_SEP_BYTE;
-pub use self::facet::{Facet, FacetParseError};
-pub use self::facet_options::FacetOptions;
 pub use self::field::Field;
 pub use self::field_entry::FieldEntry;
 pub use self::field_type::{FieldType, Type};
@@ -158,16 +153,13 @@ pub fn is_valid_field_name(field_name: &str) -> bool {
 
 pub(crate) fn value_type_to_column_type(typ: Type) -> Option<ColumnType> {
     match typ {
-        Type::Str => Some(ColumnType::Str),
         Type::U64 => Some(ColumnType::U64),
         Type::I64 => Some(ColumnType::I64),
         Type::F64 => Some(ColumnType::F64),
         Type::Bool => Some(ColumnType::Bool),
         Type::Date => Some(ColumnType::DateTime),
-        Type::Facet => Some(ColumnType::Str),
         Type::Bytes => Some(ColumnType::Bytes),
-        Type::IpAddr => Some(ColumnType::IpAddr),
-        Type::Json => None,
+        Type::Json | Type::Str | Type::IpAddr => None,
     }
 }
 

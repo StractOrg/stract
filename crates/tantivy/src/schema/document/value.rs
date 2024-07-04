@@ -84,12 +84,6 @@ pub trait Value<'a>: Send + Sync + Debug {
     }
 
     #[inline]
-    /// If the Value is a facet, returns the associated facet. Returns None otherwise.
-    fn as_facet(&self) -> Option<&'a str> {
-        self.as_leaf().and_then(|leaf| leaf.as_facet())
-    }
-
-    #[inline]
     /// Returns the iterator over the array if the Value is an array.
     fn as_array(&self) -> Option<Self::ArrayIter> {
         if let ReferenceValue::Array(val) = self.as_value() {
@@ -125,9 +119,6 @@ pub enum ReferenceValueLeaf<'a> {
     F64(f64),
     /// Date/time with nanoseconds precision
     Date(DateTime),
-    /// Facet string needs to match the format of
-    /// [Facet::encoded_str](crate::schema::Facet::encoded_str).
-    Facet(&'a str),
     /// Arbitrarily sized byte array
     Bytes(&'a [u8]),
     /// IpV6 Address. Internally there is no IpV4, it needs to be converted to `Ipv6Addr`.
@@ -211,7 +202,6 @@ impl<'a, T: Value<'a> + ?Sized> From<ReferenceValueLeaf<'a>> for ReferenceValue<
             ReferenceValueLeaf::I64(val) => ReferenceValue::Leaf(ReferenceValueLeaf::I64(val)),
             ReferenceValueLeaf::F64(val) => ReferenceValue::Leaf(ReferenceValueLeaf::F64(val)),
             ReferenceValueLeaf::Date(val) => ReferenceValue::Leaf(ReferenceValueLeaf::Date(val)),
-            ReferenceValueLeaf::Facet(val) => ReferenceValue::Leaf(ReferenceValueLeaf::Facet(val)),
             ReferenceValueLeaf::Bytes(val) => ReferenceValue::Leaf(ReferenceValueLeaf::Bytes(val)),
             ReferenceValueLeaf::IpAddr(val) => {
                 ReferenceValue::Leaf(ReferenceValueLeaf::IpAddr(val))
@@ -321,16 +311,6 @@ impl<'a> ReferenceValueLeaf<'a> {
             None
         }
     }
-
-    #[inline]
-    /// If the Value is a facet, returns the associated facet. Returns None otherwise.
-    pub fn as_facet(&self) -> Option<&'a str> {
-        if let Self::Facet(val) = self {
-            Some(val)
-        } else {
-            None
-        }
-    }
 }
 
 /// A enum representing a value for tantivy to index.
@@ -431,12 +411,6 @@ where
     /// If the Value is a bytes value, returns the associated set of bytes. Returns None otherwise.
     pub fn as_bytes(&self) -> Option<&'a [u8]> {
         self.as_leaf().and_then(|leaf| leaf.as_bytes())
-    }
-
-    #[inline]
-    /// If the Value is a facet, returns the associated facet. Returns None otherwise.
-    pub fn as_facet(&self) -> Option<&'a str> {
-        self.as_leaf().and_then(|leaf| leaf.as_facet())
     }
 
     #[inline]

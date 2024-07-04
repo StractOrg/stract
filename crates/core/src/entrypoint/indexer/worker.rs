@@ -31,7 +31,6 @@ use crate::models::dual_encoder::DualEncoder as DualEncoderModel;
 use crate::webgraph::remote::RemoteWebgraph;
 use crate::Result;
 
-use crate::human_website_annotations;
 use crate::index::Index;
 use crate::rake::RakeModel;
 use crate::ranking::SignalComputer;
@@ -42,7 +41,6 @@ pub struct Config {
     pub host_centrality_store_path: String,
     pub page_centrality_store_path: Option<String>,
     pub page_webgraph: Option<IndexerGraphConfig>,
-    pub topics_path: Option<String>,
     pub safety_classifier_path: Option<String>,
     pub dual_encoder: Option<IndexerDualEncoderConfig>,
 }
@@ -53,7 +51,6 @@ impl From<IndexerConfig> for Config {
             host_centrality_store_path: config.host_centrality_store_path,
             page_centrality_store_path: config.page_centrality_store_path,
             page_webgraph: config.page_webgraph,
-            topics_path: config.topics_path,
             safety_classifier_path: config.safety_classifier_path,
             dual_encoder: config.dual_encoder,
         }
@@ -66,7 +63,6 @@ impl From<LiveIndexConfig> for Config {
             host_centrality_store_path: config.host_centrality_store_path,
             page_centrality_store_path: config.page_centrality_store_path,
             page_webgraph: config.page_webgraph,
-            topics_path: None,
             safety_classifier_path: config.safety_classifier_path,
             dual_encoder: None,
         }
@@ -166,7 +162,6 @@ pub struct IndexingWorker {
     page_centrality_store: Option<speedy_kv::Db<NodeID, f64>>,
     page_centrality_rank_store: Option<speedy_kv::Db<NodeID, u64>>,
     page_webgraph: Option<Webgraph>,
-    topics: Option<human_website_annotations::Mapper>,
     safety_classifier: Option<safety_classifier::Model>,
     job_settings: Option<JobSettings>,
     rake: RakeModel,
@@ -198,10 +193,6 @@ impl IndexingWorker {
                 speedy_kv::Db::open_or_create(Path::new(&p).join("harmonic_rank")).unwrap()
             }),
             page_webgraph: config.page_webgraph.as_ref().map(Webgraph::new),
-            topics: config
-                .topics_path
-                .as_ref()
-                .map(|path| human_website_annotations::Mapper::open(path).unwrap()),
             safety_classifier: config
                 .safety_classifier_path
                 .as_ref()
@@ -355,16 +346,6 @@ impl IndexingWorker {
         }
     }
 
-    fn set_dmoz_description(&self, page: &mut Webpage) {
-        if let Some(mapper) = self.topics.as_ref() {
-            if let Some(info) =
-                mapper.get(&page.html.url().host_str().unwrap_or_default().to_string())
-            {
-                page.dmoz_description = Some(info.description.clone())
-            }
-        }
-    }
-
     fn set_keywords(&self, page: &mut Webpage) {
         page.keywords = page.html.keywords(&self.rake);
     }
@@ -468,7 +449,6 @@ impl IndexingWorker {
             }
 
             self.set_page_centralities(&mut prepared);
-            self.set_dmoz_description(&mut prepared);
             self.set_keywords(&mut prepared);
             self.set_safety_classification(&mut prepared);
 
@@ -516,7 +496,6 @@ mod tests {
             host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
             page_centrality_store_path: None,
             page_webgraph: None,
-            topics_path: None,
             safety_classifier_path: None,
             dual_encoder: Some(IndexerDualEncoderConfig {
                 model_path: data_path.to_str().unwrap().to_string(),

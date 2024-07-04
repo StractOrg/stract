@@ -1,14 +1,13 @@
-use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::{fmt, io};
 
 use crate::common::file_slice::FileSlice;
 use crate::common::{ByteCount, DateTime, HasLen, OwnedBytes};
 
-use super::column::{BytesColumn, Column, StrColumn};
+use super::column::{BytesColumn, Column};
 use super::column_values::{monotonic_map_column, StrictlyMonotonicFn};
 use super::columnar::ColumnType;
-use super::{Cardinality, ColumnIndex, ColumnValues, NumericalType};
+use super::{ColumnIndex, ColumnValues, NumericalType};
 
 #[derive(Clone)]
 pub enum DynamicColumn {
@@ -16,24 +15,20 @@ pub enum DynamicColumn {
     I64(Column<i64>),
     U64(Column<u64>),
     F64(Column<f64>),
-    IpAddr(Column<Ipv6Addr>),
     DateTime(Column<DateTime>),
     Bytes(BytesColumn),
-    Str(StrColumn),
 }
 
 impl fmt::Debug for DynamicColumn {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{} {} |", self.get_cardinality(), self.column_type())?;
+        write!(f, "[{} |", self.column_type())?;
         match self {
             DynamicColumn::Bool(col) => write!(f, " {col:?}")?,
             DynamicColumn::I64(col) => write!(f, " {col:?}")?,
             DynamicColumn::U64(col) => write!(f, " {col:?}")?,
             DynamicColumn::F64(col) => write!(f, "{col:?}")?,
-            DynamicColumn::IpAddr(col) => write!(f, "{col:?}")?,
             DynamicColumn::DateTime(col) => write!(f, "{col:?}")?,
             DynamicColumn::Bytes(col) => write!(f, "{col:?}")?,
-            DynamicColumn::Str(col) => write!(f, "{col:?}")?,
         }
         write!(f, "]")
     }
@@ -46,15 +41,9 @@ impl DynamicColumn {
             DynamicColumn::I64(c) => &c.index,
             DynamicColumn::U64(c) => &c.index,
             DynamicColumn::F64(c) => &c.index,
-            DynamicColumn::IpAddr(c) => &c.index,
             DynamicColumn::DateTime(c) => &c.index,
             DynamicColumn::Bytes(c) => &c.ords().index,
-            DynamicColumn::Str(c) => &c.ords().index,
         }
-    }
-
-    pub fn get_cardinality(&self) -> Cardinality {
-        self.column_index().get_cardinality()
     }
 
     pub fn num_values(&self) -> u32 {
@@ -63,10 +52,8 @@ impl DynamicColumn {
             DynamicColumn::I64(c) => c.values.num_vals(),
             DynamicColumn::U64(c) => c.values.num_vals(),
             DynamicColumn::F64(c) => c.values.num_vals(),
-            DynamicColumn::IpAddr(c) => c.values.num_vals(),
             DynamicColumn::DateTime(c) => c.values.num_vals(),
             DynamicColumn::Bytes(c) => c.ords().values.num_vals(),
-            DynamicColumn::Str(c) => c.ords().values.num_vals(),
         }
     }
 
@@ -76,10 +63,8 @@ impl DynamicColumn {
             DynamicColumn::I64(_) => ColumnType::I64,
             DynamicColumn::U64(_) => ColumnType::U64,
             DynamicColumn::F64(_) => ColumnType::F64,
-            DynamicColumn::IpAddr(_) => ColumnType::IpAddr,
             DynamicColumn::DateTime(_) => ColumnType::DateTime,
             DynamicColumn::Bytes(_) => ColumnType::Bytes,
-            DynamicColumn::Str(_) => ColumnType::Str,
         }
     }
 
@@ -224,9 +209,7 @@ static_dynamic_conversions!(Column<u64>, U64);
 static_dynamic_conversions!(Column<i64>, I64);
 static_dynamic_conversions!(Column<f64>, F64);
 static_dynamic_conversions!(Column<DateTime>, DateTime);
-static_dynamic_conversions!(StrColumn, Str);
 static_dynamic_conversions!(BytesColumn, Bytes);
-static_dynamic_conversions!(Column<Ipv6Addr>, IpAddr);
 
 #[derive(Clone, Debug)]
 pub struct DynamicColumnHandle {
@@ -259,13 +242,9 @@ impl DynamicColumnHandle {
     pub fn open_u64_lenient(&self) -> io::Result<Option<Column<u64>>> {
         let column_bytes = self.file_slice.read_bytes()?;
         match self.column_type {
-            ColumnType::Str | ColumnType::Bytes => {
+            ColumnType::Bytes => {
                 let column: BytesColumn = super::column::open_column_bytes(column_bytes)?;
                 Ok(Some(column.term_ord_column))
-            }
-            ColumnType::IpAddr => {
-                let column = super::column::open_column_u128_as_compact_u64(column_bytes)?;
-                Ok(Some(column))
             }
             ColumnType::Bool
             | ColumnType::I64
@@ -281,12 +260,10 @@ impl DynamicColumnHandle {
     fn open_internal(&self, column_bytes: OwnedBytes) -> io::Result<DynamicColumn> {
         let dynamic_column: DynamicColumn = match self.column_type {
             ColumnType::Bytes => super::column::open_column_bytes(column_bytes)?.into(),
-            ColumnType::Str => super::column::open_column_str(column_bytes)?.into(),
             ColumnType::I64 => super::column::open_column_u64::<i64>(column_bytes)?.into(),
             ColumnType::U64 => super::column::open_column_u64::<u64>(column_bytes)?.into(),
             ColumnType::F64 => super::column::open_column_u64::<f64>(column_bytes)?.into(),
             ColumnType::Bool => super::column::open_column_u64::<bool>(column_bytes)?.into(),
-            ColumnType::IpAddr => super::column::open_column_u128::<Ipv6Addr>(column_bytes)?.into(),
             ColumnType::DateTime => {
                 super::column::open_column_u64::<DateTime>(column_bytes)?.into()
             }

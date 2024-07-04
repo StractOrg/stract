@@ -14,7 +14,7 @@ use crate::schema::document::{
     DeserializeError, Document, DocumentDeserialize, DocumentDeserializer,
 };
 use crate::schema::field_type::ValueParsingError;
-use crate::schema::{Facet, Field, NamedFieldDocument, OwnedValue, Schema};
+use crate::schema::{Field, NamedFieldDocument, OwnedValue, Schema};
 use crate::tokenizer::PreTokenizedString;
 
 #[repr(packed)]
@@ -66,15 +66,6 @@ impl CompactDoc {
     /// Returns the length of the document.
     pub fn len(&self) -> usize {
         self.field_values.len()
-    }
-
-    /// Adding a facet to the document.
-    pub fn add_facet<F>(&mut self, field: Field, path: F)
-    where
-        Facet: From<F>,
-    {
-        let facet = Facet::from(path);
-        self.add_leaf_field_value(field, ReferenceValueLeaf::Facet(facet.encoded_str()));
     }
 
     /// Add a text field.
@@ -243,9 +234,6 @@ impl CompactDoc {
         let val_addr = match leaf {
             ReferenceValueLeaf::Null => 0,
             ReferenceValueLeaf::Str(bytes) => {
-                write_bytes_into(&mut self.node_data, bytes.as_bytes())
-            }
-            ReferenceValueLeaf::Facet(bytes) => {
                 write_bytes_into(&mut self.node_data, bytes.as_bytes())
             }
             ReferenceValueLeaf::Bytes(bytes) => write_bytes_into(&mut self.node_data, bytes),
@@ -430,10 +418,6 @@ impl<'a> CompactDocValue<'a> {
                 let str_ref = self.container.extract_str(addr);
                 Ok(ReferenceValueLeaf::Str(str_ref).into())
             }
-            ValueType::Facet => {
-                let str_ref = self.container.extract_str(addr);
-                Ok(ReferenceValueLeaf::Facet(str_ref).into())
-            }
             ValueType::Bytes => {
                 let data = self.container.extract_bytes(addr);
                 Ok(ReferenceValueLeaf::Bytes(data).into())
@@ -534,8 +518,6 @@ pub enum ValueType {
     F64 = 4,
     /// Date/time with nanoseconds precision
     Date = 5,
-    /// Facet
-    Facet = 6,
     /// Arbitrarily sized byte array
     Bytes = 7,
     /// IpV6 Address. Internally there is no IpV4, it needs to be converted to `Ipv6Addr`.
@@ -591,7 +573,6 @@ impl<'a> From<&ReferenceValueLeaf<'a>> for ValueType {
             ReferenceValueLeaf::Date(_) => ValueType::Date,
             ReferenceValueLeaf::IpAddr(_) => ValueType::IpAddr,
             ReferenceValueLeaf::PreTokStr(_) => ValueType::PreTokStr,
-            ReferenceValueLeaf::Facet(_) => ValueType::Facet,
             ReferenceValueLeaf::Bytes(_) => ValueType::Bytes,
         }
     }

@@ -6,8 +6,8 @@ mod tests {
     use crate::postings::Postings;
     use crate::query::QueryParser;
     use crate::schema::{
-        self, BytesOptions, Facet, FacetOptions, IndexRecordOption, NumericOptions,
-        TextFieldIndexing, TextOptions, Value,
+        self, BytesOptions, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
+        Value,
     };
     use crate::{
         DocAddress, DocSet, IndexSettings, IndexSortByField, IndexWriter, Order, TantivyDocument,
@@ -19,8 +19,6 @@ mod tests {
         let int_options = NumericOptions::default().set_fast().set_indexed();
         let int_field = schema_builder.add_u64_field("intval", int_options);
 
-        let facet_field = schema_builder.add_facet_field("facet", FacetOptions::default());
-
         let schema = schema_builder.build();
 
         let mut index_builder = Index::builder().schema(schema);
@@ -31,16 +29,10 @@ mod tests {
 
         {
             let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
-            index_writer
-                .add_document(doc!(int_field=>3_u64, facet_field=> Facet::from("/crime")))
-                .unwrap();
-            index_writer
-                .add_document(doc!(int_field=>6_u64, facet_field=> Facet::from("/crime")))
-                .unwrap();
+            index_writer.add_document(doc!(int_field=>3_u64)).unwrap();
+            index_writer.add_document(doc!(int_field=>6_u64)).unwrap();
             index_writer.commit().unwrap();
-            index_writer
-                .add_document(doc!(int_field=>5_u64, facet_field=> Facet::from("/fanta")))
-                .unwrap();
+            index_writer.add_document(doc!(int_field=>5_u64)).unwrap();
             index_writer.commit().unwrap();
         }
 
@@ -69,12 +61,6 @@ mod tests {
             .set_indexed();
         let int_field = schema_builder.add_u64_field("intval", int_options);
 
-        let bytes_options = BytesOptions::default().set_fast().set_indexed();
-        let bytes_field = schema_builder.add_bytes_field("bytes", bytes_options);
-        let facet_field = schema_builder.add_facet_field("facet", FacetOptions::default());
-
-        let multi_numbers =
-            schema_builder.add_u64_field("multi_numbers", NumericOptions::default().set_fast());
         let text_field_options = TextOptions::default()
             .set_indexing_options(
                 TextFieldIndexing::default()
@@ -94,27 +80,24 @@ mod tests {
             let mut index_writer = index.writer_for_tests()?;
 
             // segment 1 - range 1-3
-            index_writer.add_document(doc!(int_field=>1_u64))?;
-            index_writer.add_document(
-                doc!(int_field=>3_u64, multi_numbers => 3_u64, multi_numbers => 4_u64, bytes_field => vec![1, 2, 3], text_field => "some text", facet_field=> Facet::from("/book/crime")),
-            )?;
+            index_writer.add_document(doc!(int_field=>1_u64, text_field => "text"))?;
+            index_writer.add_document(doc!(int_field=>3_u64, text_field => "some text"))?;
             index_writer.add_document(
                 doc!(int_field=>1_u64, text_field=> "deleteme",  text_field => "ok text more text"),
             )?;
-            index_writer.add_document(
-                doc!(int_field=>2_u64, multi_numbers => 2_u64, multi_numbers => 3_u64, text_field => "ok text more text"),
-            )?;
+            index_writer.add_document(doc!(int_field=>2_u64, text_field => "ok text more text"))?;
 
             index_writer.commit()?;
             // segment 2 - range 1-20 , with force_disjunct_segment_sort_values 10-20
-            index_writer.add_document(doc!(int_field=>20_u64, multi_numbers => 20_u64))?;
+            index_writer
+                .add_document(doc!(int_field=>20_u64, text_field => "ok text more text"))?;
 
             let in_val = if force_disjunct_segment_sort_values {
                 10_u64
             } else {
                 1
             };
-            index_writer.add_document(doc!(int_field=>in_val, text_field=> "deleteme" , text_field => "ok text more text", facet_field=> Facet::from("/book/crime")))?;
+            index_writer.add_document(doc!(int_field=>in_val, text_field=> "deleteme" , text_field => "ok text more text"))?;
             index_writer.commit()?;
             // segment 3 - range 5-1000, with force_disjunct_segment_sort_values 50-1000
             let int_vals = if force_disjunct_segment_sort_values {
@@ -122,13 +105,13 @@ mod tests {
             } else {
                 [10, 5]
             };
-            index_writer.add_document( // position of this doc after delete in desc sorting = [2], in disjunct case [1]
-                doc!(int_field=>int_vals[0], multi_numbers => 10_u64, multi_numbers => 11_u64, text_field=> "blubber", facet_field=> Facet::from("/book/fantasy")),
+            index_writer.add_document(
+                // position of this doc after delete in desc sorting = [2], in disjunct case [1]
+                doc!(int_field=>int_vals[0], text_field=> "blubber"),
             )?;
             index_writer.add_document(doc!(int_field=>int_vals[1], text_field=> "deleteme"))?;
-            index_writer.add_document(
-                doc!(int_field=>1_000u64, multi_numbers => 1001_u64, multi_numbers => 1002_u64, bytes_field => vec![5, 5],text_field => "the biggest num")
-            )?;
+            index_writer
+                .add_document(doc!(int_field=>1_000u64, text_field => "the biggest num"))?;
 
             index_writer.delete_term(Term::from_field_text(text_field, "deleteme"));
             index_writer.commit()?;
@@ -203,16 +186,16 @@ mod tests {
         {
             let my_text_field = index.schema().get_field("text_field").unwrap();
             let fieldnorm_reader = segment_reader.get_fieldnorms_reader(my_text_field).unwrap();
-            assert_eq!(fieldnorm_reader.fieldnorm(0), 3); // the biggest num
+            assert_eq!(fieldnorm_reader.fieldnorm(0), 3);
             if force_disjunct_segment_sort_values {
                 assert_eq!(fieldnorm_reader.fieldnorm(1), 1); // blubber
-                assert_eq!(fieldnorm_reader.fieldnorm(2), 0);
+                assert_eq!(fieldnorm_reader.fieldnorm(2), 4);
             } else {
-                assert_eq!(fieldnorm_reader.fieldnorm(1), 0);
+                assert_eq!(fieldnorm_reader.fieldnorm(1), 4);
                 assert_eq!(fieldnorm_reader.fieldnorm(2), 1); // blubber
             }
             assert_eq!(fieldnorm_reader.fieldnorm(3), 2); // some text
-            assert_eq!(fieldnorm_reader.fieldnorm(5), 0);
+            assert_eq!(fieldnorm_reader.fieldnorm(5), 1);
         }
 
         let my_text_field = index.schema().get_field("text_field").unwrap();
@@ -249,24 +232,24 @@ mod tests {
                 .unwrap()
                 .unwrap();
 
-            assert_eq!(postings.doc_freq(), 2);
+            assert_eq!(postings.doc_freq(), 4);
             let fallback_bitset = AliveBitSet::for_test_from_deleted_docs(&[0], 100);
             assert_eq!(
                 postings.doc_freq_given_deletes(
                     segment_reader.alive_bitset().unwrap_or(&fallback_bitset)
                 ),
-                2
+                4
             );
 
-            assert_eq!(postings.term_freq(), 1);
+            assert_eq!(postings.term_freq(), 2);
             let mut output = vec![];
             postings.positions(&mut output);
-            assert_eq!(output, vec![1]);
+            assert_eq!(output, vec![1, 3]);
             postings.advance();
 
-            assert_eq!(postings.term_freq(), 2);
+            assert_eq!(postings.term_freq(), 1);
             postings.positions(&mut output);
-            assert_eq!(output, vec![1, 3]);
+            assert_eq!(output, vec![1]);
         }
 
         // access doc store
@@ -336,24 +319,24 @@ mod tests {
                 .read_postings(&term_a, IndexRecordOption::WithFreqsAndPositions)
                 .unwrap()
                 .unwrap();
-            assert_eq!(postings.doc_freq(), 2);
+            assert_eq!(postings.doc_freq(), 4);
             let fallback_bitset = AliveBitSet::for_test_from_deleted_docs(&[0], 100);
             assert_eq!(
                 postings.doc_freq_given_deletes(
                     segment_reader.alive_bitset().unwrap_or(&fallback_bitset)
                 ),
-                2
+                3
             );
 
             assert_eq!(postings.term_freq(), 1);
             let mut output = vec![];
             postings.positions(&mut output);
-            assert_eq!(output, vec![1]);
+            assert_eq!(output, vec![0]);
             postings.advance();
 
-            assert_eq!(postings.term_freq(), 2);
+            assert_eq!(postings.term_freq(), 1);
             postings.positions(&mut output);
-            assert_eq!(output, vec![1, 3]);
+            assert_eq!(output, vec![1]);
         }
     }
 

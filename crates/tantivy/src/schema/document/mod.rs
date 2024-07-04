@@ -184,11 +184,13 @@ use super::*;
 pub trait Document: Send + Sync + 'static {
     /// The value of the field.
     type Value<'a>: Value<'a> + Clone
-    where Self: 'a;
+    where
+        Self: 'a;
 
     /// The iterator over all of the fields and values within the doc.
     type FieldsValuesIter<'a>: Iterator<Item = (Field, Self::Value<'a>)>
-    where Self: 'a;
+    where
+        Self: 'a;
 
     /// Get an iterator iterating over all fields and values in a document.
     fn iter_fields_and_values(&self) -> Self::FieldsValuesIter<'_>;
@@ -255,7 +257,6 @@ pub(crate) mod type_codes {
     pub const TEXT_CODE: u8 = 0;
     pub const U64_CODE: u8 = 1;
     pub const I64_CODE: u8 = 2;
-    pub const HIERARCHICAL_FACET_CODE: u8 = 3;
     pub const BYTES_CODE: u8 = 4;
     pub const DATE_CODE: u8 = 5;
     pub const F64_CODE: u8 = 6;

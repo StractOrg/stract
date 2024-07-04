@@ -98,18 +98,3 @@ impl<'a, W: io::Write> io::Write for ColumnSerializer<'a, W> {
         self.columnar_serializer.wrt.write_all(buf)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_prepare_key_bytes() {
-        let mut buffer: Vec<u8> = b"somegarbage".to_vec();
-        prepare_key(b"root\0child", ColumnType::Str, &mut buffer);
-        assert_eq!(buffer.len(), 12);
-        assert_eq!(&buffer[..10], b"root0child");
-        assert_eq!(buffer[10], 0u8);
-        assert_eq!(buffer[11], ColumnType::Str.to_code());
-    }
-}

@@ -17,7 +17,7 @@ use crate::postings::{
 use crate::schema::document::{Document, Value};
 use crate::schema::{FieldEntry, FieldType, Schema, Term, DATE_TIME_PRECISION_INDEXED};
 use crate::store::{StoreReader, StoreWriter};
-use crate::tokenizer::{FacetTokenizer, PreTokenizedStream, TextAnalyzer, Tokenizer};
+use crate::tokenizer::{PreTokenizedStream, TextAnalyzer};
 use crate::{DocId, Opstamp, TantivyError};
 
 /// Computes the initial size of the hash table.
@@ -200,23 +200,6 @@ impl SegmentWriter {
             term_buffer.clear_with_field_and_type(field_entry.field_type().value_type(), field);
 
             match field_entry.field_type() {
-                FieldType::Facet(_) => {
-                    let mut facet_tokenizer = FacetTokenizer::default(); // this can be global
-                    for value in values {
-                        let value = value.as_value();
-
-                        let facet_str = value.as_facet().ok_or_else(make_schema_error)?;
-                        let mut facet_tokenizer = facet_tokenizer.token_stream(facet_str);
-                        let mut indexing_position = IndexingPosition::default();
-                        postings_writer.index_text(
-                            doc_id,
-                            &mut facet_tokenizer,
-                            term_buffer,
-                            ctx,
-                            &mut indexing_position,
-                        );
-                    }
-                }
                 FieldType::Str(_) => {
                     let mut indexing_position = IndexingPosition::default();
                     for value in values {

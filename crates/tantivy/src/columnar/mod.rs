@@ -33,7 +33,7 @@ mod value;
 
 use crate::sstable::VoidSSTable;
 pub use block_accessor::ColumnBlockAccessor;
-pub use column::{BytesColumn, Column, StrColumn};
+pub use column::{BytesColumn, Column};
 pub use column_index::ColumnIndex;
 pub use column_values::{
     ColumnValues, EmptyColumnValues, MonotonicallyMappableToU128, MonotonicallyMappableToU64,
@@ -80,30 +80,18 @@ pub enum Cardinality {
     /// `Full` is the default for auto-detecting the Cardinality, since it is the most strict.
     #[default]
     Full = 0,
-    /// All documents contain at most one value.
-    Optional = 1,
-    /// All documents may contain any number of values.
-    Multivalued = 2,
 }
 
 impl Display for Cardinality {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let short_str = match self {
             Cardinality::Full => "full",
-            Cardinality::Optional => "opt",
-            Cardinality::Multivalued => "mult",
         };
         write!(f, "{short_str}")
     }
 }
 
 impl Cardinality {
-    pub fn is_optional(&self) -> bool {
-        matches!(self, Cardinality::Optional)
-    }
-    pub fn is_multivalue(&self) -> bool {
-        matches!(self, Cardinality::Multivalued)
-    }
     pub fn is_full(&self) -> bool {
         matches!(self, Cardinality::Full)
     }
@@ -113,8 +101,6 @@ impl Cardinality {
     pub(crate) fn try_from_code(code: u8) -> Result<Cardinality, InvalidData> {
         match code {
             0 => Ok(Cardinality::Full),
-            1 => Ok(Cardinality::Optional),
-            2 => Ok(Cardinality::Multivalued),
             _ => Err(InvalidData),
         }
     }

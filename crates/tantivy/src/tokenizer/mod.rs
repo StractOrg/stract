@@ -124,7 +124,6 @@
 mod alphanum_only;
 mod ascii_folding_filter;
 mod empty_tokenizer;
-mod facet_tokenizer;
 mod lower_caser;
 mod ngram_tokenizer;
 mod raw_tokenizer;
@@ -143,7 +142,6 @@ pub use crate::tokenizer_api::{BoxTokenStream, Token, TokenFilter, TokenStream, 
 
 pub use self::alphanum_only::AlphaNumOnlyFilter;
 pub use self::ascii_folding_filter::AsciiFoldingFilter;
-pub use self::facet_tokenizer::FacetTokenizer;
 pub use self::lower_caser::LowerCaser;
 pub use self::ngram_tokenizer::NgramTokenizer;
 pub use self::raw_tokenizer::RawTokenizer;
