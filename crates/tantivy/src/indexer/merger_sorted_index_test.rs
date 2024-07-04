@@ -6,8 +6,7 @@ mod tests {
     use crate::postings::Postings;
     use crate::query::QueryParser;
     use crate::schema::{
-        self, BytesOptions, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions,
-        Value,
+        self, IndexRecordOption, NumericOptions, TextFieldIndexing, TextOptions, Value,
     };
     use crate::{
         DocAddress, DocSet, IndexSettings, IndexSortByField, IndexWriter, Order, TantivyDocument,

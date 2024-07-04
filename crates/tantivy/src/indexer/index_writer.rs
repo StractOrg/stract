@@ -771,8 +771,7 @@ impl<D: Document> Drop for IndexWriter<D> {
 mod tests {
     use std::collections::{HashMap, HashSet};
 
-    use crate::columnar::{Column, MonotonicallyMappableToU128};
-    use proptest::prop_oneof;
+    use crate::columnar::Column;
 
     use super::super::operation::UserOperation;
     use crate::collector::{Count, TopDocs};
@@ -782,15 +781,14 @@ mod tests {
     use crate::indexer::NoMergePolicy;
     use crate::query::{BooleanQuery, Occur, Query, QueryParser, TermQuery};
     use crate::schema::{
-        self, IndexRecordOption, NumericOptions, Schema, TextFieldIndexing, TextOptions, Value,
-        FAST, INDEXED, STORED, STRING, TEXT,
+        self, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, FAST, INDEXED,
+        STORED, STRING, TEXT,
     };
     use crate::store::DOCSTORE_CACHE_CAPACITY;
     use crate::{
         DateTime, DocAddress, Index, IndexSettings, IndexSortByField, IndexWriter, Order,
         ReloadPolicy, TantivyDocument, Term,
     };
-    use proptest::prelude::*;
 
     const LOREM: &str = "Doc Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do \
                          eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad \
@@ -1520,64 +1518,13 @@ mod tests {
     #[derive(Debug, Clone, Serialize)]
     #[serde(untagged)]
     enum IndexValue {
-        Str(String),
         F64(f64),
         U64(u64),
-        I64(i64),
     }
     impl Default for IndexValue {
         fn default() -> Self {
             IndexValue::F64(0.0)
         }
-    }
-
-    fn value_strategy() -> impl Strategy<Value = IndexValue> {
-        prop_oneof![
-            any::<f64>().prop_map(IndexValue::F64),
-            any::<u64>().prop_map(IndexValue::U64),
-            any::<i64>().prop_map(IndexValue::I64),
-            any::<String>().prop_map(IndexValue::Str),
-        ]
-    }
-
-    fn balanced_operation_strategy() -> impl Strategy<Value = IndexingOp> {
-        prop_oneof![
-            (0u64..20u64).prop_map(|id| IndexingOp::DeleteDoc { id }),
-            (0u64..20u64).prop_map(|id| IndexingOp::DeleteDocQuery { id }),
-            (0u64..20u64, value_strategy())
-                .prop_map(move |(id, value)| IndexingOp::AddDoc { id, value }),
-            ((0u64..20u64), (1u64..100), value_strategy()).prop_map(
-                move |(id, num_docs, value)| {
-                    IndexingOp::AddMultipleDoc {
-                        id,
-                        num_docs,
-                        value,
-                    }
-                }
-            ),
-            (0u64..1u64).prop_map(|_| IndexingOp::Commit),
-            (0u64..1u64).prop_map(|_| IndexingOp::Merge),
-        ]
-    }
-
-    fn adding_operation_strategy() -> impl Strategy<Value = IndexingOp> {
-        prop_oneof![
-            5 => (0u64..100u64).prop_map(|id| IndexingOp::DeleteDoc { id }),
-            5 => (0u64..100u64).prop_map(|id| IndexingOp::DeleteDocQuery { id }),
-            50 => (0u64..100u64, value_strategy())
-                .prop_map(move |(id, value)| IndexingOp::AddDoc { id, value }),
-            50 => (0u64..100u64, (1u64..100), value_strategy()).prop_map(
-                move |(id, num_docs, value)| {
-                    IndexingOp::AddMultipleDoc {
-                        id,
-                        num_docs,
-                        value,
-                    }
-                }
-            ),
-            2 => (0u64..1u64).prop_map(|_| IndexingOp::Commit),
-            1 => (0u64..1u64).prop_map(|_| IndexingOp::Merge),
-        ]
     }
 
     fn expected_ids(ops: &[IndexingOp]) -> (HashMap<u64, u64>, HashSet<u64>) {
@@ -1772,12 +1719,6 @@ mod tests {
         let num_docs_expected = expected_ids_and_num_occurrences
             .values()
             .map(|id_occurrences| *id_occurrences as usize)
-            .sum::<usize>();
-
-        let num_docs_with_values = expected_ids_and_num_occurrences
-            .iter()
-            .filter(|(id, _id_occurrences)| id_is_full_doc(**id))
-            .map(|(_, id_occurrences)| *id_occurrences as usize)
             .sum::<usize>();
 
         assert_eq!(searcher.num_docs() as usize, num_docs_expected);

@@ -61,10 +61,7 @@ type AddBatchReceiver<D> = channel::Receiver<AddBatch<D>>;
 #[cfg(test)]
 mod tests_mmap {
 
-    use crate::collector::{Count, TopDocs};
-    use crate::index::FieldMetadata;
-    use crate::query::QueryParser;
-    use crate::schema::{JsonObjectOptions, Schema, Type, FAST, INDEXED, STORED, TEXT};
+    use crate::schema::{Schema, TEXT};
     use crate::{Index, IndexWriter, Term};
 
     #[test]

@@ -439,9 +439,7 @@ impl Weight for RangeWeight {
 #[cfg(test)]
 mod tests {
 
-    use std::net::IpAddr;
     use std::ops::Bound;
-    use std::str::FromStr;
 
     use rand::seq::SliceRandom;
 
@@ -449,10 +447,8 @@ mod tests {
     use crate::collector::{Count, TopDocs};
     use crate::indexer::NoMergePolicy;
     use crate::query::QueryParser;
-    use crate::schema::{
-        Field, IntoIpv6Addr, Schema, TantivyDocument, FAST, INDEXED, STORED, TEXT,
-    };
-    use crate::{Index, IndexWriter};
+    use crate::schema::{Field, Schema, TantivyDocument, INDEXED, TEXT};
+    use crate::Index;
 
     #[test]
     fn test_range_query_simple() -> crate::Result<()> {
