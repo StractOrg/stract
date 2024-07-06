@@ -55,11 +55,8 @@ pub mod tests {
 
     use super::*;
     use crate::directory::{Directory, RamDirectory, WritePtr};
-    use crate::fastfield::AliveBitSet;
-    use crate::schema::{
-        self, Schema, TantivyDocument, TextFieldIndexing, TextOptions, Value, STORED, TEXT,
-    };
-    use crate::{Index, IndexWriter, Term};
+    use crate::schema::{self, Schema, TantivyDocument, TextOptions, Value, STORED, TEXT};
+    use crate::{Index, IndexWriter};
 
     const LOREM: &str = "Doc Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do \
                          eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad \
@@ -100,11 +97,6 @@ pub mod tests {
     const NUM_DOCS: usize = 1_000;
     #[test]
     fn test_doc_store_iter_with_delete_bug_1077() -> crate::Result<()> {
-        // this will cover deletion of the first element in a checkpoint
-        let deleted_doc_ids = (200..300).collect::<Vec<_>>();
-        let alive_bitset =
-            AliveBitSet::for_test_from_deleted_docs(&deleted_doc_ids, NUM_DOCS as u32);
-
         let path = Path::new("store");
         let directory = RamDirectory::create();
         let store_wrt = directory.open_write(path)?;
@@ -126,7 +118,7 @@ pub mod tests {
             );
         }
 
-        for doc in store.iter::<TantivyDocument>(Some(&alive_bitset)) {
+        for doc in store.iter::<TantivyDocument>() {
             let doc = doc?;
             let title_content = doc
                 .get_first(field_title)
@@ -137,15 +129,6 @@ pub mod tests {
                 .to_string();
             if !title_content.starts_with("Doc ") {
                 panic!("unexpected title_content {title_content}");
-            }
-
-            let id = title_content
-                .strip_prefix("Doc ")
-                .unwrap()
-                .parse::<u32>()
-                .unwrap();
-            if alive_bitset.is_deleted(id) {
-                panic!("unexpected deleted document {id}");
             }
         }
 
@@ -176,7 +159,7 @@ pub mod tests {
                 format!("Doc {i}")
             );
         }
-        for (i, doc) in store.iter::<TantivyDocument>(None).enumerate() {
+        for (i, doc) in store.iter::<TantivyDocument>().enumerate() {
             assert_eq!(
                 *doc?.get_first(field_title).unwrap().as_str().unwrap(),
                 format!("Doc {i}")
@@ -199,46 +182,6 @@ pub mod tests {
     #[test]
     fn test_store_lz4_block() -> crate::Result<()> {
         test_store(Compressor::Lz4, BLOCK_SIZE, true)
-    }
-
-    #[test]
-    fn test_store_with_delete() -> crate::Result<()> {
-        let mut schema_builder = schema::Schema::builder();
-
-        let text_field_options = TextOptions::default()
-            .set_indexing_options(
-                TextFieldIndexing::default()
-                    .set_index_option(schema::IndexRecordOption::WithFreqsAndPositions),
-            )
-            .set_stored();
-        let text_field = schema_builder.add_text_field("text_field", text_field_options);
-        let schema = schema_builder.build();
-        let index_builder = Index::builder().schema(schema);
-
-        let index = index_builder.create_in_ram()?;
-
-        {
-            let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
-            index_writer.add_document(doc!(text_field=> "deleteme"))?;
-            index_writer.add_document(doc!(text_field=> "deletemenot"))?;
-            index_writer.add_document(doc!(text_field=> "deleteme"))?;
-            index_writer.add_document(doc!(text_field=> "deletemenot"))?;
-            index_writer.add_document(doc!(text_field=> "deleteme"))?;
-
-            index_writer.delete_term(Term::from_field_text(text_field, "deleteme"));
-            index_writer.commit()?;
-        }
-
-        let searcher = index.reader()?.searcher();
-        let reader = searcher.segment_reader(0);
-        let store = reader.get_store_reader(10)?;
-        for doc in store.iter::<TantivyDocument>(reader.alive_bitset()) {
-            assert_eq!(
-                *doc?.get_first(text_field).unwrap().as_str().unwrap(),
-                "deletemenot".to_string()
-            );
-        }
-        Ok(())
     }
 
     #[test]
@@ -276,7 +219,7 @@ pub mod tests {
         assert_eq!(searcher.segment_readers().len(), 1);
         let reader = searcher.segment_readers().iter().last().unwrap();
         let store = reader.get_store_reader(10)?;
-        assert_eq!(store.block_checkpoints().count(), 1);
+        assert_eq!(store.block_checkpoints().count(), 5);
         Ok(())
     }
 }

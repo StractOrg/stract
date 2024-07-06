@@ -17,12 +17,9 @@
 use std::{
     path::Path,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-    time::SystemTime,
 };
 
 use crate::Result;
-
-use super::TTL;
 
 pub struct Index {
     search_index: Arc<RwLock<crate::index::Index>>,
@@ -48,11 +45,7 @@ impl Index {
     }
 
     pub fn prune(&self) {
-        self.search_index
-            .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .delete_all_before(SystemTime::now() - TTL)
-            .ok();
+        todo!("delete index files older than TTL")
     }
 
     pub fn clone_inner_index(&self) -> Arc<RwLock<crate::index::Index>> {

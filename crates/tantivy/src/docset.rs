@@ -1,6 +1,5 @@
 use std::borrow::{Borrow, BorrowMut};
 
-use crate::fastfield::AliveBitSet;
 use crate::DocId;
 
 /// Sentinel value returned when a [`DocSet`] has been entirely consumed.
@@ -89,24 +88,7 @@ pub trait DocSet: Send {
 
     /// Returns the number documents matching.
     /// Calling this method consumes the `DocSet`.
-    fn count(&mut self, alive_bitset: &AliveBitSet) -> u32 {
-        let mut count = 0u32;
-        let mut doc = self.doc();
-        while doc != TERMINATED {
-            if alive_bitset.is_alive(doc) {
-                count += 1u32;
-            }
-            doc = self.advance();
-        }
-        count
-    }
-
-    /// Returns the count of documents, deleted or not.
-    /// Calling this method consumes the `DocSet`.
-    ///
-    /// Of course, the result is an upper bound of the result
-    /// given by `count()`.
-    fn count_including_deleted(&mut self) -> u32 {
+    fn count(&mut self) -> u32 {
         let mut count = 0u32;
         let mut doc = self.doc();
         while doc != TERMINATED {
@@ -134,12 +116,8 @@ impl<'a> DocSet for &'a mut dyn DocSet {
         (**self).size_hint()
     }
 
-    fn count(&mut self, alive_bitset: &AliveBitSet) -> u32 {
-        (**self).count(alive_bitset)
-    }
-
-    fn count_including_deleted(&mut self) -> u32 {
-        (**self).count_including_deleted()
+    fn count(&mut self) -> u32 {
+        (**self).count()
     }
 }
 
@@ -169,13 +147,8 @@ impl<TDocSet: DocSet + ?Sized> DocSet for Box<TDocSet> {
         unboxed.size_hint()
     }
 
-    fn count(&mut self, alive_bitset: &AliveBitSet) -> u32 {
+    fn count(&mut self) -> u32 {
         let unboxed: &mut TDocSet = self.borrow_mut();
-        unboxed.count(alive_bitset)
-    }
-
-    fn count_including_deleted(&mut self) -> u32 {
-        let unboxed: &mut TDocSet = self.borrow_mut();
-        unboxed.count_including_deleted()
+        unboxed.count()
     }
 }

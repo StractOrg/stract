@@ -53,27 +53,14 @@ impl PhrasePrefixWeight {
             .map(|similarity_weight| similarity_weight.boost_by(boost));
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
         let mut term_postings_list = Vec::new();
-        if reader.has_deletes() {
-            for &(offset, ref term) in &self.phrase_terms {
-                if let Some(postings) = reader
-                    .inverted_index(term.field())?
-                    .read_postings(term, IndexRecordOption::WithFreqsAndPositions)?
-                {
-                    term_postings_list.push((offset, postings));
-                } else {
-                    return Ok(None);
-                }
-            }
-        } else {
-            for &(offset, ref term) in &self.phrase_terms {
-                if let Some(postings) = reader
-                    .inverted_index(term.field())?
-                    .read_postings_no_deletes(term, IndexRecordOption::WithFreqsAndPositions)?
-                {
-                    term_postings_list.push((offset, postings));
-                } else {
-                    return Ok(None);
-                }
+        for &(offset, ref term) in &self.phrase_terms {
+            if let Some(postings) = reader
+                .inverted_index(term.field())?
+                .read_postings_no_deletes(term, IndexRecordOption::WithFreqsAndPositions)?
+            {
+                term_postings_list.push((offset, postings));
+            } else {
+                return Ok(None);
             }
         }
 
@@ -93,13 +80,7 @@ impl PhrasePrefixWeight {
         while stream.advance() && (suffixes.len() as u32) < self.max_expansions {
             new_term.clear_with_type(new_term.typ());
             new_term.append_bytes(stream.key());
-            if reader.has_deletes() {
-                if let Some(postings) =
-                    inv_index.read_postings(&new_term, IndexRecordOption::WithFreqsAndPositions)?
-                {
-                    suffixes.push(postings);
-                }
-            } else if let Some(postings) = inv_index
+            if let Some(postings) = inv_index
                 .read_postings_no_deletes(&new_term, IndexRecordOption::WithFreqsAndPositions)?
             {
                 suffixes.push(postings);

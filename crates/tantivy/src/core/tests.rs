@@ -4,7 +4,7 @@ use crate::index::SegmentId;
 use crate::indexer::{LogMergePolicy, NoMergePolicy};
 use crate::postings::Postings;
 use crate::query::TermQuery;
-use crate::schema::{Field, IndexRecordOption, Schema, INDEXED, STRING, TEXT};
+use crate::schema::{Field, IndexRecordOption, Schema, INDEXED, TEXT};
 use crate::tokenizer::TokenizerManager;
 use crate::{
     Directory, DocSet, Index, IndexBuilder, IndexReader, IndexSettings, IndexWriter, ReloadPolicy,
@@ -304,7 +304,6 @@ fn test_single_segment_index_writer() -> crate::Result<()> {
 fn test_merging_segment_update_docfreq() {
     let mut schema_builder = Schema::builder();
     let text_field = schema_builder.add_text_field("text", TEXT);
-    let id_field = schema_builder.add_text_field("id", STRING);
     let schema = schema_builder.build();
     let index = Index::create_in_ram(schema);
     let mut writer: IndexWriter = index.writer_for_tests().unwrap();
@@ -312,12 +311,6 @@ fn test_merging_segment_update_docfreq() {
     for _ in 0..5 {
         writer.add_document(doc!(text_field=>"hello")).unwrap();
     }
-    writer
-        .add_document(doc!(text_field=>"hello", id_field=>"TO_BE_DELETED"))
-        .unwrap();
-    writer
-        .add_document(doc!(text_field=>"hello", id_field=>"TO_BE_DELETED"))
-        .unwrap();
     writer.add_document(TantivyDocument::default()).unwrap();
     writer.commit().unwrap();
     for _ in 0..7 {
@@ -325,7 +318,6 @@ fn test_merging_segment_update_docfreq() {
     }
     writer.add_document(TantivyDocument::default()).unwrap();
     writer.add_document(TantivyDocument::default()).unwrap();
-    writer.delete_term(Term::from_field_text(id_field, "TO_BE_DELETED"));
     writer.commit().unwrap();
 
     let segment_ids: Vec<SegmentId> = index

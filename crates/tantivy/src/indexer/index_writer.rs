@@ -3,25 +3,19 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 
-use crate::common::BitSet;
 use smallvec::smallvec;
 
 use super::operation::{AddOperation, UserOperation};
 use super::segment_updater::SegmentUpdater;
 use super::{AddBatch, AddBatchReceiver, AddBatchSender, PreparedCommit};
-use crate::directory::{DirectoryLock, GarbageCollectionResult, TerminatingWrite};
+use crate::directory::{DirectoryLock, GarbageCollectionResult};
 use crate::error::TantivyError;
-use crate::fastfield::write_alive_bitset;
-use crate::index::{Index, Segment, SegmentComponent, SegmentId, SegmentMeta, SegmentReader};
-use crate::indexer::delete_queue::{DeleteCursor, DeleteQueue};
-use crate::indexer::doc_opstamp_mapping::DocToOpstampMapping;
+use crate::index::{Index, Segment, SegmentId, SegmentMeta};
 use crate::indexer::index_writer_status::IndexWriterStatus;
-use crate::indexer::operation::DeleteOperation;
 use crate::indexer::stamper::Stamper;
 use crate::indexer::{MergePolicy, SegmentEntry, SegmentWriter};
-use crate::query::{EnableScoring, Query, TermQuery};
 use crate::schema::document::Document;
-use crate::schema::{IndexRecordOption, TantivyDocument, Term};
+use crate::schema::TantivyDocument;
 use crate::{FutureResult, Opstamp};
 
 // Size of the margin for the `memory_arena`. A segment is closed when the remaining memory
@@ -72,97 +66,8 @@ pub struct IndexWriter<D: Document = TantivyDocument> {
 
     num_threads: usize,
 
-    delete_queue: DeleteQueue,
-
     stamper: Stamper,
     committed_opstamp: Opstamp,
-}
-
-fn compute_deleted_bitset(
-    alive_bitset: &mut BitSet,
-    segment_reader: &SegmentReader,
-    delete_cursor: &mut DeleteCursor,
-    doc_opstamps: &DocToOpstampMapping,
-    target_opstamp: Opstamp,
-) -> crate::Result<bool> {
-    let mut might_have_changed = false;
-    while let Some(delete_op) = delete_cursor.get() {
-        if delete_op.opstamp > target_opstamp {
-            break;
-        }
-
-        // A delete operation should only affect
-        // document that were inserted before it.
-        delete_op
-            .target
-            .for_each_no_score(segment_reader, &mut |docs_matching_delete_query| {
-                for doc_matching_delete_query in docs_matching_delete_query.iter().cloned() {
-                    if doc_opstamps.is_deleted(doc_matching_delete_query, delete_op.opstamp) {
-                        alive_bitset.remove(doc_matching_delete_query);
-                        might_have_changed = true;
-                    }
-                }
-            })?;
-        delete_cursor.advance();
-    }
-    Ok(might_have_changed)
-}
-
-/// Advance delete for the given segment up to the target opstamp.
-///
-/// Note that there are no guarantee that the resulting `segment_entry` delete_opstamp
-/// is `==` target_opstamp.
-/// For instance, there was no delete operation between the state of the `segment_entry` and
-/// the `target_opstamp`, `segment_entry` is not updated.
-pub(crate) fn advance_deletes(
-    mut segment: Segment,
-    segment_entry: &mut SegmentEntry,
-    target_opstamp: Opstamp,
-) -> crate::Result<()> {
-    if segment_entry.meta().delete_opstamp() == Some(target_opstamp) {
-        // We are already up-to-date here.
-        return Ok(());
-    }
-
-    if segment_entry.alive_bitset().is_none() && segment_entry.delete_cursor().get().is_none() {
-        // There has been no `DeleteOperation` between the segment status and `target_opstamp`.
-        return Ok(());
-    }
-
-    let segment_reader = SegmentReader::open(&segment)?;
-
-    let max_doc = segment_reader.max_doc();
-    let mut alive_bitset: BitSet = match segment_entry.alive_bitset() {
-        Some(previous_alive_bitset) => (*previous_alive_bitset).clone(),
-        None => BitSet::with_max_value_and_full(max_doc),
-    };
-
-    let num_deleted_docs_before = segment.meta().num_deleted_docs();
-
-    compute_deleted_bitset(
-        &mut alive_bitset,
-        &segment_reader,
-        segment_entry.delete_cursor(),
-        &DocToOpstampMapping::None,
-        target_opstamp,
-    )?;
-
-    if let Some(seg_alive_bitset) = segment_reader.alive_bitset() {
-        alive_bitset.intersect_update(seg_alive_bitset.bitset());
-    }
-
-    let num_alive_docs: u32 = alive_bitset.len() as u32;
-    let num_deleted_docs = max_doc - num_alive_docs;
-    if num_deleted_docs > num_deleted_docs_before {
-        // There are new deletes. We need to write a new delete file.
-        segment = segment.with_delete_meta(num_deleted_docs, target_opstamp);
-        let mut alive_doc_file = segment.open_write(SegmentComponent::Delete)?;
-        write_alive_bitset(&alive_bitset, &mut alive_doc_file)?;
-        alive_doc_file.terminate()?;
-    }
-
-    segment_entry.set_meta(segment.meta().clone());
-    Ok(())
 }
 
 fn index_documents<D: Document>(
@@ -170,7 +75,6 @@ fn index_documents<D: Document>(
     segment: Segment,
     grouped_document_iterator: &mut dyn Iterator<Item = AddBatch<D>>,
     segment_updater: &SegmentUpdater,
-    mut delete_cursor: DeleteCursor,
 ) -> crate::Result<()> {
     let mut segment_writer = SegmentWriter::for_segment(memory_budget, segment.clone())?;
     for document_group in grouped_document_iterator {
@@ -197,55 +101,16 @@ fn index_documents<D: Document>(
     // the worker thread.
     assert!(max_doc > 0);
 
-    let doc_opstamps: Vec<Opstamp> = segment_writer.finalize()?;
+    let _ = segment_writer.finalize()?;
 
     let segment_with_max_doc = segment.with_max_doc(max_doc);
-
-    let alive_bitset_opt = apply_deletes(&segment_with_max_doc, &mut delete_cursor, &doc_opstamps)?;
 
     let meta = segment_with_max_doc.meta().clone();
     meta.untrack_temp_docstore();
     // update segment_updater inventory to remove tempstore
-    let segment_entry = SegmentEntry::new(meta, delete_cursor, alive_bitset_opt);
+    let segment_entry = SegmentEntry::new(meta);
     segment_updater.schedule_add_segment(segment_entry).wait()?;
     Ok(())
-}
-
-/// `doc_opstamps` is required to be non-empty.
-fn apply_deletes(
-    segment: &Segment,
-    delete_cursor: &mut DeleteCursor,
-    doc_opstamps: &[Opstamp],
-) -> crate::Result<Option<BitSet>> {
-    if delete_cursor.get().is_none() {
-        // if there are no delete operation in the queue, no need
-        // to even open the segment.
-        return Ok(None);
-    }
-
-    let max_doc_opstamp: Opstamp = doc_opstamps
-        .iter()
-        .cloned()
-        .max()
-        .expect("Empty DocOpstamp is forbidden");
-
-    let segment_reader = SegmentReader::open(segment)?;
-    let doc_to_opstamps = DocToOpstampMapping::WithMap(doc_opstamps);
-
-    let max_doc = segment.meta().max_doc();
-    let mut deleted_bitset = BitSet::with_max_value_and_full(max_doc);
-    let may_have_deletes = compute_deleted_bitset(
-        &mut deleted_bitset,
-        &segment_reader,
-        delete_cursor,
-        &doc_to_opstamps,
-        max_doc_opstamp,
-    )?;
-    Ok(if may_have_deletes {
-        Some(deleted_bitset)
-    } else {
-        None
-    })
 }
 
 impl<D: Document> IndexWriter<D> {
@@ -285,14 +150,11 @@ impl<D: Document> IndexWriter<D> {
         let (document_sender, document_receiver) =
             crossbeam_channel::bounded(PIPELINE_MAX_SIZE_IN_DOCS);
 
-        let delete_queue = DeleteQueue::new();
-
         let current_opstamp = index.load_metas()?.opstamp;
 
         let stamper = Stamper::new(current_opstamp);
 
-        let segment_updater =
-            SegmentUpdater::create(index.clone(), stamper.clone(), &delete_queue.cursor())?;
+        let segment_updater = SegmentUpdater::create(index.clone(), stamper.clone())?;
 
         let mut index_writer = Self {
             _directory_lock: Some(directory_lock),
@@ -306,8 +168,6 @@ impl<D: Document> IndexWriter<D> {
 
             workers_join_handle: vec![],
             num_threads,
-
-            delete_queue,
 
             committed_opstamp: current_opstamp,
             stamper,
@@ -357,8 +217,7 @@ impl<D: Document> IndexWriter<D> {
 
     #[doc(hidden)]
     pub fn add_segment(&self, segment_meta: SegmentMeta) -> crate::Result<()> {
-        let delete_cursor = self.delete_queue.cursor();
-        let segment_entry = SegmentEntry::new(segment_meta, delete_cursor, None);
+        let segment_entry = SegmentEntry::new(segment_meta);
         self.segment_updater
             .schedule_add_segment(segment_entry)
             .wait()
@@ -396,8 +255,6 @@ impl<D: Document> IndexWriter<D> {
 
         let segment_updater = self.segment_updater.clone();
 
-        let mut delete_cursor = self.delete_queue.cursor();
-
         let mem_budget = self.memory_budget_in_bytes_per_thread;
         let index = self.index.clone();
         let join_handle: JoinHandle<crate::Result<()>> = thread::Builder::new()
@@ -416,8 +273,7 @@ impl<D: Document> IndexWriter<D> {
                     // This is a valid guarantee as the peeked document now belongs to
                     // our local iterator.
                     if let Some(batch) = document_iterator.peek() {
-                        assert!(!batch.is_empty());
-                        delete_cursor.skip_to(batch[0].opstamp);
+                        debug_assert!(!batch.is_empty());
                     } else {
                         // No more documents.
                         // It happens when there is a commit, or if the `IndexWriter`
@@ -431,7 +287,6 @@ impl<D: Document> IndexWriter<D> {
                         index.new_segment(),
                         &mut document_iterator,
                         &segment_updater,
-                        delete_cursor.clone(),
                     )?;
                 }
             })?;
@@ -622,43 +477,6 @@ impl<D: Document> IndexWriter<D> {
         &self.segment_updater
     }
 
-    /// Delete all documents containing a given term.
-    ///
-    /// Delete operation only affects documents that
-    /// were added in previous commits, and documents
-    /// that were added previously in the same commit.
-    ///
-    /// Like adds, the deletion itself will be visible
-    /// only after calling `commit()`.
-    pub fn delete_term(&self, term: Term) -> Opstamp {
-        let query = TermQuery::new(term, IndexRecordOption::Basic);
-        // For backward compatibility, if Term is invalid for the index, do nothing but return an
-        // Opstamp
-        self.delete_query(Box::new(query))
-            .unwrap_or_else(|_| self.stamper.stamp())
-    }
-
-    /// Delete all documents matching a given query.
-    /// Returns an `Err` if the query can't be executed.
-    ///
-    /// Delete operation only affects documents that
-    /// were added in previous commits, and documents
-    /// that were added previously in the same commit.
-    ///
-    /// Like adds, the deletion itself will be visible
-    /// only after calling `commit()`.
-    #[doc(hidden)]
-    pub fn delete_query(&self, query: Box<dyn Query>) -> crate::Result<Opstamp> {
-        let weight = query.weight(EnableScoring::disabled_from_schema(&self.index.schema()))?;
-        let opstamp = self.stamper.stamp();
-        let delete_operation = DeleteOperation {
-            opstamp,
-            target: weight,
-        };
-        self.delete_queue.push(delete_operation);
-        Ok(opstamp)
-    }
-
     /// Returns the opstamp of the last successful commit.
     ///
     /// This is, for instance, the opstamp the index will
@@ -728,16 +546,6 @@ impl<D: Document> IndexWriter<D> {
 
         for (user_op, opstamp) in user_operations_it.zip(stamps) {
             match user_op {
-                UserOperation::Delete(term) => {
-                    let query = TermQuery::new(term, IndexRecordOption::Basic);
-                    let weight =
-                        query.weight(EnableScoring::disabled_from_schema(&self.index.schema()))?;
-                    let delete_operation = DeleteOperation {
-                        opstamp,
-                        target: weight,
-                    };
-                    self.delete_queue.push(delete_operation);
-                }
                 UserOperation::Add(document) => {
                     let add_operation = AddOperation { opstamp, document };
                     adds.push(add_operation);
@@ -779,7 +587,7 @@ mod tests {
     use crate::error::*;
     use crate::indexer::index_writer::MEMORY_BUDGET_NUM_BYTES_MIN;
     use crate::indexer::NoMergePolicy;
-    use crate::query::{BooleanQuery, Occur, Query, QueryParser, TermQuery};
+    use crate::query::{QueryParser, TermQuery};
     use crate::schema::{
         self, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, FAST, INDEXED,
         STORED, STRING, TEXT,
@@ -811,99 +619,6 @@ mod tests {
         ];
         let batch_opstamp1 = index_writer.run(operations).unwrap();
         assert_eq!(batch_opstamp1, 2u64);
-    }
-
-    #[test]
-    fn test_no_need_to_rewrite_delete_file_if_no_new_deletes() {
-        let mut schema_builder = schema::Schema::builder();
-        let text_field = schema_builder.add_text_field("text", TEXT);
-        let index = Index::create_in_ram(schema_builder.build());
-
-        let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
-        index_writer
-            .add_document(doc!(text_field => "hello1"))
-            .unwrap();
-        index_writer
-            .add_document(doc!(text_field => "hello2"))
-            .unwrap();
-        assert!(index_writer.commit().is_ok());
-
-        let reader = index.reader().unwrap();
-        let searcher = reader.searcher();
-        assert_eq!(searcher.segment_readers().len(), 1);
-        assert_eq!(searcher.segment_reader(0u32).num_docs(), 2);
-
-        index_writer.delete_term(Term::from_field_text(text_field, "hello1"));
-        assert!(index_writer.commit().is_ok());
-
-        assert!(reader.reload().is_ok());
-        let searcher = reader.searcher();
-        assert_eq!(searcher.segment_readers().len(), 1);
-        assert_eq!(searcher.segment_reader(0u32).num_docs(), 1);
-
-        let previous_delete_opstamp = index.load_metas().unwrap().segments[0].delete_opstamp();
-
-        // All docs containing hello1 have been already removed.
-        // We should not update the delete meta.
-        index_writer.delete_term(Term::from_field_text(text_field, "hello1"));
-        assert!(index_writer.commit().is_ok());
-
-        assert!(reader.reload().is_ok());
-        let searcher = reader.searcher();
-        assert_eq!(searcher.segment_readers().len(), 1);
-        assert_eq!(searcher.segment_reader(0u32).num_docs(), 1);
-
-        let after_delete_opstamp = index.load_metas().unwrap().segments[0].delete_opstamp();
-        assert_eq!(after_delete_opstamp, previous_delete_opstamp);
-    }
-
-    #[test]
-    fn test_ordered_batched_operations() {
-        // * one delete for `doc!(field=>"a")`
-        // * one add for `doc!(field=>"a")`
-        // * one add for `doc!(field=>"b")`
-        // * one delete for `doc!(field=>"b")`
-        // after commit there is one doc with "a" and 0 doc with "b"
-        let mut schema_builder = schema::Schema::builder();
-        let text_field = schema_builder.add_text_field("text", TEXT);
-        let index = Index::create_in_ram(schema_builder.build());
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::Manual)
-            .try_into()
-            .unwrap();
-        let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
-        let a_term = Term::from_field_text(text_field, "a");
-        let b_term = Term::from_field_text(text_field, "b");
-        let operations = vec![
-            UserOperation::Delete(a_term),
-            UserOperation::Add(doc!(text_field=>"a")),
-            UserOperation::Add(doc!(text_field=>"b")),
-            UserOperation::Delete(b_term),
-        ];
-
-        index_writer.run(operations).unwrap();
-        index_writer.commit().expect("failed to commit");
-        reader.reload().expect("failed to load searchers");
-
-        let a_term = Term::from_field_text(text_field, "a");
-        let b_term = Term::from_field_text(text_field, "b");
-
-        let a_query = TermQuery::new(a_term, IndexRecordOption::Basic);
-        let b_query = TermQuery::new(b_term, IndexRecordOption::Basic);
-
-        let searcher = reader.searcher();
-
-        let a_docs = searcher
-            .search(&a_query, &TopDocs::with_limit(1))
-            .expect("search for a failed");
-
-        let b_docs = searcher
-            .search(&b_query, &TopDocs::with_limit(1))
-            .expect("search for b failed");
-
-        assert_eq!(a_docs.len(), 1);
-        assert_eq!(b_docs.len(), 0);
     }
 
     #[test]
@@ -1034,18 +749,6 @@ mod tests {
         reader.reload().unwrap();
         assert_eq!(num_docs_containing("a"), 1);
 
-        index_writer.delete_term(Term::from_field_text(text_field, "a"));
-        index_writer.commit()?;
-
-        reader.reload().unwrap();
-        assert_eq!(num_docs_containing("a"), 0);
-
-        index_writer.merge(&segments);
-        index_writer.wait_merging_threads().unwrap();
-
-        let segments = index.searchable_segment_ids().unwrap();
-        assert_eq!(segments.len(), 0);
-
         Ok(())
     }
 
@@ -1080,17 +783,12 @@ mod tests {
         reader.reload().unwrap();
         assert_eq!(num_docs_containing("a"), 4);
 
-        index_writer.delete_term(Term::from_field_text(text_field, "a"));
-        index_writer.commit()?;
-
-        reader.reload().unwrap();
-        assert_eq!(num_docs_containing("a"), 0);
-
         index_writer.merge(&segments);
         index_writer.wait_merging_threads().unwrap();
 
         let segments = index.searchable_segment_ids().unwrap();
-        assert_eq!(segments.len(), 0);
+        assert_eq!(segments.len(), 1);
+        assert_eq!(num_docs_containing("a"), 4);
 
         Ok(())
     }
@@ -1375,116 +1073,6 @@ mod tests {
         assert!(commit_again.is_ok());
     }
 
-    #[test]
-    fn test_delete_with_sort_by_field() -> crate::Result<()> {
-        let mut schema_builder = schema::Schema::builder();
-        let id_field = schema_builder.add_u64_field("id", INDEXED | schema::STORED | FAST);
-        let schema = schema_builder.build();
-
-        let settings = IndexSettings {
-            sort_by_field: Some(IndexSortByField {
-                field: "id".to_string(),
-                order: Order::Desc,
-            }),
-            ..Default::default()
-        };
-
-        let index = Index::builder()
-            .schema(schema)
-            .settings(settings)
-            .create_in_ram()?;
-        let index_reader = index.reader()?;
-        let mut index_writer = index.writer_for_tests()?;
-
-        // create and delete docs in same commit
-        for id in 0u64..5u64 {
-            index_writer.add_document(doc!(id_field => id))?;
-        }
-        for id in 2u64..4u64 {
-            index_writer.delete_term(Term::from_field_u64(id_field, id));
-        }
-        for id in 5u64..10u64 {
-            index_writer.add_document(doc!(id_field => id))?;
-        }
-        index_writer.commit()?;
-        index_reader.reload()?;
-
-        let searcher = index_reader.searcher();
-        assert_eq!(searcher.segment_readers().len(), 1);
-
-        let segment_reader = searcher.segment_reader(0);
-        assert_eq!(segment_reader.num_docs(), 8);
-        assert_eq!(segment_reader.max_doc(), 10);
-        let fast_field_reader = segment_reader.fast_fields().u64("id")?;
-
-        let in_order_alive_ids: Vec<u64> = segment_reader
-            .doc_ids_alive()
-            .flat_map(|doc| fast_field_reader.first(doc))
-            .collect();
-        assert_eq!(&in_order_alive_ids[..], &[9, 8, 7, 6, 5, 4, 1, 0]);
-        Ok(())
-    }
-
-    #[test]
-    fn test_delete_query_with_sort_by_field() -> crate::Result<()> {
-        let mut schema_builder = schema::Schema::builder();
-        let id_field = schema_builder.add_u64_field("id", INDEXED | schema::STORED | FAST);
-        let schema = schema_builder.build();
-
-        let settings = IndexSettings {
-            sort_by_field: Some(IndexSortByField {
-                field: "id".to_string(),
-                order: Order::Desc,
-            }),
-            ..Default::default()
-        };
-
-        let index = Index::builder()
-            .schema(schema)
-            .settings(settings)
-            .create_in_ram()?;
-        let index_reader = index.reader()?;
-        let mut index_writer = index.writer_for_tests()?;
-
-        // create and delete docs in same commit
-        for id in 0u64..5u64 {
-            index_writer.add_document(doc!(id_field => id))?;
-        }
-        for id in 1u64..4u64 {
-            let term = Term::from_field_u64(id_field, id);
-            let not_term = Term::from_field_u64(id_field, 2);
-            let term = Box::new(TermQuery::new(term, Default::default()));
-            let not_term = Box::new(TermQuery::new(not_term, Default::default()));
-
-            let query: BooleanQuery = vec![
-                (Occur::Must, term as Box<dyn Query>),
-                (Occur::MustNot, not_term as Box<dyn Query>),
-            ]
-            .into();
-
-            index_writer.delete_query(Box::new(query))?;
-        }
-        for id in 5u64..10u64 {
-            index_writer.add_document(doc!(id_field => id))?;
-        }
-        index_writer.commit()?;
-        index_reader.reload()?;
-
-        let searcher = index_reader.searcher();
-        assert_eq!(searcher.segment_readers().len(), 1);
-
-        let segment_reader = searcher.segment_reader(0);
-        assert_eq!(segment_reader.num_docs(), 8);
-        assert_eq!(segment_reader.max_doc(), 10);
-        let fast_field_reader = segment_reader.fast_fields().u64("id")?;
-        let in_order_alive_ids: Vec<u64> = segment_reader
-            .doc_ids_alive()
-            .flat_map(|doc| fast_field_reader.first(doc))
-            .collect();
-        assert_eq!(&in_order_alive_ids[..], &[9, 8, 7, 6, 5, 4, 2, 0]);
-        Ok(())
-    }
-
     #[derive(Debug, Clone)]
     enum IndexingOp {
         AddMultipleDoc {
@@ -1495,12 +1083,6 @@ mod tests {
         AddDoc {
             id: u64,
             value: IndexValue,
-        },
-        DeleteDoc {
-            id: u64,
-        },
-        DeleteDocQuery {
-            id: u64,
         },
         Commit,
         Merge,
@@ -1543,14 +1125,6 @@ mod tests {
                 } => {
                     *existing_ids.entry(*id).or_insert(0) += num_docs;
                     deleted_ids.remove(id);
-                }
-                IndexingOp::DeleteDoc { id } => {
-                    existing_ids.remove(id);
-                    deleted_ids.insert(*id);
-                }
-                IndexingOp::DeleteDocQuery { id } => {
-                    existing_ids.remove(id);
-                    deleted_ids.insert(*id);
                 }
                 _ => {}
             }
@@ -1649,14 +1223,6 @@ mod tests {
                 IndexingOp::AddDoc { id, value } => {
                     add_docs(&mut index_writer, id, value, 1)?;
                 }
-                IndexingOp::DeleteDoc { id } => {
-                    index_writer.delete_term(Term::from_field_u64(id_field, id));
-                }
-                IndexingOp::DeleteDocQuery { id } => {
-                    let term = Term::from_field_u64(id_field, id);
-                    let query = TermQuery::new(term, Default::default());
-                    index_writer.delete_query(Box::new(query))?;
-                }
                 IndexingOp::Commit => {
                     index_writer.commit()?;
                 }
@@ -1698,7 +1264,7 @@ mod tests {
             .flat_map(|segment_reader| {
                 let ff_reader = segment_reader.fast_fields().u64("id").unwrap();
                 segment_reader
-                    .doc_ids_alive()
+                    .doc_ids()
                     .flat_map(move |doc| ff_reader.first(doc).into_iter())
             })
             .collect();
@@ -1709,7 +1275,7 @@ mod tests {
             .flat_map(|segment_reader| {
                 let ff_reader = segment_reader.fast_fields().u64("id").unwrap();
                 segment_reader
-                    .doc_ids_alive()
+                    .doc_ids()
                     .flat_map(move |doc| ff_reader.first(doc).into_iter())
             })
             .collect();
@@ -1761,7 +1327,7 @@ mod tests {
                 .get_store_reader(DOCSTORE_CACHE_CAPACITY)
                 .unwrap();
             // test store iterator
-            for doc in store_reader.iter::<TantivyDocument>(segment_reader.alive_bitset()) {
+            for doc in store_reader.iter::<TantivyDocument>() {
                 let id = doc
                     .unwrap()
                     .get_first(id_field)
@@ -1772,7 +1338,7 @@ mod tests {
                 assert!(expected_ids_and_num_occurrences.contains_key(&id));
             }
             // test store random access
-            for doc_id in segment_reader.doc_ids_alive() {
+            for doc_id in segment_reader.doc_ids() {
                 let id = store_reader
                     .get::<TantivyDocument>(doc_id)
                     .unwrap()
@@ -1871,16 +1437,10 @@ mod tests {
 
     #[test]
     fn test_sort_index_on_opt_field_regression() {
-        assert!(test_operation_strategy(
-            &[
-                IndexingOp::add(81),
-                IndexingOp::add(70),
-                IndexingOp::DeleteDoc { id: 70 }
-            ],
-            true,
-            false
-        )
-        .is_ok());
+        assert!(
+            test_operation_strategy(&[IndexingOp::add(81), IndexingOp::add(70),], true, false)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -1967,26 +1527,16 @@ mod tests {
 
     #[test]
     fn test_minimal_sort_force_end_merge_with_delete() {
-        assert!(test_operation_strategy(
-            &[
-                IndexingOp::add(23),
-                IndexingOp::add(13),
-                IndexingOp::DeleteDoc { id: 13 }
-            ],
-            true,
-            true
-        )
-        .is_ok());
+        assert!(
+            test_operation_strategy(&[IndexingOp::add(23), IndexingOp::add(13),], true, true)
+                .is_ok()
+        );
     }
 
     #[test]
     fn test_minimal_no_sort_no_force_end_merge() {
         assert!(test_operation_strategy(
-            &[
-                IndexingOp::add(23),
-                IndexingOp::add(13),
-                IndexingOp::DeleteDoc { id: 13 }
-            ],
+            &[IndexingOp::add(23), IndexingOp::add(13),],
             false,
             false
         )
@@ -2064,14 +1614,12 @@ mod tests {
 
         // We add a doc...
         index_writer.add_document(doc!(sort_by_field => 2u64, id_field => 0u64))?;
-        // And remove it.
-        index_writer.delete_term(Term::from_field_u64(id_field, 0u64));
         // We add another doc.
         index_writer.add_document(doc!(sort_by_field=>1u64, id_field => 0u64))?;
 
         // The expected result is a segment with
         // maxdoc = 2
-        // numdoc = 1.
+        // numdoc = 2.
         index_writer.commit()?;
 
         let searcher = index.reader()?.searcher();
@@ -2079,7 +1627,7 @@ mod tests {
 
         let segment_reader = searcher.segment_reader(0);
         assert_eq!(segment_reader.max_doc(), 2);
-        assert_eq!(segment_reader.num_docs(), 1);
+        assert_eq!(segment_reader.num_docs(), 2);
         Ok(())
     }
 
@@ -2152,9 +1700,7 @@ mod tests {
     fn test_bug_1617_3() {
         assert!(test_operation_strategy(
             &[
-                IndexingOp::DeleteDoc { id: 0 },
                 IndexingOp::add(6),
-                IndexingOp::DeleteDocQuery { id: 11 },
                 IndexingOp::Commit,
                 IndexingOp::Merge,
                 IndexingOp::Commit,
@@ -2174,7 +1720,6 @@ mod tests {
                     id: 13,
                     value: Default::default()
                 },
-                IndexingOp::DeleteDoc { id: 13 },
                 IndexingOp::Commit,
                 IndexingOp::add(30),
                 IndexingOp::Commit,
@@ -2204,7 +1749,6 @@ mod tests {
         index_writer.add_document(doc!(
             id_field=>deleted_id,
         ))?;
-        index_writer.delete_term(Term::from_field_u64(id_field, deleted_id));
         index_writer.commit()?;
 
         // Merge

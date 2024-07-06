@@ -4,14 +4,13 @@ use crate::columnar::{
     ColumnType, ColumnValues, ColumnarReader, MergeRowOrder, RowAddr, ShuffleMergeOrder,
     StackMergeOrder,
 };
-use crate::common::ReadOnlyBitSet;
 use itertools::Itertools;
 use measure_time::debug_time;
 
 use crate::directory::WritePtr;
 use crate::docset::{DocSet, TERMINATED};
 use crate::error::DataCorruption;
-use crate::fastfield::{AliveBitSet, FastFieldNotAvailableError};
+use crate::fastfield::FastFieldNotAvailableError;
 use crate::fieldnorm::{FieldNormReader, FieldNormReaders, FieldNormsSerializer, FieldNormsWriter};
 use crate::index::{Segment, SegmentComponent, SegmentReader};
 use crate::indexer::doc_id_mapping::{MappingType, SegmentDocIdMapping};
@@ -33,42 +32,7 @@ fn estimate_total_num_tokens_in_single_segment(
     reader: &SegmentReader,
     field: Field,
 ) -> crate::Result<u64> {
-    // There are no deletes. We can simply use the exact value saved into the posting list.
-    // Note that this value is not necessarily exact as it could have been the result of a merge
-    // between segments themselves containing deletes.
-    if !reader.has_deletes() {
-        return Ok(reader.inverted_index(field)?.total_num_tokens());
-    }
-
-    // When there are deletes, we use an approximation either
-    // by using the fieldnorm.
-    if let Some(fieldnorm_reader) = reader.fieldnorms_readers().get_field(field)? {
-        let mut count: [usize; 256] = [0; 256];
-        for doc in reader.doc_ids_alive() {
-            let fieldnorm_id = fieldnorm_reader.fieldnorm_id(doc);
-            count[fieldnorm_id as usize] += 1;
-        }
-        let total_num_tokens = count
-            .iter()
-            .cloned()
-            .enumerate()
-            .map(|(fieldnorm_ord, count)| {
-                count as u64 * u64::from(FieldNormReader::id_to_fieldnorm(fieldnorm_ord as u8))
-            })
-            .sum::<u64>();
-        return Ok(total_num_tokens);
-    }
-
-    // There are no fieldnorms available.
-    // Here we just do a pro-rata with the overall number of tokens an the ratio of
-    // documents alive.
-    let segment_num_tokens = reader.inverted_index(field)?.total_num_tokens();
-    if reader.max_doc() == 0 {
-        // That supposedly never happens, but let's be a bit defensive here.
-        return Ok(0u64);
-    }
-    let ratio = reader.num_docs() as f64 / reader.max_doc() as f64;
-    Ok((segment_num_tokens as f64 * ratio) as u64)
+    Ok(reader.inverted_index(field)?.total_num_tokens())
 }
 
 fn estimate_total_num_tokens(readers: &[SegmentReader], field: Field) -> crate::Result<u64> {
@@ -116,7 +80,7 @@ fn convert_to_merge_order(
 ) -> MergeRowOrder {
     match doc_id_mapping.mapping_type() {
         MappingType::Stacked => MergeRowOrder::Stack(StackMergeOrder::stack(columnars)),
-        MappingType::StackedWithDeletes | MappingType::Shuffled => {
+        MappingType::Shuffled => {
             // RUST/LLVM is amazing. The following conversion is actually a no-op:
             // no allocation, no copy.
             let new_row_id_to_old_row_id: Vec<RowAddr> = doc_id_mapping
@@ -129,7 +93,6 @@ fn convert_to_merge_order(
                 .collect();
             MergeRowOrder::Shuffled(ShuffleMergeOrder {
                 new_row_id_to_old_row_id,
-                alive_bitsets: doc_id_mapping.alive_bitsets,
             })
         }
     }
@@ -154,33 +117,10 @@ impl IndexMerger {
         index_settings: IndexSettings,
         segments: &[Segment],
     ) -> crate::Result<IndexMerger> {
-        let alive_bitset = segments.iter().map(|_| None).collect_vec();
-        Self::open_with_custom_alive_set(schema, index_settings, segments, alive_bitset)
-    }
-
-    // Create merge with a custom delete set.
-    // For every Segment, a delete bitset can be provided, which
-    // will be merged with the existing bit set. Make sure the index
-    // corresponds to the segment index.
-    //
-    // If `None` is provided for custom alive set, the regular alive set will be used.
-    // If a alive_bitset is provided, the union between the provided and regular
-    // alive set will be used.
-    //
-    // This can be used to merge but also apply an additional filter.
-    // One use case is demux, which is basically taking a list of
-    // segments and partitions them e.g. by a value in a field.
-    pub fn open_with_custom_alive_set(
-        schema: Schema,
-        index_settings: IndexSettings,
-        segments: &[Segment],
-        alive_bitset_opt: Vec<Option<AliveBitSet>>,
-    ) -> crate::Result<IndexMerger> {
         let mut readers = vec![];
-        for (segment, new_alive_bitset_opt) in segments.iter().zip(alive_bitset_opt) {
+        for segment in segments {
             if segment.meta().num_docs() > 0 {
-                let reader =
-                    SegmentReader::open_with_custom_alive_set(segment, new_alive_bitset_opt)?;
+                let reader = SegmentReader::open(segment)?;
                 readers.push(reader);
             }
         }
@@ -352,7 +292,7 @@ impl IndexMerger {
                 .map(|(reader_ord, ff_reader)| {
                     let reader = &self.readers[*reader_ord as usize];
                     reader
-                        .doc_ids_alive()
+                        .doc_ids()
                         .map(move |doc_id| (doc_id, reader_ord, ff_reader))
                 });
 
@@ -383,18 +323,9 @@ impl IndexMerger {
                 }),
         );
 
-        let alive_bitsets: Vec<Option<ReadOnlyBitSet>> = self
-            .readers
-            .iter()
-            .map(|segment_reader| {
-                let alive_bitset = segment_reader.alive_bitset()?;
-                Some(alive_bitset.bitset().clone())
-            })
-            .collect();
         Ok(SegmentDocIdMapping::new(
             sorted_doc_ids,
             MappingType::Shuffled,
-            alive_bitsets,
         ))
     }
 
@@ -414,32 +345,15 @@ impl IndexMerger {
                 .iter()
                 .enumerate()
                 .flat_map(|(segment_ord, reader)| {
-                    reader.doc_ids_alive().map(move |doc_id| DocAddress {
+                    reader.doc_ids().map(move |doc_id| DocAddress {
                         segment_ord: segment_ord as u32,
                         doc_id,
                     })
                 }),
         );
 
-        let has_deletes: bool = self.readers.iter().any(SegmentReader::has_deletes);
-        let mapping_type = if has_deletes {
-            MappingType::StackedWithDeletes
-        } else {
-            MappingType::Stacked
-        };
-        let alive_bitsets: Vec<Option<ReadOnlyBitSet>> = self
-            .readers
-            .iter()
-            .map(|reader| {
-                let alive_bitset = reader.alive_bitset()?;
-                Some(alive_bitset.bitset().clone())
-            })
-            .collect();
-        Ok(SegmentDocIdMapping::new(
-            mapping,
-            mapping_type,
-            alive_bitsets,
-        ))
+        let mapping_type = MappingType::Stacked;
+        Ok(SegmentDocIdMapping::new(mapping, mapping_type))
     }
 
     fn write_postings_for_field(
@@ -525,16 +439,10 @@ impl IndexMerger {
 
             // Let's compute the list of non-empty posting lists
             for (segment_ord, term_info) in merged_terms.current_segment_ords_and_term_infos() {
-                let segment_reader = &self.readers[segment_ord];
                 let inverted_index: &InvertedIndexReader = &field_readers[segment_ord];
                 let segment_postings = inverted_index
                     .read_postings_from_terminfo(&term_info, segment_postings_option)?;
-                let alive_bitset_opt = segment_reader.alive_bitset();
-                let doc_freq = if let Some(alive_bitset) = alive_bitset_opt {
-                    segment_postings.doc_freq_given_deletes(alive_bitset)
-                } else {
-                    segment_postings.doc_freq()
-                };
+                let doc_freq = segment_postings.doc_freq();
                 if doc_freq > 0u32 {
                     total_doc_freq += doc_freq;
                     segment_postings_containing_the_term.push((segment_ord, segment_postings));
@@ -687,11 +595,8 @@ impl IndexMerger {
                 .map(|reader| reader.get_store_reader(50))
                 .collect::<Result<_, _>>()?;
 
-            let mut document_iterators: Vec<_> = store_readers
-                .iter()
-                .enumerate()
-                .map(|(i, store)| store.iter_raw(self.readers[i].alive_bitset()))
-                .collect();
+            let mut document_iterators: Vec<_> =
+                store_readers.iter().map(|store| store.iter_raw()).collect();
 
             for old_doc_addr in doc_id_mapping.iter_old_doc_addrs() {
                 let doc_bytes_it = &mut document_iterators[old_doc_addr.segment_ord as usize];
@@ -710,30 +615,7 @@ impl IndexMerger {
             debug!("trivial-doc-id-mapping");
             for reader in &self.readers {
                 let store_reader = reader.get_store_reader(1)?;
-                if reader.has_deletes()
-                    // If there is not enough data in the store, we avoid stacking in order to
-                    // avoid creating many small blocks in the doc store. Once we have 5 full blocks,
-                    // we start stacking. In the worst case 2/7 of the blocks would be very small.
-                    // [segment 1 - {1 doc}][segment 2 - {fullblock * 5}{1doc}]
-                    // => 5 * full blocks, 2 * 1 document blocks
-                    //
-                    // In a more realistic scenario the segments are of the same size, so 1/6 of
-                    // the doc stores would be on average half full, given total randomness (which
-                    // is not the case here, but not sure how it behaves exactly).
-                    //
-                    // https://github.com/quickwit-oss/tantivy/issues/1053
-                    //
-                    // take 7 in order to not walk over all checkpoints.
-                    || store_reader.block_checkpoints().take(7).count() < 6
-                    || store_reader.decompressor() != store_writer.compressor().into()
-                {
-                    for doc_bytes_res in store_reader.iter_raw(reader.alive_bitset()) {
-                        let doc_bytes = doc_bytes_res?;
-                        store_writer.store_bytes(&doc_bytes)?;
-                    }
-                } else {
-                    store_writer.stack(store_reader)?;
-                }
+                store_writer.stack(store_reader)?;
             }
         }
         Ok(())
@@ -1363,7 +1245,7 @@ mod tests {
                 .specialized_scorer(segment_reader, 1.0)?;
             // the difference compared to before is intrinsic to the bm25 formula. no worries
             // there.
-            for doc in segment_reader.doc_ids_alive() {
+            for doc in segment_reader.doc_ids() {
                 assert_eq!(term_scorer.doc(), doc);
                 assert_nearly_equals!(term_scorer.block_max_score(), 0.003478312);
                 assert_nearly_equals!(term_scorer.score(), 0.003478312);
@@ -1387,7 +1269,7 @@ mod tests {
             .specialized_weight(EnableScoring::enabled_from_searcher(&searcher))?
             .specialized_scorer(segment_reader, 1.0)?;
         // the difference compared to before is intrinsic to the bm25 formula. no worries there.
-        for doc in segment_reader.doc_ids_alive() {
+        for doc in segment_reader.doc_ids() {
             assert_eq!(term_scorer.doc(), doc);
             assert_nearly_equals!(term_scorer.block_max_score(), 0.003478312);
             assert_nearly_equals!(term_scorer.score(), 0.003478312);

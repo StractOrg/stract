@@ -18,7 +18,6 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::SystemTime;
 
 use tantivy::tokenizer::TokenizerManager;
 
@@ -87,11 +86,6 @@ impl Index {
         }
 
         self.inverted_index.insert(webpage)
-    }
-
-    pub fn delete_all_before(&self, timestamp: SystemTime) -> Result<()> {
-        self.inverted_index
-            .delete_all_before(tantivy::DateTime::from_utc(timestamp.into()))
     }
 
     pub fn commit(&mut self) -> Result<()> {

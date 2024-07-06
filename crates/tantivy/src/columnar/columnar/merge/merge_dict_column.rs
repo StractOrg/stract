@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use crate::common::{BitSet, CountingWriter, ReadOnlyBitSet};
+use crate::common::CountingWriter;
 use crate::sstable::{SSTable, Streamer, TermOrdinal, VoidSSTable};
 
 use super::term_merger::TermMerger;
@@ -101,30 +101,6 @@ impl<'a> RemappedTermOrdinalsValues<'a> {
     }
 }
 
-fn compute_term_bitset(column: &BytesColumn, row_bitset: &ReadOnlyBitSet) -> BitSet {
-    let num_terms = column.dictionary().num_terms();
-    let mut term_bitset = BitSet::with_max_value(num_terms as u32);
-    for row_id in row_bitset.iter() {
-        if let Some(term_ord) = column.term_ord_column.first(row_id) {
-            term_bitset.insert(term_ord as u32);
-        }
-    }
-    term_bitset
-}
-
-fn is_term_present(bitsets: &[Option<BitSet>], term_merger: &TermMerger) -> bool {
-    for (segment_ord, from_term_ord) in term_merger.matching_segments() {
-        if let Some(bitset) = bitsets[segment_ord].as_ref() {
-            if bitset.contains(from_term_ord as u32) {
-                return true;
-            }
-        } else {
-            return true;
-        }
-    }
-    false
-}
-
 fn serialize_merged_dict(
     bytes_columns: &[Option<BytesColumn>],
     merge_row_order: &MergeRowOrder,
@@ -160,30 +136,10 @@ fn serialize_merged_dict(
             }
             sstable_builder.finish()?;
         }
-        MergeRowOrder::Shuffled(shuffle_merge_order) => {
-            assert_eq!(shuffle_merge_order.alive_bitsets.len(), bytes_columns.len());
-            let mut term_bitsets: Vec<Option<BitSet>> = Vec::with_capacity(bytes_columns.len());
-            for (alive_bitset_opt, bytes_column_opt) in shuffle_merge_order
-                .alive_bitsets
-                .iter()
-                .zip(bytes_columns.iter())
-            {
-                match (alive_bitset_opt, bytes_column_opt) {
-                    (Some(alive_bitset), Some(bytes_column)) => {
-                        let term_bitset = compute_term_bitset(bytes_column, alive_bitset);
-                        term_bitsets.push(Some(term_bitset));
-                    }
-                    _ => {
-                        term_bitsets.push(None);
-                    }
-                }
-            }
+        MergeRowOrder::Shuffled(_) => {
             let mut current_term_ord = 0;
             while merged_terms.advance() {
                 let term_bytes: &[u8] = merged_terms.key();
-                if !is_term_present(&term_bitsets[..], &merged_terms) {
-                    continue;
-                }
                 sstable_builder.insert(term_bytes, &())?;
                 for (segment_ord, from_term_ord) in merged_terms.matching_segments() {
                     term_ord_mapping.register_from_to(segment_ord, from_term_ord, current_term_ord);

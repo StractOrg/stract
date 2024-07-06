@@ -8,7 +8,7 @@ use itertools::Itertools;
 
 use crate::directory::{CompositeFile, FileSlice};
 use crate::error::DataCorruption;
-use crate::fastfield::{intersect_alive_bitsets, AliveBitSet, FastFieldReaders};
+use crate::fastfield::FastFieldReaders;
 use crate::fieldnorm::{FieldNormReader, FieldNormReaders};
 use crate::index::{InvertedIndexReader, Segment, SegmentComponent, SegmentId};
 use crate::json_utils::json_path_sep_to_dot;
@@ -16,7 +16,7 @@ use crate::schema::{Field, IndexRecordOption, Schema, Type};
 use crate::space_usage::SegmentSpaceUsage;
 use crate::store::StoreReader;
 use crate::termdict::TermDictionary;
-use crate::{DocId, Opstamp};
+use crate::DocId;
 
 /// Entry point to access all of the datastructures of the `Segment`
 ///
@@ -33,10 +33,8 @@ pub struct SegmentReader {
     inv_idx_reader_cache: Arc<RwLock<HashMap<Field, Arc<InvertedIndexReader>>>>,
 
     segment_id: SegmentId,
-    delete_opstamp: Option<Opstamp>,
 
     max_doc: DocId,
-    num_docs: DocId,
 
     termdict_composite: CompositeFile,
     postings_composite: CompositeFile,
@@ -45,7 +43,6 @@ pub struct SegmentReader {
     fieldnorm_readers: FieldNormReaders,
 
     store_file: FileSlice,
-    alive_bitset_opt: Option<AliveBitSet>,
     schema: Schema,
 }
 
@@ -56,26 +53,14 @@ impl SegmentReader {
         self.max_doc
     }
 
-    /// Returns the number of alive documents.
-    /// Deleted documents are not counted.
+    /// Returns the number of documents.
     pub fn num_docs(&self) -> DocId {
-        self.num_docs
+        self.max_doc()
     }
 
     /// Returns the schema of the index this segment belongs to.
     pub fn schema(&self) -> &Schema {
         &self.schema
-    }
-
-    /// Return the number of documents that have been
-    /// deleted in the segment.
-    pub fn num_deleted_docs(&self) -> DocId {
-        self.max_doc - self.num_docs
-    }
-
-    /// Returns true if some of the documents of the segment have been deleted.
-    pub fn has_deletes(&self) -> bool {
-        self.num_deleted_docs() > 0
     }
 
     /// Accessor to a segment's fast field reader given a field.
@@ -125,14 +110,6 @@ impl SegmentReader {
 
     /// Open a new segment for reading.
     pub fn open(segment: &Segment) -> crate::Result<SegmentReader> {
-        Self::open_with_custom_alive_set(segment, None)
-    }
-
-    /// Open a new segment for reading.
-    pub fn open_with_custom_alive_set(
-        segment: &Segment,
-        custom_bitset: Option<AliveBitSet>,
-    ) -> crate::Result<SegmentReader> {
         let termdict_file = segment.open_read(SegmentComponent::Terms)?;
         let termdict_composite = CompositeFile::open(&termdict_file)?;
 
@@ -158,34 +135,17 @@ impl SegmentReader {
         let fieldnorm_data = segment.open_read(SegmentComponent::FieldNorms)?;
         let fieldnorm_readers = FieldNormReaders::open(fieldnorm_data)?;
 
-        let original_bitset = if segment.meta().has_deletes() {
-            let alive_doc_file_slice = segment.open_read(SegmentComponent::Delete)?;
-            let alive_doc_data = alive_doc_file_slice.read_bytes()?;
-            Some(AliveBitSet::open(alive_doc_data))
-        } else {
-            None
-        };
-
-        let alive_bitset_opt = intersect_alive_bitset(original_bitset, custom_bitset);
-
         let max_doc = segment.meta().max_doc();
-        let num_docs = alive_bitset_opt
-            .as_ref()
-            .map(|alive_bitset| alive_bitset.num_alive_docs() as u32)
-            .unwrap_or(max_doc);
 
         Ok(SegmentReader {
             inv_idx_reader_cache: Default::default(),
-            num_docs,
             max_doc,
             termdict_composite,
             postings_composite,
             fast_fields_readers,
             fieldnorm_readers,
             segment_id: segment.id(),
-            delete_opstamp: segment.meta().delete_opstamp(),
             store_file,
-            alive_bitset_opt,
             positions_composite,
             schema,
         })
@@ -371,31 +331,9 @@ impl SegmentReader {
         self.segment_id
     }
 
-    /// Returns the delete opstamp
-    pub fn delete_opstamp(&self) -> Option<Opstamp> {
-        self.delete_opstamp
-    }
-
-    /// Returns the bitset representing the alive `DocId`s.
-    pub fn alive_bitset(&self) -> Option<&AliveBitSet> {
-        self.alive_bitset_opt.as_ref()
-    }
-
-    /// Returns true if the `doc` is marked
-    /// as deleted.
-    pub fn is_deleted(&self, doc: DocId) -> bool {
-        self.alive_bitset()
-            .map(|alive_bitset| alive_bitset.is_deleted(doc))
-            .unwrap_or(false)
-    }
-
-    /// Returns an iterator that will iterate over the alive document ids
-    pub fn doc_ids_alive(&self) -> Box<dyn Iterator<Item = DocId> + Send + '_> {
-        if let Some(alive_bitset) = &self.alive_bitset_opt {
-            Box::new(alive_bitset.iter_alive())
-        } else {
-            Box::new(0u32..self.max_doc)
-        }
+    /// Returns an iterator that will iterate over the document ids
+    pub fn doc_ids(&self) -> Box<dyn Iterator<Item = DocId> + Send + '_> {
+        Box::new(0u32..self.max_doc)
     }
 
     /// Summarize total space usage of this segment.
@@ -408,10 +346,6 @@ impl SegmentReader {
             self.fast_fields_readers.space_usage(self.schema())?,
             self.fieldnorm_readers.space_usage(),
             self.get_store_reader(0)?.space_usage(),
-            self.alive_bitset_opt
-                .as_ref()
-                .map(AliveBitSet::space_usage)
-                .unwrap_or_default(),
         ))
     }
 }
@@ -475,21 +409,6 @@ pub fn merge_field_meta_data(
     merged_field_metadata
 }
 
-fn intersect_alive_bitset(
-    left_opt: Option<AliveBitSet>,
-    right_opt: Option<AliveBitSet>,
-) -> Option<AliveBitSet> {
-    match (left_opt, right_opt) {
-        (Some(left), Some(right)) => {
-            assert_eq!(left.bitset().max_value(), right.bitset().max_value());
-            Some(intersect_alive_bitsets(left, right))
-        }
-        (Some(left), None) => Some(left),
-        (None, Some(right)) => Some(right),
-        (None, None) => None,
-    }
-}
-
 impl fmt::Debug for SegmentReader {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "SegmentReader({:?})", self.segment_id)
@@ -500,7 +419,7 @@ impl fmt::Debug for SegmentReader {
 mod test {
     use super::*;
     use crate::index::Index;
-    use crate::schema::{SchemaBuilder, Term, STORED, TEXT};
+    use crate::schema::{SchemaBuilder, STORED, TEXT};
     use crate::IndexWriter;
 
     #[test]
@@ -634,47 +553,12 @@ mod test {
             index_writer.add_document(doc!(name => "horse"))?;
             index_writer.add_document(doc!(name => "jockey"))?;
             index_writer.add_document(doc!(name => "cap"))?;
-            // we should now have one segment with two docs
-            index_writer.delete_term(Term::from_field_text(name, "horse"));
-            index_writer.delete_term(Term::from_field_text(name, "cap"));
 
-            // ok, now we should have a deleted doc
             index_writer.commit()?;
         }
         let searcher = index.reader()?.searcher();
-        assert_eq!(2, searcher.segment_reader(0).num_docs());
+        assert_eq!(4, searcher.segment_reader(0).num_docs());
         assert_eq!(4, searcher.segment_reader(0).max_doc());
-        Ok(())
-    }
-    #[test]
-    fn test_alive_docs_iterator() -> crate::Result<()> {
-        let mut schema_builder = Schema::builder();
-        schema_builder.add_text_field("name", TEXT | STORED);
-        let schema = schema_builder.build();
-        let index = Index::create_in_ram(schema.clone());
-        let name = schema.get_field("name").unwrap();
-
-        {
-            let mut index_writer: IndexWriter = index.writer_for_tests()?;
-            index_writer.add_document(doc!(name => "tantivy"))?;
-            index_writer.add_document(doc!(name => "horse"))?;
-            index_writer.add_document(doc!(name => "jockey"))?;
-            index_writer.add_document(doc!(name => "cap"))?;
-            // we should now have one segment with two docs
-            index_writer.commit()?;
-        }
-
-        {
-            let mut index_writer2: IndexWriter = index.writer(50_000_000)?;
-            index_writer2.delete_term(Term::from_field_text(name, "horse"));
-            index_writer2.delete_term(Term::from_field_text(name, "cap"));
-
-            // ok, now we should have a deleted doc
-            index_writer2.commit()?;
-        }
-        let searcher = index.reader()?.searcher();
-        let docs: Vec<DocId> = searcher.segment_reader(0).doc_ids_alive().collect();
-        assert_eq!(vec![0u32, 2u32], docs);
         Ok(())
     }
 }

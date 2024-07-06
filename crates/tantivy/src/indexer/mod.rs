@@ -4,11 +4,9 @@
 //! `IndexWriter` is the main entry point for that, which created from
 //! [`Index::writer`](crate::Index::writer).
 
-pub(crate) mod delete_queue;
 pub(crate) mod path_to_unordered_id;
 
 pub(crate) mod doc_id_mapping;
-mod doc_opstamp_mapping;
 mod flat_map_with_buffer;
 pub(crate) mod index_writer;
 pub(crate) mod index_writer_status;
@@ -62,7 +60,7 @@ type AddBatchReceiver<D> = channel::Receiver<AddBatch<D>>;
 mod tests_mmap {
 
     use crate::schema::{Schema, TEXT};
-    use crate::{Index, IndexWriter, Term};
+    use crate::{Index, IndexWriter};
 
     #[test]
     fn test_advance_delete_bug() -> crate::Result<()> {
@@ -72,7 +70,6 @@ mod tests_mmap {
         let mut index_writer: IndexWriter = index.writer_for_tests()?;
         // there must be one deleted document in the segment
         index_writer.add_document(doc!(text_field=>"b"))?;
-        index_writer.delete_term(Term::from_field_text(text_field, "b"));
         // we need enough data to trigger the bug (at least 32 documents)
         for _ in 0..32 {
             index_writer.add_document(doc!(text_field=>"c"))?;

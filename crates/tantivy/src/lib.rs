@@ -463,161 +463,6 @@ pub mod tests {
         Ok(())
     }
 
-    fn advance_undeleted(docset: &mut dyn DocSet, reader: &SegmentReader) -> bool {
-        let mut doc = docset.advance();
-        while doc != TERMINATED {
-            if !reader.is_deleted(doc) {
-                return true;
-            }
-            doc = docset.advance();
-        }
-        false
-    }
-
-    #[test]
-    fn test_delete_postings1() -> crate::Result<()> {
-        let mut schema_builder = Schema::builder();
-        let text_field = schema_builder.add_text_field("text", TEXT);
-        let term_abcd = Term::from_field_text(text_field, "abcd");
-        let term_a = Term::from_field_text(text_field, "a");
-        let term_b = Term::from_field_text(text_field, "b");
-        let term_c = Term::from_field_text(text_field, "c");
-        let schema = schema_builder.build();
-        let index = Index::create_in_ram(schema);
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::Manual)
-            .try_into()
-            .unwrap();
-        {
-            // writing the segment
-            let mut index_writer: IndexWriter = index.writer_for_tests()?;
-            // 0
-            index_writer.add_document(doc!(text_field=>"a b"))?;
-            // 1
-            index_writer.add_document(doc!(text_field=>" a c"))?;
-            // 2
-            index_writer.add_document(doc!(text_field=>" b c"))?;
-            // 3
-            index_writer.add_document(doc!(text_field=>" b d"))?;
-
-            index_writer.delete_term(Term::from_field_text(text_field, "c"));
-            index_writer.delete_term(Term::from_field_text(text_field, "a"));
-            // 4
-            index_writer.add_document(doc!(text_field=>" b c"))?;
-            // 5
-            index_writer.add_document(doc!(text_field=>" a"))?;
-            index_writer.commit()?;
-        }
-        {
-            reader.reload()?;
-            let searcher = reader.searcher();
-            let segment_reader = searcher.segment_reader(0);
-            let inverted_index = segment_reader.inverted_index(text_field)?;
-            assert!(inverted_index
-                .read_postings(&term_abcd, IndexRecordOption::WithFreqsAndPositions)?
-                .is_none());
-            {
-                let mut postings = inverted_index
-                    .read_postings(&term_a, IndexRecordOption::WithFreqsAndPositions)?
-                    .unwrap();
-                assert!(advance_undeleted(&mut postings, segment_reader));
-                assert_eq!(postings.doc(), 5);
-                assert!(!advance_undeleted(&mut postings, segment_reader));
-            }
-            {
-                let mut postings = inverted_index
-                    .read_postings(&term_b, IndexRecordOption::WithFreqsAndPositions)?
-                    .unwrap();
-                assert!(advance_undeleted(&mut postings, segment_reader));
-                assert_eq!(postings.doc(), 3);
-                assert!(advance_undeleted(&mut postings, segment_reader));
-                assert_eq!(postings.doc(), 4);
-                assert!(!advance_undeleted(&mut postings, segment_reader));
-            }
-        }
-        {
-            // writing the segment
-            let mut index_writer: IndexWriter = index.writer_for_tests()?;
-            // 0
-            index_writer.add_document(doc!(text_field=>"a b"))?;
-            // 1
-            index_writer.delete_term(Term::from_field_text(text_field, "c"));
-            index_writer.rollback()?;
-        }
-        {
-            reader.reload()?;
-            let searcher = reader.searcher();
-            let seg_reader = searcher.segment_reader(0);
-            let inverted_index = seg_reader.inverted_index(term_abcd.field())?;
-
-            assert!(inverted_index
-                .read_postings(&term_abcd, IndexRecordOption::WithFreqsAndPositions)?
-                .is_none());
-            {
-                let mut postings = inverted_index
-                    .read_postings(&term_a, IndexRecordOption::WithFreqsAndPositions)?
-                    .unwrap();
-                assert!(advance_undeleted(&mut postings, seg_reader));
-                assert_eq!(postings.doc(), 5);
-                assert!(!advance_undeleted(&mut postings, seg_reader));
-            }
-            {
-                let mut postings = inverted_index
-                    .read_postings(&term_b, IndexRecordOption::WithFreqsAndPositions)?
-                    .unwrap();
-                assert!(advance_undeleted(&mut postings, seg_reader));
-                assert_eq!(postings.doc(), 3);
-                assert!(advance_undeleted(&mut postings, seg_reader));
-                assert_eq!(postings.doc(), 4);
-                assert!(!advance_undeleted(&mut postings, seg_reader));
-            }
-        }
-        {
-            // writing the segment
-            let mut index_writer: IndexWriter = index.writer_for_tests()?;
-            index_writer.add_document(doc!(text_field=>"a b"))?;
-            index_writer.delete_term(Term::from_field_text(text_field, "c"));
-            index_writer.rollback()?;
-            index_writer.delete_term(Term::from_field_text(text_field, "a"));
-            index_writer.commit()?;
-        }
-        {
-            reader.reload()?;
-            let searcher = reader.searcher();
-            let segment_reader = searcher.segment_reader(0);
-            let inverted_index = segment_reader.inverted_index(term_abcd.field())?;
-            assert!(inverted_index
-                .read_postings(&term_abcd, IndexRecordOption::WithFreqsAndPositions)?
-                .is_none());
-            {
-                let mut postings = inverted_index
-                    .read_postings(&term_a, IndexRecordOption::WithFreqsAndPositions)?
-                    .unwrap();
-                assert!(!advance_undeleted(&mut postings, segment_reader));
-            }
-            {
-                let mut postings = inverted_index
-                    .read_postings(&term_b, IndexRecordOption::WithFreqsAndPositions)?
-                    .unwrap();
-                assert!(advance_undeleted(&mut postings, segment_reader));
-                assert_eq!(postings.doc(), 3);
-                assert!(advance_undeleted(&mut postings, segment_reader));
-                assert_eq!(postings.doc(), 4);
-                assert!(!advance_undeleted(&mut postings, segment_reader));
-            }
-            {
-                let mut postings = inverted_index
-                    .read_postings(&term_c, IndexRecordOption::WithFreqsAndPositions)?
-                    .unwrap();
-                assert!(advance_undeleted(&mut postings, segment_reader));
-                assert_eq!(postings.doc(), 4);
-                assert!(!advance_undeleted(&mut postings, segment_reader));
-            }
-        }
-        Ok(())
-    }
-
     #[test]
     fn test_indexed_u64() -> crate::Result<()> {
         let mut schema_builder = Schema::builder();
@@ -704,35 +549,6 @@ pub mod tests {
         let segment_reader = searcher.segment_reader(0);
         let inverted_index = segment_reader.inverted_index(absent_field)?;
         assert_eq!(inverted_index.terms().num_terms(), 0);
-        Ok(())
-    }
-
-    #[test]
-    fn test_delete_postings2() -> crate::Result<()> {
-        let mut schema_builder = Schema::builder();
-        let text_field = schema_builder.add_text_field("text", TEXT);
-        let schema = schema_builder.build();
-        let index = Index::create_in_ram(schema);
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::Manual)
-            .try_into()?;
-
-        // writing the segment
-        let mut index_writer: IndexWriter = index.writer_for_tests()?;
-        index_writer.add_document(doc!(text_field=>"63"))?;
-        index_writer.add_document(doc!(text_field=>"70"))?;
-        index_writer.add_document(doc!(text_field=>"34"))?;
-        index_writer.add_document(doc!(text_field=>"1"))?;
-        index_writer.add_document(doc!(text_field=>"38"))?;
-        index_writer.add_document(doc!(text_field=>"33"))?;
-        index_writer.add_document(doc!(text_field=>"40"))?;
-        index_writer.add_document(doc!(text_field=>"17"))?;
-        index_writer.delete_term(Term::from_field_text(text_field, "38"));
-        index_writer.delete_term(Term::from_field_text(text_field, "34"));
-        index_writer.commit()?;
-        reader.reload()?;
-        assert_eq!(reader.searcher().num_docs(), 6);
         Ok(())
     }
 
@@ -1020,69 +836,6 @@ pub mod tests {
         Ok(())
     }
 
-    // motivated by #729
-    #[test]
-    fn test_update_via_delete_insert() -> crate::Result<()> {
-        use crate::collector::Count;
-        use crate::index::SegmentId;
-        use crate::indexer::NoMergePolicy;
-        use crate::query::AllQuery;
-
-        const DOC_COUNT: u64 = 2u64;
-
-        let mut schema_builder = SchemaBuilder::default();
-        let id = schema_builder.add_u64_field("id", INDEXED);
-        let schema = schema_builder.build();
-
-        let index = Index::create_in_ram(schema);
-        let index_reader = index.reader()?;
-
-        let mut index_writer: IndexWriter = index.writer_for_tests()?;
-        index_writer.set_merge_policy(Box::new(NoMergePolicy));
-
-        for doc_id in 0u64..DOC_COUNT {
-            index_writer.add_document(doc!(id => doc_id))?;
-        }
-        index_writer.commit()?;
-
-        index_reader.reload()?;
-        let searcher = index_reader.searcher();
-
-        assert_eq!(
-            searcher.search(&AllQuery, &Count).unwrap(),
-            DOC_COUNT as usize
-        );
-
-        // update the 10 elements by deleting and re-adding
-        for doc_id in 0u64..DOC_COUNT {
-            index_writer.delete_term(Term::from_field_u64(id, doc_id));
-            index_writer.commit()?;
-            index_reader.reload()?;
-            index_writer.add_document(doc!(id =>  doc_id))?;
-            index_writer.commit()?;
-            index_reader.reload()?;
-            let searcher = index_reader.searcher();
-            // The number of document should be stable.
-            assert_eq!(
-                searcher.search(&AllQuery, &Count).unwrap(),
-                DOC_COUNT as usize
-            );
-        }
-
-        index_reader.reload()?;
-        let searcher = index_reader.searcher();
-        let segment_ids: Vec<SegmentId> = searcher
-            .segment_readers()
-            .iter()
-            .map(|reader| reader.segment_id())
-            .collect();
-        index_writer.merge(&segment_ids).wait()?;
-        index_reader.reload()?;
-        let searcher = index_reader.searcher();
-        assert_eq!(searcher.search(&AllQuery, &Count)?, DOC_COUNT as usize);
-        Ok(())
-    }
-
     #[test]
     fn test_validate_checksum() -> crate::Result<()> {
         let index_path = tempfile::tempdir().expect("dir");
@@ -1099,9 +852,6 @@ pub mod tests {
         writer.commit()?;
         assert!(index.validate_checksum()?.is_empty());
 
-        // delete few docs
-        writer.delete_term(Term::from_field_text(body, "foo"));
-        writer.commit()?;
         let segment_ids = index.searchable_segment_ids()?;
         writer.merge(&segment_ids).wait()?;
         assert!(index.validate_checksum()?.is_empty());

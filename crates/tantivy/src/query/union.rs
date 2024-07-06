@@ -209,7 +209,7 @@ where
             .unwrap_or(0u32)
     }
 
-    fn count_including_deleted(&mut self) -> u32 {
+    fn count(&mut self) -> u32 {
         if self.doc == TERMINATED {
             return 0;
         }
@@ -281,7 +281,7 @@ mod tests {
             count += 1;
         }
         assert_eq!(union_expected.advance(), TERMINATED);
-        assert_eq!(count, make_union().count_including_deleted());
+        assert_eq!(count, make_union().count());
     }
 
     #[test]

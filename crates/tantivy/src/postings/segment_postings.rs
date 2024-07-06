@@ -1,11 +1,10 @@
 use crate::common::HasLen;
 
 use crate::docset::DocSet;
-use crate::fastfield::AliveBitSet;
 use crate::positions::PositionReader;
 use crate::postings::compression::COMPRESSION_BLOCK_SIZE;
 use crate::postings::{branchless_binary_search, BlockSegmentPostings, Postings};
-use crate::{DocId, TERMINATED};
+use crate::DocId;
 
 /// `SegmentPostings` represents the inverted list or postings associated with
 /// a term in a `Segment`.
@@ -26,25 +25,6 @@ impl SegmentPostings {
             block_cursor: BlockSegmentPostings::empty(),
             cur: 0,
             position_reader: None,
-        }
-    }
-
-    /// Compute the number of non-deleted documents.
-    ///
-    /// This method will clone and scan through the posting lists.
-    /// (this is a rather expensive operation).
-    pub fn doc_freq_given_deletes(&self, alive_bitset: &AliveBitSet) -> u32 {
-        let mut docset = self.clone();
-        let mut doc_freq = 0;
-        loop {
-            let doc = docset.doc();
-            if doc == TERMINATED {
-                return doc_freq;
-            }
-            if alive_bitset.is_alive(doc) {
-                doc_freq += 1u32;
-            }
-            docset.advance();
         }
     }
 
@@ -269,7 +249,6 @@ mod tests {
 
     use super::SegmentPostings;
     use crate::docset::{DocSet, TERMINATED};
-    use crate::fastfield::AliveBitSet;
     use crate::postings::postings::Postings;
 
     #[test]
@@ -297,10 +276,5 @@ mod tests {
     fn test_doc_freq() {
         let docs = SegmentPostings::create_from_docs(&[0, 2, 10]);
         assert_eq!(docs.doc_freq(), 3);
-        let alive_bitset = AliveBitSet::for_test_from_deleted_docs(&[2], 12);
-        assert_eq!(docs.doc_freq_given_deletes(&alive_bitset), 2);
-        let all_deleted =
-            AliveBitSet::for_test_from_deleted_docs(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 12);
-        assert_eq!(docs.doc_freq_given_deletes(&all_deleted), 0);
     }
 }

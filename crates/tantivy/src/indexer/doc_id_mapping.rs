@@ -1,8 +1,6 @@
 //! This module is used when sorting the index by a property, e.g.
 //! to get mappings from old doc_id to new doc_id and vice versa, after sorting
 
-use crate::common::ReadOnlyBitSet;
-
 use super::SegmentWriter;
 use crate::schema::{Field, Schema};
 use crate::{DocAddress, DocId, IndexSortByField, TantivyError};
@@ -10,7 +8,6 @@ use crate::{DocAddress, DocId, IndexSortByField, TantivyError};
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum MappingType {
     Stacked,
-    StackedWithDeletes,
     Shuffled,
 }
 
@@ -18,7 +15,6 @@ pub enum MappingType {
 #[derive(Clone)]
 pub(crate) struct SegmentDocIdMapping {
     pub(crate) new_doc_id_to_old_doc_addr: Vec<DocAddress>,
-    pub(crate) alive_bitsets: Vec<Option<ReadOnlyBitSet>>,
     mapping_type: MappingType,
 }
 
@@ -26,12 +22,10 @@ impl SegmentDocIdMapping {
     pub(crate) fn new(
         new_doc_id_to_old_doc_addr: Vec<DocAddress>,
         mapping_type: MappingType,
-        alive_bitsets: Vec<Option<ReadOnlyBitSet>>,
     ) -> Self {
         Self {
             new_doc_id_to_old_doc_addr,
             mapping_type,
-            alive_bitsets,
         }
     }
 
@@ -58,7 +52,7 @@ impl SegmentDocIdMapping {
     /// This allows for some optimization.
     pub(crate) fn is_trivial(&self) -> bool {
         match self.mapping_type {
-            MappingType::Stacked | MappingType::StackedWithDeletes => true,
+            MappingType::Stacked => true,
             MappingType::Shuffled => false,
         }
     }

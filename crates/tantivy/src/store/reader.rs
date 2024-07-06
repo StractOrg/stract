@@ -13,7 +13,6 @@ use super::index::SkipIndex;
 use super::Decompressor;
 use crate::directory::FileSlice;
 use crate::error::DataCorruption;
-use crate::fastfield::AliveBitSet;
 use crate::schema::document::{BinaryDocumentDeserializer, DocumentDeserialize};
 use crate::space_usage::StoreSpaceUsage;
 use crate::store::index::Checkpoint;
@@ -143,10 +142,6 @@ impl StoreReader {
         self.skip_index.checkpoints()
     }
 
-    pub(crate) fn decompressor(&self) -> Decompressor {
-        self.decompressor
-    }
-
     /// Returns the cache hit and miss statistics of the store reader.
     pub(crate) fn cache_stats(&self) -> CacheStats {
         self.cache.stats()
@@ -234,12 +229,8 @@ impl StoreReader {
 
     /// Iterator over all Documents in their order as they are stored in the doc store.
     /// Use this, if you want to extract all Documents from the doc store.
-    /// The `alive_bitset` has to be forwarded from the `SegmentReader` or the results may be wrong.
-    pub fn iter<'a: 'b, 'b, D: DocumentDeserialize>(
-        &'b self,
-        alive_bitset: Option<&'a AliveBitSet>,
-    ) -> impl Iterator<Item = crate::Result<D>> + 'b {
-        self.iter_raw(alive_bitset).map(|doc_bytes_res| {
+    pub fn iter<D: DocumentDeserialize>(&self) -> impl Iterator<Item = crate::Result<D>> + '_ {
+        self.iter_raw().map(|doc_bytes_res| {
             let mut doc_bytes = doc_bytes_res?;
 
             let deserializer = BinaryDocumentDeserializer::from_reader(&mut doc_bytes)
@@ -250,11 +241,7 @@ impl StoreReader {
 
     /// Iterator over all raw Documents in their order as they are stored in the doc store.
     /// Use this, if you want to extract all Documents from the doc store.
-    /// The `alive_bitset` has to be forwarded from the `SegmentReader` or the results may be wrong.
-    pub(crate) fn iter_raw<'a: 'b, 'b>(
-        &'b self,
-        alive_bitset: Option<&'a AliveBitSet>,
-    ) -> impl Iterator<Item = crate::Result<OwnedBytes>> + 'b {
+    pub(crate) fn iter_raw(&self) -> impl Iterator<Item = crate::Result<OwnedBytes>> + '_ {
         let last_doc_id = self
             .block_checkpoints()
             .last()
@@ -280,12 +267,7 @@ impl StoreReader {
                     doc_pos = 0;
                 }
 
-                let alive = alive_bitset.map_or(true, |bitset| bitset.is_alive(doc_id));
-                let res = if alive {
-                    Some((curr_block.clone(), doc_pos))
-                } else {
-                    None
-                };
+                let res = Some((curr_block.clone(), doc_pos));
                 doc_pos += 1;
                 res
             })

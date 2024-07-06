@@ -40,11 +40,6 @@ fn test_functional_store() -> crate::Result<()> {
     let mut doc_id = 0u64;
     for _iteration in 0..get_num_iterations() {
         let num_docs: usize = rng.gen_range(0..4);
-        if !doc_set.is_empty() {
-            let doc_to_remove_id = rng.gen_range(0..doc_set.len());
-            let removed_doc_id = doc_set.swap_remove(doc_to_remove_id);
-            index_writer.delete_term(Term::from_field_u64(id_field, removed_doc_id));
-        }
         for _ in 0..num_docs {
             doc_set.push(doc_id);
             index_writer.add_document(doc!(id_field=>doc_id))?;
@@ -112,9 +107,6 @@ fn test_functional_indexing_sorted() -> crate::Result<()> {
                 &searcher,
                 &committed_docs.iter().cloned().collect::<Vec<u64>>(),
             )?;
-        } else if committed_docs.remove(&random_val) || uncommitted_docs.remove(&random_val) {
-            let doc_id_term = Term::from_field_u64(id_field, random_val);
-            index_writer.delete_term(doc_id_term);
         } else {
             uncommitted_docs.insert(random_val);
             let mut doc = TantivyDocument::new();
@@ -188,9 +180,6 @@ fn test_functional_indexing_unsorted() -> crate::Result<()> {
                 &searcher,
                 &committed_docs.iter().cloned().collect::<Vec<u64>>(),
             )?;
-        } else if committed_docs.remove(&random_val) || uncommitted_docs.remove(&random_val) {
-            let doc_id_term = Term::from_field_u64(id_field, random_val);
-            index_writer.delete_term(doc_id_term);
         } else {
             uncommitted_docs.insert(random_val);
             let mut doc = TantivyDocument::new();

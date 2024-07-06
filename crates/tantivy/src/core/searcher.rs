@@ -28,6 +28,8 @@ use crate::{DocAddress, Index, Opstamp, TrackedObject};
 /// - `segment_id` (e.g. for immutable document level information)
 /// - `(generation_id, segment_id)` (e.g. for consistent dynamic column)
 /// - ...
+///
+/// TODO: After we have removed delete operations, should we maybe use a `segments: BTreeSet<SegmentId>` instead?
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SearcherGeneration {
     segments: BTreeMap<SegmentId, Option<Opstamp>>,
@@ -41,8 +43,7 @@ impl SearcherGeneration {
     ) -> Self {
         let mut segment_id_to_del_opstamp = BTreeMap::new();
         for segment_reader in segment_readers {
-            segment_id_to_del_opstamp
-                .insert(segment_reader.segment_id(), segment_reader.delete_opstamp());
+            segment_id_to_del_opstamp.insert(segment_reader.segment_id(), None);
         }
         Self {
             segments: segment_id_to_del_opstamp,
@@ -251,7 +252,7 @@ impl SearcherInner {
         assert_eq!(
             &segment_readers
                 .iter()
-                .map(|reader| (reader.segment_id(), reader.delete_opstamp()))
+                .map(|reader| (reader.segment_id(), None))
                 .collect::<BTreeMap<_, _>>(),
             generation.segments(),
             "Set of segments referenced by this Searcher and its SearcherGeneration must match"

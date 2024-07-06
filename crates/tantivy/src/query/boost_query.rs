@@ -1,7 +1,6 @@
 use std::fmt;
 
 use crate::docset::COLLECT_BLOCK_BUFFER_LEN;
-use crate::fastfield::AliveBitSet;
 use crate::query::{EnableScoring, Explanation, Query, Scorer, Weight};
 use crate::{DocId, DocSet, Score, SegmentReader, Term};
 
@@ -117,12 +116,8 @@ impl<S: Scorer> DocSet for BoostScorer<S> {
         self.underlying.size_hint()
     }
 
-    fn count(&mut self, alive_bitset: &AliveBitSet) -> u32 {
-        self.underlying.count(alive_bitset)
-    }
-
-    fn count_including_deleted(&mut self) -> u32 {
-        self.underlying.count_including_deleted()
+    fn count(&mut self) -> u32 {
+        self.underlying.count()
     }
 }
 

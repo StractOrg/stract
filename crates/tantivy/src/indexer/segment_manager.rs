@@ -5,7 +5,6 @@ use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use super::segment_register::SegmentRegister;
 use crate::error::TantivyError;
 use crate::index::{SegmentId, SegmentMeta};
-use crate::indexer::delete_queue::DeleteCursor;
 use crate::indexer::SegmentEntry;
 
 #[derive(Default)]
@@ -64,14 +63,11 @@ impl Debug for SegmentManager {
 }
 
 impl SegmentManager {
-    pub fn from_segments(
-        segment_metas: Vec<SegmentMeta>,
-        delete_cursor: &DeleteCursor,
-    ) -> SegmentManager {
+    pub fn from_segments(segment_metas: Vec<SegmentMeta>) -> SegmentManager {
         SegmentManager {
             registers: RwLock::new(SegmentRegisters {
                 uncommitted: SegmentRegister::default(),
-                committed: SegmentRegister::new(segment_metas, delete_cursor),
+                committed: SegmentRegister::new(segment_metas),
             }),
         }
     }

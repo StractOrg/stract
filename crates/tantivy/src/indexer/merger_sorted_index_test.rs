@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
     use crate::collector::TopDocs;
-    use crate::fastfield::AliveBitSet;
     use crate::index::Index;
     use crate::postings::Postings;
     use crate::query::QueryParser;
@@ -112,7 +111,6 @@ mod tests {
             index_writer
                 .add_document(doc!(int_field=>1_000u64, text_field => "the biggest num"))?;
 
-            index_writer.delete_term(Term::from_field_text(text_field, "deleteme"));
             index_writer.commit()?;
         }
 
@@ -169,15 +167,17 @@ mod tests {
 
         let fast_fields = segment_reader.fast_fields();
         let fast_field = fast_fields.u64("intval").unwrap();
-        assert_eq!(fast_field.first(5), Some(1u64));
-        assert_eq!(fast_field.first(4), Some(2u64));
-        assert_eq!(fast_field.first(3), Some(3u64));
+        assert_eq!(fast_field.first(7), Some(1u64));
         if force_disjunct_segment_sort_values {
-            assert_eq!(fast_field.first(2), Some(20u64));
-            assert_eq!(fast_field.first(1), Some(100u64));
+            assert_eq!(fast_field.first(6), Some(2u64));
+            assert_eq!(fast_field.first(5), Some(3u64));
+            assert_eq!(fast_field.first(4), Some(10u64));
+            assert_eq!(fast_field.first(3), Some(20u64));
         } else {
-            assert_eq!(fast_field.first(2), Some(10u64));
-            assert_eq!(fast_field.first(1), Some(20u64));
+            assert_eq!(fast_field.first(6), Some(1u64));
+            assert_eq!(fast_field.first(5), Some(2u64));
+            assert_eq!(fast_field.first(4), Some(3u64));
+            assert_eq!(fast_field.first(3), Some(5u64));
         }
         assert_eq!(fast_field.first(0), Some(1_000u64));
 
@@ -187,14 +187,16 @@ mod tests {
             let fieldnorm_reader = segment_reader.get_fieldnorms_reader(my_text_field).unwrap();
             assert_eq!(fieldnorm_reader.fieldnorm(0), 3);
             if force_disjunct_segment_sort_values {
-                assert_eq!(fieldnorm_reader.fieldnorm(1), 1); // blubber
-                assert_eq!(fieldnorm_reader.fieldnorm(2), 4);
-            } else {
-                assert_eq!(fieldnorm_reader.fieldnorm(1), 4);
                 assert_eq!(fieldnorm_reader.fieldnorm(2), 1); // blubber
+                assert_eq!(fieldnorm_reader.fieldnorm(3), 4);
+                assert_eq!(fieldnorm_reader.fieldnorm(5), 2); // some text
+                assert_eq!(fieldnorm_reader.fieldnorm(7), 1);
+            } else {
+                assert_eq!(fieldnorm_reader.fieldnorm(2), 1);
+                assert_eq!(fieldnorm_reader.fieldnorm(3), 1); // blubber
+                assert_eq!(fieldnorm_reader.fieldnorm(5), 4); // some text
+                assert_eq!(fieldnorm_reader.fieldnorm(7), 5);
             }
-            assert_eq!(fieldnorm_reader.fieldnorm(3), 2); // some text
-            assert_eq!(fieldnorm_reader.fieldnorm(5), 1);
         }
 
         let my_text_field = index.schema().get_field("text_field").unwrap();
@@ -212,10 +214,11 @@ mod tests {
                 top_docs.iter().map(|el| el.1.doc_id).collect::<Vec<_>>()
             };
 
-            assert_eq!(do_search("some"), vec![3]);
             if force_disjunct_segment_sort_values {
+                assert_eq!(do_search("some"), vec![5]);
                 assert_eq!(do_search("blubber"), vec![1]);
             } else {
+                assert_eq!(do_search("some"), vec![4]);
                 assert_eq!(do_search("blubber"), vec![2]);
             }
             assert_eq!(do_search("biggest"), vec![0]);
@@ -231,14 +234,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
 
-            assert_eq!(postings.doc_freq(), 4);
-            let fallback_bitset = AliveBitSet::for_test_from_deleted_docs(&[0], 100);
-            assert_eq!(
-                postings.doc_freq_given_deletes(
-                    segment_reader.alive_bitset().unwrap_or(&fallback_bitset)
-                ),
-                4
-            );
+            assert_eq!(postings.doc_freq(), 6);
 
             assert_eq!(postings.term_freq(), 2);
             let mut output = vec![];
@@ -246,9 +242,15 @@ mod tests {
             assert_eq!(output, vec![1, 3]);
             postings.advance();
 
-            assert_eq!(postings.term_freq(), 1);
-            postings.positions(&mut output);
-            assert_eq!(output, vec![1]);
+            if force_disjunct_segment_sort_values {
+                assert_eq!(postings.term_freq(), 2);
+                postings.positions(&mut output);
+                assert_eq!(output, vec![3, 5]);
+            } else {
+                assert_eq!(postings.term_freq(), 1);
+                postings.positions(&mut output);
+                assert_eq!(output, vec![1]);
+            }
         }
 
         // access doc store
@@ -305,8 +307,8 @@ mod tests {
             };
 
             assert_eq!(do_search("some"), vec![1]);
-            assert_eq!(do_search("blubber"), vec![3]);
-            assert_eq!(do_search("biggest"), vec![4]);
+            assert_eq!(do_search("blubber"), vec![4]);
+            assert_eq!(do_search("biggest"), vec![6]);
         }
 
         // postings file
@@ -318,14 +320,7 @@ mod tests {
                 .read_postings(&term_a, IndexRecordOption::WithFreqsAndPositions)
                 .unwrap()
                 .unwrap();
-            assert_eq!(postings.doc_freq(), 4);
-            let fallback_bitset = AliveBitSet::for_test_from_deleted_docs(&[0], 100);
-            assert_eq!(
-                postings.doc_freq_given_deletes(
-                    segment_reader.alive_bitset().unwrap_or(&fallback_bitset)
-                ),
-                3
-            );
+            assert_eq!(postings.doc_freq(), 6);
 
             assert_eq!(postings.term_freq(), 1);
             let mut output = vec![];

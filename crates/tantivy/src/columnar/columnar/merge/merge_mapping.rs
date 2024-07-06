@@ -1,7 +1,5 @@
 use std::ops::Range;
 
-use crate::common::{BitSet, OwnedBytes, ReadOnlyBitSet};
-
 use crate::columnar::{ColumnarReader, RowAddr, RowId};
 
 pub struct StackMergeOrder {
@@ -85,40 +83,9 @@ impl MergeRowOrder {
 
 pub struct ShuffleMergeOrder {
     pub new_row_id_to_old_row_id: Vec<RowAddr>,
-    pub alive_bitsets: Vec<Option<ReadOnlyBitSet>>,
 }
 
 impl ShuffleMergeOrder {
-    pub fn for_test(
-        segment_num_rows: &[RowId],
-        new_row_id_to_old_row_id: Vec<RowAddr>,
-    ) -> ShuffleMergeOrder {
-        let mut alive_bitsets: Vec<BitSet> = segment_num_rows
-            .iter()
-            .map(|&num_rows| BitSet::with_max_value(num_rows))
-            .collect();
-        for &RowAddr {
-            segment_ord,
-            row_id,
-        } in &new_row_id_to_old_row_id
-        {
-            alive_bitsets[segment_ord as usize].insert(row_id);
-        }
-        let alive_bitsets: Vec<Option<ReadOnlyBitSet>> = alive_bitsets
-            .into_iter()
-            .map(|alive_bitset| {
-                let mut buffer = Vec::new();
-                alive_bitset.serialize(&mut buffer).unwrap();
-                let data = OwnedBytes::new(buffer);
-                Some(ReadOnlyBitSet::open(data))
-            })
-            .collect();
-        ShuffleMergeOrder {
-            new_row_id_to_old_row_id,
-            alive_bitsets,
-        }
-    }
-
     pub fn num_rows(&self) -> RowId {
         self.new_row_id_to_old_row_id.len() as RowId
     }

@@ -22,14 +22,12 @@
 pub use crate::columnar::Column;
 use crate::columnar::MonotonicallyMappableToU64;
 
-pub use self::alive_bitset::{intersect_alive_bitsets, write_alive_bitset, AliveBitSet};
 pub use self::error::{FastFieldNotAvailableError, Result};
 pub use self::readers::FastFieldReaders;
 pub use self::writer::FastFieldsWriter;
 use crate::schema::Type;
 use crate::DateTime;
 
-mod alive_bitset;
 mod error;
 mod readers;
 mod writer;

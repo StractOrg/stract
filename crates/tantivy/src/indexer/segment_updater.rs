@@ -11,10 +11,7 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 use super::segment_manager::SegmentManager;
 use crate::core::META_FILEPATH;
 use crate::directory::{Directory, DirectoryClone, GarbageCollectionResult};
-use crate::fastfield::AliveBitSet;
 use crate::index::{Index, IndexMeta, IndexSettings, Segment, SegmentId, SegmentMeta};
-use crate::indexer::delete_queue::DeleteCursor;
-use crate::indexer::index_writer::advance_deletes;
 use crate::indexer::merge_operation::MergeOperationInventory;
 use crate::indexer::merger::IndexMerger;
 use crate::indexer::segment_manager::SegmentsStatus;
@@ -85,11 +82,7 @@ fn garbage_collect_files(
 
 /// Merges a list of segments the list of segment givens in the `segment_entries`.
 /// This function happens in the calling thread and is computationally expensive.
-fn merge(
-    index: &Index,
-    mut segment_entries: Vec<SegmentEntry>,
-    target_opstamp: Opstamp,
-) -> crate::Result<Option<SegmentEntry>> {
+fn merge(index: &Index, segment_entries: Vec<SegmentEntry>) -> crate::Result<Option<SegmentEntry>> {
     let num_docs = segment_entries
         .iter()
         .map(|segment| segment.meta().num_docs() as u64)
@@ -98,16 +91,7 @@ fn merge(
         return Ok(None);
     }
 
-    // first we need to apply deletes to our segment.
     let merged_segment = index.new_segment();
-
-    // First we apply all of the delete to the merged segment, up to the target opstamp.
-    for segment_entry in &mut segment_entries {
-        let segment = index.segment(segment_entry.meta().clone());
-        advance_deletes(segment, segment_entry, target_opstamp)?;
-    }
-
-    let delete_cursor = segment_entries[0].delete_cursor().clone();
 
     let segments: Vec<Segment> = segment_entries
         .iter()
@@ -126,7 +110,7 @@ fn merge(
     let merged_segment_id = merged_segment.id();
 
     let segment_meta = index.new_segment_meta(merged_segment_id, num_docs);
-    Ok(Some(SegmentEntry::new(segment_meta, delete_cursor, None)))
+    Ok(Some(SegmentEntry::new(segment_meta)))
 }
 
 /// Advanced: Merges a list of segments from different indices in a new index.
@@ -170,8 +154,7 @@ pub fn merge_indices<T: Into<Box<dyn Directory>>>(
         segments.extend(index.searchable_segments()?);
     }
 
-    let non_filter = segments.iter().map(|_| None).collect::<Vec<_>>();
-    merge_filtered_segments(&segments, target_settings, non_filter, output_directory)
+    merge_filtered_segments(&segments, target_settings, output_directory)
 }
 
 /// Advanced: Merges a list of segments from different indices in a new index.
@@ -190,7 +173,6 @@ pub fn merge_indices<T: Into<Box<dyn Directory>>>(
 pub fn merge_filtered_segments<T: Into<Box<dyn Directory>>>(
     segments: &[Segment],
     target_settings: IndexSettings,
-    filter_doc_ids: Vec<Option<AliveBitSet>>,
     output_directory: T,
 ) -> crate::Result<Index> {
     if segments.is_empty() {
@@ -220,11 +202,10 @@ pub fn merge_filtered_segments<T: Into<Box<dyn Directory>>>(
     )?;
     let merged_segment = merged_index.new_segment();
     let merged_segment_id = merged_segment.id();
-    let merger: IndexMerger = IndexMerger::open_with_custom_alive_set(
+    let merger: IndexMerger = IndexMerger::open(
         merged_index.schema(),
         merged_index.settings().clone(),
         segments,
-        filter_doc_ids,
     )?;
     let segment_serializer = SegmentSerializer::for_segment(merged_segment, true)?;
     let num_docs = merger.write(segment_serializer)?;
@@ -276,13 +257,9 @@ pub(crate) struct InnerSegmentUpdater {
 }
 
 impl SegmentUpdater {
-    pub fn create(
-        index: Index,
-        stamper: Stamper,
-        delete_cursor: &DeleteCursor,
-    ) -> crate::Result<SegmentUpdater> {
+    pub fn create(index: Index, stamper: Stamper) -> crate::Result<SegmentUpdater> {
         let segments = index.searchable_segment_metas()?;
-        let segment_manager = SegmentManager::from_segments(segments, delete_cursor);
+        let segment_manager = SegmentManager::from_segments(segments);
         let pool = ThreadPoolBuilder::new()
             .thread_name(|_| "segment_updater".to_string())
             .num_threads(1)
@@ -363,19 +340,6 @@ impl SegmentUpdater {
         !self.killed.load(Ordering::Acquire)
     }
 
-    /// Apply deletes up to the target opstamp to all segments.
-    ///
-    /// The method returns copies of the segment entries,
-    /// updated with the delete information.
-    fn purge_deletes(&self, target_opstamp: Opstamp) -> crate::Result<Vec<SegmentEntry>> {
-        let mut segment_entries = self.segment_manager.segment_entries();
-        for segment_entry in &mut segment_entries {
-            let segment = self.index.segment(segment_entry.meta().clone());
-            advance_deletes(segment, segment_entry, target_opstamp)?;
-        }
-        Ok(segment_entries)
-    }
-
     pub fn save_metas(
         &self,
         opstamp: Opstamp,
@@ -441,7 +405,7 @@ impl SegmentUpdater {
     ) -> FutureResult<Opstamp> {
         let segment_updater: SegmentUpdater = self.clone();
         self.schedule_task(move || {
-            let segment_entries = segment_updater.purge_deletes(opstamp)?;
+            let segment_entries = segment_updater.segment_manager.segment_entries();
             segment_updater.segment_manager.commit(segment_entries);
             segment_updater.save_metas(opstamp, payload)?;
             let _ = garbage_collect_files(segment_updater.clone());
@@ -514,11 +478,7 @@ impl SegmentUpdater {
             // Its lifetime is used to track how many merging thread are currently running,
             // as well as which segment is currently in merge and therefore should not be
             // candidate for another merge.
-            match merge(
-                &segment_updater.index,
-                segment_entries,
-                merge_operation.target_opstamp(),
-            ) {
+            match merge(&segment_updater.index, segment_entries) {
                 Ok(after_merge_segment_entry) => {
                     let res = segment_updater.end_merge(merge_operation, after_merge_segment_entry);
                     let _send_result = merging_future_send.send(res);
@@ -582,7 +542,7 @@ impl SegmentUpdater {
     fn end_merge(
         &self,
         merge_operation: MergeOperation,
-        mut after_merge_segment_entry: Option<SegmentEntry>,
+        after_merge_segment_entry: Option<SegmentEntry>,
     ) -> crate::Result<Option<SegmentMeta>> {
         let segment_updater = self.clone();
         let after_merge_segment_meta = after_merge_segment_entry
@@ -594,38 +554,6 @@ impl SegmentUpdater {
                 after_merge_segment_entry.as_ref().map(|entry| entry.meta())
             );
             {
-                if let Some(after_merge_segment_entry) = after_merge_segment_entry.as_mut() {
-                    // Deletes and commits could have happened as we were merging.
-                    // We need to make sure we are up to date with deletes before accepting the
-                    // segment.
-                    let mut delete_cursor = after_merge_segment_entry.delete_cursor().clone();
-                    if let Some(delete_operation) = delete_cursor.get() {
-                        let committed_opstamp = segment_updater.load_meta().opstamp;
-                        if delete_operation.opstamp < committed_opstamp {
-                            // We are not up to date! Let's create a new tombstone file for our
-                            // freshly create split.
-                            let index = &segment_updater.index;
-                            let segment = index.segment(after_merge_segment_entry.meta().clone());
-                            if let Err(advance_deletes_err) = advance_deletes(
-                                segment,
-                                after_merge_segment_entry,
-                                committed_opstamp,
-                            ) {
-                                error!(
-                                    "Merge of {:?} was cancelled (advancing deletes failed): {:?}",
-                                    merge_operation.segment_ids(),
-                                    advance_deletes_err
-                                );
-                                assert!(!cfg!(test), "Merge failed.");
-
-                                // ... cancel merge
-                                // `merge_operations` are tracked. As it is dropped, the
-                                // the segment_ids will be available again for merge.
-                                return Err(advance_deletes_err);
-                            }
-                        }
-                    }
-                }
                 let previous_metas = segment_updater.load_meta();
                 let segments_status = segment_updater
                     .segment_manager
@@ -670,153 +598,9 @@ impl SegmentUpdater {
 #[cfg(test)]
 mod tests {
     use super::merge_indices;
-    use crate::collector::TopDocs;
     use crate::directory::RamDirectory;
-    use crate::fastfield::AliveBitSet;
-    use crate::indexer::merge_policy::tests::MergeWheneverPossible;
-    use crate::indexer::merger::IndexMerger;
-    use crate::indexer::segment_updater::merge_filtered_segments;
-    use crate::query::QueryParser;
     use crate::schema::*;
-    use crate::{Directory, DocAddress, Index, Segment};
-
-    #[test]
-    fn test_delete_during_merge() -> crate::Result<()> {
-        let mut schema_builder = Schema::builder();
-        let text_field = schema_builder.add_text_field("text", TEXT);
-        let index = Index::create_in_ram(schema_builder.build());
-
-        // writing the segment
-        let mut index_writer = index.writer_for_tests()?;
-        index_writer.set_merge_policy(Box::new(MergeWheneverPossible));
-
-        for _ in 0..100 {
-            index_writer.add_document(doc!(text_field=>"a"))?;
-            index_writer.add_document(doc!(text_field=>"b"))?;
-        }
-        index_writer.commit()?;
-
-        for _ in 0..100 {
-            index_writer.add_document(doc!(text_field=>"c"))?;
-            index_writer.add_document(doc!(text_field=>"d"))?;
-        }
-        index_writer.commit()?;
-
-        index_writer.add_document(doc!(text_field=>"e"))?;
-        index_writer.add_document(doc!(text_field=>"f"))?;
-        index_writer.commit()?;
-
-        let term = Term::from_field_text(text_field, "a");
-        index_writer.delete_term(term);
-        index_writer.commit()?;
-
-        let reader = index.reader()?;
-        assert_eq!(reader.searcher().num_docs(), 302);
-
-        index_writer.wait_merging_threads()?;
-
-        reader.reload()?;
-        assert_eq!(reader.searcher().segment_readers().len(), 1);
-        assert_eq!(reader.searcher().num_docs(), 302);
-        Ok(())
-    }
-
-    #[test]
-    fn delete_all_docs_min() -> crate::Result<()> {
-        let mut schema_builder = Schema::builder();
-        let text_field = schema_builder.add_text_field("text", TEXT);
-        let index = Index::create_in_ram(schema_builder.build());
-
-        // writing the segment
-        let mut index_writer = index.writer_for_tests()?;
-
-        for _ in 0..10 {
-            index_writer.add_document(doc!(text_field=>"a"))?;
-            index_writer.add_document(doc!(text_field=>"b"))?;
-        }
-        index_writer.commit()?;
-
-        let seg_ids = index.searchable_segment_ids()?;
-        // docs exist, should have at least 1 segment
-        assert!(!seg_ids.is_empty());
-
-        let term = Term::from_field_text(text_field, "a");
-        index_writer.delete_term(term);
-        index_writer.commit()?;
-
-        let term = Term::from_field_text(text_field, "b");
-        index_writer.delete_term(term);
-        index_writer.commit()?;
-
-        index_writer.wait_merging_threads()?;
-
-        let reader = index.reader()?;
-        assert_eq!(reader.searcher().num_docs(), 0);
-
-        let seg_ids = index.searchable_segment_ids()?;
-        assert!(seg_ids.is_empty());
-
-        reader.reload()?;
-        assert_eq!(reader.searcher().num_docs(), 0);
-        // empty segments should be erased
-        assert!(index.searchable_segment_metas()?.is_empty());
-        assert!(reader.searcher().segment_readers().is_empty());
-
-        Ok(())
-    }
-
-    #[test]
-    fn delete_all_docs() -> crate::Result<()> {
-        let mut schema_builder = Schema::builder();
-        let text_field = schema_builder.add_text_field("text", TEXT);
-        let index = Index::create_in_ram(schema_builder.build());
-
-        // writing the segment
-        let mut index_writer = index.writer_for_tests()?;
-
-        for _ in 0..100 {
-            index_writer.add_document(doc!(text_field=>"a"))?;
-            index_writer.add_document(doc!(text_field=>"b"))?;
-        }
-        index_writer.commit()?;
-
-        for _ in 0..100 {
-            index_writer.add_document(doc!(text_field=>"c"))?;
-            index_writer.add_document(doc!(text_field=>"d"))?;
-        }
-        index_writer.commit()?;
-
-        index_writer.add_document(doc!(text_field=>"e"))?;
-        index_writer.add_document(doc!(text_field=>"f"))?;
-        index_writer.commit()?;
-
-        let seg_ids = index.searchable_segment_ids()?;
-        // docs exist, should have at least 1 segment
-        assert!(!seg_ids.is_empty());
-
-        let term_vals = vec!["a", "b", "c", "d", "e", "f"];
-        for term_val in term_vals {
-            let term = Term::from_field_text(text_field, term_val);
-            index_writer.delete_term(term);
-            index_writer.commit()?;
-        }
-
-        index_writer.wait_merging_threads()?;
-
-        let reader = index.reader()?;
-        assert_eq!(reader.searcher().num_docs(), 0);
-
-        let seg_ids = index.searchable_segment_ids()?;
-        assert!(seg_ids.is_empty());
-
-        reader.reload()?;
-        assert_eq!(reader.searcher().num_docs(), 0);
-        // empty segments should be erased
-        assert!(index.searchable_segment_metas()?.is_empty());
-        assert!(reader.searcher().segment_readers().is_empty());
-
-        Ok(())
-    }
+    use crate::{Directory, Index};
 
     #[test]
     fn test_remove_all_segments() -> crate::Result<()> {
@@ -912,185 +696,6 @@ mod tests {
         // mismatched schema index list
         let result = merge_indices(&[first_index, second_index], RamDirectory::default());
         assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_merge_filtered_segments() -> crate::Result<()> {
-        let first_index = {
-            let mut schema_builder = Schema::builder();
-            let text_field = schema_builder.add_text_field("text", TEXT);
-            let index = Index::create_in_ram(schema_builder.build());
-            let mut index_writer = index.writer_for_tests()?;
-            index_writer.add_document(doc!(text_field=>"some text 1"))?;
-            index_writer.add_document(doc!(text_field=>"some text 2"))?;
-            index_writer.commit()?;
-            index
-        };
-
-        let second_index = {
-            let mut schema_builder = Schema::builder();
-            let text_field = schema_builder.add_text_field("text", TEXT);
-            let index = Index::create_in_ram(schema_builder.build());
-            let mut index_writer = index.writer_for_tests()?;
-            index_writer.add_document(doc!(text_field=>"some text 3"))?;
-            index_writer.add_document(doc!(text_field=>"some text 4"))?;
-            index_writer.delete_term(Term::from_field_text(text_field, "4"));
-
-            index_writer.commit()?;
-            index
-        };
-
-        let mut segments: Vec<Segment> = Vec::new();
-        segments.extend(first_index.searchable_segments()?);
-        segments.extend(second_index.searchable_segments()?);
-
-        let target_settings = first_index.settings().clone();
-
-        let filter_segment_1 = AliveBitSet::for_test_from_deleted_docs(&[1], 2);
-        let filter_segment_2 = AliveBitSet::for_test_from_deleted_docs(&[0], 2);
-
-        let filter_segments = vec![Some(filter_segment_1), Some(filter_segment_2)];
-
-        let merged_index = merge_filtered_segments(
-            &segments,
-            target_settings,
-            filter_segments,
-            RamDirectory::default(),
-        )?;
-
-        let segments = merged_index.searchable_segments()?;
-        assert_eq!(segments.len(), 1);
-
-        let segment_metas = segments[0].meta();
-        assert_eq!(segment_metas.num_deleted_docs(), 0);
-        assert_eq!(segment_metas.num_docs(), 1);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_merge_single_filtered_segments() -> crate::Result<()> {
-        let first_index = {
-            let mut schema_builder = Schema::builder();
-            let text_field = schema_builder.add_text_field("text", TEXT);
-            let index = Index::create_in_ram(schema_builder.build());
-            let mut index_writer = index.writer_for_tests()?;
-            index_writer.add_document(doc!(text_field=>"test text"))?;
-            index_writer.add_document(doc!(text_field=>"some text 2"))?;
-
-            index_writer.add_document(doc!(text_field=>"some text 3"))?;
-            index_writer.add_document(doc!(text_field=>"some text 4"))?;
-
-            index_writer.delete_term(Term::from_field_text(text_field, "4"));
-
-            index_writer.commit()?;
-            index
-        };
-
-        let mut segments: Vec<Segment> = Vec::new();
-        segments.extend(first_index.searchable_segments()?);
-
-        let target_settings = first_index.settings().clone();
-
-        let filter_segment = AliveBitSet::for_test_from_deleted_docs(&[0], 4);
-
-        let filter_segments = vec![Some(filter_segment)];
-
-        let index = merge_filtered_segments(
-            &segments,
-            target_settings,
-            filter_segments,
-            RamDirectory::default(),
-        )?;
-
-        let segments = index.searchable_segments()?;
-        assert_eq!(segments.len(), 1);
-
-        let segment_metas = segments[0].meta();
-        assert_eq!(segment_metas.num_deleted_docs(), 0);
-        assert_eq!(segment_metas.num_docs(), 2);
-
-        let searcher = index.reader()?.searcher();
-        {
-            let text_field = index.schema().get_field("text").unwrap();
-
-            let do_search = |term: &str| {
-                let query = QueryParser::for_index(&index, vec![text_field])
-                    .parse_query(term)
-                    .unwrap();
-                let top_docs: Vec<(f32, DocAddress)> =
-                    searcher.search(&query, &TopDocs::with_limit(3)).unwrap();
-
-                top_docs.iter().map(|el| el.1.doc_id).collect::<Vec<_>>()
-            };
-
-            assert_eq!(do_search("test"), vec![] as Vec<u32>);
-            assert_eq!(do_search("text"), vec![0, 1]);
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_apply_doc_id_filter_in_merger() -> crate::Result<()> {
-        let first_index = {
-            let mut schema_builder = Schema::builder();
-            let text_field = schema_builder.add_text_field("text", TEXT);
-            let index = Index::create_in_ram(schema_builder.build());
-            let mut index_writer = index.writer_for_tests()?;
-            index_writer.add_document(doc!(text_field=>"some text 1"))?;
-            index_writer.add_document(doc!(text_field=>"some text 2"))?;
-
-            index_writer.add_document(doc!(text_field=>"some text 3"))?;
-            index_writer.add_document(doc!(text_field=>"some text 4"))?;
-
-            index_writer.delete_term(Term::from_field_text(text_field, "4"));
-
-            index_writer.commit()?;
-            index
-        };
-
-        let mut segments: Vec<Segment> = Vec::new();
-        segments.extend(first_index.searchable_segments()?);
-
-        let target_settings = first_index.settings().clone();
-        {
-            let filter_segment = AliveBitSet::for_test_from_deleted_docs(&[1], 4);
-            let filter_segments = vec![Some(filter_segment)];
-            let target_schema = segments[0].schema();
-            let merged_index = Index::create(
-                RamDirectory::default(),
-                target_schema,
-                target_settings.clone(),
-            )?;
-            let merger: IndexMerger = IndexMerger::open_with_custom_alive_set(
-                merged_index.schema(),
-                merged_index.settings().clone(),
-                &segments[..],
-                filter_segments,
-            )?;
-
-            let doc_ids_alive: Vec<_> = merger.readers[0].doc_ids_alive().collect();
-            assert_eq!(doc_ids_alive, vec![0, 2]);
-        }
-
-        {
-            let filter_segments = vec![None];
-            let target_schema = segments[0].schema();
-            let merged_index =
-                Index::create(RamDirectory::default(), target_schema, target_settings)?;
-            let merger: IndexMerger = IndexMerger::open_with_custom_alive_set(
-                merged_index.schema(),
-                merged_index.settings().clone(),
-                &segments[..],
-                filter_segments,
-            )?;
-
-            let doc_ids_alive: Vec<_> = merger.readers[0].doc_ids_alive().collect();
-            assert_eq!(doc_ids_alive, vec![0, 1, 2]);
-        }
 
         Ok(())
     }

@@ -20,9 +20,6 @@ use tantivy::{IndexWriter, SegmentMeta};
 
 use crate::fastfield_reader::FastFieldReader;
 
-use crate::schema::text_field;
-use crate::schema::text_field::TextField;
-
 use crate::webpage::Webpage;
 use crate::Result;
 use std::collections::HashSet;
@@ -132,25 +129,6 @@ impl InvertedIndex {
         self.fastfield_reader = FastFieldReader::new(&self.reader.searcher());
 
         Ok(())
-    }
-
-    fn delete(&self, query: Box<dyn tantivy::query::Query>) -> Result<()> {
-        self.writer
-            .as_ref()
-            .expect("writer has not been prepared")
-            .delete_query(query)?;
-
-        Ok(())
-    }
-
-    pub fn delete_all_before(&self, timestamp: tantivy::DateTime) -> Result<()> {
-        let query = tantivy::query::RangeQuery::new_date_bounds(
-            text_field::InsertionTimestamp.name().to_string(),
-            std::ops::Bound::Unbounded,
-            std::ops::Bound::Excluded(timestamp),
-        );
-
-        self.delete(Box::new(query))
     }
 
     #[allow(clippy::missing_panics_doc)] // cannot panic as writer is prepared

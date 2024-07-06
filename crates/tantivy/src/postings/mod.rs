@@ -52,7 +52,7 @@ pub mod tests {
         Field, IndexRecordOption, Schema, Term, TextFieldIndexing, TextOptions, INDEXED, TEXT,
     };
     use crate::tokenizer::{SimpleTokenizer, MAX_TOKEN_LEN};
-    use crate::{DocId, HasLen, IndexWriter, Score};
+    use crate::{DocId, HasLen, Score};
 
     #[test]
     pub fn test_position_write() -> crate::Result<()> {
@@ -350,7 +350,6 @@ pub mod tests {
     #[test]
     fn test_skip_next() -> crate::Result<()> {
         let term_0 = Term::from_field_u64(Field::from_field_id(0), 0);
-        let term_1 = Term::from_field_u64(Field::from_field_id(0), 1);
         let term_2 = Term::from_field_u64(Field::from_field_id(0), 2);
 
         let num_docs = 300u32;
@@ -430,16 +429,6 @@ pub mod tests {
             }
         }
 
-        // delete some of the documents
-        {
-            let mut index_writer: IndexWriter = index.writer_for_tests()?;
-            index_writer.delete_term(term_0);
-            assert!(index_writer.commit().is_ok());
-        }
-        let searcher = index.reader()?.searcher();
-        assert_eq!(searcher.segment_readers().len(), 1);
-        let segment_reader = searcher.segment_reader(0);
-
         // make sure seeking still works
         for i in 0..num_docs {
             let mut segment_postings = segment_reader
@@ -449,9 +438,6 @@ pub mod tests {
 
             assert_eq!(segment_postings.seek(i), i);
             assert_eq!(segment_postings.doc(), i);
-            if i % 2 == 0 {
-                assert!(segment_reader.is_deleted(i));
-            }
         }
 
         // now try with a longer sequence
@@ -481,20 +467,6 @@ pub mod tests {
             assert_eq!(cur, 377);
         }
 
-        // delete everything else
-        {
-            let mut index_writer: IndexWriter = index.writer_for_tests()?;
-            index_writer.delete_term(term_1);
-            assert!(index_writer.commit().is_ok());
-        }
-        let searcher = index.reader()?.searcher();
-
-        // finally, check that it's empty
-        {
-            let searchable_segment_ids = index.searchable_segment_ids()?;
-            assert!(searchable_segment_ids.is_empty());
-            assert_eq!(searcher.num_docs(), 0);
-        }
         Ok(())
     }
 

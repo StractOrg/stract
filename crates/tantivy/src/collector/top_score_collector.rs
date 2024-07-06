@@ -390,23 +390,10 @@ impl Collector for TopDocs {
         let heap_len = self.0.limit + self.0.offset;
         let mut top_n: TopNComputer<_, _> = TopNComputer::new(heap_len);
 
-        if let Some(alive_bitset) = reader.alive_bitset() {
-            let mut threshold = Score::MIN;
-            top_n.threshold = Some(threshold);
-            weight.for_each_pruning(Score::MIN, reader, &mut |doc, score| {
-                if alive_bitset.is_deleted(doc) {
-                    return threshold;
-                }
-                top_n.push(score, doc);
-                threshold = top_n.threshold.unwrap_or(Score::MIN);
-                threshold
-            })?;
-        } else {
-            weight.for_each_pruning(Score::MIN, reader, &mut |doc, score| {
-                top_n.push(score, doc);
-                top_n.threshold.unwrap_or(Score::MIN)
-            })?;
-        }
+        weight.for_each_pruning(Score::MIN, reader, &mut |doc, score| {
+            top_n.push(score, doc);
+            top_n.threshold.unwrap_or(Score::MIN)
+        })?;
 
         let fruit = top_n
             .into_sorted_vec()

@@ -72,8 +72,6 @@ pub struct SegmentSpaceUsage {
 
     store: StoreSpaceUsage,
 
-    deletes: ByteCount,
-
     total: ByteCount,
 }
 
@@ -87,15 +85,13 @@ impl SegmentSpaceUsage {
         fast_fields: PerFieldSpaceUsage,
         fieldnorms: PerFieldSpaceUsage,
         store: StoreSpaceUsage,
-        deletes: ByteCount,
     ) -> SegmentSpaceUsage {
         let total = termdict.total()
             + postings.total()
             + positions.total()
             + fast_fields.total()
             + fieldnorms.total()
-            + store.total()
-            + deletes;
+            + store.total();
         SegmentSpaceUsage {
             num_docs,
             termdict,
@@ -104,7 +100,6 @@ impl SegmentSpaceUsage {
             fast_fields,
             fieldnorms,
             store,
-            deletes,
             total,
         }
     }
@@ -124,7 +119,6 @@ impl SegmentSpaceUsage {
             Terms => PerField(self.termdict().clone()),
             SegmentComponent::Store => ComponentSpaceUsage::Store(self.store().clone()),
             SegmentComponent::TempStore => ComponentSpaceUsage::Store(self.store().clone()),
-            Delete => Basic(self.deletes()),
         }
     }
 
@@ -161,11 +155,6 @@ impl SegmentSpaceUsage {
     /// Space usage for stored documents
     pub fn store(&self) -> &StoreSpaceUsage {
         &self.store
-    }
-
-    /// Space usage for document deletions
-    pub fn deletes(&self) -> ByteCount {
-        self.deletes
     }
 
     /// Total space usage in bytes for this segment.
@@ -293,7 +282,7 @@ mod test {
     use crate::index::Index;
     use crate::schema::{Field, Schema, FAST, INDEXED, STORED, TEXT};
     use crate::space_usage::PerFieldSpaceUsage;
-    use crate::{IndexWriter, Term};
+    use crate::IndexWriter;
 
     #[test]
     fn test_empty() {
@@ -356,7 +345,6 @@ mod test {
         expect_single_field(segment.fieldnorms(), &name, 1, 512);
         // TODO: understand why the following fails
         //        assert_eq!(0, segment.store().total());
-        assert_eq!(segment.deletes(), 0);
         Ok(())
     }
 
@@ -396,7 +384,6 @@ mod test {
         expect_single_field(segment.fieldnorms(), &name, 1, 512);
         // TODO: understand why the following fails
         //        assert_eq!(0, segment.store().total());
-        assert_eq!(segment.deletes(), 0);
         Ok(())
     }
 
@@ -435,7 +422,6 @@ mod test {
         assert_eq!(segment.fieldnorms().total(), 0);
         assert!(segment.store().total() > 0);
         assert!(segment.store().total() < 512);
-        assert_eq!(segment.deletes(), 0);
         Ok(())
     }
 
@@ -455,14 +441,6 @@ mod test {
             index_writer.commit()?;
         }
 
-        {
-            let mut index_writer2: IndexWriter = index.writer(50_000_000)?;
-            index_writer2.delete_term(Term::from_field_u64(name, 2u64));
-            index_writer2.delete_term(Term::from_field_u64(name, 3u64));
-            // ok, now we should have a deleted doc
-            index_writer2.commit()?;
-        }
-
         let reader = index.reader()?;
         let searcher = reader.searcher();
         let searcher_space_usage = searcher.space_usage()?;
@@ -472,14 +450,13 @@ mod test {
         let segment_space_usage = &searcher_space_usage.segments()[0];
         assert!(segment_space_usage.total() > 0);
 
-        assert_eq!(2, segment_space_usage.num_docs());
+        assert_eq!(4, segment_space_usage.num_docs());
 
         expect_single_field(segment_space_usage.termdict(), &name, 1, 512);
         expect_single_field(segment_space_usage.postings(), &name, 1, 512);
         assert_eq!(segment_space_usage.positions().total(), 0u64);
         assert_eq!(segment_space_usage.fast_fields().total(), 0u64);
         expect_single_field(segment_space_usage.fieldnorms(), &name, 1, 512);
-        assert!(segment_space_usage.deletes() > 0);
         Ok(())
     }
 }

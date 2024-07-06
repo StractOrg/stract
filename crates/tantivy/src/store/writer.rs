@@ -18,7 +18,6 @@ use crate::DocId;
 ///
 /// The skip list index on the other hand, is built in memory.
 pub struct StoreWriter {
-    compressor: Compressor,
     block_size: usize,
     num_docs_in_current_block: DocId,
     current_block: Vec<u8>,
@@ -39,17 +38,12 @@ impl StoreWriter {
     ) -> io::Result<StoreWriter> {
         let block_compressor = BlockCompressor::new(compressor, writer, dedicated_thread)?;
         Ok(StoreWriter {
-            compressor,
             block_size,
             num_docs_in_current_block: 0,
             doc_pos: Vec::new(),
             current_block: Vec::new(),
             block_compressor,
         })
-    }
-
-    pub(crate) fn compressor(&self) -> Compressor {
-        self.compressor
     }
 
     /// The memory used (inclusive childs)

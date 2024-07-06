@@ -81,7 +81,7 @@ pub fn merge_columnar(
         group_columns_for_merge(columnar_readers, required_columns, &merge_row_order)?;
     for res in columns_to_merge {
         let ((column_name, _column_type_category), grouped_columns) = res;
-        let grouped_columns = grouped_columns.open(&merge_row_order)?;
+        let grouped_columns = grouped_columns.open()?;
         if grouped_columns.is_empty() {
             continue;
         }
@@ -216,16 +216,16 @@ impl GroupedColumnsHandle {
             columns: vec![None; num_columnars],
         }
     }
-    fn open(self, merge_row_order: &MergeRowOrder) -> io::Result<GroupedColumns> {
+    fn open(self) -> io::Result<GroupedColumns> {
         let mut columns: Vec<Option<DynamicColumn>> = Vec::new();
-        for (columnar_id, column) in self.columns.iter().enumerate() {
+        for column in &self.columns {
             if let Some(column) = column {
                 let column = column.open()?;
 
                 // We skip columns that end up with 0 documents.
                 // That way, we make sure they don't end up influencing the merge type or
                 // creating empty columns.
-                if is_empty_after_merge(merge_row_order, &column, columnar_id) {
+                if is_empty_after_merge(&column) {
                     columns.push(None);
                 } else {
                     columns.push(Some(column));
@@ -285,33 +285,8 @@ fn merged_numerical_columns_type<'a>(
     compatible_numerical_types.to_numerical_type()
 }
 
-fn is_empty_after_merge(
-    merge_row_order: &MergeRowOrder,
-    column: &DynamicColumn,
-    columnar_ord: usize,
-) -> bool {
-    if column.num_values() == 0u32 {
-        // It was empty before the merge.
-        return true;
-    }
-    match merge_row_order {
-        MergeRowOrder::Stack(_) => {
-            // If we are stacking the columnar, no rows are being deleted.
-            false
-        }
-        MergeRowOrder::Shuffled(shuffled) => {
-            if let Some(alive_bitset) = &shuffled.alive_bitsets[columnar_ord] {
-                let column_index = column.column_index();
-                match column_index {
-                    ColumnIndex::Full => alive_bitset.len() == 0,
-                }
-            } else {
-                // No document is being deleted.
-                // The shuffle is applying a permutation.
-                false
-            }
-        }
-    }
+fn is_empty_after_merge(column: &DynamicColumn) -> bool {
+    column.num_values() == 0u32
 }
 
 /// Iterates over the columns of the columnar readers, grouped by column name.
