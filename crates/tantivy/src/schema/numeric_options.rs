@@ -3,7 +3,7 @@ use std::ops::BitOr;
 use serde::{Deserialize, Serialize};
 
 use super::flags::CoerceFlag;
-use crate::schema::flags::{FastFlag, IndexedFlag, SchemaFlagList, StoredFlag};
+use crate::schema::flags::{ColumnarFlag, IndexedFlag, SchemaFlagList, StoredFlag};
 
 /// Define how an `u64`, `i64`, or `f64` field should be handled by tantivy.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -12,7 +12,7 @@ pub struct NumericOptions {
     indexed: bool,
     // This boolean has no effect if the field is not marked as indexed too.
     fieldnorms: bool, // This attribute only has an effect if indexed is true.
-    fast: bool,
+    columnar: bool,
     stored: bool,
     #[serde(skip_serializing_if = "is_false")]
     coerce: bool,
@@ -33,7 +33,7 @@ struct NumericOptionsDeser {
     #[serde(default)]
     fieldnorms: Option<bool>, // This attribute only has an effect if indexed is true.
     #[serde(default)]
-    fast: bool,
+    columnar: bool,
     stored: bool,
     #[serde(default)]
     coerce: bool,
@@ -44,7 +44,7 @@ impl From<NumericOptionsDeser> for NumericOptions {
         NumericOptions {
             indexed: deser.indexed,
             fieldnorms: deser.fieldnorms.unwrap_or(deser.indexed),
-            fast: deser.fast,
+            columnar: deser.columnar,
             stored: deser.stored,
             coerce: deser.coerce,
         }
@@ -70,10 +70,10 @@ impl NumericOptions {
         self.fieldnorms && self.indexed
     }
 
-    /// Returns true iff the value is a fast field.
+    /// Returns true iff the value is a columnar field.
     #[inline]
-    pub fn is_fast(&self) -> bool {
-        self.fast
+    pub fn is_columnar(&self) -> bool {
+        self.columnar
     }
 
     /// Returns true if values should be coerced to numbers.
@@ -121,12 +121,12 @@ impl NumericOptions {
         self
     }
 
-    /// Set the field as a fast field.
+    /// Set the field as a columnar field.
     ///
-    /// Fast fields are designed for random access.
+    /// Columnar fields are designed for random access of a single column value for each document.
     #[must_use]
-    pub fn set_fast(mut self) -> NumericOptions {
-        self.fast = true;
+    pub fn set_columnar(mut self) -> NumericOptions {
+        self.columnar = true;
         self
     }
 }
@@ -143,19 +143,19 @@ impl From<CoerceFlag> for NumericOptions {
             indexed: false,
             fieldnorms: false,
             stored: false,
-            fast: false,
+            columnar: false,
             coerce: true,
         }
     }
 }
 
-impl From<FastFlag> for NumericOptions {
-    fn from(_: FastFlag) -> Self {
+impl From<ColumnarFlag> for NumericOptions {
+    fn from(_: ColumnarFlag) -> Self {
         NumericOptions {
             indexed: false,
             fieldnorms: false,
             stored: false,
-            fast: true,
+            columnar: true,
             coerce: false,
         }
     }
@@ -167,7 +167,7 @@ impl From<StoredFlag> for NumericOptions {
             indexed: false,
             fieldnorms: false,
             stored: true,
-            fast: false,
+            columnar: false,
             coerce: false,
         }
     }
@@ -179,7 +179,7 @@ impl From<IndexedFlag> for NumericOptions {
             indexed: true,
             fieldnorms: true,
             stored: false,
-            fast: false,
+            columnar: false,
             coerce: false,
         }
     }
@@ -194,7 +194,7 @@ impl<T: Into<NumericOptions>> BitOr<T> for NumericOptions {
             indexed: self.indexed | other.indexed,
             fieldnorms: self.fieldnorms | other.fieldnorms,
             stored: self.stored | other.stored,
-            fast: self.fast | other.fast,
+            columnar: self.columnar | other.columnar,
             coerce: self.coerce | other.coerce,
         }
     }
@@ -227,7 +227,7 @@ mod tests {
             &NumericOptions {
                 indexed: true,
                 fieldnorms: true,
-                fast: false,
+                columnar: false,
                 stored: false,
                 coerce: false,
             }
@@ -246,7 +246,7 @@ mod tests {
             &NumericOptions {
                 indexed: false,
                 fieldnorms: false,
-                fast: false,
+                columnar: false,
                 stored: false,
                 coerce: false,
             }
@@ -266,7 +266,7 @@ mod tests {
             &NumericOptions {
                 indexed: true,
                 fieldnorms: false,
-                fast: false,
+                columnar: false,
                 stored: false,
                 coerce: false,
             }
@@ -287,7 +287,7 @@ mod tests {
             &NumericOptions {
                 indexed: false,
                 fieldnorms: true,
-                fast: false,
+                columnar: false,
                 stored: false,
                 coerce: false,
             }
@@ -309,7 +309,7 @@ mod tests {
             &NumericOptions {
                 indexed: false,
                 fieldnorms: true,
-                fast: false,
+                columnar: false,
                 stored: false,
                 coerce: true,
             }

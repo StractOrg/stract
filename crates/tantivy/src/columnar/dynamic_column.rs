@@ -229,15 +229,15 @@ impl DynamicColumnHandle {
         &self.file_slice
     }
 
-    /// Returns the `u64` fast field reader reader associated with `fields` of types
+    /// Returns the `u64` columnar field reader reader associated with `fields` of types
     /// Str, u64, i64, f64, bool, ip, or datetime.
     ///
-    /// Notice that for IpAddr, the fastfield reader will return the u64 representation of the
+    /// Notice that for IpAddr, the columnfield reader will return the u64 representation of the
     /// IpAddr.
     /// In order to convert to u128 back cast to `CompactSpaceU64Accessor` and call
     /// `compact_to_u128`.
     ///
-    /// If not, the fastfield reader will returns the u64-value associated with the original
+    /// If not, the columnfield reader will returns the u64-value associated with the original
     /// FastValue.
     pub fn open_u64_lenient(&self) -> io::Result<Option<Column<u64>>> {
         let column_bytes = self.file_slice.read_bytes()?;

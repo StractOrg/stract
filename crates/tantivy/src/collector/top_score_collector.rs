@@ -13,26 +13,27 @@ use crate::collector::tweak_score_top_collector::TweakedScoreTopCollector;
 use crate::collector::{
     CustomScorer, CustomSegmentScorer, ScoreSegmentTweaker, ScoreTweaker, SegmentCollector,
 };
-use crate::fastfield::{FastFieldNotAvailableError, FastValue};
+use crate::columnfield::{ColumnFieldNotAvailableError, ColumnarValue};
 use crate::query::Weight;
 use crate::{DocAddress, DocId, Order, Score, SegmentOrdinal, SegmentReader, TantivyError};
 
-struct FastFieldConvertCollector<
+struct ColumnFieldConvertCollector<
     TCollector: Collector<Fruit = Vec<(u64, DocAddress)>>,
-    TFastValue: FastValue,
+    TColumnarValue: ColumnarValue,
 > {
     pub collector: TCollector,
     pub field: String,
-    pub fast_value: std::marker::PhantomData<TFastValue>,
+    pub columnar_value: std::marker::PhantomData<TColumnarValue>,
     order: Order,
 }
 
-impl<TCollector, TFastValue> Collector for FastFieldConvertCollector<TCollector, TFastValue>
+impl<TCollector, TColumnarValue> Collector
+    for ColumnFieldConvertCollector<TCollector, TColumnarValue>
 where
     TCollector: Collector<Fruit = Vec<(u64, DocAddress)>>,
-    TFastValue: FastValue,
+    TColumnarValue: ColumnarValue,
 {
-    type Fruit = Vec<(TFastValue, DocAddress)>;
+    type Fruit = Vec<(TColumnarValue, DocAddress)>;
 
     type Child = TCollector::Child;
 
@@ -44,13 +45,13 @@ where
         let schema = segment.schema();
         let field = schema.get_field(&self.field)?;
         let field_entry = schema.get_field_entry(field);
-        if !field_entry.is_fast() {
+        if !field_entry.is_columnar() {
             return Err(TantivyError::SchemaError(format!(
-                "Field {:?} is not a fast field.",
+                "Field {:?} is not a columnar field.",
                 field_entry.name()
             )));
         }
-        let schema_type = TFastValue::to_type();
+        let schema_type = TColumnarValue::to_type();
         let requested_type = field_entry.field_type().value_type();
         if schema_type != requested_type {
             return Err(TantivyError::SchemaError(format!(
@@ -74,9 +75,9 @@ where
             .into_iter()
             .map(|(score, doc_address)| {
                 if self.order.is_desc() {
-                    (TFastValue::from_u64(score), doc_address)
+                    (TColumnarValue::from_u64(score), doc_address)
                 } else {
-                    (TFastValue::from_u64(u64::MAX - score), doc_address)
+                    (TColumnarValue::from_u64(u64::MAX - score), doc_address)
                 }
             })
             .collect::<Vec<_>>();
@@ -108,12 +109,12 @@ impl fmt::Debug for TopDocs {
     }
 }
 
-struct ScorerByFastFieldReader {
+struct ScorerByColumnFieldReader {
     sort_column: Arc<dyn ColumnValues<u64>>,
     order: Order,
 }
 
-impl CustomSegmentScorer<u64> for ScorerByFastFieldReader {
+impl CustomSegmentScorer<u64> for ScorerByColumnFieldReader {
     fn score(&mut self, doc: DocId) -> u64 {
         let value = self.sort_column.get_val(doc);
         if self.order.is_desc() {
@@ -130,20 +131,20 @@ struct ScorerByField {
 }
 
 impl CustomScorer<u64> for ScorerByField {
-    type Child = ScorerByFastFieldReader;
+    type Child = ScorerByColumnFieldReader;
 
     fn segment_scorer(&self, segment_reader: &SegmentReader) -> crate::Result<Self::Child> {
         // We interpret this field as u64, regardless of its type, that way,
-        // we avoid needless conversion. Regardless of the fast field type, the
+        // we avoid needless conversion. Regardless of the columnar field type, the
         // mapping is monotonic, so it is sufficient to compute our top-K docs.
         //
         // The conversion will then happen only on the top-K docs.
-        let sort_column_opt = segment_reader.fast_fields().u64_lenient(&self.field)?;
+        let sort_column_opt = segment_reader.column_fields().u64_lenient(&self.field)?;
         let (sort_column, _sort_column_type) =
-            sort_column_opt.ok_or_else(|| FastFieldNotAvailableError {
+            sort_column_opt.ok_or_else(|| ColumnFieldNotAvailableError {
                 field_name: self.field.clone(),
             })?;
-        Ok(ScorerByFastFieldReader {
+        Ok(ScorerByColumnFieldReader {
             sort_column: sort_column.values,
             order: self.order.clone(),
         })
@@ -170,19 +171,19 @@ impl TopDocs {
         TopDocs(self.0.and_offset(offset))
     }
 
-    /// Set top-K to rank documents by a given fast field.
+    /// Set top-K to rank documents by a given columnar field.
     ///
-    /// If the field is not a fast or does not exist, this method returns successfully (it is not
+    /// If the field is not a columnar or does not exist, this method returns successfully (it is not
     /// aware of any schema). An error will be returned at the moment of search.
     ///
-    /// If the field is a FAST field but not a u64 field, search will return successfully but it
+    /// If the field is a COLUMN field but not a u64 field, search will return successfully but it
     /// will return returns a monotonic u64-representation (ie. the order is still correct) of
     /// the requested field type.
     ///
     /// # See also
     ///
     /// To comfortably work with `u64`s, `i64`s, `f64`s, or `date`s, please refer to
-    /// the [.order_by_fast_field(...)](TopDocs::order_by_fast_field) method.
+    /// the [.order_by_column_field(...)](TopDocs::order_by_column_field) method.
     pub fn order_by_u64_field(
         self,
         field: impl ToString,
@@ -197,22 +198,22 @@ impl TopDocs {
         )
     }
 
-    /// Set top-K to rank documents by a given fast field.
+    /// Set top-K to rank documents by a given columnar field.
     ///
-    /// If the field is not a fast field, or its field type does not match the generic type, this
+    /// If the field is not a columnar field, or its field type does not match the generic type, this
     /// method does not panic, but an explicit error will be returned at the moment of
     /// collection.
     ///
-    /// Note that this method is a generic. The requested fast field type will be often
+    /// Note that this method is a generic. The requested columnar field type will be often
     /// inferred in your code by the rust compiler.
     ///
     /// Implementation-wise, for performance reason, tantivy will manipulate the u64 representation
-    /// of your fast field until the last moment.
+    /// of your columnar field until the last moment.
     ///
     /// # Example
     ///
     /// ```rust
-    /// # use tantivy::schema::{Schema, FAST, TEXT};
+    /// # use tantivy::schema::{Schema, COLUMN, TEXT};
     /// # use tantivy::{doc, Index, DocAddress,Order};
     /// # use tantivy::query::{Query, AllQuery};
     /// use tantivy::Searcher;
@@ -221,7 +222,7 @@ impl TopDocs {
     /// # fn main() -> tantivy::Result<()> {
     /// #   let mut schema_builder = Schema::builder();
     /// #   let title = schema_builder.add_text_field("company", TEXT);
-    /// #   let revenue = schema_builder.add_i64_field("revenue", FAST);
+    /// #   let revenue = schema_builder.add_i64_field("revenue", COLUMN);
     /// #   let schema = schema_builder.build();
     /// #
     /// #   let index = Index::create_in_ram(schema);
@@ -248,13 +249,13 @@ impl TopDocs {
     ///     // This is where we build our topdocs collector
     ///     //
     ///     // Note the generics parameter that needs to match the
-    ///     // type `sort_by_field`. revenue_field here is a FAST i64 field.
+    ///     // type `sort_by_field`. revenue_field here is a COLUMN i64 field.
     ///     let top_company_by_revenue = TopDocs
     ///                 ::with_limit(2)
-    ///                  .order_by_fast_field("revenue", Order::Desc);
+    ///                  .order_by_column_field("revenue", Order::Desc);
     ///
     ///     // ... and here are our documents. Note this is a simple vec.
-    ///     // The `i64` in the pair is the value of our fast field for
+    ///     // The `i64` in the pair is the value of our columnar field for
     ///     // each documents.
     ///     //
     ///     // The vec is sorted decreasingly by `sort_by_field`, and has a
@@ -266,19 +267,19 @@ impl TopDocs {
     ///     Ok(resulting_docs)
     /// }
     /// ```
-    pub fn order_by_fast_field<TFastValue>(
+    pub fn order_by_column_field<TColumnarValue>(
         self,
-        fast_field: impl ToString,
+        column_field: impl ToString,
         order: Order,
-    ) -> impl Collector<Fruit = Vec<(TFastValue, DocAddress)>>
+    ) -> impl Collector<Fruit = Vec<(TColumnarValue, DocAddress)>>
     where
-        TFastValue: FastValue,
+        TColumnarValue: ColumnarValue,
     {
-        let u64_collector = self.order_by_u64_field(fast_field.to_string(), order.clone());
-        FastFieldConvertCollector {
+        let u64_collector = self.order_by_u64_field(column_field.to_string(), order.clone());
+        ColumnFieldConvertCollector {
             collector: u64_collector,
-            field: fast_field.to_string(),
-            fast_value: PhantomData,
+            field: column_field.to_string(),
+            columnar_value: PhantomData,
             order,
         }
     }
@@ -294,11 +295,11 @@ impl TopDocs {
     ///
     /// # Example
     ///
-    /// Typically, you will want to rely on one or more fast fields,
+    /// Typically, you will want to rely on one or more columnar fields,
     /// to alter the original relevance `Score`.
     ///
     /// For instance, in the following, we assume that we are implementing
-    /// an e-commerce website that has a fast field called `popularity`
+    /// an e-commerce website that has a columnar field called `popularity`
     /// that rates whether a product is typically often bought by users.
     ///
     /// In the following example will will tweak our ranking a bit by
@@ -333,7 +334,7 @@ impl TopDocs {
     /// # Limitation
     ///
     /// This method only makes it possible to compute the score from a given
-    /// `DocId`, fastfield values for the doc and any information you could
+    /// `DocId`, columnfield values for the doc and any information you could
     /// have precomputed beforehand. It does not make it possible for instance
     /// to compute something like TfIdf as it does not have access to the list of query
     /// terms present in the document, nor the term frequencies for the different terms.
@@ -578,7 +579,7 @@ mod tests {
     use crate::collector::top_collector::ComparableDoc;
     use crate::collector::Collector;
     use crate::query::{AllQuery, Query, QueryParser};
-    use crate::schema::{Field, Schema, FAST, STORED, TEXT};
+    use crate::schema::{Field, Schema, COLUMN, STORED, TEXT};
     use crate::time::format_description::well_known::Rfc3339;
     use crate::time::OffsetDateTime;
     use crate::{
@@ -790,7 +791,7 @@ mod tests {
     fn test_top_field_collector_not_at_capacity() -> crate::Result<()> {
         let mut schema_builder = Schema::builder();
         let title = schema_builder.add_text_field(TITLE, TEXT);
-        let size = schema_builder.add_u64_field(SIZE, FAST);
+        let size = schema_builder.add_u64_field(SIZE, COLUMN);
         let schema = schema_builder.build();
         let (index, query) = index("beer", title, schema, |index_writer| {
             index_writer
@@ -831,7 +832,7 @@ mod tests {
     fn test_top_field_collector_datetime() -> crate::Result<()> {
         let mut schema_builder = Schema::builder();
         let name = schema_builder.add_text_field("name", TEXT);
-        let birthday = schema_builder.add_date_field("birthday", FAST);
+        let birthday = schema_builder.add_date_field("birthday", COLUMN);
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema);
         let mut index_writer = index.writer_for_tests()?;
@@ -853,7 +854,7 @@ mod tests {
         ))?;
         index_writer.commit()?;
         let searcher = index.reader()?.searcher();
-        let top_collector = TopDocs::with_limit(3).order_by_fast_field("birthday", Order::Desc);
+        let top_collector = TopDocs::with_limit(3).order_by_column_field("birthday", Order::Desc);
         let top_docs: Vec<(DateTime, DocAddress)> = searcher.search(&AllQuery, &top_collector)?;
         assert_eq!(
             &top_docs[..],
@@ -869,7 +870,7 @@ mod tests {
     fn test_top_field_collector_i64() -> crate::Result<()> {
         let mut schema_builder = Schema::builder();
         let city = schema_builder.add_text_field("city", TEXT);
-        let altitude = schema_builder.add_i64_field("altitude", FAST);
+        let altitude = schema_builder.add_i64_field("altitude", COLUMN);
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema);
         let mut index_writer = index.writer_for_tests()?;
@@ -883,7 +884,7 @@ mod tests {
         ))?;
         index_writer.commit()?;
         let searcher = index.reader()?.searcher();
-        let top_collector = TopDocs::with_limit(3).order_by_fast_field("altitude", Order::Desc);
+        let top_collector = TopDocs::with_limit(3).order_by_column_field("altitude", Order::Desc);
         let top_docs: Vec<(i64, DocAddress)> = searcher.search(&AllQuery, &top_collector)?;
         assert_eq!(
             &top_docs[..],
@@ -899,7 +900,7 @@ mod tests {
     fn test_top_field_collector_f64() -> crate::Result<()> {
         let mut schema_builder = Schema::builder();
         let city = schema_builder.add_text_field("city", TEXT);
-        let altitude = schema_builder.add_f64_field("altitude", FAST);
+        let altitude = schema_builder.add_f64_field("altitude", COLUMN);
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema);
         let mut index_writer = index.writer_for_tests()?;
@@ -913,7 +914,7 @@ mod tests {
         ))?;
         index_writer.commit()?;
         let searcher = index.reader()?.searcher();
-        let top_collector = TopDocs::with_limit(3).order_by_fast_field("altitude", Order::Desc);
+        let top_collector = TopDocs::with_limit(3).order_by_column_field("altitude", Order::Desc);
         let top_docs: Vec<(f64, DocAddress)> = searcher.search(&AllQuery, &top_collector)?;
         assert_eq!(
             &top_docs[..],
@@ -930,7 +931,7 @@ mod tests {
     fn test_field_does_not_exist() {
         let mut schema_builder = Schema::builder();
         let title = schema_builder.add_text_field(TITLE, TEXT);
-        let size = schema_builder.add_u64_field(SIZE, FAST);
+        let size = schema_builder.add_u64_field(SIZE, COLUMN);
         let schema = schema_builder.build();
         let (index, _) = index("beer", title, schema, |index_writer| {
             index_writer
@@ -949,7 +950,7 @@ mod tests {
     }
 
     #[test]
-    fn test_field_not_fast_field() -> crate::Result<()> {
+    fn test_field_not_column_field() -> crate::Result<()> {
         let mut schema_builder = Schema::builder();
         let size = schema_builder.add_u64_field(SIZE, STORED);
         let schema = schema_builder.build();
@@ -976,10 +977,10 @@ mod tests {
         index_writer.commit()?;
         let searcher = index.reader()?.searcher();
         let segment = searcher.segment_reader(0);
-        let top_collector = TopDocs::with_limit(4).order_by_fast_field::<i64>(SIZE, Order::Desc);
+        let top_collector = TopDocs::with_limit(4).order_by_column_field::<i64>(SIZE, Order::Desc);
         let err = top_collector.for_segment(0, segment).err().unwrap();
         assert!(
-            matches!(err, crate::TantivyError::SchemaError(msg) if msg == "Field \"size\" is not a fast field.")
+            matches!(err, crate::TantivyError::SchemaError(msg) if msg == "Field \"size\" is not a columnar field.")
         );
         Ok(())
     }
@@ -1039,10 +1040,10 @@ mod tests {
         (index, query)
     }
     #[test]
-    fn test_fast_field_ascending_order() -> crate::Result<()> {
+    fn test_column_field_ascending_order() -> crate::Result<()> {
         let mut schema_builder = Schema::builder();
         let title = schema_builder.add_text_field(TITLE, TEXT);
-        let size = schema_builder.add_u64_field(SIZE, FAST);
+        let size = schema_builder.add_u64_field(SIZE, COLUMN);
         let schema = schema_builder.build();
         let (index, query) = index("beer", title, schema, |index_writer| {
             index_writer
@@ -1072,7 +1073,7 @@ mod tests {
         });
         let searcher = index.reader()?.searcher();
 
-        let top_collector = TopDocs::with_limit(4).order_by_fast_field(SIZE, Order::Asc);
+        let top_collector = TopDocs::with_limit(4).order_by_column_field(SIZE, Order::Asc);
         let top_docs: Vec<(u64, DocAddress)> = searcher.search(&query, &top_collector)?;
         assert_eq!(
             &top_docs[..],

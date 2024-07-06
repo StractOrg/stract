@@ -589,7 +589,7 @@ mod tests {
     use crate::indexer::NoMergePolicy;
     use crate::query::{QueryParser, TermQuery};
     use crate::schema::{
-        self, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, FAST, INDEXED,
+        self, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, COLUMN, INDEXED,
         STORED, STRING, TEXT,
     };
     use crate::store::DOCSTORE_CACHE_CAPACITY;
@@ -1138,13 +1138,13 @@ mod tests {
         force_end_merge: bool,
     ) -> crate::Result<Index> {
         let mut schema_builder = schema::Schema::builder();
-        let json_field = schema_builder.add_json_field("json", FAST | TEXT | STORED);
+        let json_field = schema_builder.add_json_field("json", COLUMN | TEXT | STORED);
         let i64_field = schema_builder.add_i64_field("i64", INDEXED);
-        let id_field = schema_builder.add_u64_field("id", FAST | INDEXED | STORED);
+        let id_field = schema_builder.add_u64_field("id", COLUMN | INDEXED | STORED);
         let f64_field = schema_builder.add_f64_field("f64", INDEXED);
         let date_field = schema_builder.add_date_field("date", INDEXED);
-        let bytes_field = schema_builder.add_bytes_field("bytes", FAST | INDEXED | STORED);
-        let bool_field = schema_builder.add_bool_field("bool", FAST | INDEXED | STORED);
+        let bytes_field = schema_builder.add_bytes_field("bytes", COLUMN | INDEXED | STORED);
+        let bool_field = schema_builder.add_bool_field("bool", COLUMN | INDEXED | STORED);
         let text_field = schema_builder.add_text_field(
             "text_field",
             TextOptions::default()
@@ -1262,7 +1262,7 @@ mod tests {
             .segment_readers()
             .iter()
             .flat_map(|segment_reader| {
-                let ff_reader = segment_reader.fast_fields().u64("id").unwrap();
+                let ff_reader = segment_reader.column_fields().u64("id").unwrap();
                 segment_reader
                     .doc_ids()
                     .flat_map(move |doc| ff_reader.first(doc).into_iter())
@@ -1273,7 +1273,7 @@ mod tests {
             .segment_readers()
             .iter()
             .flat_map(|segment_reader| {
-                let ff_reader = segment_reader.fast_fields().u64("id").unwrap();
+                let ff_reader = segment_reader.column_fields().u64("id").unwrap();
                 segment_reader
                     .doc_ids()
                     .flat_map(move |doc| ff_reader.first(doc).into_iter())
@@ -1305,13 +1305,13 @@ mod tests {
         );
 
         if force_end_merge && num_segments_before_merge > 1 && num_segments_after_merge == 1 {
-            // Test fastfield num_docs
+            // Test columnfield num_docs
             let num_docs: usize = searcher
                 .segment_readers()
                 .iter()
                 .map(|segment_reader| {
                     let ff_reader = segment_reader
-                        .fast_fields()
+                        .column_fields()
                         .column_opt::<i64>("i64")
                         .unwrap()
                         .unwrap();
@@ -1409,7 +1409,7 @@ mod tests {
             // load all id in each segment and check they are in order
 
             for reader in searcher.segment_readers() {
-                let (ff_reader, _) = reader.fast_fields().u64_lenient("id").unwrap().unwrap();
+                let (ff_reader, _) = reader.column_fields().u64_lenient("id").unwrap().unwrap();
                 let mut ids_in_segment: Vec<u64> = Vec::new();
 
                 for doc in 0..reader.num_docs() {
@@ -1430,7 +1430,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_field_range() {
+    fn test_column_field_range() {
         let ops: Vec<_> = (0..1000).map(IndexingOp::add).collect();
         assert!(test_operation_strategy(&ops, false, true).is_ok());
     }
@@ -1487,8 +1487,8 @@ mod tests {
     #[test]
     fn test_minimal_sort() {
         let mut schema_builder = Schema::builder();
-        let val = schema_builder.add_u64_field("val", FAST);
-        let id = schema_builder.add_u64_field("id", FAST);
+        let val = schema_builder.add_u64_field("val", COLUMN);
+        let id = schema_builder.add_u64_field("id", COLUMN);
         let schema = schema_builder.build();
         let settings = IndexSettings {
             sort_by_field: Some(IndexSortByField {
@@ -1517,7 +1517,7 @@ mod tests {
         let searcher = reader.searcher();
         let segment_reader = searcher.segment_reader(0);
         let id_col: Column = segment_reader
-            .fast_fields()
+            .column_fields()
             .column_opt("id")
             .unwrap()
             .unwrap();
@@ -1594,7 +1594,7 @@ mod tests {
     #[test]
     fn test_delete_with_sort_by_field_last_opstamp_is_not_max() -> crate::Result<()> {
         let mut schema_builder = schema::Schema::builder();
-        let sort_by_field = schema_builder.add_u64_field("sort_by", FAST);
+        let sort_by_field = schema_builder.add_u64_field("sort_by", COLUMN);
         let id_field = schema_builder.add_u64_field("id", INDEXED);
         let schema = schema_builder.build();
 

@@ -6,10 +6,10 @@ use std::{fmt, io};
 
 use thiserror::Error;
 
+use crate::columnfield::ColumnFieldNotAvailableError;
 use crate::directory::error::{
     Incompatibility, LockError, OpenDirectoryError, OpenReadError, OpenWriteError,
 };
-use crate::fastfield::FastFieldNotAvailableError;
 use crate::schema;
 use crate::schema::document::DeserializeError;
 
@@ -121,9 +121,9 @@ impl From<DataCorruption> for TantivyError {
         TantivyError::DataCorruption(data_corruption)
     }
 }
-impl From<FastFieldNotAvailableError> for TantivyError {
-    fn from(fastfield_error: FastFieldNotAvailableError) -> TantivyError {
-        TantivyError::SchemaError(format!("{fastfield_error}"))
+impl From<ColumnFieldNotAvailableError> for TantivyError {
+    fn from(columnfield_error: ColumnFieldNotAvailableError) -> TantivyError {
+        TantivyError::SchemaError(format!("{columnfield_error}"))
     }
 }
 impl From<LockError> for TantivyError {

@@ -32,7 +32,7 @@ use crate::{
 use super::{IndexingOption, FLOAT_SCALING};
 
 #[enum_dispatch]
-pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
+pub trait ColumnField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
     fn name(&self) -> &str;
     fn add_html_tantivy(
         &self,
@@ -66,7 +66,7 @@ pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash
     fn indexing_option(&self) -> IndexingOption {
         debug_assert!(matches!(self.data_type(), DataType::U64));
 
-        let mut opt = NumericOptions::default().set_fast();
+        let mut opt = NumericOptions::default().set_columnar();
 
         if self.is_stored() {
             opt = opt.set_stored();
@@ -86,10 +86,10 @@ pub trait FastField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash
     }
 }
 
-#[enum_dispatch(FastField)]
+#[enum_dispatch(ColumnField)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumDiscriminants)]
 #[strum_discriminants(derive(VariantArray))]
-pub enum FastFieldEnum {
+pub enum ColumnFieldEnum {
     IsHomepage,
     HostCentrality,
     HostCentralityRank,
@@ -131,7 +131,7 @@ pub enum FastFieldEnum {
     KeywordEmbeddings,
 }
 
-enum_dispatch_from_discriminant!(FastFieldEnumDiscriminants => FastFieldEnum,
+enum_dispatch_from_discriminant!(ColumnFieldEnumDiscriminants => ColumnFieldEnum,
 [
     IsHomepage,
     HostCentrality,
@@ -174,23 +174,23 @@ enum_dispatch_from_discriminant!(FastFieldEnumDiscriminants => FastFieldEnum,
     KeywordEmbeddings,
 ]);
 
-impl FastFieldEnum {
-    pub fn all() -> impl Iterator<Item = FastFieldEnum> {
-        FastFieldEnumDiscriminants::VARIANTS
+impl ColumnFieldEnum {
+    pub fn all() -> impl Iterator<Item = ColumnFieldEnum> {
+        ColumnFieldEnumDiscriminants::VARIANTS
             .iter()
             .copied()
             .map(|v| v.into())
     }
 
-    pub fn get(field_id: usize) -> Option<FastFieldEnum> {
-        FastFieldEnumDiscriminants::VARIANTS
+    pub fn get(field_id: usize) -> Option<ColumnFieldEnum> {
+        ColumnFieldEnumDiscriminants::VARIANTS
             .get(field_id)
             .copied()
-            .map(FastFieldEnum::from)
+            .map(ColumnFieldEnum::from)
     }
 
     pub fn num_variants() -> usize {
-        FastFieldEnumDiscriminants::VARIANTS.len()
+        ColumnFieldEnumDiscriminants::VARIANTS.len()
     }
 }
 
@@ -199,15 +199,15 @@ pub enum DataType {
     Bytes,
 }
 
-impl InsertEnumMapKey for FastFieldEnum {
+impl InsertEnumMapKey for ColumnFieldEnum {
     fn into_usize(self) -> usize {
-        FastFieldEnumDiscriminants::from(self) as usize
+        ColumnFieldEnumDiscriminants::from(self) as usize
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IsHomepage;
-impl FastField for IsHomepage {
+impl ColumnField for IsHomepage {
     fn name(&self) -> &str {
         "is_homepage"
     }
@@ -227,7 +227,7 @@ impl FastField for IsHomepage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HostCentrality;
-impl FastField for HostCentrality {
+impl ColumnField for HostCentrality {
     fn name(&self) -> &str {
         "host_centrality"
     }
@@ -259,7 +259,7 @@ impl FastField for HostCentrality {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HostCentralityRank;
-impl FastField for HostCentralityRank {
+impl ColumnField for HostCentralityRank {
     fn name(&self) -> &str {
         "host_centrality_rank"
     }
@@ -288,7 +288,7 @@ impl FastField for HostCentralityRank {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PageCentrality;
-impl FastField for PageCentrality {
+impl ColumnField for PageCentrality {
     fn name(&self) -> &str {
         "page_centrality"
     }
@@ -319,7 +319,7 @@ impl FastField for PageCentrality {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PageCentralityRank;
-impl FastField for PageCentralityRank {
+impl ColumnField for PageCentralityRank {
     fn name(&self) -> &str {
         "page_centrality_rank"
     }
@@ -347,7 +347,7 @@ impl FastField for PageCentralityRank {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FetchTimeMs;
-impl FastField for FetchTimeMs {
+impl ColumnField for FetchTimeMs {
     fn name(&self) -> &str {
         "fetch_time_ms"
     }
@@ -375,7 +375,7 @@ impl FastField for FetchTimeMs {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LastUpdated;
-impl FastField for LastUpdated {
+impl ColumnField for LastUpdated {
     fn name(&self) -> &str {
         "last_updated"
     }
@@ -403,7 +403,7 @@ impl FastField for LastUpdated {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TrackerScore;
-impl FastField for TrackerScore {
+impl ColumnField for TrackerScore {
     fn name(&self) -> &str {
         "tracker_score"
     }
@@ -423,7 +423,7 @@ impl FastField for TrackerScore {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Region;
-impl FastField for Region {
+impl ColumnField for Region {
     fn name(&self) -> &str {
         "region"
     }
@@ -464,7 +464,7 @@ impl FastField for Region {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumUrlTokens;
-impl FastField for NumUrlTokens {
+impl ColumnField for NumUrlTokens {
     fn name(&self) -> &str {
         "num_url_tokens"
     }
@@ -487,7 +487,7 @@ impl FastField for NumUrlTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumTitleTokens;
-impl FastField for NumTitleTokens {
+impl ColumnField for NumTitleTokens {
     fn name(&self) -> &str {
         "num_title_tokens"
     }
@@ -514,7 +514,7 @@ impl FastField for NumTitleTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumCleanBodyTokens;
-impl FastField for NumCleanBodyTokens {
+impl ColumnField for NumCleanBodyTokens {
     fn name(&self) -> &str {
         "num_clean_body_tokens"
     }
@@ -536,7 +536,7 @@ impl FastField for NumCleanBodyTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumDescriptionTokens;
-impl FastField for NumDescriptionTokens {
+impl ColumnField for NumDescriptionTokens {
     fn name(&self) -> &str {
         "num_description_tokens"
     }
@@ -559,7 +559,7 @@ impl FastField for NumDescriptionTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumUrlForSiteOperatorTokens;
-impl FastField for NumUrlForSiteOperatorTokens {
+impl ColumnField for NumUrlForSiteOperatorTokens {
     fn name(&self) -> &str {
         "num_url_for_site_operator_tokens"
     }
@@ -582,7 +582,7 @@ impl FastField for NumUrlForSiteOperatorTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumDomainTokens;
-impl FastField for NumDomainTokens {
+impl ColumnField for NumDomainTokens {
     fn name(&self) -> &str {
         "num_domain_tokens"
     }
@@ -605,7 +605,7 @@ impl FastField for NumDomainTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumMicroformatTagsTokens;
-impl FastField for NumMicroformatTagsTokens {
+impl ColumnField for NumMicroformatTagsTokens {
     fn name(&self) -> &str {
         "num_microformat_tags_tokens"
     }
@@ -628,7 +628,7 @@ impl FastField for NumMicroformatTagsTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteHash1;
-impl FastField for SiteHash1 {
+impl ColumnField for SiteHash1 {
     fn name(&self) -> &str {
         "site_hash1"
     }
@@ -648,7 +648,7 @@ impl FastField for SiteHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteHash2;
-impl FastField for SiteHash2 {
+impl ColumnField for SiteHash2 {
     fn name(&self) -> &str {
         "site_hash2"
     }
@@ -668,7 +668,7 @@ impl FastField for SiteHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutQueryHash1;
-impl FastField for UrlWithoutQueryHash1 {
+impl ColumnField for UrlWithoutQueryHash1 {
     fn name(&self) -> &str {
         "url_without_query_hash1"
     }
@@ -691,7 +691,7 @@ impl FastField for UrlWithoutQueryHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutQueryHash2;
-impl FastField for UrlWithoutQueryHash2 {
+impl ColumnField for UrlWithoutQueryHash2 {
     fn name(&self) -> &str {
         "url_without_query_hash2"
     }
@@ -714,7 +714,7 @@ impl FastField for UrlWithoutQueryHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleHash1;
-impl FastField for TitleHash1 {
+impl ColumnField for TitleHash1 {
     fn name(&self) -> &str {
         "title_hash1"
     }
@@ -734,7 +734,7 @@ impl FastField for TitleHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleHash2;
-impl FastField for TitleHash2 {
+impl ColumnField for TitleHash2 {
     fn name(&self) -> &str {
         "title_hash2"
     }
@@ -754,7 +754,7 @@ impl FastField for TitleHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlHash1;
-impl FastField for UrlHash1 {
+impl ColumnField for UrlHash1 {
     fn name(&self) -> &str {
         "url_hash1"
     }
@@ -774,7 +774,7 @@ impl FastField for UrlHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlHash2;
-impl FastField for UrlHash2 {
+impl ColumnField for UrlHash2 {
     fn name(&self) -> &str {
         "url_hash2"
     }
@@ -794,7 +794,7 @@ impl FastField for UrlHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainHash1;
-impl FastField for DomainHash1 {
+impl ColumnField for DomainHash1 {
     fn name(&self) -> &str {
         "domain_hash1"
     }
@@ -814,7 +814,7 @@ impl FastField for DomainHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainHash2;
-impl FastField for DomainHash2 {
+impl ColumnField for DomainHash2 {
     fn name(&self) -> &str {
         "domain_hash2"
     }
@@ -834,7 +834,7 @@ impl FastField for DomainHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutTldHash1;
-impl FastField for UrlWithoutTldHash1 {
+impl ColumnField for UrlWithoutTldHash1 {
     fn name(&self) -> &str {
         "url_without_tld_hash1"
     }
@@ -854,7 +854,7 @@ impl FastField for UrlWithoutTldHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutTldHash2;
-impl FastField for UrlWithoutTldHash2 {
+impl ColumnField for UrlWithoutTldHash2 {
     fn name(&self) -> &str {
         "url_without_tld_hash2"
     }
@@ -874,7 +874,7 @@ impl FastField for UrlWithoutTldHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PreComputedScore;
-impl FastField for PreComputedScore {
+impl ColumnField for PreComputedScore {
     fn name(&self) -> &str {
         "pre_computed_score"
     }
@@ -910,7 +910,7 @@ impl FastField for PreComputedScore {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HostNodeID;
-impl FastField for HostNodeID {
+impl ColumnField for HostNodeID {
     fn name(&self) -> &str {
         "host_node_id"
     }
@@ -950,7 +950,7 @@ impl FastField for HostNodeID {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SimHash;
-impl FastField for SimHash {
+impl ColumnField for SimHash {
     fn name(&self) -> &str {
         "sim_hash"
     }
@@ -981,7 +981,7 @@ impl FastField for SimHash {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumFlattenedSchemaTokens;
-impl FastField for NumFlattenedSchemaTokens {
+impl ColumnField for NumFlattenedSchemaTokens {
     fn name(&self) -> &str {
         "num_flattened_schema_tokens"
     }
@@ -1004,7 +1004,7 @@ impl FastField for NumFlattenedSchemaTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumPathAndQuerySlashes;
-impl FastField for NumPathAndQuerySlashes {
+impl ColumnField for NumPathAndQuerySlashes {
     fn name(&self) -> &str {
         "num_path_and_query_slashes"
     }
@@ -1034,7 +1034,7 @@ impl FastField for NumPathAndQuerySlashes {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumPathAndQueryDigits;
-impl FastField for NumPathAndQueryDigits {
+impl ColumnField for NumPathAndQueryDigits {
     fn name(&self) -> &str {
         "num_path_and_query_digits"
     }
@@ -1072,7 +1072,7 @@ impl FastField for NumPathAndQueryDigits {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LikelyHasAds;
-impl FastField for LikelyHasAds {
+impl ColumnField for LikelyHasAds {
     fn name(&self) -> &str {
         "likely_has_ads"
     }
@@ -1096,7 +1096,7 @@ impl FastField for LikelyHasAds {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LikelyHasPaywall;
-impl FastField for LikelyHasPaywall {
+impl ColumnField for LikelyHasPaywall {
     fn name(&self) -> &str {
         "likely_has_paywall"
     }
@@ -1120,7 +1120,7 @@ impl FastField for LikelyHasPaywall {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LinkDensity;
-impl FastField for LinkDensity {
+impl ColumnField for LinkDensity {
     fn name(&self) -> &str {
         "link_density"
     }
@@ -1147,7 +1147,7 @@ impl FastField for LinkDensity {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleEmbeddings;
-impl FastField for TitleEmbeddings {
+impl ColumnField for TitleEmbeddings {
     fn name(&self) -> &str {
         "title_embeddings"
     }
@@ -1157,7 +1157,7 @@ impl FastField for TitleEmbeddings {
     }
 
     fn indexing_option(&self) -> IndexingOption {
-        IndexingOption::Bytes(BytesOptions::default().set_fast().set_stored())
+        IndexingOption::Bytes(BytesOptions::default().set_columnar().set_stored())
     }
 
     fn add_html_tantivy(
@@ -1191,7 +1191,7 @@ impl FastField for TitleEmbeddings {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct KeywordEmbeddings;
-impl FastField for KeywordEmbeddings {
+impl ColumnField for KeywordEmbeddings {
     fn name(&self) -> &str {
         "keyword_embeddings"
     }
@@ -1201,7 +1201,7 @@ impl FastField for KeywordEmbeddings {
     }
 
     fn indexing_option(&self) -> IndexingOption {
-        IndexingOption::Bytes(BytesOptions::default().set_fast().set_stored())
+        IndexingOption::Bytes(BytesOptions::default().set_columnar().set_stored())
     }
 
     fn add_html_tantivy(

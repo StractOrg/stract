@@ -14,21 +14,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod fast_field;
+pub mod column_field;
 pub mod text_field;
 
 use tantivy::schema::{BytesOptions, DateOptions, NumericOptions, TextOptions};
 
-pub use fast_field::{DataType, FastFieldEnum};
+pub use column_field::{ColumnFieldEnum, DataType};
 pub use text_field::TextFieldEnum;
 
-use self::{fast_field::FastField, text_field::TextField};
+use self::{column_field::ColumnField, text_field::TextField};
 
 pub const FLOAT_SCALING: u64 = 1_000_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Field {
-    Fast(FastFieldEnum),
+    Columnar(ColumnFieldEnum),
     Text(TextFieldEnum),
 }
 
@@ -40,10 +40,10 @@ impl Field {
         }
         let field_id = field_id - TextFieldEnum::num_variants();
 
-        if field_id < FastFieldEnum::num_variants() {
-            return Some(Field::Fast(FastFieldEnum::get(field_id).unwrap()));
+        if field_id < ColumnFieldEnum::num_variants() {
+            return Some(Field::Columnar(ColumnFieldEnum::get(field_id).unwrap()));
         }
-        let _field_id = field_id - FastFieldEnum::num_variants();
+        let _field_id = field_id - ColumnFieldEnum::num_variants();
 
         None
     }
@@ -52,12 +52,12 @@ impl Field {
     pub fn all() -> impl Iterator<Item = Field> {
         TextFieldEnum::all()
             .map(Field::Text)
-            .chain(FastFieldEnum::all().map(Field::Fast))
+            .chain(ColumnFieldEnum::all().map(Field::Columnar))
     }
 
     pub fn has_pos(&self) -> bool {
         match self {
-            Field::Fast(_) => false,
+            Field::Columnar(_) => false,
             Field::Text(text) => text.has_pos(),
         }
     }
@@ -65,34 +65,34 @@ impl Field {
     pub fn indexing_option(&self) -> IndexingOption {
         match self {
             Field::Text(f) => f.indexing_option(),
-            Field::Fast(f) => f.indexing_option(),
+            Field::Columnar(f) => f.indexing_option(),
         }
     }
 
     pub fn name(&self) -> &str {
         match self {
             Field::Text(f) => f.name(),
-            Field::Fast(f) => f.name(),
+            Field::Columnar(f) => f.name(),
         }
     }
 
     pub fn is_searchable(&self) -> bool {
         match self {
             Field::Text(f) => f.is_searchable(),
-            Field::Fast(_) => false,
+            Field::Columnar(_) => false,
         }
     }
 
     pub fn as_text(&self) -> Option<TextFieldEnum> {
         match self {
-            Field::Fast(_) => None,
+            Field::Columnar(_) => None,
             Field::Text(field) => Some(*field),
         }
     }
 
-    pub fn as_fast(&self) -> Option<FastFieldEnum> {
+    pub fn as_fast(&self) -> Option<ColumnFieldEnum> {
         match self {
-            Field::Fast(field) => Some(*field),
+            Field::Columnar(field) => Some(*field),
             Field::Text(_) => None,
         }
     }

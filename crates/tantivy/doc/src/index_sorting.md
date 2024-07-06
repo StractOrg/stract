@@ -4,8 +4,9 @@
     - [Compression](#compression)
     - [Top-N Optimization](#top-n-optimization)
     - [Pruning](#pruning)
-    - [Other](#other)
+    - [Other?](#other)
   - [Usage](#usage)
+  - [Implementation details](#implementation-details)
 
 # Index Sorting
 
@@ -19,7 +20,7 @@ Presorting an index has several advantages:
 
 When data is sorted it is easier to compress the data. E.g. the numbers sequence [5, 2, 3, 1, 4] would be sorted to [1, 2, 3, 4, 5].
 If we apply delta encoding this list would be unsorted [5, -3, 1, -2, 3] vs. [1, 1, 1, 1, 1].
-Compression ratio is mainly affected on the fast field of the sorted property, every thing else is likely unaffected.
+Compression ratio is mainly affected on the columnar field of the sorted property, every thing else is likely unaffected.
 
 ### Top-N Optimization
 
@@ -30,7 +31,7 @@ Note: Tantivy 0.16 does not do this optimization yet.
 
 ### Pruning
 
-Let's say we want all documents and want to apply the filter `>= 2010-08-11`. When the data is sorted, we could make a lookup in the fast field to find the docid range and use this as the filter.
+Let's say we want all documents and want to apply the filter `>= 2010-08-11`. When the data is sorted, we could make a lookup in the columnar field to find the docid range and use this as the filter.
 
 Note: Tantivy 0.16 does not do this optimization yet.
 
@@ -40,7 +41,7 @@ In principle there are many algorithms possible that exploit the monotonically i
 
 ## Usage
 
-The index sorting can be configured setting [`sort_by_field`](https://github.com/quickwit-oss/tantivy/blob/000d76b11a139a84b16b9b95060a1c93e8b9851c/src/core/index_meta.rs#L238) on `IndexSettings` and passing it to a `IndexBuilder`. As of Tantivy 0.16 only fast fields are allowed to be used.
+The index sorting can be configured setting [`sort_by_field`](https://github.com/quickwit-oss/tantivy/blob/000d76b11a139a84b16b9b95060a1c93e8b9851c/src/core/index_meta.rs#L238) on `IndexSettings` and passing it to a `IndexBuilder`. As of Tantivy 0.16 only columnar fields are allowed to be used.
 
 ```rust
 let settings = IndexSettings {
@@ -59,4 +60,4 @@ let index = index_builder.create_in_ram().unwrap();
 
 Sorting an index is applied in the serialization step. In general there are two serialization steps: [Finishing a single segment](https://github.com/quickwit-oss/tantivy/blob/000d76b11a139a84b16b9b95060a1c93e8b9851c/src/indexer/segment_writer.rs#L338) and [merging multiple segments](https://github.com/quickwit-oss/tantivy/blob/000d76b11a139a84b16b9b95060a1c93e8b9851c/src/indexer/merger.rs#L1073).
 
-In both cases we generate a docid mapping reflecting the sort. This mapping is used when serializing the different components (doc store, fastfields, posting list, normfield, facets).
+In both cases we generate a docid mapping reflecting the sort. This mapping is used when serializing the different components (doc store, columnfields, posting list, normfield, facets).

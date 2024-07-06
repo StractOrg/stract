@@ -5,7 +5,7 @@
 //!
 //! Your fruit could for instance be :
 //! - [the count of matching documents](crate::collector::Count)
-//! - [the top 10 documents, by relevancy or by a fast field](crate::collector::TopDocs)
+//! - [the top 10 documents, by relevancy or by a columnar field](crate::collector::TopDocs)
 //! - [facet counts](FacetCollector)
 //!
 //! At some point in your code, you will trigger the actual search operation by calling
@@ -93,7 +93,7 @@ impl<T> Fruit for T where T: Send + downcast_rs::Downcast {}
 /// For instance,
 ///
 /// - keeping track of the top 10 best documents
-/// - computing a breakdown over a fast field
+/// - computing a breakdown over a columnar field
 /// - computing the number of documents matching the query
 ///
 /// Our search index is in fact a collection of segments, so

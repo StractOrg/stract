@@ -2,8 +2,8 @@ use std::ops::BitOr;
 
 use serde::{Deserialize, Serialize};
 
-use super::text_options::{FastFieldTextOptions, TokenizerName};
-use crate::schema::flags::{FastFlag, SchemaFlagList, StoredFlag};
+use super::text_options::{ColumnFieldTextOptions, TokenizerName};
+use crate::schema::flags::{ColumnarFlag, SchemaFlagList, StoredFlag};
 use crate::schema::{TextFieldIndexing, TextOptions};
 
 /// The `JsonObjectOptions` make it possible to
@@ -14,12 +14,12 @@ pub struct JsonObjectOptions {
     // If set to some, int, date, f64 and text will be indexed.
     // Text will use the TextFieldIndexing setting for indexing.
     indexing: Option<TextFieldIndexing>,
-    // Store all field as fast fields with an optional tokenizer for text.
-    fast: FastFieldTextOptions,
+    // Store all field as columnar fields with an optional tokenizer for text.
+    columnar: ColumnFieldTextOptions,
     /// tantivy will generate pathes to the different nodes of the json object
     /// both in:
     /// - the inverted index (for the terms)
-    /// - fast fields (for the column names).
+    /// - columnar fields (for the column names).
     ///
     /// These json path are encoded by concatenating the list of object keys that
     /// are visited from the root to the leaf.
@@ -58,22 +58,24 @@ impl JsonObjectOptions {
     }
 
     /// Returns true if and only if the json object fields are
-    /// to be treated as fast fields.
+    /// to be treated as columnar fields.
     #[inline]
-    pub fn is_fast(&self) -> bool {
-        matches!(self.fast, FastFieldTextOptions::IsEnabled(true))
+    pub fn is_columnar(&self) -> bool {
+        matches!(self.columnar, ColumnFieldTextOptions::IsEnabled(true))
             || matches!(
-                &self.fast,
-                FastFieldTextOptions::EnabledWithTokenizer { with_tokenizer: _ }
+                &self.columnar,
+                ColumnFieldTextOptions::EnabledWithTokenizer { with_tokenizer: _ }
             )
     }
 
-    /// Returns true if and only if the value is a fast field.
+    /// Returns true if and only if the value is a columnar field.
     #[inline]
-    pub fn get_fast_field_tokenizer_name(&self) -> Option<&str> {
-        match &self.fast {
-            FastFieldTextOptions::IsEnabled(true) | FastFieldTextOptions::IsEnabled(false) => None,
-            FastFieldTextOptions::EnabledWithTokenizer {
+    pub fn get_column_field_tokenizer_name(&self) -> Option<&str> {
+        match &self.columnar {
+            ColumnFieldTextOptions::IsEnabled(true) | ColumnFieldTextOptions::IsEnabled(false) => {
+                None
+            }
+            ColumnFieldTextOptions::EnabledWithTokenizer {
                 with_tokenizer: tokenizer,
             } => Some(tokenizer.name()),
         }
@@ -120,30 +122,30 @@ impl JsonObjectOptions {
         self
     }
 
-    /// Set the field as a fast field.
+    /// Set the field as a columnar field.
     ///
-    /// Fast fields are designed for random access.
+    /// Columnar fields are designed for random access.
     /// Access time are similar to a random lookup in an array.
-    /// Text fast fields will have the term ids stored in the fast field.
+    /// Text columnar fields will have the term ids stored in the columnar field.
     ///
     /// The effective cardinality depends on the tokenizer. Without a tokenizer, the text will be
     /// stored as is, which equals to the "raw" tokenizer. The tokenizer can be used to apply
     /// normalization like lower case.
-    /// The passed tokenizer_name must be available on the fast field tokenizer manager.
-    /// `Index::fast_field_tokenizer`.
+    /// The passed tokenizer_name must be available on the columnar field tokenizer manager.
+    /// `Index::column_field_tokenizer`.
     ///
     /// The original text can be retrieved via
     /// [`TermDictionary::ord_to_term()`](crate::termdict::TermDictionary::ord_to_term)
     /// from the dictionary.
     #[must_use]
-    pub fn set_fast(mut self, tokenizer_name: Option<&str>) -> Self {
+    pub fn set_columnar(mut self, tokenizer_name: Option<&str>) -> Self {
         if let Some(tokenizer) = tokenizer_name {
             let tokenizer = TokenizerName::from_name(tokenizer);
-            self.fast = FastFieldTextOptions::EnabledWithTokenizer {
+            self.columnar = ColumnFieldTextOptions::EnabledWithTokenizer {
                 with_tokenizer: tokenizer,
             }
         } else {
-            self.fast = FastFieldTextOptions::IsEnabled(true);
+            self.columnar = ColumnFieldTextOptions::IsEnabled(true);
         }
         self
     }
@@ -161,18 +163,18 @@ impl From<StoredFlag> for JsonObjectOptions {
         JsonObjectOptions {
             stored: true,
             indexing: None,
-            fast: FastFieldTextOptions::default(),
+            columnar: ColumnFieldTextOptions::default(),
             expand_dots_enabled: false,
         }
     }
 }
 
-impl From<FastFlag> for JsonObjectOptions {
-    fn from(_fast_flag: FastFlag) -> Self {
+impl From<ColumnarFlag> for JsonObjectOptions {
+    fn from(_columnar_flag: ColumnarFlag) -> Self {
         JsonObjectOptions {
             stored: false,
             indexing: None,
-            fast: FastFieldTextOptions::IsEnabled(true),
+            columnar: ColumnFieldTextOptions::IsEnabled(true),
             expand_dots_enabled: false,
         }
     }
@@ -192,7 +194,7 @@ impl<T: Into<JsonObjectOptions>> BitOr<T> for JsonObjectOptions {
         JsonObjectOptions {
             indexing: self.indexing.or(other.indexing),
             stored: self.stored | other.stored,
-            fast: self.fast | other.fast,
+            columnar: self.columnar | other.columnar,
             expand_dots_enabled: self.expand_dots_enabled | other.expand_dots_enabled,
         }
     }
@@ -214,7 +216,7 @@ impl From<TextOptions> for JsonObjectOptions {
         JsonObjectOptions {
             stored: text_options.is_stored(),
             indexing: text_options.get_indexing_options().cloned(),
-            fast: text_options.fast,
+            columnar: text_options.columnar,
             expand_dots_enabled: false,
         }
     }
@@ -223,7 +225,7 @@ impl From<TextOptions> for JsonObjectOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::{FAST, STORED, TEXT};
+    use crate::schema::{COLUMN, STORED, TEXT};
 
     #[test]
     fn test_json_options() {
@@ -231,31 +233,31 @@ mod tests {
             let json_options: JsonObjectOptions = (STORED | TEXT).into();
             assert!(json_options.is_stored());
             assert!(json_options.is_indexed());
-            assert!(!json_options.is_fast());
+            assert!(!json_options.is_columnar());
         }
         {
             let json_options: JsonObjectOptions = TEXT.into();
             assert!(!json_options.is_stored());
             assert!(json_options.is_indexed());
-            assert!(!json_options.is_fast());
+            assert!(!json_options.is_columnar());
         }
         {
             let json_options: JsonObjectOptions = STORED.into();
             assert!(json_options.is_stored());
             assert!(!json_options.is_indexed());
-            assert!(!json_options.is_fast());
+            assert!(!json_options.is_columnar());
         }
         {
-            let json_options: JsonObjectOptions = FAST.into();
+            let json_options: JsonObjectOptions = COLUMN.into();
             assert!(!json_options.is_stored());
             assert!(!json_options.is_indexed());
-            assert!(json_options.is_fast());
+            assert!(json_options.is_columnar());
         }
         {
-            let json_options: JsonObjectOptions = (FAST | STORED).into();
+            let json_options: JsonObjectOptions = (COLUMN | STORED).into();
             assert!(json_options.is_stored());
             assert!(!json_options.is_indexed());
-            assert!(json_options.is_fast());
+            assert!(json_options.is_columnar());
         }
     }
 }

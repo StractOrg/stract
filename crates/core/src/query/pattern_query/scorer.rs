@@ -23,9 +23,9 @@ use tantivy::{
 };
 
 use crate::{
-    fastfield_reader::{self, FastFieldReader},
+    columnfield_reader::{self, ColumnFieldReader},
     query::intersection::Intersection,
-    schema::FastFieldEnum,
+    schema::ColumnFieldEnum,
 };
 
 use super::SmallPatternPart;
@@ -126,8 +126,8 @@ impl Scorer for AllScorer {
 }
 
 pub struct EmptyFieldScorer {
-    pub segment_reader: Arc<fastfield_reader::SegmentReader>,
-    pub num_tokens_fastfield: FastFieldEnum,
+    pub segment_reader: Arc<columnfield_reader::SegmentReader>,
+    pub num_tokens_columnfield: ColumnFieldEnum,
     pub all_scorer: AllScorer,
 }
 
@@ -136,7 +136,7 @@ impl EmptyFieldScorer {
         let s: Option<u64> = self
             .segment_reader
             .get_field_reader(doc)
-            .get(self.num_tokens_fastfield)
+            .get(self.num_tokens_columnfield)
             .and_then(|v| v.as_u64());
         s.unwrap_or_default()
     }
@@ -210,8 +210,8 @@ pub struct NormalPatternScorer {
     left: Vec<u32>,
     right: Vec<u32>,
     phrase_count: u32,
-    num_tokens_field: FastFieldEnum,
-    segment_reader: Arc<fastfield_reader::SegmentReader>,
+    num_tokens_field: ColumnFieldEnum,
+    segment_reader: Arc<columnfield_reader::SegmentReader>,
 }
 
 impl NormalPatternScorer {
@@ -219,11 +219,11 @@ impl NormalPatternScorer {
         term_postings_list: Vec<SegmentPostings>,
         pattern: Vec<SmallPatternPart>,
         segment: tantivy::index::SegmentId,
-        num_tokens_field: FastFieldEnum,
-        fastfield_reader: FastFieldReader,
+        num_tokens_field: ColumnFieldEnum,
+        columnfield_reader: ColumnFieldReader,
     ) -> Self {
         let num_query_terms = term_postings_list.len();
-        let segment_reader = fastfield_reader.get_segment(&segment);
+        let segment_reader = columnfield_reader.get_segment(&segment);
 
         let mut s = Self {
             pattern_all_simple: pattern.iter().all(|p| matches!(p, SmallPatternPart::Term)),

@@ -307,7 +307,7 @@ fn estimation_test_bad_interpolation_case_monotonically_increasing() {
 }
 
 #[test]
-fn test_fast_field_codec_type_to_code() {
+fn test_column_field_codec_type_to_code() {
     let mut count_codec = 0;
     for code in 0..=255 {
         if let Some(codec_type) = CodecType::try_from_code(code) {
@@ -318,7 +318,7 @@ fn test_fast_field_codec_type_to_code() {
     assert_eq!(count_codec, 3);
 }
 
-fn test_fastfield_gcd_i64_with_codec(codec_type: CodecType, num_vals: usize) -> io::Result<()> {
+fn test_columnfield_gcd_i64_with_codec(codec_type: CodecType, num_vals: usize) -> io::Result<()> {
     let mut vals: Vec<i64> = (-4..=(num_vals as i64) - 5).map(|val| val * 1000).collect();
     let mut buffer: Vec<u8> = Vec::new();
     crate::columnar::column_values::serialize_u64_based_column_values(
@@ -351,18 +351,18 @@ fn test_fastfield_gcd_i64_with_codec(codec_type: CodecType, num_vals: usize) -> 
 }
 
 #[test]
-fn test_fastfield_gcd_i64() -> io::Result<()> {
+fn test_columnfield_gcd_i64() -> io::Result<()> {
     for &codec_type in &[
         CodecType::Bitpacked,
         CodecType::BlockwiseLinear,
         CodecType::Linear,
     ] {
-        test_fastfield_gcd_i64_with_codec(codec_type, 5500)?;
+        test_columnfield_gcd_i64_with_codec(codec_type, 5500)?;
     }
     Ok(())
 }
 
-fn test_fastfield_gcd_u64_with_codec(codec_type: CodecType, num_vals: usize) -> io::Result<()> {
+fn test_columnfield_gcd_u64_with_codec(codec_type: CodecType, num_vals: usize) -> io::Result<()> {
     let mut vals: Vec<u64> = (1..=num_vals).map(|i| i as u64 * 1000u64).collect();
     let mut buffer: Vec<u8> = Vec::new();
     crate::columnar::column_values::serialize_u64_based_column_values(
@@ -394,23 +394,25 @@ fn test_fastfield_gcd_u64_with_codec(codec_type: CodecType, num_vals: usize) -> 
 }
 
 #[test]
-fn test_fastfield_gcd_u64() -> io::Result<()> {
+fn test_columnfield_gcd_u64() -> io::Result<()> {
     for &codec_type in &[
         CodecType::Bitpacked,
         CodecType::BlockwiseLinear,
         CodecType::Linear,
     ] {
-        test_fastfield_gcd_u64_with_codec(codec_type, 5500)?;
+        test_columnfield_gcd_u64_with_codec(codec_type, 5500)?;
     }
     Ok(())
 }
 
 #[test]
-pub fn test_fastfield2() {
-    let test_fastfield = crate::columnar::column_values::serialize_and_load_u64_based_column_values::<
-        u64,
-    >(&&[100u64, 200u64, 300u64][..], &ALL_U64_CODEC_TYPES);
-    assert_eq!(test_fastfield.get_val(0), 100);
-    assert_eq!(test_fastfield.get_val(1), 200);
-    assert_eq!(test_fastfield.get_val(2), 300);
+pub fn test_columnfield2() {
+    let test_columnfield =
+        crate::columnar::column_values::serialize_and_load_u64_based_column_values::<u64>(
+            &&[100u64, 200u64, 300u64][..],
+            &ALL_U64_CODEC_TYPES,
+        );
+    assert_eq!(test_columnfield.get_val(0), 100);
+    assert_eq!(test_columnfield.get_val(1), 200);
+    assert_eq!(test_columnfield.get_val(2), 300);
 }

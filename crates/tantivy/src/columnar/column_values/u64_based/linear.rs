@@ -13,7 +13,7 @@ const HALF_SPACE: u64 = u64::MAX / 2;
 const LINE_ESTIMATION_BLOCK_LEN: usize = 512;
 
 /// Depending on the field type, a different
-/// fast field is required.
+/// columnar field is required.
 #[derive(Clone)]
 pub struct LinearReader {
     data: OwnedBytes,
@@ -238,7 +238,7 @@ mod tests {
         }
     }
     #[test]
-    fn linear_interpol_fast_field_test_large_amplitude() {
+    fn linear_interpol_column_field_test_large_amplitude() {
         let data = vec![
             i64::MAX as u64 / 2,
             i64::MAX as u64 / 3,
@@ -264,13 +264,13 @@ mod tests {
         create_and_validate::<LinearCodec>(&data, "convex data");
     }
     #[test]
-    fn linear_interpol_fast_field_test_simple() {
+    fn linear_interpol_column_field_test_simple() {
         let data = (10..=20_u64).collect::<Vec<_>>();
         create_and_validate::<LinearCodec>(&data, "simple monotonically");
     }
 
     #[test]
-    fn linear_interpol_fast_field_rand() {
+    fn linear_interpol_column_field_rand() {
         let mut rng = rand::thread_rng();
         for _ in 0..50 {
             let mut data = (0..10_000).map(|_| rng.next_u64()).collect::<Vec<_>>();

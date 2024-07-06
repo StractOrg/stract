@@ -6,12 +6,12 @@ use std::net::Ipv6Addr;
 pub trait MonotonicallyMappableToU128: 'static + PartialOrd + Copy + Debug + Send + Sync {
     /// Converts a value to u128.
     ///
-    /// Internally all fast field values are encoded as u64.
+    /// Internally all columnar field values are encoded as u64.
     fn to_u128(self) -> u128;
 
     /// Converts a value from u128
     ///
-    /// Internally all fast field values are encoded as u64.
+    /// Internally all columnar field values are encoded as u64.
     /// **Note: To be used for converting encoded Term, Posting values.**
     fn from_u128(val: u128) -> Self;
 }

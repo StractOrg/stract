@@ -271,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn test_blockwise_linear_fast_field_rand() {
+    fn test_blockwise_linear_column_field_rand() {
         for _ in 0..500 {
             let mut data = (0..1 + rand::random::<u8>() as usize)
                 .map(|_| rand::random::<i64>() as u64 / 2)

@@ -186,10 +186,10 @@ mod tests {
     use crate::{schema, IndexBuilder, TantivyDocument};
 
     #[test]
-    fn range_query_fast_optional_field_minimum() {
+    fn range_query_columnar_optional_field_minimum() {
         let mut schema_builder = schema::SchemaBuilder::new();
         let id_field = schema_builder.add_text_field("id", schema::STRING);
-        let score_field = schema_builder.add_u64_field("score", schema::FAST | schema::INDEXED);
+        let score_field = schema_builder.add_u64_field("score", schema::COLUMN | schema::INDEXED);
 
         let dir = RamDirectory::default();
         let index = IndexBuilder::new()

@@ -2,14 +2,14 @@ use std::ops::BitOr;
 
 use serde::{Deserialize, Serialize};
 
-use super::flags::{FastFlag, IndexedFlag, SchemaFlagList, StoredFlag};
+use super::flags::{ColumnarFlag, IndexedFlag, SchemaFlagList, StoredFlag};
 /// Define how a bytes field should be handled by tantivy.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "BytesOptionsDeser")]
 pub struct BytesOptions {
     indexed: bool,
     fieldnorms: bool,
-    fast: bool,
+    columnar: bool,
     stored: bool,
 }
 
@@ -23,7 +23,7 @@ struct BytesOptionsDeser {
     indexed: bool,
     #[serde(default)]
     fieldnorms: Option<bool>,
-    fast: bool,
+    columnar: bool,
     stored: bool,
 }
 
@@ -32,7 +32,7 @@ impl From<BytesOptionsDeser> for BytesOptions {
         BytesOptions {
             indexed: deser.indexed,
             fieldnorms: deser.fieldnorms.unwrap_or(deser.indexed),
-            fast: deser.fast,
+            columnar: deser.columnar,
             stored: deser.stored,
         }
     }
@@ -51,10 +51,10 @@ impl BytesOptions {
         self.fieldnorms
     }
 
-    /// Returns true if the value is a fast field.
+    /// Returns true if the value is a columnar field.
     #[inline]
-    pub fn is_fast(&self) -> bool {
-        self.fast
+    pub fn is_columnar(&self) -> bool {
+        self.columnar
     }
 
     /// Returns true if the value is stored.
@@ -83,12 +83,12 @@ impl BytesOptions {
         self
     }
 
-    /// Set the field as a fast field.
+    /// Set the field as a columnar field.
     ///
     /// Fast fields are designed for random access.
     #[must_use]
-    pub fn set_fast(mut self) -> BytesOptions {
-        self.fast = true;
+    pub fn set_columnar(mut self) -> BytesOptions {
+        self.columnar = true;
         self
     }
 
@@ -112,7 +112,7 @@ impl<T: Into<BytesOptions>> BitOr<T> for BytesOptions {
             indexed: self.indexed | other.indexed,
             fieldnorms: self.fieldnorms | other.fieldnorms,
             stored: self.stored | other.stored,
-            fast: self.fast | other.fast,
+            columnar: self.columnar | other.columnar,
         }
     }
 }
@@ -123,13 +123,13 @@ impl From<()> for BytesOptions {
     }
 }
 
-impl From<FastFlag> for BytesOptions {
-    fn from(_: FastFlag) -> Self {
+impl From<ColumnarFlag> for BytesOptions {
+    fn from(_: ColumnarFlag) -> Self {
         BytesOptions {
             indexed: false,
             fieldnorms: false,
             stored: false,
-            fast: true,
+            columnar: true,
         }
     }
 }
@@ -140,7 +140,7 @@ impl From<StoredFlag> for BytesOptions {
             indexed: false,
             fieldnorms: false,
             stored: true,
-            fast: false,
+            columnar: false,
         }
     }
 }
@@ -151,7 +151,7 @@ impl From<IndexedFlag> for BytesOptions {
             indexed: true,
             fieldnorms: true,
             stored: false,
-            fast: false,
+            columnar: false,
         }
     }
 }
@@ -169,11 +169,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::schema::{BytesOptions, FAST, INDEXED, STORED};
+    use crate::schema::{BytesOptions, COLUMN, INDEXED, STORED};
 
     #[test]
-    fn test_bytes_option_fast_flag() {
-        assert_eq!(BytesOptions::default().set_fast(), FAST.into());
+    fn test_bytes_option_columnar_flag() {
+        assert_eq!(BytesOptions::default().set_columnar(), COLUMN.into());
         assert_eq!(
             BytesOptions::default().set_indexed().set_fieldnorms(),
             INDEXED.into()
@@ -181,17 +181,17 @@ mod tests {
         assert_eq!(BytesOptions::default().set_stored(), STORED.into());
     }
     #[test]
-    fn test_bytes_option_fast_flag_composition() {
+    fn test_bytes_option_columnar_flag_composition() {
         assert_eq!(
-            BytesOptions::default().set_fast().set_stored(),
-            (FAST | STORED).into()
+            BytesOptions::default().set_columnar().set_stored(),
+            (COLUMN | STORED).into()
         );
         assert_eq!(
             BytesOptions::default()
                 .set_indexed()
                 .set_fieldnorms()
-                .set_fast(),
-            (INDEXED | FAST).into()
+                .set_columnar(),
+            (INDEXED | COLUMN).into()
         );
         assert_eq!(
             BytesOptions::default()
@@ -203,13 +203,13 @@ mod tests {
     }
 
     #[test]
-    fn test_bytes_option_fast_() {
+    fn test_bytes_option_columnar_() {
         assert!(!BytesOptions::default().is_stored());
-        assert!(!BytesOptions::default().is_fast());
+        assert!(!BytesOptions::default().is_columnar());
         assert!(!BytesOptions::default().is_indexed());
         assert!(!BytesOptions::default().fieldnorms());
         assert!(BytesOptions::default().set_stored().is_stored());
-        assert!(BytesOptions::default().set_fast().is_fast());
+        assert!(BytesOptions::default().set_columnar().is_columnar());
         assert!(BytesOptions::default().set_indexed().is_indexed());
         assert!(BytesOptions::default().set_fieldnorms().fieldnorms());
     }
@@ -218,7 +218,7 @@ mod tests {
     fn test_bytes_options_deser_if_fieldnorm_missing_indexed_true() {
         let json = r#"{
             "indexed": true,
-            "fast": false,
+            "columnar": false,
             "stored": false
         }"#;
         let bytes_options: BytesOptions = serde_json::from_str(json).unwrap();
@@ -227,7 +227,7 @@ mod tests {
             &BytesOptions {
                 indexed: true,
                 fieldnorms: true,
-                fast: false,
+                columnar: false,
                 stored: false
             }
         );
@@ -238,7 +238,7 @@ mod tests {
         let json = r#"{
             "indexed": false,
             "stored": false,
-            "fast": false
+            "columnar": false
         }"#;
         let bytes_options: BytesOptions = serde_json::from_str(json).unwrap();
         assert_eq!(
@@ -246,7 +246,7 @@ mod tests {
             &BytesOptions {
                 indexed: false,
                 fieldnorms: false,
-                fast: false,
+                columnar: false,
                 stored: false
             }
         );
@@ -257,7 +257,7 @@ mod tests {
         let json = r#"{
             "indexed": true,
             "fieldnorms": false,
-            "fast": false,
+            "columnar": false,
             "stored": false
         }"#;
         let bytes_options: BytesOptions = serde_json::from_str(json).unwrap();
@@ -266,7 +266,7 @@ mod tests {
             &BytesOptions {
                 indexed: true,
                 fieldnorms: false,
-                fast: false,
+                columnar: false,
                 stored: false
             }
         );
@@ -278,7 +278,7 @@ mod tests {
         let json = r#"{
             "indexed": false,
             "fieldnorms": true,
-            "fast": false,
+            "columnar": false,
             "stored": false
         }"#;
         let bytes_options: BytesOptions = serde_json::from_str(json).unwrap();
@@ -287,7 +287,7 @@ mod tests {
             &BytesOptions {
                 indexed: false,
                 fieldnorms: true,
-                fast: false,
+                columnar: false,
                 stored: false
             }
         );

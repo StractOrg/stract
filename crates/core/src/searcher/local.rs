@@ -176,7 +176,7 @@ where
     ) -> Result<Ranker> {
         let mut ranker = Ranker::new(
             computer,
-            guard.inverted_index().fastfield_reader(),
+            guard.inverted_index().columnfield_reader(),
             self.collector_config.clone(),
         );
 
@@ -232,13 +232,13 @@ where
             ranker.collector(ctx.clone()),
         )?;
 
-        let fastfield_reader = guard.inverted_index().fastfield_reader();
+        let columnfield_reader = guard.inverted_index().columnfield_reader();
 
         let ranking_websites = guard.inverted_index().retrieve_ranking_websites(
             ctx,
             res.top_websites,
             ranker.computer(),
-            &fastfield_reader,
+            &columnfield_reader,
         )?;
 
         let pipe_top_n = pipeline.top_n;

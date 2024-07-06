@@ -8,7 +8,7 @@ use crate::common::JsonPathWriter;
 
 use super::date_time_options::DATE_TIME_PRECISION_INDEXED;
 use super::Field;
-use crate::fastfield::FastValue;
+use crate::columnfield::ColumnarValue;
 use crate::json_utils::split_json_path;
 use crate::schema::Type;
 use crate::DateTime;
@@ -71,7 +71,7 @@ impl Term {
         term
     }
 
-    fn from_fast_value<T: FastValue>(field: Field, val: &T) -> Term {
+    fn from_columnar_value<T: ColumnarValue>(field: Field, val: &T) -> Term {
         let mut term = Self::with_type_and_field(T::to_type(), field);
         term.set_u64(val.to_u64());
         term
@@ -101,27 +101,27 @@ impl Term {
 
     /// Builds a term given a field, and a `u64`-value
     pub fn from_field_u64(field: Field, val: u64) -> Term {
-        Term::from_fast_value(field, &val)
+        Term::from_columnar_value(field, &val)
     }
 
     /// Builds a term given a field, and a `i64`-value
     pub fn from_field_i64(field: Field, val: i64) -> Term {
-        Term::from_fast_value(field, &val)
+        Term::from_columnar_value(field, &val)
     }
 
     /// Builds a term given a field, and a `f64`-value
     pub fn from_field_f64(field: Field, val: f64) -> Term {
-        Term::from_fast_value(field, &val)
+        Term::from_columnar_value(field, &val)
     }
 
     /// Builds a term given a field, and a `bool`-value
     pub fn from_field_bool(field: Field, val: bool) -> Term {
-        Term::from_fast_value(field, &val)
+        Term::from_columnar_value(field, &val)
     }
 
     /// Builds a term given a field, and a `DateTime` value
     pub fn from_field_date(field: Field, val: DateTime) -> Term {
-        Term::from_fast_value(field, &val.truncate(DATE_TIME_PRECISION_INDEXED))
+        Term::from_columnar_value(field, &val.truncate(DATE_TIME_PRECISION_INDEXED))
     }
 
     /// Builds a term given a field, and a string value
@@ -153,38 +153,38 @@ impl Term {
     /// The use of BigEndian has the benefit of preserving
     /// the natural order of the values.
     pub fn set_u64(&mut self, val: u64) {
-        self.set_fast_value(val);
+        self.set_columnar_value(val);
     }
 
     /// Sets a `i64` value in the term.
     pub fn set_i64(&mut self, val: i64) {
-        self.set_fast_value(val);
+        self.set_columnar_value(val);
     }
 
     /// Sets a `DateTime` value in the term.
     pub fn set_date(&mut self, date: DateTime) {
-        self.set_fast_value(date);
+        self.set_columnar_value(date);
     }
 
     /// Sets a `f64` value in the term.
     pub fn set_f64(&mut self, val: f64) {
-        self.set_fast_value(val);
+        self.set_columnar_value(val);
     }
 
     /// Sets a `bool` value in the term.
     pub fn set_bool(&mut self, val: bool) {
-        self.set_fast_value(val);
+        self.set_columnar_value(val);
     }
 
-    fn set_fast_value<T: FastValue>(&mut self, val: T) {
+    fn set_columnar_value<T: ColumnarValue>(&mut self, val: T) {
         self.set_bytes(val.to_u64().to_be_bytes().as_ref());
     }
 
-    /// Append a type marker + fast value to a term.
-    /// This is used in JSON type to append a fast value after the path.
+    /// Append a type marker + columnar value to a term.
+    /// This is used in JSON type to append a columnar value after the path.
     ///
     /// It will not clear existing bytes.
-    pub fn append_type_and_fast_value<T: FastValue>(&mut self, val: T) {
+    pub fn append_type_and_columnar_value<T: ColumnarValue>(&mut self, val: T) {
         self.0.push(T::to_type().to_code());
         let value = if T::to_type() == Type::Date {
             DateTime::from_u64(val.to_u64())
@@ -340,10 +340,10 @@ where
     /// Returns `None` if the term is not of the u64 type, or if the term byte representation
     /// is invalid.
     pub fn as_u64(&self) -> Option<u64> {
-        self.get_fast_type::<u64>()
+        self.get_columnar_type::<u64>()
     }
 
-    fn get_fast_type<T: FastValue>(&self) -> Option<T> {
+    fn get_columnar_type<T: ColumnarValue>(&self) -> Option<T> {
         if self.typ() != T::to_type() {
             return None;
         }
@@ -357,7 +357,7 @@ where
     /// Returns `None` if the term is not of the i64 type, or if the term byte representation
     /// is invalid.
     pub fn as_i64(&self) -> Option<i64> {
-        self.get_fast_type::<i64>()
+        self.get_columnar_type::<i64>()
     }
 
     /// Returns the `f64` value stored in a term.
@@ -365,7 +365,7 @@ where
     /// Returns `None` if the term is not of the f64 type, or if the term byte representation
     /// is invalid.
     pub fn as_f64(&self) -> Option<f64> {
-        self.get_fast_type::<f64>()
+        self.get_columnar_type::<f64>()
     }
 
     /// Returns the `bool` value stored in a term.
@@ -373,7 +373,7 @@ where
     /// Returns `None` if the term is not of the bool type, or if the term byte representation
     /// is invalid.
     pub fn as_bool(&self) -> Option<bool> {
-        self.get_fast_type::<bool>()
+        self.get_columnar_type::<bool>()
     }
 
     /// Returns the `Date` value stored in a term.
@@ -381,7 +381,7 @@ where
     /// Returns `None` if the term is not of the Date type, or if the term byte representation
     /// is invalid.
     pub fn as_date(&self) -> Option<DateTime> {
-        self.get_fast_type::<DateTime>()
+        self.get_columnar_type::<DateTime>()
     }
 
     /// Returns the text associated with the term.
@@ -584,7 +584,7 @@ mod tests {
         assert_eq!(term.value().as_str(), Some("test"))
     }
 
-    /// Size (in bytes) of the buffer of a fast value (u64, i64, f64, or date) term.
+    /// Size (in bytes) of the buffer of a columnar value (u64, i64, f64, or date) term.
     /// <field> + <type byte> + <value len>
     ///
     /// - <field> is a big endian encoded u32 field id
@@ -594,7 +594,7 @@ mod tests {
     ///
     /// - <value> is,  if this is not the json term, a binary representation specific to the type.
     ///     If it is a JSON Term, then it is prepended with the path that leads to this leaf value.
-    const FAST_VALUE_TERM_LEN: usize = 4 + 1 + 8;
+    const COLUMN_VALUE_TERM_LEN: usize = 4 + 1 + 8;
 
     #[test]
     pub fn test_term_u64() {
@@ -603,7 +603,7 @@ mod tests {
         let term = Term::from_field_u64(count_field, 983u64);
         assert_eq!(term.field(), count_field);
         assert_eq!(term.typ(), Type::U64);
-        assert_eq!(term.serialized_term().len(), FAST_VALUE_TERM_LEN);
+        assert_eq!(term.serialized_term().len(), COLUMN_VALUE_TERM_LEN);
         assert_eq!(term.value().as_u64(), Some(983u64))
     }
 
@@ -614,7 +614,7 @@ mod tests {
         let term = Term::from_field_bool(bool_field, true);
         assert_eq!(term.field(), bool_field);
         assert_eq!(term.typ(), Type::Bool);
-        assert_eq!(term.serialized_term().len(), FAST_VALUE_TERM_LEN);
+        assert_eq!(term.serialized_term().len(), COLUMN_VALUE_TERM_LEN);
         assert_eq!(term.value().as_bool(), Some(true))
     }
 }

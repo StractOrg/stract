@@ -307,7 +307,7 @@ mod tests {
 
     use super::*;
     use crate::schema::document::existing_type_impls::JsonObjectIter;
-    use crate::schema::{Field, FAST, STORED, TEXT};
+    use crate::schema::{Field, COLUMN, STORED, TEXT};
     use crate::tokenizer::PreTokenizedString;
 
     fn serialize_value<'a>(value: ReferenceValue<'a, &'a serde_json::Value>) -> Vec<u8> {
@@ -698,7 +698,7 @@ mod tests {
     fn test_document_serialize() {
         let mut builder = Schema::builder();
         let name = builder.add_text_field("name", TEXT | STORED);
-        let age = builder.add_u64_field("age", FAST | STORED);
+        let age = builder.add_u64_field("age", COLUMN | STORED);
         let schema = builder.build();
 
         let mut document = BTreeMap::new();
@@ -720,7 +720,7 @@ mod tests {
         let mut builder = Schema::builder();
         let name = builder.add_text_field("name", TEXT | STORED);
         // This should be skipped when serializing.
-        let age = builder.add_u64_field("age", FAST);
+        let age = builder.add_u64_field("age", COLUMN);
         let schema = builder.build();
 
         let mut document = BTreeMap::new();

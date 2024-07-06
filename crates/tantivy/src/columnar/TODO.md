@@ -35,9 +35,9 @@ use the rank & select naming in unit tests branch.
 multi-linear -> blockwise
 linear codec -> simply a multiplication for the index column
 rename columnar to something more explicit, like column_dictionary or columnar_table
-rename fastfield -> column
+rename columnfield -> column
 document changes
-rationalization FastFieldValue, HasColumnType
+rationalization ColumnFieldValue, HasColumnType
 isolate u128_based and uniform naming
 
 # Other

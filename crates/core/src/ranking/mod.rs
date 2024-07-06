@@ -28,8 +28,8 @@ use initial::InitialScoreTweaker;
 
 use crate::{
     collector::{MainCollector, MaxDocsConsidered, TopDocs},
+    columnfield_reader::ColumnFieldReader,
     config::CollectorConfig,
-    fastfield_reader::FastFieldReader,
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
 };
@@ -41,7 +41,7 @@ pub struct Ranker {
     max_docs: Option<MaxDocsConsidered>,
     offset: Option<usize>,
     computer: SignalComputer,
-    fastfield_reader: FastFieldReader,
+    columnfield_reader: ColumnFieldReader,
     de_rank_similar: bool,
     num_results: Option<usize>,
     collector_config: CollectorConfig,
@@ -50,7 +50,7 @@ pub struct Ranker {
 impl Ranker {
     pub fn new(
         computer: SignalComputer,
-        fastfield_reader: FastFieldReader,
+        columnfield_reader: ColumnFieldReader,
         collector_config: CollectorConfig,
     ) -> Self {
         Ranker {
@@ -58,7 +58,7 @@ impl Ranker {
             computer,
             max_docs: None,
             de_rank_similar: true,
-            fastfield_reader,
+            columnfield_reader,
             num_results: None,
             collector_config,
         }
@@ -94,11 +94,11 @@ impl Ranker {
         let computer = self.computer();
 
         let score_tweaker =
-            InitialScoreTweaker::new(ctx.tv_searcher, computer, self.fastfield_reader.clone());
+            InitialScoreTweaker::new(ctx.tv_searcher, computer, self.columnfield_reader.clone());
 
         let mut collector = TopDocs::with_limit(
             self.num_results.unwrap_or(NUM_RESULTS_PER_PAGE),
-            self.fastfield_reader.clone(),
+            self.columnfield_reader.clone(),
         );
 
         if self.de_rank_similar {

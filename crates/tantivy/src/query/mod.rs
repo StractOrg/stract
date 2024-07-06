@@ -54,7 +54,7 @@ pub use self::phrase_query::PhraseQuery;
 pub use self::query::{EnableScoring, Query, QueryClone};
 #[cfg(test)]
 pub use self::query_parser::{QueryParser, QueryParserError};
-pub use self::range_query::{FastFieldRangeWeight, RangeQuery};
+pub use self::range_query::{ColumnFieldRangeWeight, RangeQuery};
 pub use self::reqopt_scorer::RequiredOptionalScorer;
 pub use self::score_combiner::{
     DisjunctionMaxCombiner, ScoreCombiner, SumCombiner, SumWithCoordsCombiner,

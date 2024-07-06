@@ -7,10 +7,10 @@ use crate::columnar::{
 use itertools::Itertools;
 use measure_time::debug_time;
 
+use crate::columnfield::ColumnFieldNotAvailableError;
 use crate::directory::WritePtr;
 use crate::docset::{DocSet, TERMINATED};
 use crate::error::DataCorruption;
-use crate::fastfield::FastFieldNotAvailableError;
 use crate::fieldnorm::{FieldNormReader, FieldNormReaders, FieldNormsSerializer, FieldNormsWriter};
 use crate::index::{Segment, SegmentComponent, SegmentReader};
 use crate::indexer::doc_id_mapping::{MappingType, SegmentDocIdMapping};
@@ -98,11 +98,11 @@ fn convert_to_merge_order(
     }
 }
 
-fn extract_fast_field_required_columns(schema: &Schema) -> Vec<(String, ColumnType)> {
+fn extract_column_field_required_columns(schema: &Schema) -> Vec<(String, ColumnType)> {
     schema
         .fields()
         .map(|(_, field_entry)| field_entry)
-        .filter(|field_entry| field_entry.is_fast())
+        .filter(|field_entry| field_entry.is_columnar())
         .filter_map(|field_entry| {
             let column_name = field_entry.name().to_string();
             let column_type = value_type_to_column_type(field_entry.field_type().value_type())?;
@@ -194,24 +194,24 @@ impl IndexMerger {
         Ok(())
     }
 
-    fn write_fast_fields(
+    fn write_column_fields(
         &self,
-        fast_field_wrt: &mut WritePtr,
+        column_field_wrt: &mut WritePtr,
         doc_id_mapping: SegmentDocIdMapping,
     ) -> crate::Result<()> {
-        debug_time!("write-fast-fields");
-        let required_columns = extract_fast_field_required_columns(&self.schema);
+        debug_time!("write-columnar-fields");
+        let required_columns = extract_column_field_required_columns(&self.schema);
         let columnars: Vec<&ColumnarReader> = self
             .readers
             .iter()
-            .map(|reader| reader.fast_fields().columnar())
+            .map(|reader| reader.column_fields().columnar())
             .collect();
         let merge_row_order = convert_to_merge_order(&columnars[..], doc_id_mapping);
         crate::columnar::merge_columnar(
             &columnars[..],
             &required_columns,
             merge_row_order,
-            fast_field_wrt,
+            column_field_wrt,
         )?;
         Ok(())
     }
@@ -245,9 +245,9 @@ impl IndexMerger {
     ) -> crate::Result<Arc<dyn ColumnValues>> {
         reader.schema().get_field(&sort_by_field.field)?;
         let (value_accessor, _column_type) = reader
-            .fast_fields()
+            .column_fields()
             .u64_lenient(&sort_by_field.field)?
-            .ok_or_else(|| FastFieldNotAvailableError {
+            .ok_or_else(|| ColumnFieldNotAvailableError {
                 field_name: sort_by_field.field.to_string(),
             })?;
         Ok(value_accessor.values)
@@ -656,8 +656,8 @@ impl IndexMerger {
 
         debug!("write-storagefields");
         self.write_storable_fields(serializer.get_store_writer(), &doc_id_mapping)?;
-        debug!("write-fastfields");
-        self.write_fast_fields(serializer.get_fast_field_write(), doc_id_mapping)?;
+        debug!("write-columnfields");
+        self.write_column_fields(serializer.get_column_field_write(), doc_id_mapping)?;
 
         debug!("close-serializer");
         serializer.close()?;
@@ -668,10 +668,10 @@ impl IndexMerger {
 #[cfg(test)]
 mod tests {
 
-    use schema::FAST;
+    use schema::COLUMN;
 
     use crate::collector::tests::{
-        BytesFastFieldTestCollector, FastFieldTestCollector, TEST_COLLECTOR_WITH_SCORE,
+        BytesColumnFieldTestCollector, ColumnFieldTestCollector, TEST_COLLECTOR_WITH_SCORE,
     };
     use crate::index::{Index, SegmentId};
     use crate::query::{BooleanQuery, EnableScoring, Scorer, TermQuery};
@@ -691,9 +691,9 @@ mod tests {
             .set_stored();
         let text_field = schema_builder.add_text_field("text", text_fieldtype);
         let date_field = schema_builder.add_date_field("date", INDEXED);
-        let score_fieldtype = schema::NumericOptions::default().set_fast();
+        let score_fieldtype = schema::NumericOptions::default().set_columnar();
         let score_field = schema_builder.add_u64_field("score", score_fieldtype);
-        let bytes_score_field = schema_builder.add_bytes_field("score_bytes", FAST);
+        let bytes_score_field = schema_builder.add_bytes_field("score_bytes", COLUMN);
         let index = Index::create_in_ram(schema_builder.build());
         let reader = index.reader()?;
         let curr_time = OffsetDateTime::now_utc();
@@ -814,23 +814,23 @@ mod tests {
             }
 
             {
-                let get_fast_vals = |terms: Vec<Term>| {
+                let get_columnar_vals = |terms: Vec<Term>| {
                     let query = BooleanQuery::new_multiterms_query(terms);
-                    searcher.search(&query, &FastFieldTestCollector::for_field("score"))
+                    searcher.search(&query, &ColumnFieldTestCollector::for_field("score"))
                 };
-                let get_fast_vals_bytes = |terms: Vec<Term>| {
+                let get_columnar_vals_bytes = |terms: Vec<Term>| {
                     let query = BooleanQuery::new_multiterms_query(terms);
                     searcher.search(
                         &query,
-                        &BytesFastFieldTestCollector::for_field("score_bytes"),
+                        &BytesColumnFieldTestCollector::for_field("score_bytes"),
                     )
                 };
                 assert_eq!(
-                    get_fast_vals(vec![Term::from_field_text(text_field, "a")])?,
+                    get_columnar_vals(vec![Term::from_field_text(text_field, "a")])?,
                     vec![5, 7, 13]
                 );
                 assert_eq!(
-                    get_fast_vals_bytes(vec![Term::from_field_text(text_field, "a")])?,
+                    get_columnar_vals_bytes(vec![Term::from_field_text(text_field, "a")])?,
                     vec![0, 0, 0, 5, 0, 0, 0, 7, 0, 0, 0, 13]
                 );
             }
@@ -849,13 +849,13 @@ mod tests {
     //     let text_field = schema_builder.add_text_field("text", text_fieldtype);
     //     let score_fieldtype = schema::NumericOptions::default().set_fast();
     //     let score_field = schema_builder.add_u64_field("score", score_fieldtype);
-    //     let bytes_score_field = schema_builder.add_bytes_field("score_bytes", FAST);
+    //     let bytes_score_field = schema_builder.add_bytes_field("score_bytes", COLUMN);
     //     let index = Index::create_in_ram(schema_builder.build());
     //     let mut index_writer = index.writer_for_tests()?;
     //     let reader = index.reader().unwrap();
     //     let search_term = |searcher: &Searcher, term: Term| {
-    //         let collector = FastFieldTestCollector::for_field("score");
-    //         // let bytes_collector = BytesFastFieldTestCollector::for_field(bytes_score_field);
+    //         let collector = ColumnFieldTestCollector::for_field("score");
+    //         // let bytes_collector = BytesColumnFieldTestCollector::for_field(bytes_score_field);
     //         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
     //         // searcher
     //         //     .search(&term_query, &(collector, bytes_collector))
@@ -976,7 +976,7 @@ mod tests {
 
     //         let score_field_reader = searcher
     //             .segment_reader(0)
-    //             .fast_fields()
+    //             .column_fields()
     //             .u64("score")
     //             .unwrap();
     //         assert_eq!(score_field_reader.min_value(), 4000);
@@ -984,7 +984,7 @@ mod tests {
 
     //         let score_field_reader = searcher
     //             .segment_reader(1)
-    //             .fast_fields()
+    //             .column_fields()
     //             .u64("score")
     //             .unwrap();
     //         assert_eq!(score_field_reader.min_value(), 1);
@@ -1030,7 +1030,7 @@ mod tests {
     //         );
     //         let score_field_reader = searcher
     //             .segment_reader(0)
-    //             .fast_fields()
+    //             .column_fields()
     //             .u64("score")
     //             .unwrap();
     //         assert_eq!(score_field_reader.min_value(), 3);
@@ -1077,7 +1077,7 @@ mod tests {
     //         );
     //         let score_field_reader = searcher
     //             .segment_reader(0)
-    //             .fast_fields()
+    //             .column_fields()
     //             .u64("score")
     //             .unwrap();
     //         assert_eq!(score_field_reader.min_value(), 3);
@@ -1124,7 +1124,7 @@ mod tests {
     //         );
     //         let score_field_reader = searcher
     //             .segment_reader(0)
-    //             .fast_fields()
+    //             .column_fields()
     //             .u64("score")
     //             .unwrap();
     //         assert_eq!(score_field_reader.min_value(), 6000);
@@ -1179,10 +1179,10 @@ mod tests {
     // }
 
     #[test]
-    fn merges_f64_fast_fields_correctly() -> crate::Result<()> {
+    fn merges_f64_column_fields_correctly() -> crate::Result<()> {
         let mut builder = schema::SchemaBuilder::new();
 
-        let field = builder.add_f64_field("f64", schema::FAST);
+        let field = builder.add_f64_field("f64", schema::COLUMN);
 
         let index = Index::create_in_ram(builder.build());
 

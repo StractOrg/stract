@@ -97,9 +97,9 @@ impl FieldEntry {
         self.field_type.has_fieldnorms()
     }
 
-    /// Returns true if the field is a fast field
-    pub fn is_fast(&self) -> bool {
-        self.field_type.is_fast()
+    /// Returns true if the field is a columnar field
+    pub fn is_columnar(&self) -> bool {
+        self.field_type.is_columnar()
     }
 
     /// Returns true if the field has the expand dots option set (for json fields)
@@ -154,7 +154,7 @@ mod tests {
       "tokenizer": "default"
     },
     "stored": false,
-    "fast": false
+    "columnar": false
   }
 }"#;
         let field_value_json = serde_json::to_string_pretty(&field_value).unwrap();

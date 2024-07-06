@@ -13,10 +13,10 @@ use crate::{DocId, TantivyError};
 /// This is mostly to guard us from a stack overflow triggered by malicious input.
 const JSON_DEPTH_LIMIT: usize = 20;
 
-/// The `FastFieldsWriter` groups all of the fast field writers.
-pub struct FastFieldsWriter {
+/// The `ColumnFieldsWriter` groups all of the columnar field writers.
+pub struct ColumnFieldsWriter {
     columnar_writer: ColumnarWriter,
-    fast_field_names: Vec<Option<String>>, //< TODO see if we can hash the field name hash too.
+    column_field_names: Vec<Option<String>>, //< TODO see if we can hash the field name hash too.
     per_field_tokenizer: Vec<Option<TextAnalyzer>>,
     date_precisions: Vec<DateTimePrecision>,
     expand_dots: Vec<bool>,
@@ -25,21 +25,21 @@ pub struct FastFieldsWriter {
     json_path_buffer: JsonPathWriter,
 }
 
-impl FastFieldsWriter {
-    /// Create all `FastFieldWriter` required by the schema.
+impl ColumnFieldsWriter {
+    /// Create all `ColumnFieldWriter` required by the schema.
     #[cfg(test)]
-    pub fn from_schema(schema: &Schema) -> crate::Result<FastFieldsWriter> {
-        FastFieldsWriter::from_schema_and_tokenizer_manager(schema, TokenizerManager::new())
+    pub fn from_schema(schema: &Schema) -> crate::Result<ColumnFieldsWriter> {
+        ColumnFieldsWriter::from_schema_and_tokenizer_manager(schema, TokenizerManager::new())
     }
 
-    /// Create all `FastFieldWriter` required by the schema.
+    /// Create all `ColumnFieldWriter` required by the schema.
     pub fn from_schema_and_tokenizer_manager(
         schema: &Schema,
         tokenizer_manager: TokenizerManager,
-    ) -> crate::Result<FastFieldsWriter> {
+    ) -> crate::Result<ColumnFieldsWriter> {
         let mut columnar_writer = ColumnarWriter::default();
 
-        let mut fast_field_names: Vec<Option<String>> = vec![None; schema.num_fields()];
+        let mut column_field_names: Vec<Option<String>> = vec![None; schema.num_fields()];
         let mut date_precisions: Vec<DateTimePrecision> =
             std::iter::repeat_with(DateTimePrecision::default)
                 .take(schema.num_fields())
@@ -48,16 +48,17 @@ impl FastFieldsWriter {
         let mut per_field_tokenizer: Vec<Option<TextAnalyzer>> = vec![None; schema.num_fields()];
         // TODO see other types
         for (field_id, field_entry) in schema.fields() {
-            if !field_entry.field_type().is_fast() {
+            if !field_entry.field_type().is_columnar() {
                 continue;
             }
-            fast_field_names[field_id.field_id() as usize] = Some(field_entry.name().to_string());
+            column_field_names[field_id.field_id() as usize] = Some(field_entry.name().to_string());
             let value_type = field_entry.field_type().value_type();
             if let FieldType::Date(date_options) = field_entry.field_type() {
                 date_precisions[field_id.field_id() as usize] = date_options.get_precision();
             }
             if let FieldType::JsonObject(json_object_options) = field_entry.field_type() {
-                if let Some(tokenizer_name) = json_object_options.get_fast_field_tokenizer_name() {
+                if let Some(tokenizer_name) = json_object_options.get_column_field_tokenizer_name()
+                {
                     let text_analyzer = tokenizer_manager.get(tokenizer_name).ok_or_else(|| {
                         TantivyError::InvalidArgument(format!(
                             "Tokenizer {tokenizer_name:?} not found"
@@ -70,7 +71,7 @@ impl FastFieldsWriter {
                     json_object_options.is_expand_dots_enabled();
             }
             if let FieldType::Str(text_options) = field_entry.field_type() {
-                if let Some(tokenizer_name) = text_options.get_fast_field_tokenizer_name() {
+                if let Some(tokenizer_name) = text_options.get_column_field_tokenizer_name() {
                     let text_analyzer = tokenizer_manager.get(tokenizer_name).ok_or_else(|| {
                         TantivyError::InvalidArgument(format!(
                             "Tokenizer {tokenizer_name:?} not found"
@@ -89,9 +90,9 @@ impl FastFieldsWriter {
                 );
             }
         }
-        Ok(FastFieldsWriter {
+        Ok(ColumnFieldsWriter {
             columnar_writer,
-            fast_field_names,
+            column_field_names,
             per_field_tokenizer,
             num_docs: 0u32,
             date_precisions,
@@ -115,7 +116,7 @@ impl FastFieldsWriter {
             .sort_order(sort_field, num_docs, reversed)
     }
 
-    /// Indexes all of the fastfields of a new document.
+    /// Indexes all of the columnfields of a new document.
     pub fn add_document<D: Document>(&mut self, doc: &D) -> crate::Result<()> {
         let doc_id = self.num_docs;
         for (field, value) in doc.iter_fields_and_values() {
@@ -133,7 +134,7 @@ impl FastFieldsWriter {
         field: Field,
         value: V,
     ) -> crate::Result<()> {
-        let field_name = match &self.fast_field_names[field.field_id() as usize] {
+        let field_name = match &self.column_field_names[field.field_id() as usize] {
             None => return Ok(()),
             Some(name) => name,
         };
@@ -208,8 +209,8 @@ impl FastFieldsWriter {
         Ok(())
     }
 
-    /// Serializes all of the `FastFieldWriter`s by pushing them in
-    /// order to the fast field serializer.
+    /// Serializes all of the `ColumnFieldWriter`s by pushing them in
+    /// order to the columnar field serializer.
     pub fn serialize(
         mut self,
         wrt: &mut dyn io::Write,

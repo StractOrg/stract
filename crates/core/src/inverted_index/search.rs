@@ -26,13 +26,13 @@ use url::Url;
 use crate::collector::approx_count::ApproxCount;
 use crate::collector::{approx_count, MainCollector};
 
-use crate::fastfield_reader::FastFieldReader;
+use crate::columnfield_reader::ColumnFieldReader;
 use crate::highlighted::HighlightedFragment;
 use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::pipeline::LocalRecallRankingWebpage;
 use crate::ranking::SignalComputer;
-use crate::schema::{fast_field, text_field, FastFieldEnum, Field, TextFieldEnum};
+use crate::schema::{column_field, text_field, ColumnFieldEnum, Field, TextFieldEnum};
 use crate::search_ctx::Ctx;
 use crate::snippet;
 use crate::snippet::TextSnippet;
@@ -87,7 +87,7 @@ impl InvertedIndex {
     pub fn local_search_ctx(&self) -> Ctx {
         let tv_searcher = self.tv_searcher();
         Ctx {
-            fastfield_reader: self.fastfield_reader.clone(),
+            columnfield_reader: self.columnfield_reader.clone(),
             tv_searcher,
         }
     }
@@ -101,7 +101,7 @@ impl InvertedIndex {
         ctx: &Ctx,
         pointers: Vec<WebpagePointer>,
         mut computer: SignalComputer,
-        fastfield_reader: &FastFieldReader,
+        columnfield_reader: &ColumnFieldReader,
     ) -> Result<Vec<LocalRecallRankingWebpage>> {
         let mut top_websites = Vec::new();
 
@@ -127,7 +127,7 @@ impl InvertedIndex {
 
             let segment_reader = ctx.tv_searcher.segment_reader(pointer.address.segment);
             if update_segment {
-                computer.register_segment(&ctx.tv_searcher, segment_reader, fastfield_reader)?;
+                computer.register_segment(&ctx.tv_searcher, segment_reader, columnfield_reader)?;
             }
 
             prev_segment = Some(pointer.address.segment);
@@ -136,7 +136,7 @@ impl InvertedIndex {
                 orig_index,
                 LocalRecallRankingWebpage::new(
                     pointer,
-                    fastfield_reader.borrow_segment(&segment_reader.segment_id()),
+                    columnfield_reader.borrow_segment(&segment_reader.segment_id()),
                     &mut computer,
                 ),
             ));
@@ -156,7 +156,7 @@ impl InvertedIndex {
 
         let field = self
             .schema()
-            .get_field(Field::Fast(FastFieldEnum::from(fast_field::HostNodeID)).name())
+            .get_field(Field::Columnar(ColumnFieldEnum::from(column_field::HostNodeID)).name())
             .unwrap();
 
         let id = doc.get_first(field).unwrap().as_u64().unwrap();

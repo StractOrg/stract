@@ -411,7 +411,7 @@ fn test_non_text_json_term_freq() {
     let inv_idx = segment_reader.inverted_index(field).unwrap();
 
     let mut term = Term::from_field_json_path(field, "tenant_id", false);
-    term.append_type_and_fast_value(75i64);
+    term.append_type_and_columnar_value(75i64);
 
     let postings = inv_idx
         .read_postings(&term, IndexRecordOption::WithFreqsAndPositions)
@@ -445,7 +445,7 @@ fn test_non_text_json_term_freq_bitpacked() {
     let inv_idx = segment_reader.inverted_index(field).unwrap();
 
     let mut term = Term::from_field_json_path(field, "tenant_id", false);
-    term.append_type_and_fast_value(75i64);
+    term.append_type_and_columnar_value(75i64);
 
     let mut postings = inv_idx
         .read_postings(&term, IndexRecordOption::WithFreqsAndPositions)

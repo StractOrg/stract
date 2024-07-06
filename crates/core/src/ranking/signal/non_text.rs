@@ -105,7 +105,7 @@ impl Signal for HostCentrality {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::HostCentrality.into()))
+        Some(Field::Columnar(schema::column_field::HostCentrality.into()))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -114,10 +114,10 @@ impl Signal for HostCentrality {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(val as f64 / FLOAT_SCALING as f64)
@@ -143,7 +143,9 @@ impl Signal for HostCentralityRank {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::HostCentralityRank.into()))
+        Some(Field::Columnar(
+            schema::column_field::HostCentralityRank.into(),
+        ))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -152,10 +154,10 @@ impl Signal for HostCentralityRank {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_rank(val as f64))
@@ -181,7 +183,7 @@ impl Signal for PageCentrality {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::PageCentrality.into()))
+        Some(Field::Columnar(schema::column_field::PageCentrality.into()))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -190,10 +192,10 @@ impl Signal for PageCentrality {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(val as f64 / FLOAT_SCALING as f64)
@@ -219,7 +221,9 @@ impl Signal for PageCentralityRank {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::PageCentralityRank.into()))
+        Some(Field::Columnar(
+            schema::column_field::PageCentralityRank.into(),
+        ))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -228,10 +232,10 @@ impl Signal for PageCentralityRank {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_rank(val as f64))
@@ -257,7 +261,7 @@ impl Signal for IsHomepage {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::IsHomepage.into()))
+        Some(Field::Columnar(schema::column_field::IsHomepage.into()))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -266,10 +270,10 @@ impl Signal for IsHomepage {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(val as f64)
@@ -295,7 +299,7 @@ impl Signal for FetchTimeMs {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::FetchTimeMs.into()))
+        Some(Field::Columnar(schema::column_field::FetchTimeMs.into()))
     }
 
     fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
@@ -309,10 +313,10 @@ impl Signal for FetchTimeMs {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let fetch_time_ms = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let fetch_time_ms = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap() as usize;
 
@@ -343,7 +347,7 @@ impl Signal for UpdateTimestamp {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::LastUpdated.into()))
+        Some(Field::Columnar(schema::column_field::LastUpdated.into()))
     }
 
     fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
@@ -358,10 +362,10 @@ impl Signal for UpdateTimestamp {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap() as usize;
 
@@ -388,7 +392,7 @@ impl Signal for TrackerScore {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::TrackerScore.into()))
+        Some(Field::Columnar(schema::column_field::TrackerScore.into()))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -398,10 +402,10 @@ impl Signal for TrackerScore {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_trackers(val as f64))
@@ -427,7 +431,7 @@ impl Signal for Region {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::Region.into()))
+        Some(Field::Columnar(schema::column_field::Region.into()))
     }
 
     fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
@@ -438,10 +442,10 @@ impl Signal for Region {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         let region = crate::webpage::Region::from_id(val);
@@ -549,8 +553,8 @@ impl Signal for UrlDigits {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(
-            schema::fast_field::NumPathAndQueryDigits.into(),
+        Some(Field::Columnar(
+            schema::column_field::NumPathAndQueryDigits.into(),
         ))
     }
 
@@ -576,10 +580,10 @@ impl Signal for UrlDigits {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_digits(val as f64))
@@ -605,8 +609,8 @@ impl Signal for UrlSlashes {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(
-            schema::fast_field::NumPathAndQuerySlashes.into(),
+        Some(Field::Columnar(
+            schema::column_field::NumPathAndQuerySlashes.into(),
         ))
     }
 
@@ -623,10 +627,10 @@ impl Signal for UrlSlashes {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_slashes(val as f64))
@@ -652,7 +656,7 @@ impl Signal for LinkDensity {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::LinkDensity.into()))
+        Some(Field::Columnar(schema::column_field::LinkDensity.into()))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -662,10 +666,10 @@ impl Signal for LinkDensity {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let fastfield_reader = seg_reader.fastfield_reader().get_field_reader(doc);
+        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
 
-        let val = fastfield_reader
-            .get(self.as_fastfield().unwrap())
+        let val = columnfield_reader
+            .get(self.as_columnfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_link_density(val as f64 / FLOAT_SCALING as f64))

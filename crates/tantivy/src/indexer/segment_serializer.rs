@@ -11,7 +11,7 @@ use crate::store::StoreWriter;
 pub struct SegmentSerializer {
     segment: Segment,
     pub(crate) store_writer: StoreWriter,
-    fast_field_write: WritePtr,
+    column_field_write: WritePtr,
     fieldnorms_serializer: Option<FieldNormsSerializer>,
     postings_serializer: InvertedIndexSerializer,
 }
@@ -48,7 +48,7 @@ impl SegmentSerializer {
             )?
         };
 
-        let fast_field_write = segment.open_write(SegmentComponent::FastFields)?;
+        let column_field_write = segment.open_write(SegmentComponent::ColumnFields)?;
 
         let fieldnorms_write = segment.open_write(SegmentComponent::FieldNorms)?;
         let fieldnorms_serializer = FieldNormsSerializer::from_write(fieldnorms_write)?;
@@ -57,7 +57,7 @@ impl SegmentSerializer {
         Ok(SegmentSerializer {
             segment,
             store_writer,
-            fast_field_write,
+            column_field_write,
             fieldnorms_serializer: Some(fieldnorms_serializer),
             postings_serializer,
         })
@@ -81,9 +81,9 @@ impl SegmentSerializer {
         &mut self.postings_serializer
     }
 
-    /// Accessor to the `FastFieldSerializer`.
-    pub fn get_fast_field_write(&mut self) -> &mut WritePtr {
-        &mut self.fast_field_write
+    /// Accessor to the `ColumnFieldSerializer`.
+    pub fn get_column_field_write(&mut self) -> &mut WritePtr {
+        &mut self.column_field_write
     }
 
     /// Extract the field norm serializer.
@@ -103,7 +103,7 @@ impl SegmentSerializer {
         if let Some(fieldnorms_serializer) = self.extract_fieldnorms_serializer() {
             fieldnorms_serializer.close()?;
         }
-        self.fast_field_write.terminate()?;
+        self.column_field_write.terminate()?;
         self.postings_serializer.close()?;
         self.store_writer.close()?;
         Ok(())

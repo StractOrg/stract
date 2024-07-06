@@ -135,12 +135,12 @@ pub(crate) fn get_doc_id_mapping_from_field(
 ) -> crate::Result<DocIdMapping> {
     let schema = segment_writer.segment_serializer.segment().schema();
     expect_field_id_for_sort_field(&schema, &sort_by_field)?; // for now expect
-    let new_doc_id_to_old = segment_writer.fast_field_writers.sort_order(
+    let new_doc_id_to_old = segment_writer.column_field_writers.sort_order(
         sort_by_field.field.as_str(),
         segment_writer.max_doc(),
         sort_by_field.order.is_desc(),
     );
-    // create new doc_id to old doc_id index (used in fast_field_writers)
+    // create new doc_id to old doc_id index (used in column_field_writers)
     Ok(DocIdMapping::from_new_id_to_old_id(new_doc_id_to_old))
 }
 
@@ -164,10 +164,10 @@ mod tests_indexsorting {
         let my_text_field = schema_builder.add_text_field("text_field", text_field_options);
         let my_string_field = schema_builder.add_text_field("string_field", STRING | STORED);
         let my_number =
-            schema_builder.add_u64_field("my_number", NumericOptions::default().set_fast());
+            schema_builder.add_u64_field("my_number", NumericOptions::default().set_columnar());
 
         let multi_numbers =
-            schema_builder.add_u64_field("multi_numbers", NumericOptions::default().set_fast());
+            schema_builder.add_u64_field("multi_numbers", NumericOptions::default().set_columnar());
 
         let schema = schema_builder.build();
         let mut index_builder = Index::builder().schema(schema);
@@ -440,7 +440,7 @@ mod tests_indexsorting {
     }
 
     #[test]
-    fn test_sort_index_fast_field() -> crate::Result<()> {
+    fn test_sort_index_column_field() -> crate::Result<()> {
         let index = create_test_index(
             Some(IndexSettings {
                 sort_by_field: Some(IndexSortByField {
@@ -459,12 +459,12 @@ mod tests_indexsorting {
         let searcher = index.reader()?.searcher();
         assert_eq!(searcher.segment_readers().len(), 1);
         let segment_reader = searcher.segment_reader(0);
-        let fast_fields = segment_reader.fast_fields();
+        let column_fields = segment_reader.column_fields();
 
-        let fast_field = fast_fields.u64("my_number").unwrap().values;
-        assert_eq!(fast_field.get_val(0), 10u64);
-        assert_eq!(fast_field.get_val(1), 20u64);
-        assert_eq!(fast_field.get_val(2), 30u64);
+        let column_field = column_fields.u64("my_number").unwrap().values;
+        assert_eq!(column_field.get_val(0), 10u64);
+        assert_eq!(column_field.get_val(1), 20u64);
+        assert_eq!(column_field.get_val(2), 30u64);
 
         Ok(())
     }
@@ -472,7 +472,7 @@ mod tests_indexsorting {
     #[test]
     fn test_with_sort_by_date_field() -> crate::Result<()> {
         let mut schema_builder = Schema::builder();
-        let date_field = schema_builder.add_date_field("date", INDEXED | STORED | FAST);
+        let date_field = schema_builder.add_date_field("date", INDEXED | STORED | COLUMN);
         let schema = schema_builder.build();
 
         let settings = IndexSettings {
@@ -504,12 +504,12 @@ mod tests_indexsorting {
         let searcher = index.reader()?.searcher();
         assert_eq!(searcher.segment_readers().len(), 1);
         let segment_reader = searcher.segment_reader(0);
-        let fast_fields = segment_reader.fast_fields();
+        let column_fields = segment_reader.column_fields();
 
-        let fast_field = fast_fields.date("date").unwrap().values;
-        assert_eq!(fast_field.get_val(0), DateTime::from_timestamp_secs(1001));
-        assert_eq!(fast_field.get_val(1), DateTime::from_timestamp_secs(1000));
-        assert_eq!(fast_field.get_val(2), DateTime::from_timestamp_secs(999));
+        let column_field = column_fields.date("date").unwrap().values;
+        assert_eq!(column_field.get_val(0), DateTime::from_timestamp_secs(1001));
+        assert_eq!(column_field.get_val(1), DateTime::from_timestamp_secs(1000));
+        assert_eq!(column_field.get_val(2), DateTime::from_timestamp_secs(999));
         Ok(())
     }
 
@@ -539,7 +539,7 @@ mod tests_indexsorting {
     #[test]
     fn test_text_sort() -> crate::Result<()> {
         let mut schema_builder = SchemaBuilder::new();
-        schema_builder.add_text_field("id", STRING | FAST | STORED);
+        schema_builder.add_text_field("id", STRING | COLUMN | STORED);
         schema_builder.add_text_field("name", TEXT | STORED);
 
         let resp = IndexBuilder::new()

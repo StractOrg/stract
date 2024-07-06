@@ -133,7 +133,7 @@ impl Query {
 
         for optic in &optics {
             let mut subqueries = vec![(Occur::Must, tantivy_query.box_clone())];
-            subqueries.append(&mut optic.as_multiple_tantivy(&schema, &ctx.fastfield_reader));
+            subqueries.append(&mut optic.as_multiple_tantivy(&schema, &ctx.columnfield_reader));
             tantivy_query = Box::new(BooleanQuery::new(subqueries));
         }
 

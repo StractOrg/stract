@@ -118,7 +118,7 @@ impl<T> From<T> for ColumnOperation<T> {
 }
 
 // Serialization trait very local to the writer.
-// As we write fast fields, we accumulate them in "in memory".
+// As we write columnar fields, we accumulate them in "in memory".
 // In order to limit memory usage, and in order
 // to benefit from the stacker, we do this by serialization our data
 // as "Symbols".

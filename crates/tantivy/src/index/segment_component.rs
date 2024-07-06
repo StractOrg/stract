@@ -11,9 +11,9 @@ pub enum SegmentComponent {
     /// Positions of terms in each document.
     Positions,
     /// Column-oriented random-access storage of fields.
-    FastFields,
+    ColumnFields,
     /// Stores the sum  of the length (in terms) of each field for each document.
-    /// Field norms are stored as a special u64 fast field.
+    /// Field norms are stored as a special u64 columnar field.
     FieldNorms,
     /// Dictionary associating `Term`s to `TermInfo`s which is
     /// simply an address into the `postings` file and the `positions` file.
@@ -32,7 +32,7 @@ impl SegmentComponent {
         static SEGMENT_COMPONENTS: [SegmentComponent; 7] = [
             SegmentComponent::Postings,
             SegmentComponent::Positions,
-            SegmentComponent::FastFields,
+            SegmentComponent::ColumnFields,
             SegmentComponent::FieldNorms,
             SegmentComponent::Terms,
             SegmentComponent::Store,

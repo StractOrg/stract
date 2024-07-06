@@ -14,7 +14,7 @@ mod tests {
 
     fn create_test_index_posting_list_issue(index_settings: Option<IndexSettings>) -> Index {
         let mut schema_builder = schema::Schema::builder();
-        let int_options = NumericOptions::default().set_fast().set_indexed();
+        let int_options = NumericOptions::default().set_columnar().set_indexed();
         let int_field = schema_builder.add_u64_field("intval", int_options);
 
         let schema = schema_builder.build();
@@ -54,7 +54,7 @@ mod tests {
     ) -> crate::Result<Index> {
         let mut schema_builder = schema::Schema::builder();
         let int_options = NumericOptions::default()
-            .set_fast()
+            .set_columnar()
             .set_stored()
             .set_indexed();
         let int_field = schema_builder.add_u64_field("intval", int_options);
@@ -165,21 +165,21 @@ mod tests {
         assert_eq!(searcher.segment_readers().len(), 1);
         let segment_reader = searcher.segment_readers().last().unwrap();
 
-        let fast_fields = segment_reader.fast_fields();
-        let fast_field = fast_fields.u64("intval").unwrap();
-        assert_eq!(fast_field.first(7), Some(1u64));
+        let column_fields = segment_reader.column_fields();
+        let column_field = column_fields.u64("intval").unwrap();
+        assert_eq!(column_field.first(7), Some(1u64));
         if force_disjunct_segment_sort_values {
-            assert_eq!(fast_field.first(6), Some(2u64));
-            assert_eq!(fast_field.first(5), Some(3u64));
-            assert_eq!(fast_field.first(4), Some(10u64));
-            assert_eq!(fast_field.first(3), Some(20u64));
+            assert_eq!(column_field.first(6), Some(2u64));
+            assert_eq!(column_field.first(5), Some(3u64));
+            assert_eq!(column_field.first(4), Some(10u64));
+            assert_eq!(column_field.first(3), Some(20u64));
         } else {
-            assert_eq!(fast_field.first(6), Some(1u64));
-            assert_eq!(fast_field.first(5), Some(2u64));
-            assert_eq!(fast_field.first(4), Some(3u64));
-            assert_eq!(fast_field.first(3), Some(5u64));
+            assert_eq!(column_field.first(6), Some(1u64));
+            assert_eq!(column_field.first(5), Some(2u64));
+            assert_eq!(column_field.first(4), Some(3u64));
+            assert_eq!(column_field.first(3), Some(5u64));
         }
-        assert_eq!(fast_field.first(0), Some(1_000u64));
+        assert_eq!(column_field.first(0), Some(1_000u64));
 
         // test new field norm mapping
         {
@@ -356,33 +356,33 @@ mod tests {
     //     assert_eq!(searcher.segment_readers().len(), 1);
     //     let segment_reader = searcher.segment_readers().last().unwrap();
 
-    //     let fast_fields = segment_reader.fast_fields();
-    //     let fast_field = fast_fields.u64(int_field).unwrap();
-    //     assert_eq!(fast_field.get_val(0), 1u64);
-    //     assert_eq!(fast_field.get_val(1), 2u64);
-    //     assert_eq!(fast_field.get_val(2), 3u64);
-    //     assert_eq!(fast_field.get_val(3), 10u64);
-    //     assert_eq!(fast_field.get_val(4), 20u64);
-    //     assert_eq!(fast_field.get_val(5), 1_000u64);
+    //     let column_fields = segment_reader.column_fields();
+    //     let column_field = column_fields.u64(int_field).unwrap();
+    //     assert_eq!(column_field.get_val(0), 1u64);
+    //     assert_eq!(column_field.get_val(1), 2u64);
+    //     assert_eq!(column_field.get_val(2), 3u64);
+    //     assert_eq!(column_field.get_val(3), 10u64);
+    //     assert_eq!(column_field.get_val(4), 20u64);
+    //     assert_eq!(column_field.get_val(5), 1_000u64);
 
-    //     let get_vals = |fast_field: &MultiValuedFastFieldReader<u64>, doc_id: u32| -> Vec<u64> {
+    //     let get_vals = |column_field: &MultiValuedColumnFieldReader<u64>, doc_id: u32| -> Vec<u64> {
     //         let mut vals = vec![];
-    //         fast_field.get_vals(doc_id, &mut vals);
+    //         column_field.get_vals(doc_id, &mut vals);
     //         vals
     //     };
-    //     let fast_fields = segment_reader.fast_fields();
-    //     let fast_field = fast_fields.u64s(multi_numbers).unwrap();
-    //     assert_eq!(&get_vals(&fast_field, 0), &[] as &[u64]);
-    //     assert_eq!(&get_vals(&fast_field, 1), &[2, 3]);
-    //     assert_eq!(&get_vals(&fast_field, 2), &[3, 4]);
-    //     assert_eq!(&get_vals(&fast_field, 3), &[10, 11]);
-    //     assert_eq!(&get_vals(&fast_field, 4), &[20]);
-    //     assert_eq!(&get_vals(&fast_field, 5), &[1001, 1002]);
+    //     let column_fields = segment_reader.column_fields();
+    //     let column_field = column_fields.u64s(multi_numbers).unwrap();
+    //     assert_eq!(&get_vals(&column_field, 0), &[] as &[u64]);
+    //     assert_eq!(&get_vals(&column_field, 1), &[2, 3]);
+    //     assert_eq!(&get_vals(&column_field, 2), &[3, 4]);
+    //     assert_eq!(&get_vals(&column_field, 3), &[10, 11]);
+    //     assert_eq!(&get_vals(&column_field, 4), &[20]);
+    //     assert_eq!(&get_vals(&column_field, 5), &[1001, 1002]);
 
-    //     let fast_field = fast_fields.bytes(bytes_field).unwrap();
-    //     assert_eq!(fast_field.get_bytes(0), &[] as &[u8]);
-    //     assert_eq!(fast_field.get_bytes(2), &[1, 2, 3]);
-    //     assert_eq!(fast_field.get_bytes(5), &[5, 5]);
+    //     let column_field = column_fields.bytes(bytes_field).unwrap();
+    //     assert_eq!(column_field.get_bytes(0), &[] as &[u8]);
+    //     assert_eq!(column_field.get_bytes(2), &[1, 2, 3]);
+    //     assert_eq!(column_field.get_bytes(5), &[5, 5]);
 
     //     // test new field norm mapping
     //     {

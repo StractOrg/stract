@@ -36,22 +36,22 @@ pub struct CoerceFlag;
 ///
 /// `COERCE` will try to convert values into its value type if they don't match.
 ///
-/// See [fast fields](`crate::fastfield`).
+/// See [columnar fields](`crate::columnfield`).
 pub const COERCE: SchemaFlagList<CoerceFlag, ()> = SchemaFlagList {
     head: CoerceFlag,
     tail: (),
 };
 
 #[derive(Clone)]
-pub struct FastFlag;
-/// Flag to mark the field as a fast field (similar to Lucene's DocValues)
+pub struct ColumnarFlag;
+/// Flag to mark the field as a columnar field (similar to Lucene's DocValues)
 ///
 /// Fast fields can be random-accessed rapidly. Fields useful for scoring, filtering
-/// or collection should be mark as fast fields.
+/// or collection should be mark as columnar fields.
 ///
-/// See [fast fields](`crate::fastfield`).
-pub const FAST: SchemaFlagList<FastFlag, ()> = SchemaFlagList {
-    head: FastFlag,
+/// See [columnar fields](`crate::columnfield`).
+pub const COLUMN: SchemaFlagList<ColumnarFlag, ()> = SchemaFlagList {
+    head: ColumnarFlag,
     tail: (),
 };
 

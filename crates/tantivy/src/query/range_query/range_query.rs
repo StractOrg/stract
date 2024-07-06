@@ -5,11 +5,11 @@ use std::ops::{Bound, Range};
 use crate::common::{BinarySerializable, BitSet};
 
 use super::map_bound;
-use super::range_query_u64_fastfield::FastFieldRangeWeight;
+use super::range_query_u64_columnfield::ColumnFieldRangeWeight;
 use crate::error::TantivyError;
 use crate::index::SegmentReader;
 use crate::query::explanation::does_not_match;
-use crate::query::range_query::is_type_valid_for_fastfield_range_query;
+use crate::query::range_query::is_type_valid_for_columnfield_range_query;
 use crate::query::{BitSetDocSet, ConstScorer, EnableScoring, Explanation, Query, Scorer, Weight};
 use crate::schema::{Field, IndexRecordOption, Term, Type};
 use crate::termdict::{TermDictionary, TermStreamer};
@@ -27,9 +27,9 @@ use crate::{DateTime, DocId, Score};
 /// `TermInfo` from the inverted index (posting list) and put them into a `BitSet`.
 /// Depending on the number of terms matched, this is a potentially expensive operation.
 ///
-/// ## IP fast field
-/// For IP fast fields a custom variant is used, by scanning the fast field. Unlike the default
-/// variant we can walk in a lazy fashion over it, since the fastfield is implicit orderered by
+/// ## IP columnar field
+/// For IP columnar fields a custom variant is used, by scanning the columnar field. Unlike the default
+/// variant we can walk in a lazy fashion over it, since the columnfield is implicit orderered by
 /// DocId.
 ///
 ///
@@ -317,8 +317,8 @@ impl RangeQuery {
     }
 }
 
-/// Returns true if the type maps to a u64 fast field
-pub(crate) fn maps_to_u64_fastfield(typ: Type) -> bool {
+/// Returns true if the type maps to a u64 columnar field
+pub(crate) fn maps_to_u64_columnfield(typ: Type) -> bool {
     match typ {
         Type::U64 | Type::I64 | Type::F64 | Type::Bool | Type::Date => true,
         Type::IpAddr => false,
@@ -342,17 +342,17 @@ impl Query for RangeQuery {
             return Err(TantivyError::SchemaError(err_msg));
         }
 
-        if field_type.is_fast() && is_type_valid_for_fastfield_range_query(self.value_type) {
+        if field_type.is_columnar() && is_type_valid_for_columnfield_range_query(self.value_type) {
             // We run the range query on u64 value space for performance reasons and simpicity
             // assert the type maps to u64
-            assert!(maps_to_u64_fastfield(self.value_type));
+            assert!(maps_to_u64_columnfield(self.value_type));
             let parse_from_bytes = |data: &Vec<u8>| {
                 u64::from_be(BinarySerializable::deserialize(&mut &data[..]).unwrap())
             };
 
             let lower_bound = map_bound(&self.lower_bound, parse_from_bytes);
             let upper_bound = map_bound(&self.upper_bound, parse_from_bytes);
-            Ok(Box::new(FastFieldRangeWeight::new_u64_lenient(
+            Ok(Box::new(ColumnFieldRangeWeight::new_u64_lenient(
                 self.field.to_string(),
                 lower_bound,
                 upper_bound,

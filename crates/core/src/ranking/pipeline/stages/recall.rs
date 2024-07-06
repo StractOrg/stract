@@ -17,10 +17,9 @@
 use std::sync::Arc;
 
 use crate::{
-    collector,
+    collector, columnfield_reader,
     config::CollectorConfig,
     enum_map::EnumMap,
-    fastfield_reader,
     inverted_index::WebpagePointer,
     models::dual_encoder::DualEncoder,
     ranking::{
@@ -29,7 +28,7 @@ use crate::{
         pipeline::{RankableWebpage, RankingPipeline, RankingStage, Recall, Scorer},
         SignalComputer, SignalEnum,
     },
-    schema::fast_field,
+    schema::column_field,
     searcher::{api, SearchQuery},
     webgraph,
 };
@@ -155,21 +154,21 @@ impl LocalRecallRankingWebpage {
     /// the index to calculate bm25.
     pub fn new(
         pointer: WebpagePointer,
-        fastfield_reader: &fastfield_reader::SegmentReader,
+        columnfield_reader: &columnfield_reader::SegmentReader,
         computer: &mut SignalComputer,
     ) -> Self {
-        let fastfields = fastfield_reader.get_field_reader(pointer.address.doc_id);
+        let columnfields = columnfield_reader.get_field_reader(pointer.address.doc_id);
 
-        let title_embedding: Option<Vec<u8>> = fastfields
-            .get(fast_field::TitleEmbeddings.into())
+        let title_embedding: Option<Vec<u8>> = columnfields
+            .get(column_field::TitleEmbeddings.into())
             .and_then(|v| v.into());
 
-        let keyword_embedding: Option<Vec<u8>> = fastfields
-            .get(fast_field::KeywordEmbeddings.into())
+        let keyword_embedding: Option<Vec<u8>> = columnfields
+            .get(column_field::KeywordEmbeddings.into())
             .and_then(|v| v.into());
 
-        let host_id = fastfields
-            .get(fast_field::HostNodeID.into())
+        let host_id = columnfields
+            .get(column_field::HostNodeID.into())
             .unwrap()
             .as_u64()
             .unwrap()

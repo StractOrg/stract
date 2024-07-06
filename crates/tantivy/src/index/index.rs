@@ -91,7 +91,7 @@ fn save_new_metas(
 /// let body_field = schema_builder.add_text_field("body", TEXT);
 /// let number_field = schema_builder.add_u64_field(
 ///     "number",
-///     NumericOptions::default().set_fast(),
+///     NumericOptions::default().set_columnar(),
 /// );
 ///
 /// let schema = schema_builder.build();
@@ -105,7 +105,7 @@ pub struct IndexBuilder {
     schema: Option<Schema>,
     index_settings: IndexSettings,
     tokenizer_manager: TokenizerManager,
-    fast_field_tokenizer_manager: TokenizerManager,
+    column_field_tokenizer_manager: TokenizerManager,
 }
 impl Default for IndexBuilder {
     fn default() -> Self {
@@ -119,7 +119,7 @@ impl IndexBuilder {
             schema: None,
             index_settings: IndexSettings::default(),
             tokenizer_manager: TokenizerManager::default(),
-            fast_field_tokenizer_manager: TokenizerManager::default(),
+            column_field_tokenizer_manager: TokenizerManager::default(),
         }
     }
 
@@ -143,9 +143,9 @@ impl IndexBuilder {
         self
     }
 
-    /// Set the fast field tokenizers.
-    pub fn fast_field_tokenizers(mut self, tokenizers: TokenizerManager) -> Self {
-        self.fast_field_tokenizer_manager = tokenizers;
+    /// Set the columnar field tokenizers.
+    pub fn column_field_tokenizers(mut self, tokenizers: TokenizerManager) -> Self {
+        self.column_field_tokenizer_manager = tokenizers;
         self
     }
 
@@ -241,9 +241,9 @@ impl IndexBuilder {
                     ))
                 })?;
                 let entry = schema.get_field_entry(schema_field);
-                if !entry.is_fast() {
+                if !entry.is_columnar() {
                     return Err(TantivyError::InvalidArgument(format!(
-                        "Field {} is no fast field. Field needs to be a single value fast field \
+                        "Field {} is no columnar field. Field needs to be a single value columnar field \
                          to be used to sort an index",
                         sort_by_field.field
                     )));
@@ -281,7 +281,7 @@ impl IndexBuilder {
         metas.index_settings = self.index_settings;
         let mut index = Index::open_from_metas(directory, &metas, SegmentMetaInventory::default());
         index.set_tokenizers(self.tokenizer_manager);
-        index.set_fast_field_tokenizers(self.fast_field_tokenizer_manager);
+        index.set_column_field_tokenizers(self.column_field_tokenizer_manager);
         Ok(index)
     }
 }
@@ -294,7 +294,7 @@ pub struct Index {
     settings: IndexSettings,
     executor: Executor,
     tokenizers: TokenizerManager,
-    fast_field_tokenizers: TokenizerManager,
+    column_field_tokenizers: TokenizerManager,
     inventory: SegmentMetaInventory,
 }
 
@@ -412,7 +412,7 @@ impl Index {
             directory,
             schema,
             tokenizers: TokenizerManager::default(),
-            fast_field_tokenizers: TokenizerManager::default(),
+            column_field_tokenizers: TokenizerManager::default(),
             executor: Executor::single_thread(),
             inventory,
         }
@@ -428,14 +428,14 @@ impl Index {
         &self.tokenizers
     }
 
-    /// Setter for the fast field tokenizer manager.
-    pub fn set_fast_field_tokenizers(&mut self, tokenizers: TokenizerManager) {
-        self.fast_field_tokenizers = tokenizers;
+    /// Setter for the columnar field tokenizer manager.
+    pub fn set_column_field_tokenizers(&mut self, tokenizers: TokenizerManager) {
+        self.column_field_tokenizers = tokenizers;
     }
 
-    /// Accessor for the fast field tokenizer manager.
-    pub fn fast_field_tokenizer(&self) -> &TokenizerManager {
-        &self.fast_field_tokenizers
+    /// Accessor for the columnar field tokenizer manager.
+    pub fn column_field_tokenizer(&self) -> &TokenizerManager {
+        &self.column_field_tokenizers
     }
 
     /// Get the tokenizer associated with a specific field.
@@ -510,7 +510,7 @@ impl Index {
     /// browsing through the inverted index term dictionary and the columnar field dictionary.
     ///
     /// Disclaimer: Some fields may not be listed here. For instance, if the schema contains a json
-    /// field that is not indexed nor a fast field but is stored, it is possible for the field
+    /// field that is not indexed nor a columnar field but is stored, it is possible for the field
     /// to not be listed.
     pub fn fields_metadata(&self) -> crate::Result<Vec<FieldMetadata>> {
         let segments = self.searchable_segments()?;

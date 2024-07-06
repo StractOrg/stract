@@ -231,18 +231,18 @@ impl FieldType {
         }
     }
 
-    /// returns true if the field is fast.
-    pub fn is_fast(&self) -> bool {
+    /// returns true if the field is columnar,
+    pub fn is_columnar(&self) -> bool {
         match *self {
-            FieldType::Bytes(ref bytes_options) => bytes_options.is_fast(),
-            FieldType::Str(ref text_options) => text_options.is_fast(),
+            FieldType::Bytes(ref bytes_options) => bytes_options.is_columnar(),
+            FieldType::Str(ref text_options) => text_options.is_columnar(),
             FieldType::U64(ref int_options)
             | FieldType::I64(ref int_options)
             | FieldType::F64(ref int_options)
-            | FieldType::Bool(ref int_options) => int_options.is_fast(),
-            FieldType::Date(ref date_options) => date_options.is_fast(),
-            FieldType::IpAddr(ref ip_addr_options) => ip_addr_options.is_fast(),
-            FieldType::JsonObject(ref json_object_options) => json_object_options.is_fast(),
+            | FieldType::Bool(ref int_options) => int_options.is_columnar(),
+            FieldType::Date(ref date_options) => date_options.is_columnar(),
+            FieldType::IpAddr(ref ip_addr_options) => ip_addr_options.is_columnar(),
+            FieldType::JsonObject(ref json_object_options) => json_object_options.is_columnar(),
         }
     }
 

@@ -25,12 +25,12 @@ use tantivy::{
 };
 
 use crate::{
+    columnfield_reader,
     config::CollectorConfig,
-    fastfield_reader,
     inverted_index::{DocAddress, WebpagePointer},
     prehashed::Prehashed,
     ranking::initial::{InitialScoreTweaker, Score},
-    schema::{fast_field, FastFieldEnum},
+    schema::{column_field, ColumnFieldEnum},
     simhash,
 };
 
@@ -40,19 +40,22 @@ pub struct TopDocs {
     top_n: usize,
     offset: usize,
     max_docs: Option<MaxDocsConsidered>,
-    fastfield_reader: fastfield_reader::FastFieldReader,
+    columnfield_reader: columnfield_reader::ColumnFieldReader,
     de_rank_similar: bool,
     collector_config: CollectorConfig,
 }
 
 impl TopDocs {
-    pub fn with_limit(top_n: usize, fastfield_reader: fastfield_reader::FastFieldReader) -> Self {
+    pub fn with_limit(
+        top_n: usize,
+        columnfield_reader: columnfield_reader::ColumnFieldReader,
+    ) -> Self {
         Self {
             top_n,
             offset: 0,
             max_docs: None,
             de_rank_similar: false,
-            fastfield_reader,
+            columnfield_reader,
             collector_config: CollectorConfig::default(),
         }
     }
@@ -98,7 +101,7 @@ impl TopDocs {
             .map(|max_docs| max_docs.total_docs / max_docs.segments);
 
         Ok(TopSegmentCollector {
-            fastfield_segment_reader: self.fastfield_reader.get_segment(&segment.segment_id()),
+            columnfield_segment_reader: self.columnfield_reader.get_segment(&segment.segment_id()),
             max_docs,
             num_docs_taken: 0,
             segment_ord: segment_local_id,
@@ -111,7 +114,7 @@ impl TopDocs {
 }
 
 pub struct TopSegmentCollector {
-    fastfield_segment_reader: Arc<fastfield_reader::SegmentReader>,
+    columnfield_segment_reader: Arc<columnfield_reader::SegmentReader>,
     max_docs: Option<usize>,
     num_docs_taken: usize,
     segment_ord: SegmentOrdinal,
@@ -119,8 +122,8 @@ pub struct TopSegmentCollector {
 }
 
 impl TopSegmentCollector {
-    fn get_hash(&self, doc: DocId, field1: FastFieldEnum, field2: FastFieldEnum) -> Prehashed {
-        let field_reader = self.fastfield_segment_reader.get_field_reader(doc);
+    fn get_hash(&self, doc: DocId, field1: ColumnFieldEnum, field2: ColumnFieldEnum) -> Prehashed {
+        let field_reader = self.columnfield_segment_reader.get_field_reader(doc);
 
         let hash = [
             field_reader.get(field1).unwrap().as_u64().unwrap(),
@@ -147,9 +150,9 @@ impl TopSegmentCollector {
         self.num_docs_taken += 1;
 
         let simhash: Option<u64> = self
-            .fastfield_segment_reader
+            .columnfield_segment_reader
             .get_field_reader(doc)
-            .get(fast_field::SimHash.into())
+            .get(column_field::SimHash.into())
             .unwrap()
             .into();
 
@@ -157,23 +160,23 @@ impl TopSegmentCollector {
             hashes: Hashes {
                 site: self.get_hash(
                     doc,
-                    fast_field::SiteHash1.into(),
-                    fast_field::SiteHash2.into(),
+                    column_field::SiteHash1.into(),
+                    column_field::SiteHash2.into(),
                 ),
                 title: self.get_hash(
                     doc,
-                    fast_field::TitleHash1.into(),
-                    fast_field::TitleHash2.into(),
+                    column_field::TitleHash1.into(),
+                    column_field::TitleHash2.into(),
                 ),
                 url: self.get_hash(
                     doc,
-                    fast_field::UrlHash1.into(),
-                    fast_field::UrlHash2.into(),
+                    column_field::UrlHash1.into(),
+                    column_field::UrlHash2.into(),
                 ),
                 url_without_tld: self.get_hash(
                     doc,
-                    fast_field::UrlWithoutTldHash1.into(),
-                    fast_field::UrlWithoutTldHash2.into(),
+                    column_field::UrlWithoutTldHash1.into(),
+                    column_field::UrlWithoutTldHash2.into(),
                 ),
                 simhash: simhash.unwrap(),
             },

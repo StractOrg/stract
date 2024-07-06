@@ -3,7 +3,7 @@ use std::ops::BitOr;
 pub use crate::common::DateTimePrecision;
 use serde::{Deserialize, Serialize};
 
-use crate::schema::flags::{FastFlag, IndexedFlag, SchemaFlagList, StoredFlag};
+use crate::schema::flags::{ColumnarFlag, IndexedFlag, SchemaFlagList, StoredFlag};
 
 /// The precision of the indexed date/time values in the inverted index.
 pub const DATE_TIME_PRECISION_INDEXED: DateTimePrecision = DateTimePrecision::Seconds;
@@ -15,10 +15,10 @@ pub struct DateOptions {
     // This boolean has no effect if the field is not marked as indexed true.
     fieldnorms: bool,
     #[serde(default)]
-    fast: bool,
+    columnar: bool,
     stored: bool,
     // Internal storage precision, used to optimize storage
-    // compression on fast fields.
+    // compression on columnar fields.
     #[serde(default)]
     precision: DateTimePrecision,
 }
@@ -42,10 +42,10 @@ impl DateOptions {
         self.fieldnorms && self.indexed
     }
 
-    /// Returns true iff the value is a fast field.
+    /// Returns true iff the value is a columnar field.
     #[inline]
-    pub fn is_fast(&self) -> bool {
-        self.fast
+    pub fn is_columnar(&self) -> bool {
+        self.columnar
     }
 
     /// Set the field as stored.
@@ -80,20 +80,20 @@ impl DateOptions {
         self
     }
 
-    /// Set the field as a fast field.
+    /// Set the field as a columnar field.
     ///
-    /// Fast fields are designed for random access.
+    /// Columnar fields are designed for random access.
     #[must_use]
-    pub fn set_fast(mut self) -> DateOptions {
-        self.fast = true;
+    pub fn set_columnar(mut self) -> DateOptions {
+        self.columnar = true;
         self
     }
 
-    /// Sets the precision for this DateTime field on the fast field.
+    /// Sets the precision for this DateTime field on the columnar field.
     /// Indexed precision is always [`DATE_TIME_PRECISION_INDEXED`].
     ///
     /// Internal storage precision, used to optimize storage
-    /// compression on fast fields.
+    /// compression on columnar fields.
     pub fn set_precision(mut self, precision: DateTimePrecision) -> DateOptions {
         self.precision = precision;
         self
@@ -102,7 +102,7 @@ impl DateOptions {
     /// Returns the storage precision for this DateTime field.
     ///
     /// Internal storage precision, used to optimize storage
-    /// compression on fast fields.
+    /// compression on columnar fields.
     pub fn get_precision(&self) -> DateTimePrecision {
         self.precision
     }
@@ -114,10 +114,10 @@ impl From<()> for DateOptions {
     }
 }
 
-impl From<FastFlag> for DateOptions {
-    fn from(_: FastFlag) -> Self {
+impl From<ColumnarFlag> for DateOptions {
+    fn from(_: ColumnarFlag) -> Self {
         DateOptions {
-            fast: true,
+            columnar: true,
             ..Default::default()
         }
     }
@@ -151,7 +151,7 @@ impl<T: Into<DateOptions>> BitOr<T> for DateOptions {
             indexed: self.indexed | other.indexed,
             fieldnorms: self.fieldnorms | other.fieldnorms,
             stored: self.stored | other.stored,
-            fast: self.fast | other.fast,
+            columnar: self.columnar | other.columnar,
             precision: self.precision,
         }
     }
@@ -204,7 +204,7 @@ mod tests {
             serde_json::json!({
                 "precision": "milliseconds",
                 "indexed": true,
-                "fast": false,
+                "columnar": false,
                 "fieldnorms": false,
                 "stored": false
             })

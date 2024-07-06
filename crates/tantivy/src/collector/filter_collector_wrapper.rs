@@ -2,7 +2,7 @@
 //
 // This example shows how you can implement your own
 // collector. As an example, we will compute a collector
-// that computes the standard deviation of a given fast field.
+// that computes the standard deviation of a given columnar field.
 //
 // Of course, you can have a look at the tantivy's built-in collectors
 // such as the `CountCollector` for more examples.
@@ -14,7 +14,7 @@ use crate::columnar::{BytesColumn, Column, DynamicColumn, HasAssociatedColumnTyp
 use crate::collector::{Collector, SegmentCollector};
 use crate::{DocId, Score, SegmentReader};
 
-/// The `FilterCollector` filters docs using a fast field value and a predicate.
+/// The `FilterCollector` filters docs using a columnar field value and a predicate.
 ///
 /// Only the documents containing at least one value for which the predicate returns `true`
 /// will be passed on to the next collector.
@@ -23,9 +23,9 @@ use crate::{DocId, Score, SegmentReader};
 /// - documents with no values are filtered out.
 /// - documents with several values are accepted if at least one value matches the predicate.
 ///
-/// Note that this is limited to fast fields which implement the
-/// [`FastValue`][crate::fastfield::FastValue] trait, e.g. `u64` but not `&[u8]`.
-/// To filter based on a bytes fast field, use a [`BytesFilterCollector`] instead.
+/// Note that this is limited to columnar fields which implement the
+/// [`FastValue`][crate::columnfield::FastValue] trait, e.g. `u64` but not `&[u8]`.
+/// To filter based on a bytes columnar field, use a [`BytesFilterCollector`] instead.
 pub struct FilterCollector<TCollector, TPredicate, TPredicateValue>
 where
     TPredicate: 'static + Clone,
@@ -70,7 +70,7 @@ where
         segment_local_id: u32,
         segment_reader: &SegmentReader,
     ) -> crate::Result<Self::Child> {
-        let column_opt = segment_reader.fast_fields().column_opt(&self.field)?;
+        let column_opt = segment_reader.column_fields().column_opt(&self.field)?;
 
         let segment_collector = self
             .collector
@@ -142,9 +142,9 @@ where
     }
 }
 
-/// A variant of the [`FilterCollector`] specialized for bytes fast fields, i.e.
+/// A variant of the [`FilterCollector`] specialized for bytes columnar fields, i.e.
 /// it transparently wraps an inner [`Collector`] but filters documents
-/// based on the result of applying the predicate to the bytes fast field.
+/// based on the result of applying the predicate to the bytes columnar field.
 ///
 /// A document is accepted if and only if the predicate returns `true` for at least one value.
 ///
@@ -189,7 +189,7 @@ where
         segment_local_id: u32,
         segment_reader: &SegmentReader,
     ) -> crate::Result<Self::Child> {
-        let column_opt = segment_reader.fast_fields().bytes(&self.field)?;
+        let column_opt = segment_reader.column_fields().bytes(&self.field)?;
 
         let segment_collector = self
             .collector

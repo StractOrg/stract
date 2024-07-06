@@ -7,8 +7,8 @@ use time::{OffsetDateTime, PrimitiveDateTime, UtcOffset};
 
 use super::BinarySerializable;
 
-/// Precision with which datetimes are truncated when stored in fast fields. This setting is only
-/// relevant for fast fields. In the docstore, datetimes are always saved with nanosecond precision.
+/// Precision with which datetimes are truncated when stored in columnar fields. This setting is only
+/// relevant for columnar fields. In the docstore, datetimes are always saved with nanosecond precision.
 #[derive(
     Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default,
 )]

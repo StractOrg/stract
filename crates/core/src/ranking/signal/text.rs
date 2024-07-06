@@ -806,7 +806,9 @@ impl Signal for TitleEmbeddingSimilarity {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::TitleEmbeddings.into()))
+        Some(Field::Columnar(
+            schema::column_field::TitleEmbeddings.into(),
+        ))
     }
 
     fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
@@ -833,7 +835,9 @@ impl Signal for KeywordEmbeddingSimilarity {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Fast(schema::fast_field::KeywordEmbeddings.into()))
+        Some(Field::Columnar(
+            schema::column_field::KeywordEmbeddings.into(),
+        ))
     }
 
     fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {

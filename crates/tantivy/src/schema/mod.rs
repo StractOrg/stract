@@ -94,15 +94,15 @@
 //! ### Fast fields
 //! This functionality is somewhat similar to Lucene's `DocValues`.
 //!
-//! Fields that are indexed as [`FAST`] will be stored in a special data structure that will
+//! Fields that are indexed as [`COLUMN`] will be stored in a special data structure that will
 //! make it possible to access the value given the doc id rapidly. This is useful if the value
 //! of the field is required during scoring or collection for instance.
 //!
 //! ```
 //! use tantivy::schema::*;
 //! let mut schema_builder = Schema::builder();
-//! schema_builder.add_u64_field("population", STORED | FAST);
-//! schema_builder.add_text_field("zip_code", STRING | FAST);
+//! schema_builder.add_u64_field("population", STORED | COLUMN);
+//! schema_builder.add_text_field("zip_code", STRING | COLUMN);
 //! let schema = schema_builder.build();
 //! ```
 
@@ -132,7 +132,7 @@ pub use self::document::{DocParsingError, Document, OwnedValue, TantivyDocument,
 pub use self::field::Field;
 pub use self::field_entry::FieldEntry;
 pub use self::field_type::{FieldType, Type};
-pub use self::flags::{COERCE, FAST, INDEXED, STORED};
+pub use self::flags::{COERCE, COLUMN, INDEXED, STORED};
 pub use self::index_record_option::IndexRecordOption;
 pub use self::ip_options::{IntoIpv6Addr, IpAddrOptions};
 pub use self::json_object_options::JsonObjectOptions;

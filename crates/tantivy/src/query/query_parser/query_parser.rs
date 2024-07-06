@@ -11,8 +11,8 @@ use rustc_hash::FxHashMap;
 
 use super::logical_ast::*;
 use crate::index::Index;
-use crate::json_utils::convert_to_fast_value_and_append_to_json_term;
-use crate::query::range_query::{is_type_valid_for_fastfield_range_query, RangeQuery};
+use crate::json_utils::convert_to_columnar_value_and_append_to_json_term;
+use crate::query::range_query::{is_type_valid_for_columnfield_range_query, RangeQuery};
 use crate::query::{
     AllQuery, BooleanQuery, BoostQuery, EmptyQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery,
     PhraseQuery, Query, TermQuery, TermSetQuery,
@@ -424,8 +424,8 @@ impl QueryParser {
     ) -> Result<Term, QueryParserError> {
         let field_entry = self.schema.get_field_entry(field);
         let field_type = field_entry.field_type();
-        let field_supports_ff_range_queries = field_type.is_fast()
-            && is_type_valid_for_fastfield_range_query(field_type.value_type());
+        let field_supports_ff_range_queries = field_type.is_columnar()
+            && is_type_valid_for_columnfield_range_query(field_type.value_type());
 
         if !field_type.is_indexed() && !field_supports_ff_range_queries {
             return Err(QueryParserError::FieldNotIndexed(
@@ -947,8 +947,9 @@ fn generate_literals_for_json_object(
     let get_term_with_path =
         || Term::from_field_json_path(field, json_path, json_options.is_expand_dots_enabled());
 
-    // Try to convert the phrase to a fast value
-    if let Some(term) = convert_to_fast_value_and_append_to_json_term(get_term_with_path(), phrase)
+    // Try to convert the phrase to a columnar value
+    if let Some(term) =
+        convert_to_columnar_value_and_append_to_json_term(get_term_with_path(), phrase)
     {
         logical_literals.push(LogicalLiteral::Term(term));
     }

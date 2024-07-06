@@ -5,7 +5,7 @@ use itertools::Itertools;
 
 use super::doc_id_mapping::{get_doc_id_mapping_from_field, DocIdMapping};
 use super::operation::AddOperation;
-use crate::fastfield::FastFieldsWriter;
+use crate::columnfield::ColumnFieldsWriter;
 use crate::fieldnorm::{FieldNormReaders, FieldNormsWriter};
 use crate::index::{Segment, SegmentComponent};
 use crate::indexer::segment_serializer::SegmentSerializer;
@@ -65,7 +65,7 @@ pub struct SegmentWriter {
     pub(crate) ctx: IndexingContext,
     pub(crate) per_field_postings_writers: PerFieldPostingsWriter,
     pub(crate) segment_serializer: SegmentSerializer,
-    pub(crate) fast_field_writers: FastFieldsWriter,
+    pub(crate) column_field_writers: ColumnFieldsWriter,
     pub(crate) fieldnorms_writer: FieldNormsWriter,
     pub(crate) json_path_writer: JsonPathWriter,
     pub(crate) json_positions_per_path: IndexingPositionsPerPath,
@@ -88,7 +88,7 @@ impl SegmentWriter {
     pub fn for_segment(memory_budget_in_bytes: usize, segment: Segment) -> crate::Result<Self> {
         let schema = segment.schema();
         let tokenizer_manager = segment.index().tokenizers().clone();
-        let tokenizer_manager_fast_field = segment.index().fast_field_tokenizer().clone();
+        let tokenizer_manager_column_field = segment.index().column_field_tokenizer().clone();
         let table_size = compute_initial_table_size(memory_budget_in_bytes)?;
         let segment_serializer = SegmentSerializer::for_segment(segment, false)?;
         let per_field_postings_writers = PerFieldPostingsWriter::for_schema(&schema);
@@ -122,9 +122,9 @@ impl SegmentWriter {
             json_path_writer: JsonPathWriter::default(),
             json_positions_per_path: IndexingPositionsPerPath::default(),
             segment_serializer,
-            fast_field_writers: FastFieldsWriter::from_schema_and_tokenizer_manager(
+            column_field_writers: ColumnFieldsWriter::from_schema_and_tokenizer_manager(
                 &schema,
-                tokenizer_manager_fast_field,
+                tokenizer_manager_column_field,
             )?,
             doc_opstamps: Vec::with_capacity(1_000),
             per_field_text_analyzers,
@@ -152,7 +152,7 @@ impl SegmentWriter {
             self.schema,
             &self.per_field_postings_writers,
             self.ctx,
-            self.fast_field_writers,
+            self.column_field_writers,
             &self.fieldnorms_writer,
             self.segment_serializer,
             mapping.as_ref(),
@@ -166,7 +166,7 @@ impl SegmentWriter {
     pub fn mem_usage(&self) -> usize {
         self.ctx.mem_usage()
             + self.fieldnorms_writer.mem_usage()
-            + self.fast_field_writers.mem_usage()
+            + self.column_field_writers.mem_usage()
             + self.segment_serializer.mem_usage()
     }
 
@@ -361,7 +361,7 @@ impl SegmentWriter {
     ) -> crate::Result<()> {
         let AddOperation { document, opstamp } = add_operation;
         self.doc_opstamps.push(opstamp);
-        self.fast_field_writers.add_document(&document)?;
+        self.column_field_writers.add_document(&document)?;
         self.index_document(&document)?;
         let doc_writer = self.segment_serializer.get_store_writer();
         doc_writer.store(&document, &self.schema)?;
@@ -399,7 +399,7 @@ fn remap_and_write(
     schema: Schema,
     per_field_postings_writers: &PerFieldPostingsWriter,
     ctx: IndexingContext,
-    fast_field_writers: FastFieldsWriter,
+    column_field_writers: ColumnFieldsWriter,
     fieldnorms_writer: &FieldNormsWriter,
     mut serializer: SegmentSerializer,
     doc_id_map: Option<&DocIdMapping>,
@@ -420,8 +420,8 @@ fn remap_and_write(
         doc_id_map,
         serializer.get_postings_serializer(),
     )?;
-    debug!("fastfield-serialize");
-    fast_field_writers.serialize(serializer.get_fast_field_write(), doc_id_map)?;
+    debug!("columnfield-serialize");
+    column_field_writers.serialize(serializer.get_column_field_write(), doc_id_map)?;
 
     // finalize temp docstore and create version, which reflects the doc_id_map
     if let Some(doc_id_map) = doc_id_map {
@@ -465,8 +465,8 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::collector::{Count, TopDocs};
+    use crate::columnfield::ColumnarValue;
     use crate::directory::RamDirectory;
-    use crate::fastfield::FastValue;
     use crate::postings::{Postings, TermInfo};
     use crate::query::{PhraseQuery, QueryParser};
     use crate::schema::{
@@ -658,8 +658,8 @@ mod tests {
         let term_from_path =
             |path: &str| -> Term { Term::from_field_json_path(json_field, path, false) };
 
-        fn set_fast_val<T: FastValue>(val: T, mut term: Term) -> Term {
-            term.append_type_and_fast_value(val);
+        fn set_columnar_val<T: ColumnarValue>(val: T, mut term: Term) -> Term {
+            term.append_type_and_columnar_value(val);
             term
         }
         fn set_str(val: &str, mut term: Term) -> Term {
@@ -671,14 +671,14 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_fast_val(true, term).serialized_value_bytes()
+            set_columnar_val(true, term).serialized_value_bytes()
         );
 
         let term = term_from_path("complexobject.field\\.with\\.dot");
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_fast_val(1i64, term).serialized_value_bytes()
+            set_columnar_val(1i64, term).serialized_value_bytes()
         );
 
         // Date
@@ -687,7 +687,7 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_fast_val(
+            set_columnar_val(
                 DateTime::from_utc(
                     OffsetDateTime::parse("1985-04-12T23:20:50.52Z", &Rfc3339).unwrap(),
                 ),
@@ -701,7 +701,7 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_fast_val(-0.2f64, term).serialized_value_bytes()
+            set_columnar_val(-0.2f64, term).serialized_value_bytes()
         );
 
         // Number In Array
@@ -709,21 +709,21 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_fast_val(2i64, term).serialized_value_bytes()
+            set_columnar_val(2i64, term).serialized_value_bytes()
         );
 
         let term = term_from_path("my_arr");
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_fast_val(3i64, term).serialized_value_bytes()
+            set_columnar_val(3i64, term).serialized_value_bytes()
         );
 
         let term = term_from_path("my_arr");
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_fast_val(4i64, term).serialized_value_bytes()
+            set_columnar_val(4i64, term).serialized_value_bytes()
         );
 
         // El in Array
@@ -745,7 +745,7 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_fast_val(-2i64, term).serialized_value_bytes()
+            set_columnar_val(-2i64, term).serialized_value_bytes()
         );
 
         let term = term_from_path("toto");
@@ -759,7 +759,7 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_fast_val(1i64, term).serialized_value_bytes()
+            set_columnar_val(1i64, term).serialized_value_bytes()
         );
 
         assert!(!term_stream.advance());

@@ -13,20 +13,23 @@ use crate::schema::{Field, FieldEntry, FieldType, Schema};
 use crate::space_usage::{FieldUsage, PerFieldSpaceUsage};
 use crate::TantivyError;
 
-/// Provides access to all of the BitpackedFastFieldReader.
+/// Provides access to all of the BitpackedColumnFieldReader.
 ///
-/// Internally, `FastFieldReaders` have preloaded fast field readers,
+/// Internally, `ColumnFieldReaders` have preloaded columnar field readers,
 /// and just wraps several `HashMap`.
 #[derive(Clone)]
-pub struct FastFieldReaders {
+pub struct ColumnFieldReaders {
     columnar: Arc<ColumnarReader>,
     schema: Schema,
 }
 
-impl FastFieldReaders {
-    pub(crate) fn open(fast_field_file: FileSlice, schema: Schema) -> io::Result<FastFieldReaders> {
-        let columnar = Arc::new(ColumnarReader::open(fast_field_file)?);
-        Ok(FastFieldReaders { columnar, schema })
+impl ColumnFieldReaders {
+    pub(crate) fn open(
+        column_field_file: FileSlice,
+        schema: Schema,
+    ) -> io::Result<ColumnFieldReaders> {
+        let columnar = Arc::new(ColumnarReader::open(column_field_file)?);
+        Ok(ColumnFieldReaders { columnar, schema })
     }
 
     fn resolve_field(&self, column_name: &str) -> crate::Result<Option<String>> {
@@ -53,19 +56,19 @@ impl FastFieldReaders {
         self.columnar.as_ref()
     }
 
-    /// Transforms a user-supplied fast field name into a column name.
+    /// Transforms a user-supplied columnar field name into a column name.
     ///
-    /// A user-supplied fast field name is not necessarily a schema field name
-    /// because we handle fast fields.
+    /// A user-supplied columnar field name is not necessarily a schema field name
+    /// because we handle columnar fields.
     ///
     /// For instance, if the documents look like `{.., "attributes": {"color": "red"}}` and
-    /// `attributes` is a json fast field,  a user could want to run a term aggregation over
+    /// `attributes` is a json columnar field,  a user could want to run a term aggregation over
     /// colors, by referring to the field as `attributes.color`.
     ///
     /// This function transforms `attributes.color` into a column key to be used in the `columnar`.
     ///
     /// The logic works as follows, first we identify which field is targetted by calling
-    /// `schema.find_field(..)`. This method will attempt to split the user splied fast field
+    /// `schema.find_field(..)`. This method will attempt to split the user splied columnar field
     /// name by non-escaped dots, and find the longest matching schema field name.
     /// In our case, it would return the (attribute_field, "color").
     ///
@@ -86,9 +89,9 @@ impl FastFieldReaders {
             return Ok(None);
         };
         let field_entry: &FieldEntry = self.schema.get_field_entry(field);
-        if !field_entry.is_fast() {
+        if !field_entry.is_columnar() {
             return Err(TantivyError::InvalidArgument(format!(
-                "Field {field_name:?} is not configured as fast field"
+                "Field {field_name:?} is not configured as columnar field"
             )));
         }
         Ok(match (field_entry.field_type(), path) {
@@ -149,21 +152,21 @@ impl FastFieldReaders {
         let col_opt: Option<Column<T>> = self.column_opt(field)?;
         col_opt.ok_or_else(|| {
             crate::TantivyError::SchemaError(format!(
-                "Field `{field}` is missing or is not configured as a fast field."
+                "Field `{field}` is missing or is not configured as a columnar field."
             ))
         })
     }
 
-    /// Returns the `u64` fast field reader reader associated with `field`.
+    /// Returns the `u64` columnar field reader reader associated with `field`.
     ///
-    /// If `field` is not a u64 fast field, this method returns an Error.
+    /// If `field` is not a u64 columnar field, this method returns an Error.
     pub fn u64(&self, field: &str) -> crate::Result<Column<u64>> {
         self.column(field)
     }
 
-    /// Returns the `date` fast field reader reader associated with `field`.
+    /// Returns the `date` columnar field reader reader associated with `field`.
     ///
-    /// If `field` is not a date fast field, this method returns an Error.
+    /// If `field` is not a date columnar field, this method returns an Error.
     pub fn date(&self, field: &str) -> crate::Result<Column<crate::common::DateTime>> {
         self.column(field)
     }
@@ -292,23 +295,23 @@ impl FastFieldReaders {
         self.u64_lenient_for_type(None, field_name)
     }
 
-    /// Returns the `i64` fast field reader reader associated with `field`.
+    /// Returns the `i64` columnar field reader reader associated with `field`.
     ///
-    /// If `field` is not a i64 fast field, this method returns an Error.
+    /// If `field` is not a i64 columnar field, this method returns an Error.
     pub fn i64(&self, field_name: &str) -> crate::Result<Column<i64>> {
         self.column(field_name)
     }
 
-    /// Returns the `f64` fast field reader reader associated with `field`.
+    /// Returns the `f64` columnar field reader reader associated with `field`.
     ///
-    /// If `field` is not a f64 fast field, this method returns an Error.
+    /// If `field` is not a f64 columnar field, this method returns an Error.
     pub fn f64(&self, field_name: &str) -> crate::Result<Column<f64>> {
         self.column(field_name)
     }
 
-    /// Returns the `bool` fast field reader reader associated with `field`.
+    /// Returns the `bool` columnar field reader reader associated with `field`.
     ///
-    /// If `field` is not a bool fast field, this method returns an Error.
+    /// If `field` is not a bool columnar field, this method returns an Error.
     pub fn bool(&self, field_name: &str) -> crate::Result<Column<bool>> {
         self.column(field_name)
     }
@@ -318,21 +321,21 @@ impl FastFieldReaders {
 mod tests {
     use crate::columnar::ColumnType;
 
-    use crate::schema::{JsonObjectOptions, Schema, FAST};
+    use crate::schema::{JsonObjectOptions, Schema, COLUMN};
     use crate::{Index, IndexWriter, TantivyDocument};
 
     #[test]
-    fn test_fast_field_reader_resolve_with_dynamic_internal() {
+    fn test_column_field_reader_resolve_with_dynamic_internal() {
         let mut schema_builder = Schema::builder();
-        schema_builder.add_i64_field("age", FAST);
-        schema_builder.add_json_field("json_expand_dots_disabled", FAST);
+        schema_builder.add_i64_field("age", COLUMN);
+        schema_builder.add_json_field("json_expand_dots_disabled", COLUMN);
         schema_builder.add_json_field(
             "json_expand_dots_enabled",
             JsonObjectOptions::default()
-                .set_fast(None)
+                .set_columnar(None)
                 .set_expand_dots_enabled(),
         );
-        let dynamic_field = schema_builder.add_json_field("_dyna", FAST);
+        let dynamic_field = schema_builder.add_json_field("_dyna", COLUMN);
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema);
         let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
@@ -343,21 +346,21 @@ mod tests {
         let reader = index.reader().unwrap();
         let searcher = reader.searcher();
         let reader = searcher.segment_reader(0u32);
-        let fast_field_readers = reader.fast_fields();
+        let column_field_readers = reader.column_fields();
         assert_eq!(
-            fast_field_readers
+            column_field_readers
                 .resolve_column_name_given_default_field("age", None)
                 .unwrap(),
             Some("age".to_string())
         );
         assert_eq!(
-            fast_field_readers
+            column_field_readers
                 .resolve_column_name_given_default_field("age", Some(dynamic_field))
                 .unwrap(),
             Some("age".to_string())
         );
         assert_eq!(
-            fast_field_readers
+            column_field_readers
                 .resolve_column_name_given_default_field(
                     "json_expand_dots_disabled.attr.color",
                     None
@@ -366,7 +369,7 @@ mod tests {
             Some("json_expand_dots_disabled\u{1}attr\u{1}color".to_string())
         );
         assert_eq!(
-            fast_field_readers
+            column_field_readers
                 .resolve_column_name_given_default_field(
                     "json_expand_dots_disabled.attr\\.color",
                     Some(dynamic_field)
@@ -375,7 +378,7 @@ mod tests {
             Some("json_expand_dots_disabled\u{1}attr.color".to_string())
         );
         assert_eq!(
-            fast_field_readers
+            column_field_readers
                 .resolve_column_name_given_default_field(
                     "json_expand_dots_enabled.attr\\.color",
                     Some(dynamic_field)
@@ -384,13 +387,13 @@ mod tests {
             Some("json_expand_dots_enabled\u{1}attr\u{1}color".to_string())
         );
         assert_eq!(
-            fast_field_readers
+            column_field_readers
                 .resolve_column_name_given_default_field("notinschema.attr.color", None)
                 .unwrap(),
             None
         );
         assert_eq!(
-            fast_field_readers
+            column_field_readers
                 .resolve_column_name_given_default_field(
                     "notinschema.attr.color",
                     Some(dynamic_field)
@@ -401,10 +404,10 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_field_reader_dynamic_column_handles() {
+    fn test_column_field_reader_dynamic_column_handles() {
         let mut schema_builder = Schema::builder();
-        let id = schema_builder.add_u64_field("id", FAST);
-        let json = schema_builder.add_json_field("json", FAST);
+        let id = schema_builder.add_u64_field("id", COLUMN);
+        let json = schema_builder.add_json_field("json", COLUMN);
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema);
         let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
@@ -421,12 +424,12 @@ mod tests {
         let reader = index.reader().unwrap();
         let searcher = reader.searcher();
         let reader = searcher.segment_reader(0u32);
-        let fast_fields = reader.fast_fields();
-        let id_columns = fast_fields.dynamic_column_handles("id").unwrap();
+        let column_fields = reader.column_fields();
+        let id_columns = column_fields.dynamic_column_handles("id").unwrap();
         assert_eq!(id_columns.len(), 1);
         assert_eq!(id_columns.first().unwrap().column_type(), ColumnType::U64);
 
-        let foo_columns = fast_fields.dynamic_column_handles("json.foo").unwrap();
+        let foo_columns = column_fields.dynamic_column_handles("json.foo").unwrap();
         assert_eq!(foo_columns.len(), 2);
         assert!(foo_columns
             .iter()
@@ -435,6 +438,6 @@ mod tests {
             .iter()
             .any(|column| column.column_type() == ColumnType::Bool));
 
-        println!("*** {:?}", fast_fields.columnar().list_columns());
+        println!("*** {:?}", column_fields.columnar().list_columns());
     }
 }

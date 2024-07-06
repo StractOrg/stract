@@ -11,18 +11,18 @@ use super::RowId;
 pub trait MonotonicallyMappableToU64: 'static + PartialOrd + Debug + Copy + Send + Sync {
     /// Converts a value to u64.
     ///
-    /// Internally all fast field values are encoded as u64.
+    /// Internally all columnar field values are encoded as u64.
     fn to_u64(self) -> u64;
 
     /// Converts a value from u64
     ///
-    /// Internally all fast field values are encoded as u64.
+    /// Internally all columnar field values are encoded as u64.
     /// **Note: To be used for converting encoded Term, Posting values.**
     fn from_u64(val: u64) -> Self;
 }
 
 /// Values need to be strictly monotonic mapped to a `Internal` value (u64 or u128) that can be
-/// used in fast field codecs.
+/// used in columnar field codecs.
 ///
 /// The monotonic mapping is required so that `PartialOrd` can be used on `Internal` without
 /// converting to `External`.

@@ -1,6 +1,6 @@
 #![warn(missing_docs)]
 
-//! # `fastfield_codecs`
+//! # `columnfield_codecs`
 //!
 //! - Columnar storage of data for tantivy [`super::Column`].
 //! - Encode data in different codecs.
@@ -104,7 +104,7 @@ pub trait ColumnValues<T: PartialOrd = u64>: Send + Sync + DowncastSync {
         }
     }
 
-    /// Fills an output buffer with the fast field values
+    /// Fills an output buffer with the columnar field values
     /// associated with the `DocId` going from
     /// `start` to `start + output.len()`.
     ///
@@ -121,7 +121,7 @@ pub trait ColumnValues<T: PartialOrd = u64>: Send + Sync + DowncastSync {
 
     /// Get the row ids of values which are in the provided value range.
     ///
-    /// Note that position == docid for single value fast fields
+    /// Note that position == docid for single value columnar fields
     fn get_row_ids_for_value_range(
         &self,
         value_range: RangeInclusive<T>,

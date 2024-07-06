@@ -23,7 +23,7 @@ use crate::columnar::value::{Coerce, NumericalType, NumericalValue};
 use crate::columnar::{Cardinality, RowId};
 
 /// This is a set of buffers that are used to temporarily write the values into before passing them
-/// to the fast field codecs.
+/// to the columnar field codecs.
 #[derive(Default)]
 struct SpareBuffers {
     value_index_builders: PreallocatedIndexBuilders,

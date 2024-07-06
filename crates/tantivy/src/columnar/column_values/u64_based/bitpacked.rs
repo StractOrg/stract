@@ -10,7 +10,7 @@ use crate::columnar::column_values::u64_based::{ColumnCodec, ColumnCodecEstimato
 use crate::columnar::{ColumnValues, RowId};
 
 /// Depending on the field type, a different
-/// fast field is required.
+/// columnar field is required.
 #[derive(Clone)]
 pub struct BitpackedReader {
     data: OwnedBytes,
@@ -138,7 +138,7 @@ impl ColumnCodec for BitpackedCodec {
     type ColumnValues = BitpackedReader;
     type Estimator = BitpackedCodecEstimator;
 
-    /// Opens a fast field given a file.
+    /// Opens a columnar field given a file.
     fn load(mut data: OwnedBytes) -> io::Result<Self::ColumnValues> {
         let stats = ColumnStats::deserialize(&mut data)?;
         let num_bits = num_bits(&stats);
@@ -177,7 +177,7 @@ mod tests {
     }
 
     #[test]
-    fn bitpacked_fast_field_rand() {
+    fn bitpacked_column_field_rand() {
         for _ in 0..500 {
             let mut data = (0..1 + rand::random::<u8>() as usize)
                 .map(|_| rand::random::<i64>() as u64 / 2)

@@ -67,7 +67,7 @@ pub struct SegmentSpaceUsage {
     termdict: PerFieldSpaceUsage,
     postings: PerFieldSpaceUsage,
     positions: PerFieldSpaceUsage,
-    fast_fields: PerFieldSpaceUsage,
+    column_fields: PerFieldSpaceUsage,
     fieldnorms: PerFieldSpaceUsage,
 
     store: StoreSpaceUsage,
@@ -82,14 +82,14 @@ impl SegmentSpaceUsage {
         termdict: PerFieldSpaceUsage,
         postings: PerFieldSpaceUsage,
         positions: PerFieldSpaceUsage,
-        fast_fields: PerFieldSpaceUsage,
+        column_fields: PerFieldSpaceUsage,
         fieldnorms: PerFieldSpaceUsage,
         store: StoreSpaceUsage,
     ) -> SegmentSpaceUsage {
         let total = termdict.total()
             + postings.total()
             + positions.total()
-            + fast_fields.total()
+            + column_fields.total()
             + fieldnorms.total()
             + store.total();
         SegmentSpaceUsage {
@@ -97,7 +97,7 @@ impl SegmentSpaceUsage {
             termdict,
             postings,
             positions,
-            fast_fields,
+            column_fields,
             fieldnorms,
             store,
             total,
@@ -114,7 +114,7 @@ impl SegmentSpaceUsage {
         match component {
             Postings => PerField(self.postings().clone()),
             Positions => PerField(self.positions().clone()),
-            FastFields => PerField(self.fast_fields().clone()),
+            ColumnFields => PerField(self.column_fields().clone()),
             FieldNorms => PerField(self.fieldnorms().clone()),
             Terms => PerField(self.termdict().clone()),
             SegmentComponent::Store => ComponentSpaceUsage::Store(self.store().clone()),
@@ -142,9 +142,9 @@ impl SegmentSpaceUsage {
         &self.positions
     }
 
-    /// Space usage for fast fields
-    pub fn fast_fields(&self) -> &PerFieldSpaceUsage {
-        &self.fast_fields
+    /// Space usage for columnar fields
+    pub fn column_fields(&self) -> &PerFieldSpaceUsage {
+        &self.column_fields
     }
 
     /// Space usage for field norms
@@ -280,7 +280,7 @@ impl FieldUsage {
 #[cfg(test)]
 mod test {
     use crate::index::Index;
-    use crate::schema::{Field, Schema, FAST, INDEXED, STORED, TEXT};
+    use crate::schema::{Field, Schema, COLUMN, INDEXED, STORED, TEXT};
     use crate::space_usage::PerFieldSpaceUsage;
     use crate::IndexWriter;
 
@@ -312,9 +312,9 @@ mod test {
     }
 
     #[test]
-    fn test_fast_indexed() -> crate::Result<()> {
+    fn test_columnar_indexed() -> crate::Result<()> {
         let mut schema_builder = Schema::builder();
-        let name = schema_builder.add_u64_field("name", FAST | INDEXED);
+        let name = schema_builder.add_u64_field("name", COLUMN | INDEXED);
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema);
 
@@ -341,7 +341,7 @@ mod test {
         expect_single_field(segment.termdict(), &name, 1, 512);
         expect_single_field(segment.postings(), &name, 1, 512);
         assert_eq!(segment.positions().total(), 0);
-        expect_single_field(segment.fast_fields(), &name, 1, 512);
+        expect_single_field(segment.column_fields(), &name, 1, 512);
         expect_single_field(segment.fieldnorms(), &name, 1, 512);
         // TODO: understand why the following fails
         //        assert_eq!(0, segment.store().total());
@@ -380,7 +380,7 @@ mod test {
         expect_single_field(segment.termdict(), &name, 1, 512);
         expect_single_field(segment.postings(), &name, 1, 512);
         expect_single_field(segment.positions(), &name, 1, 512);
-        assert_eq!(segment.fast_fields().total(), 0);
+        assert_eq!(segment.column_fields().total(), 0);
         expect_single_field(segment.fieldnorms(), &name, 1, 512);
         // TODO: understand why the following fails
         //        assert_eq!(0, segment.store().total());
@@ -418,7 +418,7 @@ mod test {
         assert_eq!(segment.termdict().total(), 0);
         assert_eq!(segment.postings().total(), 0);
         assert_eq!(segment.positions().total(), 0);
-        assert_eq!(segment.fast_fields().total(), 0);
+        assert_eq!(segment.column_fields().total(), 0);
         assert_eq!(segment.fieldnorms().total(), 0);
         assert!(segment.store().total() > 0);
         assert!(segment.store().total() < 512);
@@ -455,7 +455,7 @@ mod test {
         expect_single_field(segment_space_usage.termdict(), &name, 1, 512);
         expect_single_field(segment_space_usage.postings(), &name, 1, 512);
         assert_eq!(segment_space_usage.positions().total(), 0u64);
-        assert_eq!(segment_space_usage.fast_fields().total(), 0u64);
+        assert_eq!(segment_space_usage.column_fields().total(), 0u64);
         expect_single_field(segment_space_usage.fieldnorms(), &name, 1, 512);
         Ok(())
     }

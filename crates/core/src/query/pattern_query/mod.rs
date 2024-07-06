@@ -22,7 +22,7 @@ use optics::PatternPart;
 use tantivy::tokenizer::Tokenizer;
 
 use crate::{
-    fastfield_reader::FastFieldReader,
+    columnfield_reader::ColumnFieldReader,
     schema::{text_field::TextField, Field, TextFieldEnum},
 };
 
@@ -34,7 +34,7 @@ pub struct PatternQuery {
     can_optimize_site_domain: bool,
     field: tantivy::schema::Field,
     raw_terms: Vec<tantivy::Term>,
-    fastfield_reader: FastFieldReader,
+    columnfield_reader: ColumnFieldReader,
 }
 
 impl std::fmt::Debug for PatternQuery {
@@ -52,7 +52,7 @@ impl PatternQuery {
         patterns: Vec<PatternPart>,
         field: TextFieldEnum,
         schema: &tantivy::schema::Schema,
-        fastfield_reader: FastFieldReader,
+        columnfield_reader: ColumnFieldReader,
     ) -> Self {
         let field = Field::Text(field);
         let tv_field = schema.get_field(field.name()).unwrap();
@@ -68,7 +68,7 @@ impl PatternQuery {
                     field: tv_field,
                     can_optimize_site_domain: true,
                     raw_terms: vec![tantivy::Term::from_field_text(tv_field, term.as_str())],
-                    fastfield_reader,
+                    columnfield_reader,
                 };
             } else {
                 let term: String = patterns
@@ -85,7 +85,7 @@ impl PatternQuery {
                     field: tv_field,
                     can_optimize_site_domain: true,
                     raw_terms: vec![tantivy::Term::from_field_text(tv_field, &term)],
-                    fastfield_reader,
+                    columnfield_reader,
                 };
             }
         }
@@ -120,7 +120,7 @@ impl PatternQuery {
             field: tv_field,
             raw_terms,
             can_optimize_site_domain: false,
-            fastfield_reader,
+            columnfield_reader,
         }
     }
 }
@@ -141,7 +141,7 @@ impl tantivy::query::Query for PatternQuery {
             raw_terms: self.raw_terms.clone(),
             patterns: self.patterns.clone(),
             field: self.field,
-            fastfield_reader: self.fastfield_reader.clone(),
+            columnfield_reader: self.columnfield_reader.clone(),
         }))
     }
 

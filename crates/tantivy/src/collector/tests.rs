@@ -2,7 +2,7 @@ use crate::columnar::{BytesColumn, Column};
 
 use super::*;
 use crate::query::{AllQuery, QueryParser};
-use crate::schema::{Schema, FAST, TEXT};
+use crate::schema::{Schema, COLUMN, TEXT};
 use crate::time::format_description::well_known::Rfc3339;
 use crate::time::OffsetDateTime;
 use crate::{DateTime, DocAddress, Index, Searcher, TantivyDocument};
@@ -19,8 +19,8 @@ pub const TEST_COLLECTOR_WITHOUT_SCORE: TestCollector = TestCollector {
 pub fn test_filter_collector() -> crate::Result<()> {
     let mut schema_builder = Schema::builder();
     let title = schema_builder.add_text_field("title", TEXT);
-    let price = schema_builder.add_u64_field("price", FAST);
-    let date = schema_builder.add_date_field("date", FAST);
+    let price = schema_builder.add_u64_field("price", COLUMN);
+    let date = schema_builder.add_date_field("date", COLUMN);
     let schema = schema_builder.build();
     let index = Index::create_in_ram(schema);
 
@@ -149,41 +149,41 @@ impl SegmentCollector for TestSegmentCollector {
     }
 }
 
-/// Collects in order all of the fast fields for all of the
+/// Collects in order all of the columnar fields for all of the
 /// doc in the `DocSet`
 ///
 /// This collector is mainly useful for tests.
-pub struct FastFieldTestCollector {
+pub struct ColumnFieldTestCollector {
     field: String,
 }
 
-pub struct FastFieldSegmentCollector {
+pub struct ColumnFieldSegmentCollector {
     vals: Vec<u64>,
     reader: Column,
 }
 
-impl FastFieldTestCollector {
-    pub fn for_field(field: impl ToString) -> FastFieldTestCollector {
-        FastFieldTestCollector {
+impl ColumnFieldTestCollector {
+    pub fn for_field(field: impl ToString) -> ColumnFieldTestCollector {
+        ColumnFieldTestCollector {
             field: field.to_string(),
         }
     }
 }
 
-impl Collector for FastFieldTestCollector {
+impl Collector for ColumnFieldTestCollector {
     type Fruit = Vec<u64>;
-    type Child = FastFieldSegmentCollector;
+    type Child = ColumnFieldSegmentCollector;
 
     fn for_segment(
         &self,
         _: SegmentOrdinal,
         segment_reader: &SegmentReader,
-    ) -> crate::Result<FastFieldSegmentCollector> {
+    ) -> crate::Result<ColumnFieldSegmentCollector> {
         let reader = segment_reader
-            .fast_fields()
+            .column_fields()
             .u64(&self.field)
-            .expect("Requested field is not a fast field.");
-        Ok(FastFieldSegmentCollector {
+            .expect("Requested field is not a columnar field.");
+        Ok(ColumnFieldSegmentCollector {
             vals: Vec::new(),
             reader,
         })
@@ -198,7 +198,7 @@ impl Collector for FastFieldTestCollector {
     }
 }
 
-impl SegmentCollector for FastFieldSegmentCollector {
+impl SegmentCollector for ColumnFieldSegmentCollector {
     type Fruit = Vec<u64>;
 
     fn collect(&mut self, doc: DocId, _score: Score) {
@@ -210,40 +210,40 @@ impl SegmentCollector for FastFieldSegmentCollector {
     }
 }
 
-/// Collects in order all of the fast field bytes for all of the
+/// Collects in order all of the columnar field bytes for all of the
 /// docs in the `DocSet`
 ///
 /// This collector is mainly useful for tests.
 /// It is very slow.
-pub struct BytesFastFieldTestCollector {
+pub struct BytesColumnFieldTestCollector {
     field: String,
 }
 
-pub struct BytesFastFieldSegmentCollector {
+pub struct BytesColumnFieldSegmentCollector {
     vals: Vec<u8>,
     column_opt: Option<BytesColumn>,
     buffer: Vec<u8>,
 }
 
-impl BytesFastFieldTestCollector {
-    pub fn for_field(field: impl ToString) -> BytesFastFieldTestCollector {
-        BytesFastFieldTestCollector {
+impl BytesColumnFieldTestCollector {
+    pub fn for_field(field: impl ToString) -> BytesColumnFieldTestCollector {
+        BytesColumnFieldTestCollector {
             field: field.to_string(),
         }
     }
 }
 
-impl Collector for BytesFastFieldTestCollector {
+impl Collector for BytesColumnFieldTestCollector {
     type Fruit = Vec<u8>;
-    type Child = BytesFastFieldSegmentCollector;
+    type Child = BytesColumnFieldSegmentCollector;
 
     fn for_segment(
         &self,
         _segment_local_id: u32,
         segment_reader: &SegmentReader,
-    ) -> crate::Result<BytesFastFieldSegmentCollector> {
-        let column_opt = segment_reader.fast_fields().bytes(&self.field)?;
-        Ok(BytesFastFieldSegmentCollector {
+    ) -> crate::Result<BytesColumnFieldSegmentCollector> {
+        let column_opt = segment_reader.column_fields().bytes(&self.field)?;
+        Ok(BytesColumnFieldSegmentCollector {
             vals: Vec::new(),
             column_opt,
             buffer: Vec::new(),
@@ -259,7 +259,7 @@ impl Collector for BytesFastFieldTestCollector {
     }
 }
 
-impl SegmentCollector for BytesFastFieldSegmentCollector {
+impl SegmentCollector for BytesColumnFieldSegmentCollector {
     type Fruit = Vec<u8>;
 
     fn collect(&mut self, doc: DocId, _score: Score) {

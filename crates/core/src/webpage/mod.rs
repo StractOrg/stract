@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    schema::{fast_field::FastField, text_field::TextField, Field},
+    schema::{column_field::ColumnField, text_field::TextField, Field},
     webgraph::NodeID,
     Result,
 };
@@ -134,7 +134,7 @@ impl Webpage {
 
         for field in Field::all() {
             match field {
-                Field::Fast(f) => f.add_webpage_tantivy(self, &mut doc, schema)?,
+                Field::Columnar(f) => f.add_webpage_tantivy(self, &mut doc, schema)?,
                 Field::Text(f) => f.add_webpage_tantivy(self, &mut doc, schema)?,
             }
         }

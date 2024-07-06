@@ -19,7 +19,7 @@ use crate::query::{Query, MAX_TERMS_FOR_NGRAM_LOOKUPS};
 use crate::ranking::bm25f::MultiBm25FWeight;
 use crate::schema::text_field::TextField;
 use crate::Result;
-use crate::{enum_map::EnumMap, fastfield_reader, schema::TextFieldEnum, webpage::Webpage};
+use crate::{columnfield_reader, enum_map::EnumMap, schema::TextFieldEnum, webpage::Webpage};
 
 use std::cell::RefCell;
 
@@ -121,7 +121,7 @@ pub struct OpticBoosts {
 pub struct SegmentReader {
     text_fields: EnumMap<TextFieldEnum, TextFieldData>,
     optic_boosts: OpticBoosts,
-    fastfield_reader: Arc<fastfield_reader::SegmentReader>,
+    columnfield_reader: Arc<columnfield_reader::SegmentReader>,
 }
 
 impl SegmentReader {
@@ -129,8 +129,8 @@ impl SegmentReader {
         &mut self.text_fields
     }
 
-    pub fn fastfield_reader(&self) -> &fastfield_reader::SegmentReader {
-        &self.fastfield_reader
+    pub fn columnfield_reader(&self) -> &columnfield_reader::SegmentReader {
+        &self.columnfield_reader
     }
 }
 
@@ -322,7 +322,7 @@ impl SignalComputer {
         &self,
         tv_searcher: &tantivy::Searcher,
         segment_reader: &tantivy::SegmentReader,
-        fastfield_reader: &fastfield_reader::FastFieldReader,
+        columnfield_reader: &columnfield_reader::ColumnFieldReader,
     ) -> Vec<RuleBoost> {
         let mut optic_rule_boosts = Vec::new();
 
@@ -330,7 +330,9 @@ impl SignalComputer {
             optic_rule_boosts = query
                 .optic_rules
                 .iter()
-                .filter_map(|rule| rule.as_searchable_rule(tv_searcher.schema(), fastfield_reader))
+                .filter_map(|rule| {
+                    rule.as_searchable_rule(tv_searcher.schema(), columnfield_reader)
+                })
                 .map(|(_, rule)| RuleBoost {
                     docset: rule
                         .query
@@ -353,15 +355,16 @@ impl SignalComputer {
         &mut self,
         tv_searcher: &tantivy::Searcher,
         segment_reader: &tantivy::SegmentReader,
-        fastfield_reader: &fastfield_reader::FastFieldReader,
+        columnfield_reader: &columnfield_reader::ColumnFieldReader,
     ) -> Result<()> {
-        let fastfield_segment_reader = fastfield_reader.get_segment(&segment_reader.segment_id());
+        let columnfield_segment_reader =
+            columnfield_reader.get_segment(&segment_reader.segment_id());
         let text_fields = self.prepare_textfields(tv_searcher, segment_reader)?;
-        let optic_rule_boosts = self.prepare_optic(tv_searcher, segment_reader, fastfield_reader);
+        let optic_rule_boosts = self.prepare_optic(tv_searcher, segment_reader, columnfield_reader);
 
         self.segment_reader = Some(RefCell::new(SegmentReader {
             text_fields,
-            fastfield_reader: fastfield_segment_reader,
+            columnfield_reader: columnfield_segment_reader,
             optic_boosts: OpticBoosts {
                 rules: optic_rule_boosts,
             },

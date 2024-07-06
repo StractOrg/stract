@@ -23,7 +23,7 @@
 /// # Example
 ///
 /// ```rust
-/// use tantivy::schema::{Schema, TEXT, FAST};
+/// use tantivy::schema::{Schema, TEXT, COLUMN};
 /// use tantivy::doc;
 ///
 /// //...
@@ -32,7 +32,7 @@
 /// let mut schema_builder = Schema::builder();
 /// let title = schema_builder.add_text_field("title", TEXT);
 /// let author = schema_builder.add_text_field("text", TEXT);
-/// let likes = schema_builder.add_u64_field("num_u64", FAST);
+/// let likes = schema_builder.add_u64_field("num_u64", COLUMN);
 /// let schema = schema_builder.build();
 /// let doc = doc!(
 ///     title => "Life Aquatic",
@@ -66,14 +66,14 @@ macro_rules! doc(
 
 #[cfg(test)]
 mod test {
-    use crate::schema::{Schema, FAST, TEXT};
+    use crate::schema::{Schema, COLUMN, TEXT};
 
     #[test]
     fn test_doc_basic() {
         let mut schema_builder = Schema::builder();
         let title = schema_builder.add_text_field("title", TEXT);
         let author = schema_builder.add_text_field("text", TEXT);
-        let likes = schema_builder.add_u64_field("num_u64", FAST);
+        let likes = schema_builder.add_u64_field("num_u64", COLUMN);
         let _schema = schema_builder.build();
         let _doc = doc!(
         title => "Life Aquatic",
@@ -87,7 +87,7 @@ mod test {
         let mut schema_builder = Schema::builder();
         let title = schema_builder.add_text_field("title", TEXT);
         let author = schema_builder.add_text_field("text", TEXT);
-        let likes = schema_builder.add_u64_field("num_u64", FAST);
+        let likes = schema_builder.add_u64_field("num_u64", COLUMN);
         let _schema = schema_builder.build();
         let _doc = doc!(
         title => "Life Aquatic",

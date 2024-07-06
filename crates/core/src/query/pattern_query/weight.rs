@@ -22,9 +22,9 @@ use tantivy::{
 };
 
 use crate::{
-    fastfield_reader::FastFieldReader,
+    columnfield_reader::ColumnFieldReader,
     schema::{
-        fast_field,
+        column_field,
         text_field::{self, TextField},
         Field, TextFieldEnum,
     },
@@ -62,7 +62,7 @@ impl FastSiteDomainPatternWeight {
 
         let opt = match field_no_tokenizer {
             Field::Text(t) => t.record_option(),
-            Field::Fast(_) => unreachable!(),
+            Field::Columnar(_) => unreachable!(),
         };
 
         match reader
@@ -114,7 +114,7 @@ pub struct PatternWeight {
     pub patterns: Vec<PatternPart>,
     pub raw_terms: Vec<tantivy::Term>,
     pub field: tantivy::schema::Field,
-    pub fastfield_reader: FastFieldReader,
+    pub columnfield_reader: ColumnFieldReader,
 }
 
 impl PatternWeight {
@@ -126,24 +126,24 @@ impl PatternWeight {
             return Ok(None);
         }
 
-        let num_tokens_fastfield = match Field::get(self.field.field_id() as usize) {
-            Some(Field::Text(TextFieldEnum::Title(_))) => Ok(fast_field::NumTitleTokens.into()),
+        let num_tokens_columnfield = match Field::get(self.field.field_id() as usize) {
+            Some(Field::Text(TextFieldEnum::Title(_))) => Ok(column_field::NumTitleTokens.into()),
             Some(Field::Text(TextFieldEnum::CleanBody(_))) => {
-                Ok(fast_field::NumCleanBodyTokens.into())
+                Ok(column_field::NumCleanBodyTokens.into())
             }
-            Some(Field::Text(TextFieldEnum::Url(_))) => Ok(fast_field::NumUrlTokens.into()),
-            Some(Field::Text(TextFieldEnum::Domain(_))) => Ok(fast_field::NumDomainTokens.into()),
+            Some(Field::Text(TextFieldEnum::Url(_))) => Ok(column_field::NumUrlTokens.into()),
+            Some(Field::Text(TextFieldEnum::Domain(_))) => Ok(column_field::NumDomainTokens.into()),
             Some(Field::Text(TextFieldEnum::UrlForSiteOperator(_))) => {
-                Ok(fast_field::NumUrlForSiteOperatorTokens.into())
+                Ok(column_field::NumUrlForSiteOperatorTokens.into())
             }
             Some(Field::Text(TextFieldEnum::Description(_))) => {
-                Ok(fast_field::NumDescriptionTokens.into())
+                Ok(column_field::NumDescriptionTokens.into())
             }
             Some(Field::Text(TextFieldEnum::MicroformatTags(_))) => {
-                Ok(fast_field::NumMicroformatTagsTokens.into())
+                Ok(column_field::NumMicroformatTagsTokens.into())
             }
             Some(Field::Text(TextFieldEnum::FlattenedSchemaOrgJson(_))) => {
-                Ok(fast_field::NumFlattenedSchemaTokens.into())
+                Ok(column_field::NumFlattenedSchemaTokens.into())
             }
             Some(field) => Err(TantivyError::InvalidArgument(format!(
                 "{} is not supported in pattern query",
@@ -177,8 +177,8 @@ impl PatternWeight {
                 .all(|p| matches!(p, PatternPart::Anchor))
         {
             return Ok(Some(PatternScorer::EmptyField(EmptyFieldScorer {
-                num_tokens_fastfield,
-                segment_reader: self.fastfield_reader.get_segment(&reader.segment_id()),
+                num_tokens_columnfield,
+                segment_reader: self.columnfield_reader.get_segment(&reader.segment_id()),
                 all_scorer: AllScorer {
                     doc: 0,
                     max_doc: reader.max_doc(),
@@ -212,8 +212,8 @@ impl PatternWeight {
             term_postings_list,
             small_patterns,
             reader.segment_id(),
-            num_tokens_fastfield,
-            self.fastfield_reader.clone(),
+            num_tokens_columnfield,
+            self.columnfield_reader.clone(),
         ))))
     }
 }

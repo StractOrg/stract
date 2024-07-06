@@ -108,8 +108,8 @@ pub mod error;
 pub mod tokenizer;
 
 pub mod collector;
+pub mod columnfield;
 pub mod directory;
-pub mod fastfield;
 pub mod fieldnorm;
 pub mod index;
 pub mod positions;
@@ -777,11 +777,11 @@ pub mod tests {
     }
 
     #[test]
-    fn test_wrong_fast_field_type() -> crate::Result<()> {
+    fn test_wrong_column_field_type() -> crate::Result<()> {
         let mut schema_builder = Schema::builder();
-        let fast_field_unsigned = schema_builder.add_u64_field("unsigned", FAST);
-        let fast_field_signed = schema_builder.add_i64_field("signed", FAST);
-        let fast_field_float = schema_builder.add_f64_field("float", FAST);
+        let column_field_unsigned = schema_builder.add_u64_field("unsigned", COLUMN);
+        let column_field_signed = schema_builder.add_i64_field("signed", COLUMN);
+        let column_field_float = schema_builder.add_f64_field("float", COLUMN);
         schema_builder.add_text_field("text", TEXT);
         schema_builder.add_u64_field("stored_int", STORED);
         let schema = schema_builder.build();
@@ -789,8 +789,7 @@ pub mod tests {
         let index = Index::create_in_ram(schema);
         let mut index_writer: IndexWriter = index.writer_for_tests()?;
         {
-            let document =
-                doc!(fast_field_unsigned => 4u64, fast_field_signed=>4i64, fast_field_float=>4f64);
+            let document = doc!(column_field_unsigned => 4u64, column_field_signed=>4i64, column_field_float=>4f64);
             index_writer.add_document(document)?;
             index_writer.commit()?;
         }
@@ -798,40 +797,40 @@ pub mod tests {
         let searcher = reader.searcher();
         let segment_reader: &SegmentReader = searcher.segment_reader(0);
         {
-            let fast_field_reader_res = segment_reader.fast_fields().u64("text");
-            assert!(fast_field_reader_res.is_err());
+            let column_field_reader_res = segment_reader.column_fields().u64("text");
+            assert!(column_field_reader_res.is_err());
         }
         {
-            let fast_field_reader_opt = segment_reader.fast_fields().u64("stored_int");
-            assert!(fast_field_reader_opt.is_err());
+            let column_field_reader_opt = segment_reader.column_fields().u64("stored_int");
+            assert!(column_field_reader_opt.is_err());
         }
         {
-            let fast_field_reader_opt = segment_reader.fast_fields().u64("signed");
-            assert!(fast_field_reader_opt.is_err());
+            let column_field_reader_opt = segment_reader.column_fields().u64("signed");
+            assert!(column_field_reader_opt.is_err());
         }
         {
-            let fast_field_reader_opt = segment_reader.fast_fields().u64("float");
-            assert!(fast_field_reader_opt.is_err());
+            let column_field_reader_opt = segment_reader.column_fields().u64("float");
+            assert!(column_field_reader_opt.is_err());
         }
         {
-            let fast_field_reader_opt = segment_reader.fast_fields().u64("unsigned");
-            assert!(fast_field_reader_opt.is_ok());
-            let fast_field_reader = fast_field_reader_opt.unwrap();
-            assert_eq!(fast_field_reader.first(0), Some(4u64))
-        }
-
-        {
-            let fast_field_reader_res = segment_reader.fast_fields().i64("signed");
-            assert!(fast_field_reader_res.is_ok());
-            let fast_field_reader = fast_field_reader_res.unwrap();
-            assert_eq!(fast_field_reader.first(0), Some(4i64))
+            let column_field_reader_opt = segment_reader.column_fields().u64("unsigned");
+            assert!(column_field_reader_opt.is_ok());
+            let column_field_reader = column_field_reader_opt.unwrap();
+            assert_eq!(column_field_reader.first(0), Some(4u64))
         }
 
         {
-            let fast_field_reader_res = segment_reader.fast_fields().f64("float");
-            assert!(fast_field_reader_res.is_ok());
-            let fast_field_reader = fast_field_reader_res.unwrap();
-            assert_eq!(fast_field_reader.first(0), Some(4f64))
+            let column_field_reader_res = segment_reader.column_fields().i64("signed");
+            assert!(column_field_reader_res.is_ok());
+            let column_field_reader = column_field_reader_res.unwrap();
+            assert_eq!(column_field_reader.first(0), Some(4i64))
+        }
+
+        {
+            let column_field_reader_res = segment_reader.column_fields().f64("float");
+            assert!(column_field_reader_res.is_ok());
+            let column_field_reader = column_field_reader_res.unwrap();
+            assert_eq!(column_field_reader.first(0), Some(4f64))
         }
         Ok(())
     }

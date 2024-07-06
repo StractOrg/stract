@@ -63,7 +63,7 @@ fn get_num_iterations() -> usize {
 fn test_functional_indexing_sorted() -> crate::Result<()> {
     let mut schema_builder = Schema::builder();
 
-    let id_field = schema_builder.add_u64_field("id", INDEXED | FAST);
+    let id_field = schema_builder.add_u64_field("id", INDEXED | COLUMN);
     let multiples_field = schema_builder.add_u64_field("multiples", INDEXED);
     let text_field_options = TextOptions::default()
         .set_indexing_options(

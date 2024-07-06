@@ -155,10 +155,10 @@ impl SchemaBuilder {
         self.add_field(field_entry)
     }
 
-    /// Adds a fast bytes field to the schema.
+    /// Adds a columnar field to the schema.
     ///
     /// Bytes field are not searchable and are only used
-    /// as fast field, to associate any kind of payload
+    /// as columnar field, to associate any kind of payload
     /// to a document.
     ///
     /// For instance, learning-to-rank often requires to access
@@ -334,7 +334,7 @@ impl Schema {
         None
     }
 
-    /// Transforms a user-supplied fast field name into a column name.
+    /// Transforms a user-supplied columnar field name into a column name.
     ///
     /// This is similar to `.find_field` except it includes some fallback logic to
     /// a default json field. This functionality is used in Quickwit.
@@ -438,13 +438,13 @@ mod tests {
     #[test]
     pub fn test_schema_serialization() {
         let mut schema_builder = Schema::builder();
-        let count_options = NumericOptions::default().set_stored().set_fast();
-        let popularity_options = NumericOptions::default().set_stored().set_fast();
+        let count_options = NumericOptions::default().set_stored().set_columnar();
+        let popularity_options = NumericOptions::default().set_stored().set_columnar();
         let score_options = NumericOptions::default()
             .set_indexed()
             .set_fieldnorm()
-            .set_fast();
-        let is_read_options = NumericOptions::default().set_stored().set_fast();
+            .set_columnar();
+        let is_read_options = NumericOptions::default().set_stored().set_columnar();
         schema_builder.add_text_field("title", TEXT);
         schema_builder.add_text_field(
             "author",
@@ -471,7 +471,7 @@ mod tests {
         "tokenizer": "default"
       },
       "stored": false,
-      "fast": false
+      "columnar": false
     }
   },
   {
@@ -484,7 +484,7 @@ mod tests {
         "tokenizer": "raw"
       },
       "stored": false,
-      "fast": false
+      "columnar": false
     }
   },
   {
@@ -493,7 +493,7 @@ mod tests {
     "options": {
       "indexed": false,
       "fieldnorms": false,
-      "fast": true,
+      "columnar": true,
       "stored": true
     }
   },
@@ -503,7 +503,7 @@ mod tests {
     "options": {
       "indexed": false,
       "fieldnorms": false,
-      "fast": true,
+      "columnar": true,
       "stored": true
     }
   },
@@ -513,7 +513,7 @@ mod tests {
     "options": {
       "indexed": true,
       "fieldnorms": true,
-      "fast": true,
+      "columnar": true,
       "stored": false
     }
   },
@@ -523,7 +523,7 @@ mod tests {
     "options": {
       "indexed": false,
       "fieldnorms": false,
-      "fast": true,
+      "columnar": true,
       "stored": true
     }
   }
@@ -569,12 +569,12 @@ mod tests {
     #[test]
     pub fn test_document_to_json() {
         let mut schema_builder = Schema::builder();
-        let count_options = NumericOptions::default().set_stored().set_fast();
-        let is_read_options = NumericOptions::default().set_stored().set_fast();
+        let count_options = NumericOptions::default().set_stored().set_columnar();
+        let is_read_options = NumericOptions::default().set_stored().set_columnar();
         schema_builder.add_text_field("title", TEXT);
         schema_builder.add_text_field("author", STRING);
         schema_builder.add_u64_field("count", count_options);
-        schema_builder.add_ip_addr_field("ip", FAST | STORED);
+        schema_builder.add_ip_addr_field("ip", COLUMN | STORED);
         schema_builder.add_bool_field("is_read", is_read_options);
         let schema = schema_builder.build();
         let doc_json = r#"{
@@ -593,7 +593,7 @@ mod tests {
     #[test]
     pub fn test_document_to_ipv4_json() {
         let mut schema_builder = Schema::builder();
-        schema_builder.add_ip_addr_field("ip", FAST | STORED);
+        schema_builder.add_ip_addr_field("ip", COLUMN | STORED);
         let schema = schema_builder.build();
 
         // IpV4 loopback
@@ -667,9 +667,9 @@ mod tests {
     #[test]
     pub fn test_parse_document() {
         let mut schema_builder = Schema::builder();
-        let count_options = NumericOptions::default().set_stored().set_fast();
-        let popularity_options = NumericOptions::default().set_stored().set_fast();
-        let score_options = NumericOptions::default().set_indexed().set_fast();
+        let count_options = NumericOptions::default().set_stored().set_columnar();
+        let popularity_options = NumericOptions::default().set_stored().set_columnar();
+        let score_options = NumericOptions::default().set_indexed().set_columnar();
         let title_field = schema_builder.add_text_field("title", TEXT);
         let author_field = schema_builder.add_text_field("author", STRING);
         let count_field = schema_builder.add_u64_field("count", count_options);
@@ -826,7 +826,7 @@ mod tests {
             .set_stored()
             .set_indexed()
             .set_fieldnorm()
-            .set_fast();
+            .set_columnar();
         schema_builder.add_text_field("_id", id_options);
         schema_builder.add_date_field("_timestamp", timestamp_options);
 
@@ -841,7 +841,7 @@ mod tests {
         "tokenizer": "default"
       },
       "stored": false,
-      "fast": false
+      "columnar": false
     }
   },
   {
@@ -850,7 +850,7 @@ mod tests {
     "options": {
       "indexed": false,
       "fieldnorms": false,
-      "fast": true,
+      "columnar": true,
       "stored": true
     }
   }
@@ -874,7 +874,7 @@ mod tests {
         "tokenizer": "raw"
       },
       "stored": true,
-      "fast": false
+      "columnar": false
     }
   },
   {
@@ -883,7 +883,7 @@ mod tests {
     "options": {
       "indexed": true,
       "fieldnorms": true,
-      "fast": true,
+      "columnar": true,
       "stored": true,
       "precision": "seconds"
     }
@@ -898,7 +898,7 @@ mod tests {
         "tokenizer": "default"
       },
       "stored": false,
-      "fast": false
+      "columnar": false
     }
   },
   {
@@ -907,7 +907,7 @@ mod tests {
     "options": {
       "indexed": false,
       "fieldnorms": false,
-      "fast": true,
+      "columnar": true,
       "stored": true
     }
   }

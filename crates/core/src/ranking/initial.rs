@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::fastfield_reader::FastFieldReader;
+use crate::columnfield_reader::ColumnFieldReader;
 use chrono::Utc;
 
 use tantivy::collector::{ScoreSegmentTweaker, ScoreTweaker};
@@ -24,7 +24,7 @@ use super::SignalComputer;
 
 pub struct InitialScoreTweaker {
     tv_searcher: tantivy::Searcher,
-    fastfield_reader: FastFieldReader,
+    columnfield_reader: ColumnFieldReader,
     computer: SignalComputer,
 }
 
@@ -38,12 +38,12 @@ impl InitialScoreTweaker {
     pub fn new(
         tv_searcher: tantivy::Searcher,
         computer: SignalComputer,
-        fastfield_reader: FastFieldReader,
+        columnfield_reader: ColumnFieldReader,
     ) -> Self {
         Self {
             tv_searcher,
             computer,
-            fastfield_reader,
+            columnfield_reader,
         }
     }
 }
@@ -58,7 +58,7 @@ impl ScoreTweaker<Score> for InitialScoreTweaker {
         computer.set_current_timestamp(current_timestamp);
 
         computer
-            .register_segment(&self.tv_searcher, segment_reader, &self.fastfield_reader)
+            .register_segment(&self.tv_searcher, segment_reader, &self.columnfield_reader)
             .unwrap();
 
         Ok(InitialSegmentScoreTweaker { computer })

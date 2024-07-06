@@ -1,27 +1,27 @@
 //! Fastfields support efficient scanning for range queries.
-//! We use this variant only if the fastfield exists, otherwise the default in `range_query` is
+//! We use this variant only if the columnfield exists, otherwise the default in `range_query` is
 //! used, which uses the term dictionary + postings.
 
 use std::ops::{Bound, RangeInclusive};
 
 use crate::columnar::{ColumnType, HasAssociatedColumnType, MonotonicallyMappableToU64};
 
-use super::fast_field_range_query::RangeDocSet;
+use super::column_field_range_query::RangeDocSet;
 use super::map_bound;
 use crate::query::{ConstScorer, EmptyScorer, Explanation, Query, Scorer, Weight};
 use crate::{DocId, DocSet, Score, SegmentReader, TantivyError};
 
-/// `FastFieldRangeWeight` uses the fast field to execute range queries.
+/// `ColumnFieldRangeWeight` uses the columnar field to execute range queries.
 #[derive(Clone, Debug)]
-pub struct FastFieldRangeWeight {
+pub struct ColumnFieldRangeWeight {
     field: String,
     lower_bound: Bound<u64>,
     upper_bound: Bound<u64>,
     column_type_opt: Option<ColumnType>,
 }
 
-impl FastFieldRangeWeight {
-    /// Create a new FastFieldRangeWeight, using the u64 representation of any fast field.
+impl ColumnFieldRangeWeight {
+    /// Create a new ColumnFieldRangeWeight, using the u64 representation of any columnar field.
     pub(crate) fn new_u64_lenient(
         field: String,
         lower_bound: Bound<u64>,
@@ -37,7 +37,7 @@ impl FastFieldRangeWeight {
         }
     }
 
-    /// Create a new `FastFieldRangeWeight` for a range of a u64-mappable type .
+    /// Create a new `ColumnFieldRangeWeight` for a range of a u64-mappable type .
     pub fn new<T: HasAssociatedColumnType + MonotonicallyMappableToU64>(
         field: String,
         lower_bound: Bound<T>,
@@ -54,7 +54,7 @@ impl FastFieldRangeWeight {
     }
 }
 
-impl Query for FastFieldRangeWeight {
+impl Query for ColumnFieldRangeWeight {
     fn weight(
         &self,
         _enable_scoring: crate::query::EnableScoring<'_>,
@@ -63,16 +63,16 @@ impl Query for FastFieldRangeWeight {
     }
 }
 
-impl Weight for FastFieldRangeWeight {
+impl Weight for ColumnFieldRangeWeight {
     fn scorer(&self, reader: &SegmentReader, boost: Score) -> crate::Result<Box<dyn Scorer>> {
-        let fast_field_reader = reader.fast_fields();
+        let column_field_reader = reader.column_fields();
         let column_type_opt: Option<[ColumnType; 1]> =
             self.column_type_opt.map(|column_type| [column_type]);
         let column_type_opt_ref: Option<&[ColumnType]> = column_type_opt
             .as_ref()
             .map(|column_types| column_types.as_slice());
         let Some((column, _)) =
-            fast_field_reader.u64_lenient_for_type(column_type_opt_ref, &self.field)?
+            column_field_reader.u64_lenient_for_type(column_type_opt_ref, &self.field)?
         else {
             return Ok(Box::new(EmptyScorer));
         };
@@ -138,9 +138,9 @@ pub mod tests {
     use rand::SeedableRng;
 
     use crate::collector::Count;
-    use crate::query::range_query::range_query_u64_fastfield::FastFieldRangeWeight;
+    use crate::query::range_query::range_query_u64_columnfield::ColumnFieldRangeWeight;
     use crate::query::{QueryParser, Weight};
-    use crate::schema::{Schema, SchemaBuilder, FAST, INDEXED, STORED, STRING};
+    use crate::schema::{Schema, SchemaBuilder, COLUMN, INDEXED, STORED, STRING};
     use crate::{Index, IndexWriter, TERMINATED};
 
     #[derive(Clone, Debug)]
@@ -194,14 +194,14 @@ pub mod tests {
     #[test]
     fn test_range_regression_simplified() {
         let mut schema_builder = SchemaBuilder::new();
-        let field = schema_builder.add_u64_field("test_field", FAST);
+        let field = schema_builder.add_u64_field("test_field", COLUMN);
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema);
         let mut writer: IndexWriter = index.writer_for_tests().unwrap();
         writer.add_document(doc!(field=>52_000u64)).unwrap();
         writer.commit().unwrap();
         let searcher = index.reader().unwrap().searcher();
-        let range_query = FastFieldRangeWeight::new_u64_lenient(
+        let range_query = ColumnFieldRangeWeight::new_u64_lenient(
             "test_field".to_string(),
             Bound::Included(50_000),
             Bound::Included(50_002),
@@ -220,9 +220,9 @@ pub mod tests {
 
     pub fn create_index_from_docs(docs: &[Doc]) -> Index {
         let mut schema_builder = Schema::builder();
-        let id_u64_field = schema_builder.add_u64_field("id", INDEXED | STORED | FAST);
-        let id_f64_field = schema_builder.add_f64_field("id_f64", INDEXED | STORED | FAST);
-        let id_i64_field = schema_builder.add_i64_field("id_i64", INDEXED | STORED | FAST);
+        let id_u64_field = schema_builder.add_u64_field("id", INDEXED | STORED | COLUMN);
+        let id_f64_field = schema_builder.add_f64_field("id_f64", INDEXED | STORED | COLUMN);
+        let id_i64_field = schema_builder.add_i64_field("id_i64", INDEXED | STORED | COLUMN);
 
         let text_field = schema_builder.add_text_field("id_name", STRING | STORED);
         let schema = schema_builder.build();

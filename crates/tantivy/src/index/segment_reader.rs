@@ -6,9 +6,9 @@ use std::{fmt, io};
 use fnv::FnvHashMap;
 use itertools::Itertools;
 
+use crate::columnfield::ColumnFieldReaders;
 use crate::directory::{CompositeFile, FileSlice};
 use crate::error::DataCorruption;
-use crate::fastfield::FastFieldReaders;
 use crate::fieldnorm::{FieldNormReader, FieldNormReaders};
 use crate::index::{InvertedIndexReader, Segment, SegmentComponent, SegmentId};
 use crate::json_utils::json_path_sep_to_dot;
@@ -23,7 +23,7 @@ use crate::DocId;
 /// - term dictionary
 /// - postings
 /// - store
-/// - fast field readers
+/// - columnar field readers
 /// - field norm reader
 ///
 /// The segment reader has a very low memory footprint,
@@ -39,7 +39,7 @@ pub struct SegmentReader {
     termdict_composite: CompositeFile,
     postings_composite: CompositeFile,
     positions_composite: CompositeFile,
-    fast_fields_readers: FastFieldReaders,
+    column_fields_readers: ColumnFieldReaders,
     fieldnorm_readers: FieldNormReaders,
 
     store_file: FileSlice,
@@ -63,18 +63,18 @@ impl SegmentReader {
         &self.schema
     }
 
-    /// Accessor to a segment's fast field reader given a field.
+    /// Accessor to a segment's columnar field reader given a field.
     ///
-    /// Returns the u64 fast value reader if the field
-    /// is a u64 field indexed as "fast".
+    /// Returns the u64 columnar value reader if the field
+    /// is a u64 field indexed as "columnar".
     ///
-    /// Return a FastFieldNotAvailableError if the field is not
-    /// declared as a fast field in the schema.
+    /// Return a ColumnFieldNotAvailableError if the field is not
+    /// declared as a columnar field in the schema.
     ///
     /// # Panics
     /// May panic if the index is corrupted.
-    pub fn fast_fields(&self) -> &FastFieldReaders {
-        &self.fast_fields_readers
+    pub fn column_fields(&self) -> &ColumnFieldReaders {
+        &self.column_fields_readers
     }
 
     /// Accessor to the segment's `Field norms`'s reader.
@@ -82,7 +82,7 @@ impl SegmentReader {
     /// Field norms are the length (in tokens) of the fields.
     /// It is used in the computation of the [TfIdf](https://fulmicoton.gitbooks.io/tantivy-doc/content/tfidf.html).
     ///
-    /// They are simply stored as a fast field, serialized in
+    /// They are simply stored as a columnar field, serialized in
     /// the `.fieldnorm` file of the segment.
     pub fn get_fieldnorms_reader(&self, field: Field) -> crate::Result<FieldNormReader> {
         self.fieldnorm_readers.get_field(field)?.ok_or_else(|| {
@@ -130,8 +130,8 @@ impl SegmentReader {
 
         let schema = segment.schema();
 
-        let fast_fields_data = segment.open_read(SegmentComponent::FastFields)?;
-        let fast_fields_readers = FastFieldReaders::open(fast_fields_data, schema.clone())?;
+        let column_fields_data = segment.open_read(SegmentComponent::ColumnFields)?;
+        let column_fields_readers = ColumnFieldReaders::open(column_fields_data, schema.clone())?;
         let fieldnorm_data = segment.open_read(SegmentComponent::FieldNorms)?;
         let fieldnorm_readers = FieldNormReaders::open(fieldnorm_data)?;
 
@@ -142,7 +142,7 @@ impl SegmentReader {
             max_doc,
             termdict_composite,
             postings_composite,
-            fast_fields_readers,
+            column_fields_readers,
             fieldnorm_readers,
             segment_id: segment.id(),
             store_file,
@@ -240,7 +240,7 @@ impl SegmentReader {
     /// browsing through the inverted index term dictionary and the columnar field dictionary.
     ///
     /// Disclaimer: Some fields may not be listed here. For instance, if the schema contains a json
-    /// field that is not indexed nor a fast field but is stored, it is possible for the field
+    /// field that is not indexed nor a columnar field but is stored, it is possible for the field
     /// to not be listed.
     pub fn fields_metadata(&self) -> crate::Result<Vec<FieldMetadata>> {
         let mut indexed_fields: Vec<FieldMetadata> = Vec::new();
@@ -255,7 +255,7 @@ impl SegmentReader {
                     let inv_index = self.inverted_index(field)?;
                     let encoded_fields_in_index = inv_index.list_encoded_fields()?;
                     let mut build_path = |field_name: &str, mut json_path: String| {
-                        // In this case we need to map the potential fast field to the field name
+                        // In this case we need to map the potential columnar field to the field name
                         // accepted by the query parser.
                         let create_canonical =
                             !field_entry.is_expand_dots_enabled() && json_path.contains('.');
@@ -280,7 +280,7 @@ impl SegmentReader {
                                 indexed: true,
                                 stored: false,
                                 field_name,
-                                fast: false,
+                                columnar: false,
                                 typ,
                             }),
                     );
@@ -289,14 +289,14 @@ impl SegmentReader {
                         indexed: true,
                         stored: false,
                         field_name: field_name.to_string(),
-                        fast: false,
+                        columnar: false,
                         typ: field_entry.field_type().value_type(),
                     });
                 }
             }
         }
-        let mut fast_fields: Vec<FieldMetadata> = self
-            .fast_fields()
+        let mut column_fields: Vec<FieldMetadata> = self
+            .column_fields()
             .columnar()
             .iter_columns()?
             .map(|(mut field_name, handle)| {
@@ -311,17 +311,17 @@ impl SegmentReader {
                     indexed: false,
                     stored: false,
                     field_name,
-                    fast: true,
+                    columnar: true,
                     typ: Type::from(handle.column_type()),
                 }
             })
             .collect();
-        // Since the type is encoded differently in the fast field and in the inverted index,
+        // Since the type is encoded differently in the columnar field and in the inverted index,
         // the order of the fields is not guaranteed to be the same. Therefore, we sort the fields.
         // If we are sure that the order is the same, we can remove this sort.
         indexed_fields.sort_unstable();
-        fast_fields.sort_unstable();
-        let merged = merge_field_meta_data(vec![indexed_fields, fast_fields], &self.schema);
+        column_fields.sort_unstable();
+        let merged = merge_field_meta_data(vec![indexed_fields, column_fields], &self.schema);
 
         Ok(merged)
     }
@@ -343,7 +343,7 @@ impl SegmentReader {
             self.termdict_composite.space_usage(),
             self.postings_composite.space_usage(),
             self.positions_composite.space_usage(),
-            self.fast_fields_readers.space_usage(self.schema())?,
+            self.column_fields_readers.space_usage(self.schema())?,
             self.fieldnorm_readers.space_usage(),
             self.get_store_reader(0)?.space_usage(),
         ))
@@ -366,7 +366,7 @@ pub struct FieldMetadata {
     /// Is the field stored in the doc store
     pub stored: bool,
     /// Is the field stored in the columnar storage
-    pub fast: bool,
+    pub columnar: bool,
 }
 impl BitOrAssign for FieldMetadata {
     fn bitor_assign(&mut self, rhs: Self) {
@@ -374,7 +374,7 @@ impl BitOrAssign for FieldMetadata {
         assert!(self.typ == rhs.typ);
         self.indexed |= rhs.indexed;
         self.stored |= rhs.stored;
-        self.fast |= rhs.fast;
+        self.columnar |= rhs.columnar;
     }
 }
 
@@ -430,14 +430,14 @@ mod test {
             typ: crate::schema::Type::Str,
             indexed: true,
             stored: false,
-            fast: true,
+            columnar: true,
         };
         let field_metadata2 = FieldMetadata {
             field_name: "a".to_string(),
             typ: crate::schema::Type::Str,
             indexed: true,
             stored: false,
-            fast: true,
+            columnar: true,
         };
         let res = merge_field_meta_data(
             vec![vec![field_metadata1.clone()], vec![field_metadata2]],
@@ -453,21 +453,21 @@ mod test {
             typ: crate::schema::Type::Str,
             indexed: false,
             stored: false,
-            fast: true,
+            columnar: true,
         };
         let field_metadata2 = FieldMetadata {
             field_name: "b".to_string(),
             typ: crate::schema::Type::Str,
             indexed: false,
             stored: false,
-            fast: true,
+            columnar: true,
         };
         let field_metadata3 = FieldMetadata {
             field_name: "a".to_string(),
             typ: crate::schema::Type::Str,
             indexed: true,
             stored: false,
-            fast: false,
+            columnar: false,
         };
         let res = merge_field_meta_data(
             vec![
@@ -481,7 +481,7 @@ mod test {
             typ: crate::schema::Type::Str,
             indexed: true,
             stored: false,
-            fast: true,
+            columnar: true,
         };
         assert_eq!(res, vec![field_metadata_expected1, field_metadata2.clone()]);
     }
@@ -493,7 +493,7 @@ mod test {
             typ,
             indexed: false,
             stored: false,
-            fast: true,
+            columnar: true,
         };
         let schema = SchemaBuilder::new().build();
         let mut metas = vec![get_meta_data("d", Type::Str), get_meta_data("e", Type::U64)];
@@ -515,21 +515,21 @@ mod test {
             typ: crate::schema::Type::Str,
             indexed: false,
             stored: false,
-            fast: true,
+            columnar: true,
         };
         let field_metadata2 = FieldMetadata {
             field_name: "a".to_string(),
             typ: crate::schema::Type::Str,
             indexed: true,
             stored: false,
-            fast: false,
+            columnar: false,
         };
         let field_metadata_expected = FieldMetadata {
             field_name: "a".to_string(),
             typ: crate::schema::Type::Str,
             indexed: true,
             stored: false,
-            fast: true,
+            columnar: true,
         };
         let mut res1 = field_metadata1.clone();
         res1 |= field_metadata2.clone();

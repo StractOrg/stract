@@ -20,20 +20,20 @@ use tantivy::{columnar::ColumnValues, index::SegmentId, DocId};
 
 use crate::{
     enum_map::EnumMap,
-    schema::{fast_field::FastField, DataType, FastFieldEnum, Field},
+    schema::{column_field::ColumnField, ColumnFieldEnum, DataType, Field},
 };
 
 #[derive(Default, Clone)]
-struct InnerFastFieldReader {
+struct InnerColumnFieldReader {
     segments: HashMap<SegmentId, Arc<SegmentReader>>,
 }
 
 #[derive(Default, Clone)]
-pub struct FastFieldReader {
-    inner: Arc<InnerFastFieldReader>,
+pub struct ColumnFieldReader {
+    inner: Arc<InnerColumnFieldReader>,
 }
 
-impl FastFieldReader {
+impl ColumnFieldReader {
     pub fn get_segment(&self, segment: &SegmentId) -> Arc<SegmentReader> {
         Arc::clone(self.inner.segments.get(segment).unwrap())
     }
@@ -43,12 +43,12 @@ impl FastFieldReader {
     }
 }
 
-impl FastFieldReader {
+impl ColumnFieldReader {
     pub fn new(tv_searcher: &tantivy::Searcher) -> Self {
         let mut segments = HashMap::new();
 
         for reader in tv_searcher.segment_readers() {
-            let fastfield_readers = reader.fast_fields();
+            let columnfield_readers = reader.column_fields();
 
             let mut u64s = EnumMap::new();
             let mut bytes = EnumMap::new();
@@ -58,7 +58,7 @@ impl FastFieldReader {
                     DataType::U64 => {
                         let num_docs = reader.max_doc() as usize;
                         let mut data = vec![0; num_docs];
-                        if let Ok(field_reader) = fastfield_readers.u64(field.name()) {
+                        if let Ok(field_reader) = columnfield_readers.u64(field.name()) {
                             for (doc, elem) in data.iter_mut().enumerate() {
                                 *elem = field_reader.values.get_val(doc as u32);
                             }
@@ -67,7 +67,8 @@ impl FastFieldReader {
                         u64s.insert(field, data);
                     }
                     DataType::Bytes => {
-                        if let Some(reader) = fastfield_readers.bytes(field.name()).ok().flatten() {
+                        if let Some(reader) = columnfield_readers.bytes(field.name()).ok().flatten()
+                        {
                             bytes.insert(field, reader);
                         }
                     }
@@ -83,14 +84,14 @@ impl FastFieldReader {
         }
 
         Self {
-            inner: Arc::new(InnerFastFieldReader { segments }),
+            inner: Arc::new(InnerColumnFieldReader { segments }),
         }
     }
 }
 
 struct AllReaders {
-    u64s: EnumMap<FastFieldEnum, Vec<u64>>,
-    bytes: EnumMap<FastFieldEnum, tantivy::columnar::BytesColumn>,
+    u64s: EnumMap<ColumnFieldEnum, Vec<u64>>,
+    bytes: EnumMap<ColumnFieldEnum, tantivy::columnar::BytesColumn>,
 }
 
 pub enum Value {
@@ -153,7 +154,7 @@ pub struct FieldReader<'a> {
 }
 
 impl<'a> FieldReader<'a> {
-    pub fn get(&self, field: FastFieldEnum) -> Option<Value> {
+    pub fn get(&self, field: ColumnFieldEnum) -> Option<Value> {
         match field.data_type() {
             DataType::U64 => Some(
                 self.readers
