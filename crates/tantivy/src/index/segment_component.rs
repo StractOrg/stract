@@ -12,6 +12,8 @@ pub enum SegmentComponent {
     Positions,
     /// Column-oriented random-access storage of fields.
     ColumnFields,
+    /// Row-oriented random-access storage of fields.
+    RowFields,
     /// Stores the sum  of the length (in terms) of each field for each document.
     /// Field norms are stored as a special u64 columnar field.
     FieldNorms,
@@ -29,10 +31,11 @@ pub enum SegmentComponent {
 impl SegmentComponent {
     /// Iterates through the components.
     pub fn iterator() -> slice::Iter<'static, SegmentComponent> {
-        static SEGMENT_COMPONENTS: [SegmentComponent; 7] = [
+        static SEGMENT_COMPONENTS: [SegmentComponent; 8] = [
             SegmentComponent::Postings,
             SegmentComponent::Positions,
             SegmentComponent::ColumnFields,
+            SegmentComponent::RowFields,
             SegmentComponent::FieldNorms,
             SegmentComponent::Terms,
             SegmentComponent::Store,

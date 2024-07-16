@@ -1,5 +1,6 @@
 use crate::columnar::MonotonicallyMappableToU64;
 use crate::common::JsonPathWriter;
+use crate::roworder::writer::RowFieldsWriter;
 use crate::tokenizer_api::BoxTokenStream;
 use itertools::Itertools;
 
@@ -66,6 +67,7 @@ pub struct SegmentWriter {
     pub(crate) per_field_postings_writers: PerFieldPostingsWriter,
     pub(crate) segment_serializer: SegmentSerializer,
     pub(crate) column_field_writers: ColumnFieldsWriter,
+    pub(crate) row_field_writers: RowFieldsWriter,
     pub(crate) fieldnorms_writer: FieldNormsWriter,
     pub(crate) json_path_writer: JsonPathWriter,
     pub(crate) json_positions_per_path: IndexingPositionsPerPath,
@@ -126,6 +128,7 @@ impl SegmentWriter {
                 &schema,
                 tokenizer_manager_column_field,
             )?,
+            row_field_writers: RowFieldsWriter::from_schema(&schema)?,
             doc_opstamps: Vec::with_capacity(1_000),
             per_field_text_analyzers,
             term_buffer: Term::with_capacity(16),
@@ -148,12 +151,18 @@ impl SegmentWriter {
             .clone()
             .map(|sort_by_field| get_doc_id_mapping_from_field(sort_by_field, &self))
             .transpose()?;
+
+        let writers = Writers {
+            per_field_postings_writers: self.per_field_postings_writers,
+            column_field_writers: self.column_field_writers,
+            row_field_writers: self.row_field_writers,
+            fieldnorms_writer: self.fieldnorms_writer,
+        };
+
         remap_and_write(
             self.schema,
-            &self.per_field_postings_writers,
             self.ctx,
-            self.column_field_writers,
-            &self.fieldnorms_writer,
+            writers,
             self.segment_serializer,
             mapping.as_ref(),
         )?;
@@ -167,6 +176,7 @@ impl SegmentWriter {
         self.ctx.mem_usage()
             + self.fieldnorms_writer.mem_usage()
             + self.column_field_writers.mem_usage()
+            + self.row_field_writers.mem_usage()
             + self.segment_serializer.mem_usage()
     }
 
@@ -362,6 +372,7 @@ impl SegmentWriter {
         let AddOperation { document, opstamp } = add_operation;
         self.doc_opstamps.push(opstamp);
         self.column_field_writers.add_document(&document)?;
+        self.row_field_writers.add_document(&document)?;
         self.index_document(&document)?;
         let doc_writer = self.segment_serializer.get_store_writer();
         doc_writer.store(&document, &self.schema)?;
@@ -390,6 +401,13 @@ impl SegmentWriter {
     }
 }
 
+struct Writers {
+    per_field_postings_writers: PerFieldPostingsWriter,
+    column_field_writers: ColumnFieldsWriter,
+    row_field_writers: RowFieldsWriter,
+    fieldnorms_writer: FieldNormsWriter,
+}
+
 /// This method is used as a trick to workaround the borrow checker
 /// Writes a view of a segment by pushing information
 /// to the `SegmentSerializer`.
@@ -397,16 +415,16 @@ impl SegmentWriter {
 /// `doc_id_map` is used to map to the new doc_id order.
 fn remap_and_write(
     schema: Schema,
-    per_field_postings_writers: &PerFieldPostingsWriter,
     ctx: IndexingContext,
-    column_field_writers: ColumnFieldsWriter,
-    fieldnorms_writer: &FieldNormsWriter,
+    writers: Writers,
     mut serializer: SegmentSerializer,
     doc_id_map: Option<&DocIdMapping>,
 ) -> crate::Result<()> {
     debug!("remap-and-write");
     if let Some(fieldnorms_serializer) = serializer.extract_fieldnorms_serializer() {
-        fieldnorms_writer.serialize(fieldnorms_serializer, doc_id_map)?;
+        writers
+            .fieldnorms_writer
+            .serialize(fieldnorms_serializer, doc_id_map)?;
     }
     let fieldnorm_data = serializer
         .segment()
@@ -415,13 +433,20 @@ fn remap_and_write(
     serialize_postings(
         ctx,
         schema,
-        per_field_postings_writers,
+        &writers.per_field_postings_writers,
         fieldnorm_readers,
         doc_id_map,
         serializer.get_postings_serializer(),
     )?;
     debug!("columnfield-serialize");
-    column_field_writers.serialize(serializer.get_column_field_write(), doc_id_map)?;
+    writers
+        .column_field_writers
+        .serialize(serializer.get_column_field_write(), doc_id_map)?;
+
+    debug!("rowfield-serialize");
+    writers
+        .row_field_writers
+        .serialize(serializer.get_row_field_write(), doc_id_map)?;
 
     // finalize temp docstore and create version, which reflects the doc_id_map
     if let Some(doc_id_map) = doc_id_map {
@@ -471,7 +496,7 @@ mod tests {
     use crate::query::{PhraseQuery, QueryParser};
     use crate::schema::{
         Document, IndexRecordOption, OwnedValue, Schema, TextFieldIndexing, TextOptions, Value,
-        STORED, STRING, TEXT,
+        INDEXED, ROW_ORDER, STORED, STRING, TEXT,
     };
     use crate::store::{Compressor, StoreReader, StoreWriter};
     use crate::time::format_description::well_known::Rfc3339;
@@ -1049,5 +1074,30 @@ mod tests {
             error.to_string(),
             "Schema error: 'Error getting tokenizer for field: title'"
         );
+    }
+
+    #[test]
+    fn test_row_order_indexing() {
+        let mut schema_builder = Schema::builder();
+
+        let text_field = schema_builder.add_text_field("text", TEXT);
+        let u64_field = schema_builder.add_u64_field("u64", STORED | ROW_ORDER | INDEXED);
+        let f64_field = schema_builder.add_f64_field("f64", STORED | ROW_ORDER | INDEXED);
+
+        let schema = schema_builder.build();
+        let index = Index::create_in_ram(schema.clone());
+        let mut writer = index.writer_for_tests().unwrap();
+
+        let doc = doc!(text_field=>"hello", u64_field=>10u64, f64_field=>10.0f64);
+        writer.add_document(doc).unwrap();
+        writer.commit().unwrap();
+
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        let segment_reader = searcher.segment_reader(0);
+        let row = segment_reader.row_fields().row_index().get_row(0).unwrap();
+
+        assert_eq!(row.get_u64(&u64_field), Some(10u64));
+        assert_eq!(row.get_f64(&f64_field), Some(10.0f64));
     }
 }

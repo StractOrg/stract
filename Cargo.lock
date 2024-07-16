@@ -5242,6 +5242,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
+ "strum 0.26.3",
  "tempfile",
  "thiserror",
  "time",

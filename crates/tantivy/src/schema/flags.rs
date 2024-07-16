@@ -55,6 +55,16 @@ pub const COLUMN: SchemaFlagList<ColumnarFlag, ()> = SchemaFlagList {
     tail: (),
 };
 
+#[derive(Clone)]
+pub struct RowOrderFlag;
+/// Flag to mark the field as a row ordered field.
+///
+/// Row ordered fields are designed for fast random access of all the values of a single document.
+pub const ROW_ORDER: SchemaFlagList<RowOrderFlag, ()> = SchemaFlagList {
+    head: RowOrderFlag,
+    tail: (),
+};
+
 impl<Head, OldHead, OldTail> BitOr<SchemaFlagList<Head, ()>> for SchemaFlagList<OldHead, OldTail>
 where
     Head: Clone,

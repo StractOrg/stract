@@ -114,6 +114,7 @@ pub mod fieldnorm;
 pub mod index;
 pub mod positions;
 pub mod postings;
+pub mod roworder;
 
 /// Module containing the different query implementations.
 pub mod query;

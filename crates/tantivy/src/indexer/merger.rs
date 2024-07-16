@@ -76,7 +76,7 @@ impl DeltaComputer {
 
 fn convert_to_merge_order(
     columnars: &[&ColumnarReader],
-    doc_id_mapping: SegmentDocIdMapping,
+    doc_id_mapping: &SegmentDocIdMapping,
 ) -> MergeRowOrder {
     match doc_id_mapping.mapping_type() {
         MappingType::Stacked => MergeRowOrder::Stack(StackMergeOrder::stack(columnars)),
@@ -85,7 +85,7 @@ fn convert_to_merge_order(
             // no allocation, no copy.
             let new_row_id_to_old_row_id: Vec<RowAddr> = doc_id_mapping
                 .new_doc_id_to_old_doc_addr
-                .into_iter()
+                .iter()
                 .map(|doc_addr| RowAddr {
                     segment_ord: doc_addr.segment_ord,
                     row_id: doc_addr.doc_id,
@@ -197,7 +197,7 @@ impl IndexMerger {
     fn write_column_fields(
         &self,
         column_field_wrt: &mut WritePtr,
-        doc_id_mapping: SegmentDocIdMapping,
+        doc_id_mapping: &SegmentDocIdMapping,
     ) -> crate::Result<()> {
         debug_time!("write-columnar-fields");
         let required_columns = extract_column_field_required_columns(&self.schema);
@@ -213,6 +213,37 @@ impl IndexMerger {
             merge_row_order,
             column_field_wrt,
         )?;
+        Ok(())
+    }
+
+    fn write_row_fields(
+        &self,
+        row_field_wrt: &mut WritePtr,
+        doc_id_mapping: &SegmentDocIdMapping,
+    ) -> crate::Result<()> {
+        debug_time!("write-row-fields");
+
+        let indexes: Vec<_> = self
+            .readers
+            .iter()
+            .map(|reader| reader.row_fields().row_index())
+            .collect();
+
+        let order = match doc_id_mapping.mapping_type() {
+            MappingType::Stacked => crate::roworder::MergeRowOrder::Stack,
+            MappingType::Shuffled => crate::roworder::MergeRowOrder::Shuffled {
+                addrs: doc_id_mapping
+                    .iter_old_doc_addrs()
+                    .map(|addr| crate::roworder::MergeAddr {
+                        segment_ord: addr.segment_ord as usize,
+                    })
+                    .collect(),
+            },
+        };
+
+        crate::roworder::merge(&indexes, order, row_field_wrt)
+            .map_err(|_| DataCorruption::comment_only("Failed to merge row fields"))?;
+
         Ok(())
     }
 
@@ -657,7 +688,9 @@ impl IndexMerger {
         debug!("write-storagefields");
         self.write_storable_fields(serializer.get_store_writer(), &doc_id_mapping)?;
         debug!("write-columnfields");
-        self.write_column_fields(serializer.get_column_field_write(), doc_id_mapping)?;
+        self.write_column_fields(serializer.get_column_field_write(), &doc_id_mapping)?;
+        debug!("write-rowfields");
+        self.write_row_fields(serializer.get_row_field_write(), &doc_id_mapping)?;
 
         debug!("close-serializer");
         serializer.close()?;
@@ -1284,5 +1317,41 @@ mod tests {
         // this is the first time I write a unit test for a constant.
         assert!(((super::MAX_DOC_LIMIT - 1) as i32) >= 0);
         assert!((super::MAX_DOC_LIMIT as i32) < 0);
+    }
+
+    #[test]
+    fn test_rowfields_merge() -> crate::Result<()> {
+        let mut schema_builder = schema::Schema::builder();
+        let u64_field = schema_builder
+            .add_u64_field("u64", schema::INDEXED | schema::ROW_ORDER | schema::STORED);
+        let f64_field = schema_builder
+            .add_f64_field("f64", schema::INDEXED | schema::ROW_ORDER | schema::STORED);
+
+        let index = Index::create_in_ram(schema_builder.build());
+        let mut writer = index.writer_for_tests()?;
+
+        // Make sure we'll attempt to merge every created segment
+        let mut policy = crate::indexer::LogMergePolicy::default();
+        policy.set_min_num_segments(2);
+        writer.set_merge_policy(Box::new(policy));
+
+        for i in 0..100 {
+            let mut doc = TantivyDocument::new();
+            doc.add_f64(f64_field, 42.0);
+            doc.add_u64(u64_field, 42);
+
+            writer.add_document(doc)?;
+            if i % 5 == 0 {
+                writer.commit()?;
+            }
+        }
+
+        writer.commit()?;
+        writer.wait_merging_threads()?;
+
+        // If a merging thread fails, we should end up with more
+        // than one segment here
+        assert_eq!(1, index.searchable_segments()?.len());
+        Ok(())
     }
 }

@@ -102,6 +102,11 @@ impl FieldEntry {
         self.field_type.is_columnar()
     }
 
+    /// Returns true if the field is a row ordered field
+    pub fn is_row_order(&self) -> bool {
+        self.field_type.is_row_order()
+    }
+
     /// Returns true if the field has the expand dots option set (for json fields)
     pub fn is_expand_dots_enabled(&self) -> bool {
         match self.field_type {

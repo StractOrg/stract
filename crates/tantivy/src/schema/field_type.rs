@@ -246,6 +246,21 @@ impl FieldType {
         }
     }
 
+    /// returns true if the field is row ordered,
+    pub fn is_row_order(&self) -> bool {
+        match *self {
+            FieldType::Bytes(_)
+            | FieldType::Str(_)
+            | FieldType::Date(_)
+            | FieldType::IpAddr(_)
+            | FieldType::JsonObject(_) => false,
+            FieldType::U64(ref int_options)
+            | FieldType::I64(ref int_options)
+            | FieldType::F64(ref int_options)
+            | FieldType::Bool(ref int_options) => int_options.is_row_order(),
+        }
+    }
+
     /// returns true if the field is normed (see [fieldnorms](crate::fieldnorm)).
     pub fn has_fieldnorms(&self) -> bool {
         match *self {

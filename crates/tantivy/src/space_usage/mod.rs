@@ -68,6 +68,7 @@ pub struct SegmentSpaceUsage {
     postings: PerFieldSpaceUsage,
     positions: PerFieldSpaceUsage,
     column_fields: PerFieldSpaceUsage,
+    row_fields: PerFieldSpaceUsage,
     fieldnorms: PerFieldSpaceUsage,
 
     store: StoreSpaceUsage,
@@ -83,6 +84,7 @@ impl SegmentSpaceUsage {
         postings: PerFieldSpaceUsage,
         positions: PerFieldSpaceUsage,
         column_fields: PerFieldSpaceUsage,
+        row_fields: PerFieldSpaceUsage,
         fieldnorms: PerFieldSpaceUsage,
         store: StoreSpaceUsage,
     ) -> SegmentSpaceUsage {
@@ -90,6 +92,7 @@ impl SegmentSpaceUsage {
             + postings.total()
             + positions.total()
             + column_fields.total()
+            + row_fields.total()
             + fieldnorms.total()
             + store.total();
         SegmentSpaceUsage {
@@ -98,6 +101,7 @@ impl SegmentSpaceUsage {
             postings,
             positions,
             column_fields,
+            row_fields,
             fieldnorms,
             store,
             total,
@@ -115,6 +119,7 @@ impl SegmentSpaceUsage {
             Postings => PerField(self.postings().clone()),
             Positions => PerField(self.positions().clone()),
             ColumnFields => PerField(self.column_fields().clone()),
+            RowFields => PerField(self.row_fields().clone()),
             FieldNorms => PerField(self.fieldnorms().clone()),
             Terms => PerField(self.termdict().clone()),
             SegmentComponent::Store => ComponentSpaceUsage::Store(self.store().clone()),
@@ -145,6 +150,11 @@ impl SegmentSpaceUsage {
     /// Space usage for columnar fields
     pub fn column_fields(&self) -> &PerFieldSpaceUsage {
         &self.column_fields
+    }
+
+    /// Space usage for row fields
+    pub fn row_fields(&self) -> &PerFieldSpaceUsage {
+        &self.row_fields
     }
 
     /// Space usage for field norms

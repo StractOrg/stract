@@ -12,6 +12,7 @@ pub struct SegmentSerializer {
     segment: Segment,
     pub(crate) store_writer: StoreWriter,
     column_field_write: WritePtr,
+    row_field_write: WritePtr,
     fieldnorms_serializer: Option<FieldNormsSerializer>,
     postings_serializer: InvertedIndexSerializer,
 }
@@ -49,6 +50,7 @@ impl SegmentSerializer {
         };
 
         let column_field_write = segment.open_write(SegmentComponent::ColumnFields)?;
+        let row_field_write = segment.open_write(SegmentComponent::RowFields)?;
 
         let fieldnorms_write = segment.open_write(SegmentComponent::FieldNorms)?;
         let fieldnorms_serializer = FieldNormsSerializer::from_write(fieldnorms_write)?;
@@ -58,6 +60,7 @@ impl SegmentSerializer {
             segment,
             store_writer,
             column_field_write,
+            row_field_write,
             fieldnorms_serializer: Some(fieldnorms_serializer),
             postings_serializer,
         })
@@ -86,6 +89,11 @@ impl SegmentSerializer {
         &mut self.column_field_write
     }
 
+    /// Accessor to the `RowFieldSerializer`.
+    pub fn get_row_field_write(&mut self) -> &mut WritePtr {
+        &mut self.row_field_write
+    }
+
     /// Extract the field norm serializer.
     ///
     /// Note the fieldnorms serializer can only be extracted once.
@@ -104,6 +112,7 @@ impl SegmentSerializer {
             fieldnorms_serializer.close()?;
         }
         self.column_field_write.terminate()?;
+        self.row_field_write.terminate()?;
         self.postings_serializer.close()?;
         self.store_writer.close()?;
         Ok(())

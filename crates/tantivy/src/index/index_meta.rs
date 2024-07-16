@@ -139,7 +139,8 @@ impl SegmentMeta {
             SegmentComponent::Terms => ".term".to_string(),
             SegmentComponent::Store => ".store".to_string(),
             SegmentComponent::TempStore => ".store.temp".to_string(),
-            SegmentComponent::ColumnFields => ".fast".to_string(),
+            SegmentComponent::ColumnFields => ".col".to_string(),
+            SegmentComponent::RowFields => ".row".to_string(),
             SegmentComponent::FieldNorms => ".fieldnorm".to_string(),
         });
         PathBuf::from(path)

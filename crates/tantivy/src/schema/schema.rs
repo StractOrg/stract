@@ -494,6 +494,7 @@ mod tests {
       "indexed": false,
       "fieldnorms": false,
       "columnar": true,
+      "row_order": false,
       "stored": true
     }
   },
@@ -504,6 +505,7 @@ mod tests {
       "indexed": false,
       "fieldnorms": false,
       "columnar": true,
+      "row_order": false,
       "stored": true
     }
   },
@@ -514,6 +516,7 @@ mod tests {
       "indexed": true,
       "fieldnorms": true,
       "columnar": true,
+      "row_order": false,
       "stored": false
     }
   },
@@ -524,6 +527,7 @@ mod tests {
       "indexed": false,
       "fieldnorms": false,
       "columnar": true,
+      "row_order": false,
       "stored": true
     }
   }
@@ -851,6 +855,7 @@ mod tests {
       "indexed": false,
       "fieldnorms": false,
       "columnar": true,
+      "row_order": false,
       "stored": true
     }
   }
@@ -908,6 +913,7 @@ mod tests {
       "indexed": false,
       "fieldnorms": false,
       "columnar": true,
+      "row_order": false,
       "stored": true
     }
   }

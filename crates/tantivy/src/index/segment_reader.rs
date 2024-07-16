@@ -12,6 +12,7 @@ use crate::error::DataCorruption;
 use crate::fieldnorm::{FieldNormReader, FieldNormReaders};
 use crate::index::{InvertedIndexReader, Segment, SegmentComponent, SegmentId};
 use crate::json_utils::json_path_sep_to_dot;
+use crate::roworder::readers::RowFieldReaders;
 use crate::schema::{Field, IndexRecordOption, Schema, Type};
 use crate::space_usage::SegmentSpaceUsage;
 use crate::store::StoreReader;
@@ -40,6 +41,7 @@ pub struct SegmentReader {
     postings_composite: CompositeFile,
     positions_composite: CompositeFile,
     column_fields_readers: ColumnFieldReaders,
+    row_fields_readers: RowFieldReaders,
     fieldnorm_readers: FieldNormReaders,
 
     store_file: FileSlice,
@@ -75,6 +77,11 @@ impl SegmentReader {
     /// May panic if the index is corrupted.
     pub fn column_fields(&self) -> &ColumnFieldReaders {
         &self.column_fields_readers
+    }
+
+    /// Accessor to the segment's row field reader.
+    pub fn row_fields(&self) -> &RowFieldReaders {
+        &self.row_fields_readers
     }
 
     /// Accessor to the segment's `Field norms`'s reader.
@@ -134,6 +141,8 @@ impl SegmentReader {
         let column_fields_readers = ColumnFieldReaders::open(column_fields_data, schema.clone())?;
         let fieldnorm_data = segment.open_read(SegmentComponent::FieldNorms)?;
         let fieldnorm_readers = FieldNormReaders::open(fieldnorm_data)?;
+        let row_fields_data = segment.open_read(SegmentComponent::RowFields)?;
+        let row_fields_readers = RowFieldReaders::open(row_fields_data)?;
 
         let max_doc = segment.meta().max_doc();
 
@@ -143,6 +152,7 @@ impl SegmentReader {
             termdict_composite,
             postings_composite,
             column_fields_readers,
+            row_fields_readers,
             fieldnorm_readers,
             segment_id: segment.id(),
             store_file,
@@ -344,6 +354,7 @@ impl SegmentReader {
             self.postings_composite.space_usage(),
             self.positions_composite.space_usage(),
             self.column_fields_readers.space_usage(self.schema())?,
+            self.row_fields_readers.space_usage(self.schema())?,
             self.fieldnorm_readers.space_usage(),
             self.get_store_reader(0)?.space_usage(),
         ))

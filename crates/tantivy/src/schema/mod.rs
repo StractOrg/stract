@@ -132,7 +132,7 @@ pub use self::document::{DocParsingError, Document, OwnedValue, TantivyDocument,
 pub use self::field::Field;
 pub use self::field_entry::FieldEntry;
 pub use self::field_type::{FieldType, Type};
-pub use self::flags::{COERCE, COLUMN, INDEXED, STORED};
+pub use self::flags::{COERCE, COLUMN, INDEXED, ROW_ORDER, STORED};
 pub use self::index_record_option::IndexRecordOption;
 pub use self::ip_options::{IntoIpv6Addr, IpAddrOptions};
 pub use self::json_object_options::JsonObjectOptions;

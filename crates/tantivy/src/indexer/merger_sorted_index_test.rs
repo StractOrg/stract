@@ -59,6 +59,18 @@ mod tests {
             .set_indexed();
         let int_field = schema_builder.add_u64_field("intval", int_options);
 
+        let col1 = NumericOptions::default()
+            .set_row_order()
+            .set_stored()
+            .set_indexed();
+        let col1_field = schema_builder.add_u64_field("col1", col1);
+
+        let col2 = NumericOptions::default()
+            .set_row_order()
+            .set_stored()
+            .set_indexed();
+        let col2_field = schema_builder.add_u64_field("col2", col2);
+
         let text_field_options = TextOptions::default()
             .set_indexing_options(
                 TextFieldIndexing::default()
@@ -78,24 +90,30 @@ mod tests {
             let mut index_writer = index.writer_for_tests()?;
 
             // segment 1 - range 1-3
-            index_writer.add_document(doc!(int_field=>1_u64, text_field => "text"))?;
-            index_writer.add_document(doc!(int_field=>3_u64, text_field => "some text"))?;
             index_writer.add_document(
-                doc!(int_field=>1_u64, text_field=> "deleteme",  text_field => "ok text more text"),
+                doc!(int_field=>1_u64, col1_field=>1_u64, col2_field=>2_u64, text_field => "text"),
             )?;
-            index_writer.add_document(doc!(int_field=>2_u64, text_field => "ok text more text"))?;
+            index_writer.add_document(
+                doc!(int_field=>3_u64, col1_field=>3_u64, col2_field=>6_u64, text_field => "some text"),
+            )?;
+            index_writer.add_document(
+                doc!(int_field=>1_u64, col1_field=>1u64, col2_field=>2u64, text_field=> "deleteme",  text_field => "ok text more text"),
+            )?;
+            index_writer.add_document(
+                doc!(int_field=>2_u64, col1_field=>2u64, col2_field=>4u64, text_field => "ok text more text"),
+            )?;
 
             index_writer.commit()?;
             // segment 2 - range 1-20 , with force_disjunct_segment_sort_values 10-20
             index_writer
-                .add_document(doc!(int_field=>20_u64, text_field => "ok text more text"))?;
+                .add_document(doc!(int_field=>20_u64, col1_field=>20u64, col2_field=>40u64, text_field => "ok text more text"))?;
 
             let in_val = if force_disjunct_segment_sort_values {
                 10_u64
             } else {
                 1
             };
-            index_writer.add_document(doc!(int_field=>in_val, text_field=> "deleteme" , text_field => "ok text more text"))?;
+            index_writer.add_document(doc!(int_field=>in_val, col1_field=>in_val, col2_field=>2*in_val, text_field=> "deleteme" , text_field => "ok text more text"))?;
             index_writer.commit()?;
             // segment 3 - range 5-1000, with force_disjunct_segment_sort_values 50-1000
             let int_vals = if force_disjunct_segment_sort_values {
@@ -105,11 +123,11 @@ mod tests {
             };
             index_writer.add_document(
                 // position of this doc after delete in desc sorting = [2], in disjunct case [1]
-                doc!(int_field=>int_vals[0], text_field=> "blubber"),
+                doc!(int_field=>int_vals[0], col1_field=>int_vals[0], col2_field=>2*int_vals[0], text_field=> "blubber"),
             )?;
-            index_writer.add_document(doc!(int_field=>int_vals[1], text_field=> "deleteme"))?;
+            index_writer.add_document(doc!(int_field=>int_vals[1], col1_field=>int_vals[1], col2_field=>2*int_vals[1], text_field=> "deleteme"))?;
             index_writer
-                .add_document(doc!(int_field=>1_000u64, text_field => "the biggest num"))?;
+                .add_document(doc!(int_field=>1_000u64, col1_field=>1_000u64, col2_field=>2_000u64, text_field => "the biggest num"))?;
 
             index_writer.commit()?;
         }
@@ -275,6 +293,48 @@ mod tests {
                 Some(1000)
             );
         }
+
+        // row fields
+        {
+            let col1_field = index.schema().get_field("col1").unwrap();
+            let col2_field = index.schema().get_field("col2").unwrap();
+
+            let row_index = segment_reader.row_fields().row_index();
+
+            let get_u64 = |doc_id: usize, field_id: u32| -> u64 {
+                let row = row_index.get_row(doc_id).unwrap();
+                row.get_by_field_id(field_id).unwrap().as_u64().unwrap()
+            };
+
+            assert_eq!(get_u64(0, col1_field.field_id()), 1_000);
+            assert_eq!(get_u64(0, col2_field.field_id()), 2_000);
+
+            if force_disjunct_segment_sort_values {
+                assert_eq!(get_u64(6, col1_field.field_id()), 2u64);
+                assert_eq!(get_u64(6, col2_field.field_id()), 4u64);
+
+                assert_eq!(get_u64(5, col1_field.field_id()), 3u64);
+                assert_eq!(get_u64(5, col2_field.field_id()), 6u64);
+
+                assert_eq!(get_u64(4, col1_field.field_id()), 10u64);
+                assert_eq!(get_u64(4, col2_field.field_id()), 20u64);
+
+                assert_eq!(get_u64(3, col1_field.field_id()), 20u64);
+                assert_eq!(get_u64(3, col2_field.field_id()), 40u64);
+            } else {
+                assert_eq!(get_u64(6, col1_field.field_id()), 1u64);
+                assert_eq!(get_u64(6, col2_field.field_id()), 2u64);
+
+                assert_eq!(get_u64(5, col1_field.field_id()), 2u64);
+                assert_eq!(get_u64(5, col2_field.field_id()), 4u64);
+
+                assert_eq!(get_u64(4, col1_field.field_id()), 3u64);
+                assert_eq!(get_u64(4, col2_field.field_id()), 6u64);
+
+                assert_eq!(get_u64(3, col1_field.field_id()), 5u64);
+                assert_eq!(get_u64(3, col2_field.field_id()), 10u64);
+            }
+        }
     }
 
     #[test]
@@ -331,6 +391,76 @@ mod tests {
             assert_eq!(postings.term_freq(), 1);
             postings.positions(&mut output);
             assert_eq!(output, vec![1]);
+        }
+
+        {
+            let col1_field = index.schema().get_field("col1").unwrap();
+            let col2_field = index.schema().get_field("col2").unwrap();
+
+            let row_index = segment_reader.row_fields().row_index();
+            let row = row_index.get_row(0).unwrap();
+            assert_eq!(
+                row.get_by_field_id(col1_field.field_id())
+                    .unwrap()
+                    .as_u64()
+                    .unwrap(),
+                1
+            );
+            assert_eq!(
+                row.get_by_field_id(col2_field.field_id())
+                    .unwrap()
+                    .as_u64()
+                    .unwrap(),
+                2
+            );
+
+            let row = row_index.get_row(1).unwrap();
+            assert_eq!(
+                row.get_by_field_id(col1_field.field_id())
+                    .unwrap()
+                    .as_u64()
+                    .unwrap(),
+                3
+            );
+            assert_eq!(
+                row.get_by_field_id(col2_field.field_id())
+                    .unwrap()
+                    .as_u64()
+                    .unwrap(),
+                6
+            );
+
+            let row = row_index.get_row(2).unwrap();
+            assert_eq!(
+                row.get_by_field_id(col1_field.field_id())
+                    .unwrap()
+                    .as_u64()
+                    .unwrap(),
+                1
+            );
+            assert_eq!(
+                row.get_by_field_id(col2_field.field_id())
+                    .unwrap()
+                    .as_u64()
+                    .unwrap(),
+                2
+            );
+
+            let row = row_index.get_row(3).unwrap();
+            assert_eq!(
+                row.get_by_field_id(col1_field.field_id())
+                    .unwrap()
+                    .as_u64()
+                    .unwrap(),
+                2
+            );
+            assert_eq!(
+                row.get_by_field_id(col2_field.field_id())
+                    .unwrap()
+                    .as_u64()
+                    .unwrap(),
+                4
+            );
         }
     }
 
