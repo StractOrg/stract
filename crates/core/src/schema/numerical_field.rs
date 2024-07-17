@@ -29,10 +29,12 @@ use crate::{
     Result,
 };
 
-use super::{IndexingOption, FLOAT_SCALING};
+use super::IndexingOption;
 
 #[enum_dispatch]
-pub trait ColumnField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
+pub trait NumericalField:
+    Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash
+{
     fn name(&self) -> &str;
     fn add_html_tantivy(
         &self,
@@ -64,19 +66,30 @@ pub trait ColumnField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::ha
     }
 
     fn indexing_option(&self) -> IndexingOption {
-        debug_assert!(matches!(self.data_type(), DataType::U64));
+        match self.data_type() {
+            DataType::U64 | DataType::Bool | DataType::F64 => {
+                let mut opt = NumericOptions::default().set_columnar();
 
-        let mut opt = NumericOptions::default().set_columnar();
+                if self.is_stored() {
+                    opt = opt.set_stored();
+                }
 
-        if self.is_stored() {
-            opt = opt.set_stored();
+                if self.is_indexed() {
+                    opt = opt.set_indexed();
+                }
+
+                IndexingOption::Integer(opt)
+            }
+            DataType::Bytes => {
+                let mut opt = BytesOptions::default().set_columnar().set_indexed();
+
+                if self.is_stored() {
+                    opt = opt.set_stored();
+                }
+
+                IndexingOption::Bytes(opt)
+            }
         }
-
-        if self.is_indexed() {
-            opt = opt.set_indexed();
-        }
-
-        IndexingOption::Integer(opt)
     }
 
     fn tantivy_field(&self, schema: &tantivy::schema::Schema) -> tantivy::schema::Field {
@@ -86,10 +99,10 @@ pub trait ColumnField: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::ha
     }
 }
 
-#[enum_dispatch(ColumnField)]
+#[enum_dispatch(NumericalField)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumDiscriminants)]
 #[strum_discriminants(derive(VariantArray))]
-pub enum ColumnFieldEnum {
+pub enum NumericalFieldEnum {
     IsHomepage,
     HostCentrality,
     HostCentralityRank,
@@ -131,7 +144,7 @@ pub enum ColumnFieldEnum {
     KeywordEmbeddings,
 }
 
-enum_dispatch_from_discriminant!(ColumnFieldEnumDiscriminants => ColumnFieldEnum,
+enum_dispatch_from_discriminant!(NumericalFieldEnumDiscriminants => NumericalFieldEnum,
 [
     IsHomepage,
     HostCentrality,
@@ -174,42 +187,48 @@ enum_dispatch_from_discriminant!(ColumnFieldEnumDiscriminants => ColumnFieldEnum
     KeywordEmbeddings,
 ]);
 
-impl ColumnFieldEnum {
-    pub fn all() -> impl Iterator<Item = ColumnFieldEnum> {
-        ColumnFieldEnumDiscriminants::VARIANTS
+impl NumericalFieldEnum {
+    pub fn all() -> impl Iterator<Item = NumericalFieldEnum> {
+        NumericalFieldEnumDiscriminants::VARIANTS
             .iter()
             .copied()
             .map(|v| v.into())
     }
 
-    pub fn get(field_id: usize) -> Option<ColumnFieldEnum> {
-        ColumnFieldEnumDiscriminants::VARIANTS
+    pub fn get(field_id: usize) -> Option<NumericalFieldEnum> {
+        NumericalFieldEnumDiscriminants::VARIANTS
             .get(field_id)
             .copied()
-            .map(ColumnFieldEnum::from)
+            .map(NumericalFieldEnum::from)
     }
 
     pub fn num_variants() -> usize {
-        ColumnFieldEnumDiscriminants::VARIANTS.len()
+        NumericalFieldEnumDiscriminants::VARIANTS.len()
     }
 }
 
 pub enum DataType {
     U64,
+    F64,
+    Bool,
     Bytes,
 }
 
-impl InsertEnumMapKey for ColumnFieldEnum {
+impl InsertEnumMapKey for NumericalFieldEnum {
     fn into_usize(self) -> usize {
-        ColumnFieldEnumDiscriminants::from(self) as usize
+        NumericalFieldEnumDiscriminants::from(self) as usize
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IsHomepage;
-impl ColumnField for IsHomepage {
+impl NumericalField for IsHomepage {
     fn name(&self) -> &str {
         "is_homepage"
+    }
+
+    fn data_type(&self) -> DataType {
+        DataType::Bool
     }
 
     fn add_html_tantivy(
@@ -219,7 +238,7 @@ impl ColumnField for IsHomepage {
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), (html.is_homepage()).into());
+        doc.add_bool(self.tantivy_field(schema), html.is_homepage());
 
         Ok(())
     }
@@ -227,7 +246,7 @@ impl ColumnField for IsHomepage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HostCentrality;
-impl ColumnField for HostCentrality {
+impl NumericalField for HostCentrality {
     fn name(&self) -> &str {
         "host_centrality"
     }
@@ -242,16 +261,17 @@ impl ColumnField for HostCentrality {
         Ok(())
     }
 
+    fn data_type(&self) -> DataType {
+        DataType::F64
+    }
+
     fn add_webpage_tantivy(
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
-        doc.add_u64(
-            self.tantivy_field(schema),
-            (webpage.host_centrality * FLOAT_SCALING as f64) as u64,
-        );
+        doc.add_f64(self.tantivy_field(schema), webpage.host_centrality);
 
         Ok(())
     }
@@ -259,7 +279,7 @@ impl ColumnField for HostCentrality {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HostCentralityRank;
-impl ColumnField for HostCentralityRank {
+impl NumericalField for HostCentralityRank {
     fn name(&self) -> &str {
         "host_centrality_rank"
     }
@@ -288,7 +308,7 @@ impl ColumnField for HostCentralityRank {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PageCentrality;
-impl ColumnField for PageCentrality {
+impl NumericalField for PageCentrality {
     fn name(&self) -> &str {
         "page_centrality"
     }
@@ -302,16 +322,17 @@ impl ColumnField for PageCentrality {
         Ok(())
     }
 
+    fn data_type(&self) -> DataType {
+        DataType::F64
+    }
+
     fn add_webpage_tantivy(
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
-        doc.add_u64(
-            self.tantivy_field(schema),
-            (webpage.page_centrality * FLOAT_SCALING as f64) as u64,
-        );
+        doc.add_f64(self.tantivy_field(schema), webpage.page_centrality);
 
         Ok(())
     }
@@ -319,7 +340,7 @@ impl ColumnField for PageCentrality {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PageCentralityRank;
-impl ColumnField for PageCentralityRank {
+impl NumericalField for PageCentralityRank {
     fn name(&self) -> &str {
         "page_centrality_rank"
     }
@@ -347,7 +368,7 @@ impl ColumnField for PageCentralityRank {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FetchTimeMs;
-impl ColumnField for FetchTimeMs {
+impl NumericalField for FetchTimeMs {
     fn name(&self) -> &str {
         "fetch_time_ms"
     }
@@ -375,7 +396,7 @@ impl ColumnField for FetchTimeMs {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LastUpdated;
-impl ColumnField for LastUpdated {
+impl NumericalField for LastUpdated {
     fn name(&self) -> &str {
         "last_updated"
     }
@@ -403,7 +424,7 @@ impl ColumnField for LastUpdated {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TrackerScore;
-impl ColumnField for TrackerScore {
+impl NumericalField for TrackerScore {
     fn name(&self) -> &str {
         "tracker_score"
     }
@@ -423,7 +444,7 @@ impl ColumnField for TrackerScore {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Region;
-impl ColumnField for Region {
+impl NumericalField for Region {
     fn name(&self) -> &str {
         "region"
     }
@@ -464,7 +485,7 @@ impl ColumnField for Region {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumUrlTokens;
-impl ColumnField for NumUrlTokens {
+impl NumericalField for NumUrlTokens {
     fn name(&self) -> &str {
         "num_url_tokens"
     }
@@ -487,7 +508,7 @@ impl ColumnField for NumUrlTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumTitleTokens;
-impl ColumnField for NumTitleTokens {
+impl NumericalField for NumTitleTokens {
     fn name(&self) -> &str {
         "num_title_tokens"
     }
@@ -514,7 +535,7 @@ impl ColumnField for NumTitleTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumCleanBodyTokens;
-impl ColumnField for NumCleanBodyTokens {
+impl NumericalField for NumCleanBodyTokens {
     fn name(&self) -> &str {
         "num_clean_body_tokens"
     }
@@ -536,7 +557,7 @@ impl ColumnField for NumCleanBodyTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumDescriptionTokens;
-impl ColumnField for NumDescriptionTokens {
+impl NumericalField for NumDescriptionTokens {
     fn name(&self) -> &str {
         "num_description_tokens"
     }
@@ -559,7 +580,7 @@ impl ColumnField for NumDescriptionTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumUrlForSiteOperatorTokens;
-impl ColumnField for NumUrlForSiteOperatorTokens {
+impl NumericalField for NumUrlForSiteOperatorTokens {
     fn name(&self) -> &str {
         "num_url_for_site_operator_tokens"
     }
@@ -582,7 +603,7 @@ impl ColumnField for NumUrlForSiteOperatorTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumDomainTokens;
-impl ColumnField for NumDomainTokens {
+impl NumericalField for NumDomainTokens {
     fn name(&self) -> &str {
         "num_domain_tokens"
     }
@@ -605,7 +626,7 @@ impl ColumnField for NumDomainTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumMicroformatTagsTokens;
-impl ColumnField for NumMicroformatTagsTokens {
+impl NumericalField for NumMicroformatTagsTokens {
     fn name(&self) -> &str {
         "num_microformat_tags_tokens"
     }
@@ -628,7 +649,7 @@ impl ColumnField for NumMicroformatTagsTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteHash1;
-impl ColumnField for SiteHash1 {
+impl NumericalField for SiteHash1 {
     fn name(&self) -> &str {
         "site_hash1"
     }
@@ -648,7 +669,7 @@ impl ColumnField for SiteHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteHash2;
-impl ColumnField for SiteHash2 {
+impl NumericalField for SiteHash2 {
     fn name(&self) -> &str {
         "site_hash2"
     }
@@ -668,7 +689,7 @@ impl ColumnField for SiteHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutQueryHash1;
-impl ColumnField for UrlWithoutQueryHash1 {
+impl NumericalField for UrlWithoutQueryHash1 {
     fn name(&self) -> &str {
         "url_without_query_hash1"
     }
@@ -691,7 +712,7 @@ impl ColumnField for UrlWithoutQueryHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutQueryHash2;
-impl ColumnField for UrlWithoutQueryHash2 {
+impl NumericalField for UrlWithoutQueryHash2 {
     fn name(&self) -> &str {
         "url_without_query_hash2"
     }
@@ -714,7 +735,7 @@ impl ColumnField for UrlWithoutQueryHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleHash1;
-impl ColumnField for TitleHash1 {
+impl NumericalField for TitleHash1 {
     fn name(&self) -> &str {
         "title_hash1"
     }
@@ -734,7 +755,7 @@ impl ColumnField for TitleHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleHash2;
-impl ColumnField for TitleHash2 {
+impl NumericalField for TitleHash2 {
     fn name(&self) -> &str {
         "title_hash2"
     }
@@ -754,7 +775,7 @@ impl ColumnField for TitleHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlHash1;
-impl ColumnField for UrlHash1 {
+impl NumericalField for UrlHash1 {
     fn name(&self) -> &str {
         "url_hash1"
     }
@@ -774,7 +795,7 @@ impl ColumnField for UrlHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlHash2;
-impl ColumnField for UrlHash2 {
+impl NumericalField for UrlHash2 {
     fn name(&self) -> &str {
         "url_hash2"
     }
@@ -794,7 +815,7 @@ impl ColumnField for UrlHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainHash1;
-impl ColumnField for DomainHash1 {
+impl NumericalField for DomainHash1 {
     fn name(&self) -> &str {
         "domain_hash1"
     }
@@ -814,7 +835,7 @@ impl ColumnField for DomainHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DomainHash2;
-impl ColumnField for DomainHash2 {
+impl NumericalField for DomainHash2 {
     fn name(&self) -> &str {
         "domain_hash2"
     }
@@ -834,7 +855,7 @@ impl ColumnField for DomainHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutTldHash1;
-impl ColumnField for UrlWithoutTldHash1 {
+impl NumericalField for UrlWithoutTldHash1 {
     fn name(&self) -> &str {
         "url_without_tld_hash1"
     }
@@ -854,7 +875,7 @@ impl ColumnField for UrlWithoutTldHash1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UrlWithoutTldHash2;
-impl ColumnField for UrlWithoutTldHash2 {
+impl NumericalField for UrlWithoutTldHash2 {
     fn name(&self) -> &str {
         "url_without_tld_hash2"
     }
@@ -874,7 +895,7 @@ impl ColumnField for UrlWithoutTldHash2 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PreComputedScore;
-impl ColumnField for PreComputedScore {
+impl NumericalField for PreComputedScore {
     fn name(&self) -> &str {
         "pre_computed_score"
     }
@@ -893,16 +914,17 @@ impl ColumnField for PreComputedScore {
         Ok(())
     }
 
+    fn data_type(&self) -> DataType {
+        DataType::F64
+    }
+
     fn add_webpage_tantivy(
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
-        doc.add_u64(
-            self.tantivy_field(schema),
-            (webpage.pre_computed_score * FLOAT_SCALING as f64) as u64,
-        );
+        doc.add_f64(self.tantivy_field(schema), webpage.pre_computed_score);
 
         Ok(())
     }
@@ -910,7 +932,7 @@ impl ColumnField for PreComputedScore {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HostNodeID;
-impl ColumnField for HostNodeID {
+impl NumericalField for HostNodeID {
     fn name(&self) -> &str {
         "host_node_id"
     }
@@ -950,7 +972,7 @@ impl ColumnField for HostNodeID {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SimHash;
-impl ColumnField for SimHash {
+impl NumericalField for SimHash {
     fn name(&self) -> &str {
         "sim_hash"
     }
@@ -981,7 +1003,7 @@ impl ColumnField for SimHash {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumFlattenedSchemaTokens;
-impl ColumnField for NumFlattenedSchemaTokens {
+impl NumericalField for NumFlattenedSchemaTokens {
     fn name(&self) -> &str {
         "num_flattened_schema_tokens"
     }
@@ -1004,7 +1026,7 @@ impl ColumnField for NumFlattenedSchemaTokens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumPathAndQuerySlashes;
-impl ColumnField for NumPathAndQuerySlashes {
+impl NumericalField for NumPathAndQuerySlashes {
     fn name(&self) -> &str {
         "num_path_and_query_slashes"
     }
@@ -1034,7 +1056,7 @@ impl ColumnField for NumPathAndQuerySlashes {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NumPathAndQueryDigits;
-impl ColumnField for NumPathAndQueryDigits {
+impl NumericalField for NumPathAndQueryDigits {
     fn name(&self) -> &str {
         "num_path_and_query_digits"
     }
@@ -1072,7 +1094,7 @@ impl ColumnField for NumPathAndQueryDigits {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LikelyHasAds;
-impl ColumnField for LikelyHasAds {
+impl NumericalField for LikelyHasAds {
     fn name(&self) -> &str {
         "likely_has_ads"
     }
@@ -1081,6 +1103,10 @@ impl ColumnField for LikelyHasAds {
         true
     }
 
+    fn data_type(&self) -> DataType {
+        DataType::Bool
+    }
+
     fn add_html_tantivy(
         &self,
         html: &Html,
@@ -1088,7 +1114,7 @@ impl ColumnField for LikelyHasAds {
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), html.likely_has_ads() as u64);
+        doc.add_bool(self.tantivy_field(schema), html.likely_has_ads());
 
         Ok(())
     }
@@ -1096,7 +1122,7 @@ impl ColumnField for LikelyHasAds {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LikelyHasPaywall;
-impl ColumnField for LikelyHasPaywall {
+impl NumericalField for LikelyHasPaywall {
     fn name(&self) -> &str {
         "likely_has_paywall"
     }
@@ -1105,6 +1131,10 @@ impl ColumnField for LikelyHasPaywall {
         true
     }
 
+    fn data_type(&self) -> DataType {
+        DataType::Bool
+    }
+
     fn add_html_tantivy(
         &self,
         html: &Html,
@@ -1112,7 +1142,7 @@ impl ColumnField for LikelyHasPaywall {
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), html.likely_has_paywall() as u64);
+        doc.add_bool(self.tantivy_field(schema), html.likely_has_paywall());
 
         Ok(())
     }
@@ -1120,7 +1150,7 @@ impl ColumnField for LikelyHasPaywall {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LinkDensity;
-impl ColumnField for LinkDensity {
+impl NumericalField for LinkDensity {
     fn name(&self) -> &str {
         "link_density"
     }
@@ -1129,6 +1159,10 @@ impl ColumnField for LinkDensity {
         true
     }
 
+    fn data_type(&self) -> DataType {
+        DataType::F64
+    }
+
     fn add_html_tantivy(
         &self,
         html: &Html,
@@ -1136,10 +1170,7 @@ impl ColumnField for LinkDensity {
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
-        doc.add_u64(
-            self.tantivy_field(schema),
-            (html.link_density() * FLOAT_SCALING as f64) as u64,
-        );
+        doc.add_f64(self.tantivy_field(schema), html.link_density());
 
         Ok(())
     }
@@ -1147,7 +1178,7 @@ impl ColumnField for LinkDensity {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TitleEmbeddings;
-impl ColumnField for TitleEmbeddings {
+impl NumericalField for TitleEmbeddings {
     fn name(&self) -> &str {
         "title_embeddings"
     }
@@ -1156,8 +1187,8 @@ impl ColumnField for TitleEmbeddings {
         DataType::Bytes
     }
 
-    fn indexing_option(&self) -> IndexingOption {
-        IndexingOption::Bytes(BytesOptions::default().set_columnar().set_stored())
+    fn is_stored(&self) -> bool {
+        true
     }
 
     fn add_html_tantivy(
@@ -1191,7 +1222,7 @@ impl ColumnField for TitleEmbeddings {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct KeywordEmbeddings;
-impl ColumnField for KeywordEmbeddings {
+impl NumericalField for KeywordEmbeddings {
     fn name(&self) -> &str {
         "keyword_embeddings"
     }
@@ -1200,8 +1231,8 @@ impl ColumnField for KeywordEmbeddings {
         DataType::Bytes
     }
 
-    fn indexing_option(&self) -> IndexingOption {
-        IndexingOption::Bytes(BytesOptions::default().set_columnar().set_stored())
+    fn is_stored(&self) -> bool {
+        true
     }
 
     fn add_html_tantivy(

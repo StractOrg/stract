@@ -46,7 +46,7 @@ use crate::config::SnippetConfig;
 use crate::ranking::initial::Score;
 
 use crate::schema::text_field::TextField;
-use crate::schema::{column_field, text_field, ColumnFieldEnum, Field, TextFieldEnum};
+use crate::schema::{numerical_field, text_field, Field, NumericalFieldEnum, TextFieldEnum};
 use crate::snippet::TextSnippet;
 use crate::tokenizer::{
     BigramTokenizer, Identity, JsonField, Stemmed, TrigramTokenizer, UrlTokenizer,
@@ -151,9 +151,11 @@ impl InvertedIndex {
         } else {
             let index_settings = tantivy::IndexSettings {
                 sort_by_field: Some(tantivy::IndexSortByField {
-                    field: Field::Columnar(ColumnFieldEnum::from(column_field::PreComputedScore))
-                        .name()
-                        .to_string(),
+                    field: Field::Numerical(NumericalFieldEnum::from(
+                        numerical_field::PreComputedScore,
+                    ))
+                    .name()
+                    .to_string(),
                     order: tantivy::Order::Desc,
                 }),
                 ..Default::default()
@@ -277,7 +279,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
                 Some(Field::Text(TextFieldEnum::Url(_))) => {
                     webpage.url = str_value(text_field::Url.name(), &value);
                 }
-                Some(Field::Columnar(ColumnFieldEnum::LastUpdated(_))) => {
+                Some(Field::Numerical(NumericalFieldEnum::LastUpdated(_))) => {
                     webpage.updated_time = {
                         let timestamp = value.as_u64().unwrap() as i64;
                         if timestamp == 0 {
@@ -290,7 +292,7 @@ impl From<TantivyDocument> for RetrievedWebpage {
                 Some(Field::Text(TextFieldEnum::AllBody(_))) => {
                     webpage.dirty_body = str_value(text_field::AllBody.name(), &value);
                 }
-                Some(Field::Columnar(ColumnFieldEnum::Region(_))) => {
+                Some(Field::Numerical(NumericalFieldEnum::Region(_))) => {
                     webpage.region = {
                         let id = value.as_u64().unwrap();
                         Region::from_id(id)
@@ -304,11 +306,11 @@ impl From<TantivyDocument> for RetrievedWebpage {
                     let json = str_value(text_field::SchemaOrgJson.name(), &value);
                     webpage.schema_org = serde_json::from_str(&json).unwrap_or_default();
                 }
-                Some(Field::Columnar(ColumnFieldEnum::LikelyHasAds(_))) => {
-                    webpage.likely_has_ads = value.as_u64().unwrap_or_default() != 0;
+                Some(Field::Numerical(NumericalFieldEnum::LikelyHasAds(_))) => {
+                    webpage.likely_has_ads = value.as_bool().unwrap_or_default();
                 }
-                Some(Field::Columnar(ColumnFieldEnum::LikelyHasPaywall(_))) => {
-                    webpage.likely_has_paywall = value.as_u64().unwrap_or_default() != 0;
+                Some(Field::Numerical(NumericalFieldEnum::LikelyHasPaywall(_))) => {
+                    webpage.likely_has_paywall = value.as_bool().unwrap_or_default();
                 }
                 Some(Field::Text(TextFieldEnum::RecipeFirstIngredientTagId(_))) => {
                     let tag_id = str_value(text_field::RecipeFirstIngredientTagId.name(), &value);

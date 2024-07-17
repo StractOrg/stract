@@ -18,7 +18,7 @@ use crate::enum_map::{GetEnumMapKey, InsertEnumMapKey};
 
 use crate::schema::Field;
 use crate::{
-    schema::{ColumnFieldEnum, TextFieldEnum},
+    schema::{NumericalFieldEnum, TextFieldEnum},
     webpage::Webpage,
 };
 use enum_dispatch::enum_dispatch;
@@ -46,8 +46,8 @@ pub trait Signal:
         self.as_field().and_then(|field| field.as_text())
     }
 
-    fn as_columnfield(&self) -> Option<ColumnFieldEnum> {
-        self.as_field().and_then(|field| field.as_fast())
+    fn as_columnfield(&self) -> Option<NumericalFieldEnum> {
+        self.as_field().and_then(|field| field.as_numerical())
     }
 }
 

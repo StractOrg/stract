@@ -19,7 +19,7 @@ use crate::{
     prehashed::hash,
     rake::RakeModel,
     schema::{
-        column_field::ColumnField,
+        numerical_field::NumericalField,
         text_field::{self, TextField},
         TextFieldEnum,
     },
@@ -201,7 +201,7 @@ impl Html {
         {
             match field {
                 Field::Text(f) => f.add_html_tantivy(self, &mut cache, &mut doc, schema)?,
-                Field::Columnar(f) => f.add_html_tantivy(self, &mut cache, &mut doc, schema)?,
+                Field::Numerical(f) => f.add_html_tantivy(self, &mut cache, &mut doc, schema)?,
             }
         }
 

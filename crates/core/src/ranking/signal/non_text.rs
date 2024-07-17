@@ -18,7 +18,7 @@ use tantivy::DocId;
 
 use super::{Signal, SignalComputer};
 use crate::{
-    schema::{self, Field, FLOAT_SCALING},
+    schema::{self, Field},
     webpage::Webpage,
 };
 
@@ -105,7 +105,9 @@ impl Signal for HostCentrality {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(schema::column_field::HostCentrality.into()))
+        Some(Field::Numerical(
+            schema::numerical_field::HostCentrality.into(),
+        ))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -118,9 +120,9 @@ impl Signal for HostCentrality {
 
         let val = columnfield_reader
             .get(self.as_columnfield().unwrap())
-            .and_then(|v| v.as_u64())
+            .and_then(|v| v.as_f64())
             .unwrap();
-        Some(val as f64 / FLOAT_SCALING as f64)
+        Some(val)
     }
 }
 
@@ -143,8 +145,8 @@ impl Signal for HostCentralityRank {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(
-            schema::column_field::HostCentralityRank.into(),
+        Some(Field::Numerical(
+            schema::numerical_field::HostCentralityRank.into(),
         ))
     }
 
@@ -183,7 +185,9 @@ impl Signal for PageCentrality {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(schema::column_field::PageCentrality.into()))
+        Some(Field::Numerical(
+            schema::numerical_field::PageCentrality.into(),
+        ))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -196,9 +200,9 @@ impl Signal for PageCentrality {
 
         let val = columnfield_reader
             .get(self.as_columnfield().unwrap())
-            .and_then(|v| v.as_u64())
+            .and_then(|v| v.as_f64())
             .unwrap();
-        Some(val as f64 / FLOAT_SCALING as f64)
+        Some(val)
     }
 }
 
@@ -221,8 +225,8 @@ impl Signal for PageCentralityRank {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(
-            schema::column_field::PageCentralityRank.into(),
+        Some(Field::Numerical(
+            schema::numerical_field::PageCentralityRank.into(),
         ))
     }
 
@@ -261,7 +265,7 @@ impl Signal for IsHomepage {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(schema::column_field::IsHomepage.into()))
+        Some(Field::Numerical(schema::numerical_field::IsHomepage.into()))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -274,9 +278,14 @@ impl Signal for IsHomepage {
 
         let val = columnfield_reader
             .get(self.as_columnfield().unwrap())
-            .and_then(|v| v.as_u64())
+            .and_then(|v| v.as_bool())
             .unwrap();
-        Some(val as f64)
+
+        if val {
+            Some(1.0)
+        } else {
+            Some(0.0)
+        }
     }
 }
 
@@ -299,7 +308,9 @@ impl Signal for FetchTimeMs {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(schema::column_field::FetchTimeMs.into()))
+        Some(Field::Numerical(
+            schema::numerical_field::FetchTimeMs.into(),
+        ))
     }
 
     fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
@@ -347,7 +358,9 @@ impl Signal for UpdateTimestamp {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(schema::column_field::LastUpdated.into()))
+        Some(Field::Numerical(
+            schema::numerical_field::LastUpdated.into(),
+        ))
     }
 
     fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
@@ -392,7 +405,9 @@ impl Signal for TrackerScore {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(schema::column_field::TrackerScore.into()))
+        Some(Field::Numerical(
+            schema::numerical_field::TrackerScore.into(),
+        ))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -431,7 +446,7 @@ impl Signal for Region {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(schema::column_field::Region.into()))
+        Some(Field::Numerical(schema::numerical_field::Region.into()))
     }
 
     fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
@@ -553,8 +568,8 @@ impl Signal for UrlDigits {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(
-            schema::column_field::NumPathAndQueryDigits.into(),
+        Some(Field::Numerical(
+            schema::numerical_field::NumPathAndQueryDigits.into(),
         ))
     }
 
@@ -609,8 +624,8 @@ impl Signal for UrlSlashes {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(
-            schema::column_field::NumPathAndQuerySlashes.into(),
+        Some(Field::Numerical(
+            schema::numerical_field::NumPathAndQuerySlashes.into(),
         ))
     }
 
@@ -656,7 +671,9 @@ impl Signal for LinkDensity {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(schema::column_field::LinkDensity.into()))
+        Some(Field::Numerical(
+            schema::numerical_field::LinkDensity.into(),
+        ))
     }
 
     fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
@@ -670,8 +687,8 @@ impl Signal for LinkDensity {
 
         let val = columnfield_reader
             .get(self.as_columnfield().unwrap())
-            .and_then(|v| v.as_u64())
+            .and_then(|v| v.as_f64())
             .unwrap();
-        Some(score_link_density(val as f64 / FLOAT_SCALING as f64))
+        Some(score_link_density(val))
     }
 }

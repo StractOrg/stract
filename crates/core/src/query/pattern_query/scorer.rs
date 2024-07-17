@@ -25,7 +25,7 @@ use tantivy::{
 use crate::{
     columnfield_reader::{self, ColumnFieldReader},
     query::intersection::Intersection,
-    schema::ColumnFieldEnum,
+    schema::NumericalFieldEnum,
 };
 
 use super::SmallPatternPart;
@@ -127,7 +127,7 @@ impl Scorer for AllScorer {
 
 pub struct EmptyFieldScorer {
     pub segment_reader: Arc<columnfield_reader::SegmentReader>,
-    pub num_tokens_columnfield: ColumnFieldEnum,
+    pub num_tokens_columnfield: NumericalFieldEnum,
     pub all_scorer: AllScorer,
 }
 
@@ -210,7 +210,7 @@ pub struct NormalPatternScorer {
     left: Vec<u32>,
     right: Vec<u32>,
     phrase_count: u32,
-    num_tokens_field: ColumnFieldEnum,
+    num_tokens_field: NumericalFieldEnum,
     segment_reader: Arc<columnfield_reader::SegmentReader>,
 }
 
@@ -219,7 +219,7 @@ impl NormalPatternScorer {
         term_postings_list: Vec<SegmentPostings>,
         pattern: Vec<SmallPatternPart>,
         segment: tantivy::index::SegmentId,
-        num_tokens_field: ColumnFieldEnum,
+        num_tokens_field: NumericalFieldEnum,
         columnfield_reader: ColumnFieldReader,
     ) -> Self {
         let num_query_terms = term_postings_list.len();

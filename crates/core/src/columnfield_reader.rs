@@ -20,7 +20,7 @@ use tantivy::{columnar::ColumnValues, index::SegmentId, DocId};
 
 use crate::{
     enum_map::EnumMap,
-    schema::{column_field::ColumnField, ColumnFieldEnum, DataType, Field},
+    schema::{numerical_field::NumericalField, DataType, Field, NumericalFieldEnum},
 };
 
 #[derive(Default, Clone)]
@@ -52,23 +52,28 @@ impl ColumnFieldReader {
 
             let mut u64s = EnumMap::new();
             let mut bytes = EnumMap::new();
+            let mut bools = EnumMap::new();
+            let mut f64s = EnumMap::new();
 
-            for field in Field::all().filter_map(|f| f.as_fast()) {
+            for field in Field::all().filter_map(|f| f.as_numerical()) {
                 match field.data_type() {
                     DataType::U64 => {
-                        let num_docs = reader.max_doc() as usize;
-                        let mut data = vec![0; num_docs];
-                        if let Ok(field_reader) = columnfield_readers.u64(field.name()) {
-                            for (doc, elem) in data.iter_mut().enumerate() {
-                                *elem = field_reader.values.get_val(doc as u32);
-                            }
+                        if let Ok(reader) = columnfield_readers.u64(field.name()) {
+                            u64s.insert(field, reader.values);
                         }
-
-                        u64s.insert(field, data);
+                    }
+                    DataType::F64 => {
+                        if let Ok(reader) = columnfield_readers.f64(field.name()) {
+                            f64s.insert(field, reader.values);
+                        }
+                    }
+                    DataType::Bool => {
+                        if let Ok(reader) = columnfield_readers.bool(field.name()) {
+                            bools.insert(field, reader.values);
+                        }
                     }
                     DataType::Bytes => {
-                        if let Some(reader) = columnfield_readers.bytes(field.name()).ok().flatten()
-                        {
+                        if let Ok(Some(reader)) = columnfield_readers.bytes(field.name()) {
                             bytes.insert(field, reader);
                         }
                     }
@@ -78,7 +83,12 @@ impl ColumnFieldReader {
             segments.insert(
                 reader.segment_id(),
                 Arc::new(SegmentReader {
-                    field_readers: AllReaders { u64s, bytes },
+                    field_readers: AllReaders {
+                        u64s,
+                        bytes,
+                        bools,
+                        f64s,
+                    },
                 }),
             );
         }
@@ -90,13 +100,17 @@ impl ColumnFieldReader {
 }
 
 struct AllReaders {
-    u64s: EnumMap<ColumnFieldEnum, Vec<u64>>,
-    bytes: EnumMap<ColumnFieldEnum, tantivy::columnar::BytesColumn>,
+    u64s: EnumMap<NumericalFieldEnum, Arc<dyn ColumnValues<u64>>>,
+    f64s: EnumMap<NumericalFieldEnum, Arc<dyn ColumnValues<f64>>>,
+    bools: EnumMap<NumericalFieldEnum, Arc<dyn ColumnValues<bool>>>,
+    bytes: EnumMap<NumericalFieldEnum, tantivy::columnar::BytesColumn>,
 }
 
 pub enum Value {
     U64(u64),
+    F64(f64),
     Bytes(Vec<u8>),
+    Bool(bool),
 }
 
 impl Value {
@@ -107,9 +121,23 @@ impl Value {
         }
     }
 
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Value::F64(val) => Some(*val),
+            _ => None,
+        }
+    }
+
     pub fn as_bytes(&self) -> Option<&[u8]> {
         match self {
             Value::Bytes(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Value::Bool(val) => Some(*val),
             _ => None,
         }
     }
@@ -121,9 +149,21 @@ impl From<u64> for Value {
     }
 }
 
+impl From<f64> for Value {
+    fn from(val: f64) -> Self {
+        Value::F64(val)
+    }
+}
+
 impl From<Vec<u8>> for Value {
     fn from(val: Vec<u8>) -> Self {
         Value::Bytes(val)
+    }
+}
+
+impl From<bool> for Value {
+    fn from(val: bool) -> Self {
+        Value::Bool(val)
     }
 }
 
@@ -148,22 +188,25 @@ impl From<Value> for Option<Vec<u8>> {
     }
 }
 
+impl From<Value> for Option<bool> {
+    fn from(val: Value) -> Self {
+        val.as_bool()
+    }
+}
+
 pub struct FieldReader<'a> {
     readers: &'a AllReaders,
     doc: DocId,
 }
 
 impl<'a> FieldReader<'a> {
-    pub fn get(&self, field: ColumnFieldEnum) -> Option<Value> {
+    pub fn get(&self, field: NumericalFieldEnum) -> Option<Value> {
         match field.data_type() {
-            DataType::U64 => Some(
-                self.readers
-                    .u64s
-                    .get(field)?
-                    .get(self.doc as usize)
-                    .copied()?
-                    .into(),
-            ),
+            DataType::U64 => Some(self.readers.u64s.get(field)?.get_val(self.doc).into()),
+
+            DataType::F64 => Some(self.readers.f64s.get(field)?.get_val(self.doc).into()),
+
+            DataType::Bool => Some(self.readers.bools.get(field)?.get_val(self.doc).into()),
 
             DataType::Bytes => {
                 let reader = self.readers.bytes.get(field)?;

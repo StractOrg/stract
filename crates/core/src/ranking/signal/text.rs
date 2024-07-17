@@ -806,8 +806,8 @@ impl Signal for TitleEmbeddingSimilarity {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(
-            schema::column_field::TitleEmbeddings.into(),
+        Some(Field::Numerical(
+            schema::numerical_field::TitleEmbeddings.into(),
         ))
     }
 
@@ -835,8 +835,8 @@ impl Signal for KeywordEmbeddingSimilarity {
     }
 
     fn as_field(&self) -> Option<Field> {
-        Some(Field::Columnar(
-            schema::column_field::KeywordEmbeddings.into(),
+        Some(Field::Numerical(
+            schema::numerical_field::KeywordEmbeddings.into(),
         ))
     }
 

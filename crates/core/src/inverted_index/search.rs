@@ -32,7 +32,7 @@ use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::pipeline::LocalRecallRankingWebpage;
 use crate::ranking::SignalComputer;
-use crate::schema::{column_field, text_field, ColumnFieldEnum, Field, TextFieldEnum};
+use crate::schema::{numerical_field, text_field, Field, NumericalFieldEnum, TextFieldEnum};
 use crate::search_ctx::Ctx;
 use crate::snippet;
 use crate::snippet::TextSnippet;
@@ -156,7 +156,9 @@ impl InvertedIndex {
 
         let field = self
             .schema()
-            .get_field(Field::Columnar(ColumnFieldEnum::from(column_field::HostNodeID)).name())
+            .get_field(
+                Field::Numerical(NumericalFieldEnum::from(numerical_field::HostNodeID)).name(),
+            )
             .unwrap();
 
         let id = doc.get_first(field).unwrap().as_u64().unwrap();

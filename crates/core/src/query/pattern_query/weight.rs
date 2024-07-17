@@ -24,7 +24,7 @@ use tantivy::{
 use crate::{
     columnfield_reader::ColumnFieldReader,
     schema::{
-        column_field,
+        numerical_field,
         text_field::{self, TextField},
         Field, TextFieldEnum,
     },
@@ -62,7 +62,7 @@ impl FastSiteDomainPatternWeight {
 
         let opt = match field_no_tokenizer {
             Field::Text(t) => t.record_option(),
-            Field::Columnar(_) => unreachable!(),
+            Field::Numerical(_) => unreachable!(),
         };
 
         match reader
@@ -127,23 +127,27 @@ impl PatternWeight {
         }
 
         let num_tokens_columnfield = match Field::get(self.field.field_id() as usize) {
-            Some(Field::Text(TextFieldEnum::Title(_))) => Ok(column_field::NumTitleTokens.into()),
-            Some(Field::Text(TextFieldEnum::CleanBody(_))) => {
-                Ok(column_field::NumCleanBodyTokens.into())
+            Some(Field::Text(TextFieldEnum::Title(_))) => {
+                Ok(numerical_field::NumTitleTokens.into())
             }
-            Some(Field::Text(TextFieldEnum::Url(_))) => Ok(column_field::NumUrlTokens.into()),
-            Some(Field::Text(TextFieldEnum::Domain(_))) => Ok(column_field::NumDomainTokens.into()),
+            Some(Field::Text(TextFieldEnum::CleanBody(_))) => {
+                Ok(numerical_field::NumCleanBodyTokens.into())
+            }
+            Some(Field::Text(TextFieldEnum::Url(_))) => Ok(numerical_field::NumUrlTokens.into()),
+            Some(Field::Text(TextFieldEnum::Domain(_))) => {
+                Ok(numerical_field::NumDomainTokens.into())
+            }
             Some(Field::Text(TextFieldEnum::UrlForSiteOperator(_))) => {
-                Ok(column_field::NumUrlForSiteOperatorTokens.into())
+                Ok(numerical_field::NumUrlForSiteOperatorTokens.into())
             }
             Some(Field::Text(TextFieldEnum::Description(_))) => {
-                Ok(column_field::NumDescriptionTokens.into())
+                Ok(numerical_field::NumDescriptionTokens.into())
             }
             Some(Field::Text(TextFieldEnum::MicroformatTags(_))) => {
-                Ok(column_field::NumMicroformatTagsTokens.into())
+                Ok(numerical_field::NumMicroformatTagsTokens.into())
             }
             Some(Field::Text(TextFieldEnum::FlattenedSchemaOrgJson(_))) => {
-                Ok(column_field::NumFlattenedSchemaTokens.into())
+                Ok(numerical_field::NumFlattenedSchemaTokens.into())
             }
             Some(field) => Err(TantivyError::InvalidArgument(format!(
                 "{} is not supported in pattern query",

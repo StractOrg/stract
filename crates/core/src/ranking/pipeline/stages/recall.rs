@@ -28,7 +28,7 @@ use crate::{
         pipeline::{RankableWebpage, RankingPipeline, RankingStage, Recall, Scorer},
         SignalComputer, SignalEnum,
     },
-    schema::column_field,
+    schema::numerical_field,
     searcher::{api, SearchQuery},
     webgraph,
 };
@@ -160,15 +160,15 @@ impl LocalRecallRankingWebpage {
         let columnfields = columnfield_reader.get_field_reader(pointer.address.doc_id);
 
         let title_embedding: Option<Vec<u8>> = columnfields
-            .get(column_field::TitleEmbeddings.into())
+            .get(numerical_field::TitleEmbeddings.into())
             .and_then(|v| v.into());
 
         let keyword_embedding: Option<Vec<u8>> = columnfields
-            .get(column_field::KeywordEmbeddings.into())
+            .get(numerical_field::KeywordEmbeddings.into())
             .and_then(|v| v.into());
 
         let host_id = columnfields
-            .get(column_field::HostNodeID.into())
+            .get(numerical_field::HostNodeID.into())
             .unwrap()
             .as_u64()
             .unwrap()

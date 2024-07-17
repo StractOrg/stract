@@ -14,21 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod column_field;
+pub mod numerical_field;
 pub mod text_field;
 
 use tantivy::schema::{BytesOptions, DateOptions, NumericOptions, TextOptions};
 
-pub use column_field::{ColumnFieldEnum, DataType};
+pub use numerical_field::{DataType, NumericalFieldEnum};
 pub use text_field::TextFieldEnum;
 
-use self::{column_field::ColumnField, text_field::TextField};
-
-pub const FLOAT_SCALING: u64 = 1_000_000_000;
+use self::{numerical_field::NumericalField, text_field::TextField};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Field {
-    Columnar(ColumnFieldEnum),
+    Numerical(NumericalFieldEnum),
     Text(TextFieldEnum),
 }
 
@@ -40,10 +38,10 @@ impl Field {
         }
         let field_id = field_id - TextFieldEnum::num_variants();
 
-        if field_id < ColumnFieldEnum::num_variants() {
-            return Some(Field::Columnar(ColumnFieldEnum::get(field_id).unwrap()));
+        if field_id < NumericalFieldEnum::num_variants() {
+            return Some(Field::Numerical(NumericalFieldEnum::get(field_id).unwrap()));
         }
-        let _field_id = field_id - ColumnFieldEnum::num_variants();
+        let _field_id = field_id - NumericalFieldEnum::num_variants();
 
         None
     }
@@ -52,12 +50,12 @@ impl Field {
     pub fn all() -> impl Iterator<Item = Field> {
         TextFieldEnum::all()
             .map(Field::Text)
-            .chain(ColumnFieldEnum::all().map(Field::Columnar))
+            .chain(NumericalFieldEnum::all().map(Field::Numerical))
     }
 
     pub fn has_pos(&self) -> bool {
         match self {
-            Field::Columnar(_) => false,
+            Field::Numerical(_) => false,
             Field::Text(text) => text.has_pos(),
         }
     }
@@ -65,34 +63,34 @@ impl Field {
     pub fn indexing_option(&self) -> IndexingOption {
         match self {
             Field::Text(f) => f.indexing_option(),
-            Field::Columnar(f) => f.indexing_option(),
+            Field::Numerical(f) => f.indexing_option(),
         }
     }
 
     pub fn name(&self) -> &str {
         match self {
             Field::Text(f) => f.name(),
-            Field::Columnar(f) => f.name(),
+            Field::Numerical(f) => f.name(),
         }
     }
 
     pub fn is_searchable(&self) -> bool {
         match self {
             Field::Text(f) => f.is_searchable(),
-            Field::Columnar(_) => false,
+            Field::Numerical(_) => false,
         }
     }
 
     pub fn as_text(&self) -> Option<TextFieldEnum> {
         match self {
-            Field::Columnar(_) => None,
+            Field::Numerical(_) => None,
             Field::Text(field) => Some(*field),
         }
     }
 
-    pub fn as_fast(&self) -> Option<ColumnFieldEnum> {
+    pub fn as_numerical(&self) -> Option<NumericalFieldEnum> {
         match self {
-            Field::Columnar(field) => Some(*field),
+            Field::Numerical(field) => Some(*field),
             Field::Text(_) => None,
         }
     }
@@ -104,7 +102,17 @@ pub fn create_schema() -> tantivy::schema::Schema {
     for field in Field::all() {
         match field.indexing_option() {
             IndexingOption::Text(options) => builder.add_text_field(field.name(), options),
-            IndexingOption::Integer(options) => builder.add_u64_field(field.name(), options),
+            IndexingOption::Integer(options) => {
+                let fast = field.as_numerical().expect("Expected fast field");
+                match fast.data_type() {
+                    DataType::U64 => builder.add_u64_field(field.name(), options),
+                    DataType::F64 => builder.add_f64_field(field.name(), options),
+                    DataType::Bool => builder.add_bool_field(field.name(), options),
+                    DataType::Bytes => {
+                        panic!("bytes field should have a `Bytes` variant as indexing option")
+                    }
+                }
+            }
             IndexingOption::DateTime(options) => builder.add_date_field(field.name(), options),
             IndexingOption::Bytes(options) => builder.add_bytes_field(field.name(), options),
         };

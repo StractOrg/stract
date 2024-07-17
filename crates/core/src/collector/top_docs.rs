@@ -30,7 +30,7 @@ use crate::{
     inverted_index::{DocAddress, WebpagePointer},
     prehashed::Prehashed,
     ranking::initial::{InitialScoreTweaker, Score},
-    schema::{column_field, ColumnFieldEnum},
+    schema::{numerical_field, NumericalFieldEnum},
     simhash,
 };
 
@@ -122,7 +122,12 @@ pub struct TopSegmentCollector {
 }
 
 impl TopSegmentCollector {
-    fn get_hash(&self, doc: DocId, field1: ColumnFieldEnum, field2: ColumnFieldEnum) -> Prehashed {
+    fn get_hash(
+        &self,
+        doc: DocId,
+        field1: NumericalFieldEnum,
+        field2: NumericalFieldEnum,
+    ) -> Prehashed {
         let field_reader = self.columnfield_segment_reader.get_field_reader(doc);
 
         let hash = [
@@ -152,7 +157,7 @@ impl TopSegmentCollector {
         let simhash: Option<u64> = self
             .columnfield_segment_reader
             .get_field_reader(doc)
-            .get(column_field::SimHash.into())
+            .get(numerical_field::SimHash.into())
             .unwrap()
             .into();
 
@@ -160,23 +165,23 @@ impl TopSegmentCollector {
             hashes: Hashes {
                 site: self.get_hash(
                     doc,
-                    column_field::SiteHash1.into(),
-                    column_field::SiteHash2.into(),
+                    numerical_field::SiteHash1.into(),
+                    numerical_field::SiteHash2.into(),
                 ),
                 title: self.get_hash(
                     doc,
-                    column_field::TitleHash1.into(),
-                    column_field::TitleHash2.into(),
+                    numerical_field::TitleHash1.into(),
+                    numerical_field::TitleHash2.into(),
                 ),
                 url: self.get_hash(
                     doc,
-                    column_field::UrlHash1.into(),
-                    column_field::UrlHash2.into(),
+                    numerical_field::UrlHash1.into(),
+                    numerical_field::UrlHash2.into(),
                 ),
                 url_without_tld: self.get_hash(
                     doc,
-                    column_field::UrlWithoutTldHash1.into(),
-                    column_field::UrlWithoutTldHash2.into(),
+                    numerical_field::UrlWithoutTldHash1.into(),
+                    numerical_field::UrlWithoutTldHash2.into(),
                 ),
                 simhash: simhash.unwrap(),
             },
