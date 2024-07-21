@@ -28,8 +28,8 @@ use initial::InitialScoreTweaker;
 
 use crate::{
     collector::{MainCollector, MaxDocsConsidered, TopDocs},
-    columnfield_reader::ColumnFieldReader,
     config::CollectorConfig,
+    numericalfield_reader::NumericalFieldReader,
     search_ctx::Ctx,
     searcher::NUM_RESULTS_PER_PAGE,
 };
@@ -41,7 +41,7 @@ pub struct Ranker {
     max_docs: Option<MaxDocsConsidered>,
     offset: Option<usize>,
     computer: SignalComputer,
-    columnfield_reader: ColumnFieldReader,
+    columnfield_reader: NumericalFieldReader,
     de_rank_similar: bool,
     num_results: Option<usize>,
     collector_config: CollectorConfig,
@@ -50,7 +50,7 @@ pub struct Ranker {
 impl Ranker {
     pub fn new(
         computer: SignalComputer,
-        columnfield_reader: ColumnFieldReader,
+        columnfield_reader: NumericalFieldReader,
         collector_config: CollectorConfig,
     ) -> Self {
         Ranker {

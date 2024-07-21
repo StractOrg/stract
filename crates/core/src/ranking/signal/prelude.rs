@@ -46,7 +46,7 @@ pub trait Signal:
         self.as_field().and_then(|field| field.as_text())
     }
 
-    fn as_columnfield(&self) -> Option<NumericalFieldEnum> {
+    fn as_numericalfield(&self) -> Option<NumericalFieldEnum> {
         self.as_field().and_then(|field| field.as_numerical())
     }
 }

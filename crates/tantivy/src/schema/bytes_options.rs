@@ -228,7 +228,7 @@ mod tests {
                 indexed: true,
                 fieldnorms: true,
                 columnar: false,
-                stored: false
+                stored: false,
             }
         );
     }
@@ -247,7 +247,7 @@ mod tests {
                 indexed: false,
                 fieldnorms: false,
                 columnar: false,
-                stored: false
+                stored: false,
             }
         );
     }
@@ -267,7 +267,7 @@ mod tests {
                 indexed: true,
                 fieldnorms: false,
                 columnar: false,
-                stored: false
+                stored: false,
             }
         );
     }
@@ -288,7 +288,7 @@ mod tests {
                 indexed: false,
                 fieldnorms: true,
                 columnar: false,
-                stored: false
+                stored: false,
             }
         );
     }

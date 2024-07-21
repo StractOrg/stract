@@ -22,7 +22,7 @@ use tantivy::{
 };
 
 use crate::{
-    columnfield_reader::ColumnFieldReader,
+    numericalfield_reader::NumericalFieldReader,
     schema::{
         numerical_field,
         text_field::{self, TextField},
@@ -114,7 +114,7 @@ pub struct PatternWeight {
     pub patterns: Vec<PatternPart>,
     pub raw_terms: Vec<tantivy::Term>,
     pub field: tantivy::schema::Field,
-    pub columnfield_reader: ColumnFieldReader,
+    pub columnfield_reader: NumericalFieldReader,
 }
 
 impl PatternWeight {

@@ -282,6 +282,12 @@ impl AsFieldId for crate::schema::Field {
     }
 }
 
+impl AsFieldId for u32 {
+    fn field_id(&self) -> u32 {
+        *self
+    }
+}
+
 impl<'a> Row<'a> {
     pub fn get<F: AsFieldId>(&self, field: &F) -> Option<&RowValue> {
         self.get_by_field_id(field.field_id())

@@ -40,8 +40,8 @@ use tantivy::tokenizer::TokenizerManager;
 use tantivy::{IndexReader, IndexWriter, TantivyDocument};
 
 use crate::collector::{approx_count, Hashes};
-use crate::columnfield_reader::ColumnFieldReader;
 use crate::config::SnippetConfig;
+use crate::numericalfield_reader::NumericalFieldReader;
 
 use crate::ranking::initial::Score;
 
@@ -138,7 +138,7 @@ pub struct InvertedIndex {
     reader: IndexReader,
     schema: Arc<Schema>,
     snippet_config: SnippetConfig,
-    columnfield_reader: ColumnFieldReader,
+    columnfield_reader: NumericalFieldReader,
 }
 
 impl InvertedIndex {
@@ -170,7 +170,7 @@ impl InvertedIndex {
 
         let reader: IndexReader = tantivy_index.reader_builder().try_into()?;
 
-        let columnfield_reader = ColumnFieldReader::new(&reader.searcher());
+        let columnfield_reader = NumericalFieldReader::new(&reader.searcher());
 
         Ok(InvertedIndex {
             writer: None,
@@ -183,7 +183,7 @@ impl InvertedIndex {
         })
     }
 
-    pub fn columnfield_reader(&self) -> ColumnFieldReader {
+    pub fn columnfield_reader(&self) -> NumericalFieldReader {
         self.columnfield_reader.clone()
     }
 

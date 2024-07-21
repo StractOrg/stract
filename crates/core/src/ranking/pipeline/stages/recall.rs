@@ -17,11 +17,12 @@
 use std::sync::Arc;
 
 use crate::{
-    collector, columnfield_reader,
+    collector,
     config::CollectorConfig,
     enum_map::EnumMap,
     inverted_index::WebpagePointer,
     models::dual_encoder::DualEncoder,
+    numericalfield_reader,
     ranking::{
         bitvec_similarity, inbound_similarity,
         models::lambdamart::LambdaMART,
@@ -154,7 +155,7 @@ impl LocalRecallRankingWebpage {
     /// the index to calculate bm25.
     pub fn new(
         pointer: WebpagePointer,
-        columnfield_reader: &columnfield_reader::SegmentReader,
+        columnfield_reader: &numericalfield_reader::SegmentReader,
         computer: &mut SignalComputer,
     ) -> Self {
         let columnfields = columnfield_reader.get_field_reader(pointer.address.doc_id);

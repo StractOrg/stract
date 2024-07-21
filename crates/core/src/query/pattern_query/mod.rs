@@ -22,7 +22,7 @@ use optics::PatternPart;
 use tantivy::tokenizer::Tokenizer;
 
 use crate::{
-    columnfield_reader::ColumnFieldReader,
+    numericalfield_reader::NumericalFieldReader,
     schema::{text_field::TextField, Field, TextFieldEnum},
 };
 
@@ -34,7 +34,7 @@ pub struct PatternQuery {
     can_optimize_site_domain: bool,
     field: tantivy::schema::Field,
     raw_terms: Vec<tantivy::Term>,
-    columnfield_reader: ColumnFieldReader,
+    columnfield_reader: NumericalFieldReader,
 }
 
 impl std::fmt::Debug for PatternQuery {
@@ -52,7 +52,7 @@ impl PatternQuery {
         patterns: Vec<PatternPart>,
         field: TextFieldEnum,
         schema: &tantivy::schema::Schema,
-        columnfield_reader: ColumnFieldReader,
+        columnfield_reader: NumericalFieldReader,
     ) -> Self {
         let field = Field::Text(field);
         let tv_field = schema.get_field(field.name()).unwrap();

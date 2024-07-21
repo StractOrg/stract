@@ -25,9 +25,9 @@ use tantivy::{
 };
 
 use crate::{
-    columnfield_reader,
     config::CollectorConfig,
     inverted_index::{DocAddress, WebpagePointer},
+    numericalfield_reader,
     prehashed::Prehashed,
     ranking::initial::{InitialScoreTweaker, Score},
     schema::{numerical_field, NumericalFieldEnum},
@@ -40,7 +40,7 @@ pub struct TopDocs {
     top_n: usize,
     offset: usize,
     max_docs: Option<MaxDocsConsidered>,
-    columnfield_reader: columnfield_reader::ColumnFieldReader,
+    columnfield_reader: numericalfield_reader::NumericalFieldReader,
     de_rank_similar: bool,
     collector_config: CollectorConfig,
 }
@@ -48,7 +48,7 @@ pub struct TopDocs {
 impl TopDocs {
     pub fn with_limit(
         top_n: usize,
-        columnfield_reader: columnfield_reader::ColumnFieldReader,
+        columnfield_reader: numericalfield_reader::NumericalFieldReader,
     ) -> Self {
         Self {
             top_n,
@@ -114,7 +114,7 @@ impl TopDocs {
 }
 
 pub struct TopSegmentCollector {
-    columnfield_segment_reader: Arc<columnfield_reader::SegmentReader>,
+    columnfield_segment_reader: Arc<numericalfield_reader::SegmentReader>,
     max_docs: Option<usize>,
     num_docs_taken: usize,
     segment_ord: SegmentOrdinal,

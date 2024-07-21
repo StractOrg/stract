@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::columnfield_reader::ColumnFieldReader;
+use crate::numericalfield_reader::NumericalFieldReader;
 
 #[derive(Clone)]
 pub struct Ctx {
     pub tv_searcher: tantivy::Searcher,
-    pub columnfield_reader: ColumnFieldReader,
+    pub columnfield_reader: NumericalFieldReader,
 }

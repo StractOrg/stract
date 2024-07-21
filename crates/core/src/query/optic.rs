@@ -22,7 +22,7 @@ use tantivy::{
     schema::Schema,
 };
 
-use crate::{columnfield_reader::ColumnFieldReader, schema::text_field, webpage::schema_org};
+use crate::{numericalfield_reader::NumericalFieldReader, schema::text_field, webpage::schema_org};
 
 use super::{const_query::ConstQuery, pattern_query::PatternQuery, union::UnionQuery};
 
@@ -30,7 +30,7 @@ pub trait AsTantivyQuery {
     fn as_tantivy(
         &self,
         schema: &Schema,
-        columnfield_reader: &ColumnFieldReader,
+        columnfield_reader: &NumericalFieldReader,
     ) -> Box<dyn tantivy::query::Query>;
 }
 
@@ -38,7 +38,7 @@ pub trait AsMultipleTantivyQuery {
     fn as_multiple_tantivy(
         &self,
         schema: &Schema,
-        columnfield_reader: &ColumnFieldReader,
+        columnfield_reader: &NumericalFieldReader,
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query>)>;
 }
 
@@ -46,7 +46,7 @@ impl AsMultipleTantivyQuery for Optic {
     fn as_multiple_tantivy(
         &self,
         schema: &Schema,
-        columnfields: &ColumnFieldReader,
+        columnfields: &NumericalFieldReader,
     ) -> Vec<(Occur, Box<dyn tantivy::query::Query>)> {
         if self.discard_non_matching {
             let block = (
@@ -92,7 +92,7 @@ pub trait AsSearchableRule {
     fn as_searchable_rule(
         &self,
         schema: &Schema,
-        columnfield_reader: &ColumnFieldReader,
+        columnfield_reader: &NumericalFieldReader,
     ) -> Option<(Occur, SearchableRule)>;
 }
 
@@ -100,7 +100,7 @@ impl AsSearchableRule for Rule {
     fn as_searchable_rule(
         &self,
         schema: &Schema,
-        columnfield_reader: &ColumnFieldReader,
+        columnfield_reader: &NumericalFieldReader,
     ) -> Option<(Occur, SearchableRule)> {
         let mut subqueries: Vec<_> = self
             .matches
@@ -167,7 +167,7 @@ impl AsTantivyQuery for Matching {
     fn as_tantivy(
         &self,
         schema: &Schema,
-        columnfield_reader: &ColumnFieldReader,
+        columnfield_reader: &NumericalFieldReader,
     ) -> Box<dyn tantivy::query::Query> {
         match &self.location {
             MatchLocation::Site => ConstQuery::new(

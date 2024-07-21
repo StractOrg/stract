@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
+use bitflags::bitflags;
 use enum_dispatch::enum_dispatch;
 use strum::{EnumDiscriminants, VariantArray};
 use tantivy::{
@@ -30,6 +31,16 @@ use crate::{
 };
 
 use super::IndexingOption;
+
+#[derive(Debug, Clone, Copy, bincode::Encode, bincode::Decode, PartialEq, Eq, Hash)]
+pub struct Orientation(u8);
+
+bitflags! {
+    impl Orientation: u8 {
+        const ROW = 1 << 0;
+        const COLUMNAR = 1 << 1;
+    }
+}
 
 #[enum_dispatch]
 pub trait NumericalField:
@@ -66,9 +77,18 @@ pub trait NumericalField:
     }
 
     fn indexing_option(&self) -> IndexingOption {
+        let orientation = self.orientation();
         match self.data_type() {
             DataType::U64 | DataType::Bool | DataType::F64 => {
-                let mut opt = NumericOptions::default().set_columnar();
+                let mut opt = NumericOptions::default();
+
+                if orientation.contains(Orientation::COLUMNAR) {
+                    opt = opt.set_columnar();
+                }
+
+                if orientation.contains(Orientation::ROW) {
+                    opt = opt.set_row_order();
+                }
 
                 if self.is_stored() {
                     opt = opt.set_stored();
@@ -81,7 +101,11 @@ pub trait NumericalField:
                 IndexingOption::Integer(opt)
             }
             DataType::Bytes => {
-                let mut opt = BytesOptions::default().set_columnar().set_indexed();
+                let mut opt = BytesOptions::default().set_indexed();
+
+                if orientation.contains(Orientation::COLUMNAR) {
+                    opt = opt.set_columnar();
+                }
 
                 if self.is_stored() {
                     opt = opt.set_stored();
@@ -96,6 +120,10 @@ pub trait NumericalField:
         schema
             .get_field(self.name())
             .unwrap_or_else(|_| unreachable!("Unknown field: {}", self.name()))
+    }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::COLUMNAR
     }
 }
 
@@ -275,6 +303,10 @@ impl NumericalField for HostCentrality {
 
         Ok(())
     }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -303,6 +335,10 @@ impl NumericalField for HostCentralityRank {
         doc.add_u64(self.tantivy_field(schema), webpage.host_centrality_rank);
 
         Ok(())
+    }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
     }
 }
 
@@ -336,6 +372,10 @@ impl NumericalField for PageCentrality {
 
         Ok(())
     }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -363,6 +403,10 @@ impl NumericalField for PageCentralityRank {
         doc.add_u64(self.tantivy_field(schema), webpage.page_centrality_rank);
 
         Ok(())
+    }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
     }
 }
 
@@ -392,6 +436,10 @@ impl NumericalField for FetchTimeMs {
 
         Ok(())
     }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -420,6 +468,10 @@ impl NumericalField for LastUpdated {
 
         Ok(())
     }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -439,6 +491,10 @@ impl NumericalField for TrackerScore {
         doc.add_u64(self.tantivy_field(schema), html.trackers().len() as u64);
 
         Ok(())
+    }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
     }
 }
 
@@ -480,6 +536,10 @@ impl NumericalField for Region {
         }
 
         Ok(())
+    }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
     }
 }
 
@@ -968,6 +1028,10 @@ impl NumericalField for HostNodeID {
 
         Ok(())
     }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1052,6 +1116,10 @@ impl NumericalField for NumPathAndQuerySlashes {
 
         Ok(())
     }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1090,6 +1158,10 @@ impl NumericalField for NumPathAndQueryDigits {
 
         Ok(())
     }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1117,6 +1189,10 @@ impl NumericalField for LikelyHasAds {
         doc.add_bool(self.tantivy_field(schema), html.likely_has_ads());
 
         Ok(())
+    }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
     }
 }
 
@@ -1146,6 +1222,10 @@ impl NumericalField for LikelyHasPaywall {
 
         Ok(())
     }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1173,6 +1253,10 @@ impl NumericalField for LinkDensity {
         doc.add_f64(self.tantivy_field(schema), html.link_density());
 
         Ok(())
+    }
+
+    fn orientation(&self) -> Orientation {
+        Orientation::ROW
     }
 }
 

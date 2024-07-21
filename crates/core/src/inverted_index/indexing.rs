@@ -18,7 +18,7 @@ use tantivy::merge_policy::NoMergePolicy;
 
 use tantivy::{IndexWriter, SegmentMeta};
 
-use crate::columnfield_reader::ColumnFieldReader;
+use crate::numericalfield_reader::NumericalFieldReader;
 
 use crate::webpage::Webpage;
 use crate::Result;
@@ -126,7 +126,7 @@ impl InvertedIndex {
             .expect("writer has not been prepared")
             .commit()?;
         self.reader.reload()?;
-        self.columnfield_reader = ColumnFieldReader::new(&self.reader.searcher());
+        self.columnfield_reader = NumericalFieldReader::new(&self.reader.searcher());
 
         Ok(())
     }

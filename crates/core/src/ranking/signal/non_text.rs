@@ -116,10 +116,10 @@ impl Signal for HostCentrality {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_f64())
             .unwrap();
         Some(val)
@@ -156,10 +156,10 @@ impl Signal for HostCentralityRank {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_rank(val as f64))
@@ -196,10 +196,10 @@ impl Signal for PageCentrality {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_f64())
             .unwrap();
         Some(val)
@@ -236,10 +236,10 @@ impl Signal for PageCentralityRank {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_rank(val as f64))
@@ -274,10 +274,10 @@ impl Signal for IsHomepage {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_bool())
             .unwrap();
 
@@ -324,10 +324,10 @@ impl Signal for FetchTimeMs {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let fetch_time_ms = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let fetch_time_ms = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap() as usize;
 
@@ -375,10 +375,10 @@ impl Signal for UpdateTimestamp {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap() as usize;
 
@@ -417,10 +417,10 @@ impl Signal for TrackerScore {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_trackers(val as f64))
@@ -457,10 +457,10 @@ impl Signal for Region {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         let region = crate::webpage::Region::from_id(val);
@@ -595,10 +595,10 @@ impl Signal for UrlDigits {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_digits(val as f64))
@@ -642,10 +642,10 @@ impl Signal for UrlSlashes {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
         Some(score_slashes(val as f64))
@@ -683,10 +683,10 @@ impl Signal for LinkDensity {
 
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
-        let columnfield_reader = seg_reader.columnfield_reader().get_field_reader(doc);
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
-        let val = columnfield_reader
-            .get(self.as_columnfield().unwrap())
+        let val = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_f64())
             .unwrap();
         Some(score_link_density(val))

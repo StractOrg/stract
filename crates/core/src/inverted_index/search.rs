@@ -26,8 +26,8 @@ use url::Url;
 use crate::collector::approx_count::ApproxCount;
 use crate::collector::{approx_count, MainCollector};
 
-use crate::columnfield_reader::ColumnFieldReader;
 use crate::highlighted::HighlightedFragment;
+use crate::numericalfield_reader::NumericalFieldReader;
 use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::pipeline::LocalRecallRankingWebpage;
@@ -101,7 +101,7 @@ impl InvertedIndex {
         ctx: &Ctx,
         pointers: Vec<WebpagePointer>,
         mut computer: SignalComputer,
-        columnfield_reader: &ColumnFieldReader,
+        columnfield_reader: &NumericalFieldReader,
     ) -> Result<Vec<LocalRecallRankingWebpage>> {
         let mut top_websites = Vec::new();
 
