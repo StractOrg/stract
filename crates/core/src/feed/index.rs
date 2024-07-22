@@ -21,7 +21,7 @@ use std::{
 
 use crate::{
     inverted_index::merge_tantivy_segments,
-    tokenizer::{Tokenizer, UrlTokenizer},
+    tokenizer::fields::{FieldTokenizer, UrlTokenizer},
 };
 use anyhow::Result;
 use hashbrown::HashSet;
@@ -45,8 +45,8 @@ pub struct FeedIndex {
 
 impl FeedIndex {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let url_tokenizer = Tokenizer::Url(UrlTokenizer);
-        let kind_tokenizer = Tokenizer::default();
+        let url_tokenizer = FieldTokenizer::Url(UrlTokenizer);
+        let kind_tokenizer = FieldTokenizer::default();
 
         let mut builder = tantivy::schema::Schema::builder();
 

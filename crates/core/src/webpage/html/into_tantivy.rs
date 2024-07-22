@@ -74,7 +74,7 @@ impl Html {
     pub fn pretokenize_url_for_site_operator(&self) -> PreTokenizedString {
         self.pretokenize_string_with(
             self.url().to_string(),
-            tokenizer::Tokenizer::Url(tokenizer::UrlTokenizer),
+            tokenizer::FieldTokenizer::Url(tokenizer::fields::UrlTokenizer),
         )
     }
 
@@ -114,7 +114,7 @@ impl Html {
     fn pretokenize_string_with(
         &self,
         text: String,
-        tokenizer: tokenizer::Tokenizer,
+        tokenizer: tokenizer::FieldTokenizer,
     ) -> PreTokenizedString {
         let mut tokenizer = tokenizer;
 

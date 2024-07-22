@@ -146,7 +146,6 @@ pub mod tests {
     use openraft::{error::InitializeError, Config};
 
     use proptest::prelude::*;
-    use proptest_derive::Arbitrary;
 
     use futures::{pin_mut, TryStreamExt};
     use rand::seq::SliceRandom;
@@ -557,13 +556,27 @@ pub mod tests {
         bincode::Encode,
         bincode::Decode,
         PartialEq,
-        Arbitrary,
     )]
     enum Action {
         Set { key: String, value: String },
         // get actions[prev_key % actions.len()]
         // if actions[prev_key % actions.len()] is a get, then get a non-existent key
         Get { prev_key: usize },
+    }
+
+    impl Arbitrary for Action {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: ()) -> Self::Strategy {
+            prop_oneof![
+                (".{1,10}", ".{1,10}").prop_map(|(key, value)| Action::Set { key, value }),
+                (0..1000).prop_map(|prev_key| Action::Get {
+                    prev_key: prev_key as usize
+                }),
+            ]
+            .boxed()
+        }
     }
 
     proptest! {

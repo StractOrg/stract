@@ -34,7 +34,7 @@ use tantivy::{
 use crate::{
     image_store::{EntityImageStore, Image, ImageStore},
     inverted_index::merge_tantivy_segments,
-    tokenizer::Normal,
+    tokenizer::fields::DefaultTokenizer,
     Result,
 };
 
@@ -49,7 +49,7 @@ fn schema() -> Schema {
         TextOptions::default()
             .set_indexing_options(
                 TextFieldIndexing::default()
-                    .set_tokenizer(Normal::as_str())
+                    .set_tokenizer(DefaultTokenizer::as_str())
                     .set_index_option(IndexRecordOption::WithFreqsAndPositions),
             )
             .set_stored(),
@@ -59,7 +59,7 @@ fn schema() -> Schema {
         TextOptions::default()
             .set_indexing_options(
                 TextFieldIndexing::default()
-                    .set_tokenizer(Normal::as_str())
+                    .set_tokenizer(DefaultTokenizer::as_str())
                     .set_index_option(IndexRecordOption::WithFreqsAndPositions),
             )
             .set_stored(),
@@ -164,8 +164,8 @@ impl EntityIndex {
             .collect();
 
         tantivy_index.tokenizers().register(
-            Normal::as_str(),
-            Normal::with_stopwords(stopwords.clone().into_iter().collect()),
+            DefaultTokenizer::as_str(),
+            DefaultTokenizer::with_stopwords(stopwords.clone().into_iter().collect()),
         );
 
         let image_store = EntityImageStore::open(path.as_ref().join("images"));
@@ -270,7 +270,7 @@ impl EntityIndex {
         let entity_abstract = self.schema.get_field("abstract").unwrap();
 
         let mut term_queries = Vec::new();
-        let mut tokenizer = Normal::default();
+        let mut tokenizer = DefaultTokenizer::default();
         let mut stream = tokenizer.token_stream(query);
         while let Some(token) = stream.next() {
             if self.stopwords.contains(&token.text) {

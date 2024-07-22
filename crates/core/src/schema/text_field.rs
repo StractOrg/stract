@@ -29,8 +29,9 @@ use crate::{
     enum_dispatch_from_discriminant,
     enum_map::InsertEnumMapKey,
     ranking::bm25::Bm25Constants,
-    tokenizer::{
-        self, BigramTokenizer, Identity, JsonField, Tokenizer, TrigramTokenizer, UrlTokenizer,
+    tokenizer,
+    tokenizer::fields::{
+        BigramTokenizer, FieldTokenizer, Identity, JsonField, TrigramTokenizer, UrlTokenizer,
     },
     webpage::Html,
     Result,
@@ -64,11 +65,11 @@ pub trait TextField:
     }
 
     #[allow(unused_variables)]
-    fn tokenizer(&self, lang: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::default()
+    fn tokenizer(&self, lang: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::default()
     }
 
-    fn query_tokenizer(&self, lang: Option<&whatlang::Lang>) -> Tokenizer {
+    fn query_tokenizer(&self, lang: Option<&whatlang::Lang>) -> FieldTokenizer {
         self.tokenizer(lang)
     }
 
@@ -372,10 +373,10 @@ impl TextField for StemmedTitle {
         "stemmed_title"
     }
 
-    fn tokenizer(&self, lang: Option<&whatlang::Lang>) -> Tokenizer {
+    fn tokenizer(&self, lang: Option<&whatlang::Lang>) -> FieldTokenizer {
         match lang {
-            Some(lang) => tokenizer::Stemmed::with_forced_language(*lang).into(),
-            None => tokenizer::Stemmed::default().into(),
+            Some(lang) => tokenizer::fields::Stemmed::with_forced_language(*lang).into(),
+            None => tokenizer::fields::Stemmed::default().into(),
         }
     }
 
@@ -418,10 +419,10 @@ impl TextField for StemmedCleanBody {
         "stemmed_body"
     }
 
-    fn tokenizer(&self, lang: Option<&whatlang::Lang>) -> Tokenizer {
+    fn tokenizer(&self, lang: Option<&whatlang::Lang>) -> FieldTokenizer {
         match lang {
-            Some(lang) => tokenizer::Stemmed::with_forced_language(*lang).into(),
-            None => tokenizer::Stemmed::default().into(),
+            Some(lang) => tokenizer::fields::Stemmed::with_forced_language(*lang).into(),
+            None => tokenizer::fields::Stemmed::default().into(),
         }
     }
 
@@ -543,8 +544,8 @@ impl TextField for UrlNoTokenizer {
         "url_no_tokenizer"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn is_searchable(&self) -> bool {
@@ -590,8 +591,8 @@ impl TextField for UrlForSiteOperator {
         true
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Url(UrlTokenizer)
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Url(UrlTokenizer)
     }
 
     fn add_html_tantivy(
@@ -673,8 +674,8 @@ impl TextField for SiteNoTokenizer {
         "site_no_tokenizer"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn is_searchable(&self) -> bool {
@@ -716,8 +717,8 @@ impl TextField for DomainNoTokenizer {
         "domain_no_tokenizer"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn is_searchable(&self) -> bool {
@@ -759,8 +760,8 @@ impl TextField for DomainNameNoTokenizer {
         "domain_name_no_tokenizer"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn is_searchable(&self) -> bool {
@@ -802,8 +803,8 @@ impl TextField for SiteIfHomepageNoTokenizer {
         "site_if_homepage_no_tokenizer"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn add_html_tantivy(
@@ -882,8 +883,8 @@ impl TextField for DomainNameIfHomepageNoTokenizer {
         "domain_name_if_homepage_no_tokenizer"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn add_html_tantivy(
@@ -929,8 +930,8 @@ impl TextField for DomainIfHomepageNoTokenizer {
         "domain_if_homepage_no_tokenizer"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn add_html_tantivy(
@@ -1125,8 +1126,8 @@ impl TextField for SchemaOrgJson {
         "schema_org_json"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn is_stored(&self) -> bool {
@@ -1161,8 +1162,8 @@ impl TextField for FlattenedSchemaOrgJson {
         true
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Json(JsonField)
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Json(JsonField)
     }
 
     fn add_html_tantivy(
@@ -1197,12 +1198,12 @@ impl TextField for CleanBodyBigrams {
         CleanBody.into()
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Bigram(BigramTokenizer::default())
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Bigram(BigramTokenizer::default())
     }
 
-    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::default()
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::default()
     }
 
     fn is_searchable(&self) -> bool {
@@ -1241,12 +1242,12 @@ impl TextField for TitleBigrams {
         Title.into()
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Bigram(BigramTokenizer::default())
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Bigram(BigramTokenizer::default())
     }
 
-    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::default()
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::default()
     }
 
     fn is_searchable(&self) -> bool {
@@ -1291,12 +1292,12 @@ impl TextField for CleanBodyTrigrams {
         CleanBody.into()
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Trigram(TrigramTokenizer::default())
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Trigram(TrigramTokenizer::default())
     }
 
-    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::default()
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::default()
     }
 
     fn is_searchable(&self) -> bool {
@@ -1335,12 +1336,12 @@ impl TextField for TitleTrigrams {
         Title.into()
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Trigram(TrigramTokenizer::default())
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Trigram(TrigramTokenizer::default())
     }
 
-    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::default()
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::default()
     }
 
     fn is_searchable(&self) -> bool {
@@ -1405,8 +1406,8 @@ impl TextField for SafetyClassification {
         "safety_classification"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn add_html_tantivy(
@@ -1447,8 +1448,8 @@ impl TextField for InsertionTimestamp {
         "insertion_timestamp"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn indexing_option(&self) -> IndexingOption {
@@ -1490,8 +1491,8 @@ impl TextField for RecipeFirstIngredientTagId {
         "recipe_first_ingredient_tag_id"
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Identity(Identity {})
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn is_stored(&self) -> bool {
@@ -1563,8 +1564,8 @@ impl TextField for Links {
         true
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> Tokenizer {
-        Tokenizer::Url(UrlTokenizer)
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Url(UrlTokenizer)
     }
 
     fn add_html_tantivy(

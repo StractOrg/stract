@@ -306,7 +306,6 @@ mod tests {
     use std::{collections::HashMap, future::Future};
 
     use proptest::prelude::*;
-    use proptest_derive::Arbitrary;
 
     use crate::free_socket_addr;
 
@@ -343,10 +342,24 @@ mod tests {
             })
     }
 
-    #[derive(Debug, Clone, bincode::Encode, bincode::Decode, PartialEq, Arbitrary)]
+    #[derive(Debug, Clone, bincode::Encode, bincode::Decode, PartialEq)]
     struct Message {
         text: String,
         other: HashMap<String, f32>,
+    }
+
+    impl Arbitrary for Message {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: ()) -> Self::Strategy {
+            (
+                any::<String>(),
+                prop::collection::hash_map(".*", 0.0f32..100.0f32, 0..10),
+            )
+                .prop_map(|(text, other)| Message { text, other })
+                .boxed()
+        }
     }
 
     proptest! {

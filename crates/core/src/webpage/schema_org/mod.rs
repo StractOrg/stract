@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 use kuchiki::NodeRef;
 
-use crate::tokenizer::FlattenedJson;
+use crate::tokenizer::fields::FlattenedJson;
 use crate::{OneOrMany, Result};
 
 mod json_ld;

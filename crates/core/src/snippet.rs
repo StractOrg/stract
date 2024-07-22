@@ -19,7 +19,9 @@ use std::ops::Range;
 use crate::config::SnippetConfig;
 use crate::highlighted::{HighlightedFragment, HighlightedKind};
 use crate::query::Query;
-use crate::tokenizer::{BigramTokenizer, Normal, Stemmed, Tokenizer, TrigramTokenizer};
+use crate::tokenizer::fields::{
+    BigramTokenizer, DefaultTokenizer, FieldTokenizer, Stemmed, TrigramTokenizer,
+};
 use crate::web_spell::sentence_ranges;
 use crate::webpage::region::Region;
 use hashbrown::{HashMap, HashSet};
@@ -81,10 +83,10 @@ struct SnippetBuilder {
 impl SnippetBuilder {
     fn highlight(&mut self, terms: &HashSet<String>, lang: whatlang::Lang) {
         for mut tokenizer in [
-            Tokenizer::Stemmed(Stemmed::with_forced_language(lang)),
-            Tokenizer::Normal(Normal::default()),
-            Tokenizer::Bigram(BigramTokenizer::default()),
-            Tokenizer::Trigram(TrigramTokenizer::default()),
+            FieldTokenizer::Stemmed(Stemmed::with_forced_language(lang)),
+            FieldTokenizer::Default(DefaultTokenizer::default()),
+            FieldTokenizer::Bigram(BigramTokenizer::default()),
+            FieldTokenizer::Trigram(TrigramTokenizer::default()),
         ] {
             let mut stream =
                 tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, &self.fragment);
@@ -143,7 +145,11 @@ impl SnippetBuilder {
     }
 }
 
-fn passages(text: &str, mut tokenizer: Tokenizer, config: &SnippetConfig) -> Vec<PassageCandidate> {
+fn passages(
+    text: &str,
+    mut tokenizer: FieldTokenizer,
+    config: &SnippetConfig,
+) -> Vec<PassageCandidate> {
     sentence_ranges(text)
         .into_iter()
         .filter(|offset| offset.end - offset.start > config.min_passage_width)
@@ -216,7 +222,7 @@ fn snippet_string_builder(
     terms: &[String],
     lang: whatlang::Lang,
     config: SnippetConfig,
-    mut tokenizer: Tokenizer,
+    mut tokenizer: FieldTokenizer,
 ) -> SnippetBuilder {
     let terms: HashSet<String> = terms
         .iter()
@@ -288,7 +294,7 @@ fn snippet_string(
     lang: whatlang::Lang,
     config: SnippetConfig,
 ) -> TextSnippet {
-    let tokenizer = Tokenizer::Normal(Normal::default());
+    let tokenizer = FieldTokenizer::Default(DefaultTokenizer::default());
     let snip = snippet_string_builder(text, terms, lang, config.clone(), tokenizer).build();
 
     if !snip.fragments.is_empty()
@@ -300,7 +306,7 @@ fn snippet_string(
         return snip;
     }
 
-    let tokenizer = Tokenizer::Stemmed(Stemmed::with_forced_language(lang));
+    let tokenizer = FieldTokenizer::Stemmed(Stemmed::with_forced_language(lang));
     snippet_string_builder(text, terms, lang, config, tokenizer).build()
 }
 
@@ -346,6 +352,7 @@ mod tests {
         searcher::{LocalSearcher, SearchQuery},
         webpage::Webpage,
     };
+    use proptest::prelude::*;
 
     const TEST_TEXT: &str = r#"Rust is a systems programming language sponsored by
 Mozilla which describes it as a "safe, concurrent, practical language", supporting functional and
@@ -546,7 +553,7 @@ Survey in 2016, 2017, and 2018."#;
             &["thisis".to_string()],
             whatlang::Lang::Eng,
             SnippetConfig::default(),
-            Tokenizer::Normal(Normal::default()),
+            FieldTokenizer::Default(DefaultTokenizer::default()),
         );
 
         let mut terms = HashSet::new();
@@ -560,5 +567,13 @@ Survey in 2016, 2017, and 2018."#;
             .as_str(),
             "<b>this is</b> a test"
         );
+    }
+
+    proptest! {
+        #[test]
+        fn prop_snippet_gen(text: String, query: String) {
+            let terms = query.split_whitespace().map(|s| s.to_string()).collect::<Vec<_>>();
+            let _ = snippet_string(&text, &terms, whatlang::Lang::Eng, SnippetConfig::default());
+        }
     }
 }

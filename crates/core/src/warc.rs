@@ -30,7 +30,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use fnv::FnvHashSet;
 #[cfg(test)]
-use proptest_derive::Arbitrary;
+use proptest::prelude::*;
 
 use tracing::{debug, trace};
 
@@ -208,15 +208,31 @@ struct RawWarcRecord {
 }
 
 #[derive(Debug)]
-#[cfg_attr(test, derive(Clone, Arbitrary, PartialEq))]
+#[cfg_attr(test, derive(Clone, PartialEq))]
 pub struct WarcRecord {
     pub request: Request,
     pub response: Response,
     pub metadata: Metadata,
 }
 
+#[cfg(test)]
+impl Arbitrary for WarcRecord {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        (any::<Request>(), any::<Response>(), any::<Metadata>())
+            .prop_map(|(request, response, metadata)| Self {
+                request,
+                response,
+                metadata,
+            })
+            .boxed()
+    }
+}
+
 #[derive(Debug)]
-#[cfg_attr(test, derive(Clone, Arbitrary, PartialEq))]
+#[cfg_attr(test, derive(Clone, PartialEq))]
 pub struct Request {
     // WARC-Target-URI
     pub url: String,
@@ -234,13 +250,38 @@ impl Request {
     }
 }
 
+#[cfg(test)]
+impl Arbitrary for Request {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        ".+".prop_map(|url| Self { url }).boxed()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(test, derive(Arbitrary))]
 pub enum PayloadType {
     Html,
     Pdf,
     Rss,
     Atom,
+}
+
+#[cfg(test)]
+impl Arbitrary for PayloadType {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        prop_oneof![
+            Just(Self::Html),
+            Just(Self::Pdf),
+            Just(Self::Rss),
+            Just(Self::Atom),
+        ]
+        .boxed()
+    }
 }
 
 impl FromStr for PayloadType {
@@ -273,7 +314,7 @@ impl Display for PayloadType {
 }
 
 #[derive(Debug)]
-#[cfg_attr(test, derive(Clone, Arbitrary, PartialEq))]
+#[cfg_attr(test, derive(Clone, PartialEq))]
 pub struct Response {
     pub body: String,
     pub payload_type: Option<PayloadType>,
@@ -297,8 +338,20 @@ impl Response {
     }
 }
 
+#[cfg(test)]
+impl Arbitrary for Response {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        (".+", any::<Option<PayloadType>>())
+            .prop_map(|(body, payload_type)| Self { body, payload_type })
+            .boxed()
+    }
+}
+
 #[derive(Debug)]
-#[cfg_attr(test, derive(Clone, Arbitrary, PartialEq))]
+#[cfg_attr(test, derive(Clone, PartialEq))]
 pub struct Metadata {
     // fetchTimeMs
     pub fetch_time_ms: u64,
@@ -322,6 +375,18 @@ impl Metadata {
         }
 
         Err(Error::WarcParse("Failed to parse metadata".to_string()).into())
+    }
+}
+
+#[cfg(test)]
+impl Arbitrary for Metadata {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        (0..10000u64)
+            .prop_map(|fetch_time_ms| Self { fetch_time_ms })
+            .boxed()
     }
 }
 
@@ -670,8 +735,6 @@ impl Default for WarcWriter {
 mod tests {
     use super::*;
     use core::panic;
-
-    use proptest::prelude::*;
 
     #[test]
     fn it_works() {

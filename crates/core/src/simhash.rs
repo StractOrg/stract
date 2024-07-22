@@ -19,7 +19,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use crate::tokenizer::Tokenizer;
+use crate::tokenizer::FieldTokenizer;
 
 pub type HashType = u64;
 
@@ -30,7 +30,7 @@ fn hash_token(token: &tantivy::tokenizer::Token) -> HashType {
 }
 
 pub fn hash(text: &str) -> HashType {
-    let mut tokenizer = Tokenizer::default();
+    let mut tokenizer = FieldTokenizer::default();
 
     let mut stream = tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, text);
 

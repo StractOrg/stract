@@ -102,6 +102,7 @@ tower-http.workspace = true
 tower.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
+unicode-segmentation.workspace = true
 url.workspace = true
 utoipa-swagger-ui.workspace = true
 utoipa.workspace = true

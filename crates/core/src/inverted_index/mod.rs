@@ -48,14 +48,14 @@ use crate::ranking::initial::Score;
 use crate::schema::text_field::TextField;
 use crate::schema::{numerical_field, text_field, Field, NumericalFieldEnum, TextFieldEnum};
 use crate::snippet::TextSnippet;
-use crate::tokenizer::{
+use crate::tokenizer::fields::{
     BigramTokenizer, Identity, JsonField, Stemmed, TrigramTokenizer, UrlTokenizer,
 };
 use crate::webpage::region::Region;
 
 use crate::webpage::schema_org;
 use crate::Result;
-use crate::{schema::create_schema, tokenizer::Tokenizer};
+use crate::{schema::create_schema, tokenizer::FieldTokenizer};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -109,25 +109,25 @@ impl From<DocAddress> for tantivy::DocAddress {
 }
 
 fn register_tokenizers(manager: &TokenizerManager) {
-    let tokenizer = Tokenizer::default();
+    let tokenizer = FieldTokenizer::default();
     manager.register(tokenizer.as_str(), tokenizer);
 
-    let tokenizer = Tokenizer::Stemmed(Stemmed::default());
+    let tokenizer = FieldTokenizer::Stemmed(Stemmed::default());
     manager.register(tokenizer.as_str(), tokenizer);
 
-    let tokenizer = Tokenizer::Identity(Identity::default());
+    let tokenizer = FieldTokenizer::Identity(Identity::default());
     manager.register(tokenizer.as_str(), tokenizer);
 
-    let tokenizer = Tokenizer::Bigram(BigramTokenizer::default());
+    let tokenizer = FieldTokenizer::Bigram(BigramTokenizer::default());
     manager.register(tokenizer.as_str(), tokenizer);
 
-    let tokenizer = Tokenizer::Trigram(TrigramTokenizer::default());
+    let tokenizer = FieldTokenizer::Trigram(TrigramTokenizer::default());
     manager.register(tokenizer.as_str(), tokenizer);
 
-    let tokenizer = Tokenizer::Url(UrlTokenizer);
+    let tokenizer = FieldTokenizer::Url(UrlTokenizer);
     manager.register(tokenizer.as_str(), tokenizer);
 
-    let tokenizer = Tokenizer::Json(JsonField);
+    let tokenizer = FieldTokenizer::Json(JsonField);
     manager.register(tokenizer.as_str(), tokenizer);
 }
 

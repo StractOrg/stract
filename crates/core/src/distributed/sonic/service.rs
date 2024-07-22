@@ -335,9 +335,8 @@ mod tests {
     mod counter_service {
         use std::sync::atomic::AtomicI32;
 
-        use proptest_derive::Arbitrary;
-
         use super::super::Message;
+        use proptest::prelude::*;
 
         pub struct CounterService {
             pub counter: AtomicI32,
@@ -346,17 +345,21 @@ mod tests {
         sonic_service!(CounterService, [Change, Reset]);
 
         #[derive(
-            Debug,
-            Clone,
-            serde::Serialize,
-            serde::Deserialize,
-            bincode::Encode,
-            bincode::Decode,
-            Arbitrary,
+            Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
         )]
         pub struct Change {
             pub amount: i32,
         }
+
+        impl Arbitrary for Change {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                (0..100).prop_map(|amount| Change { amount }).boxed()
+            }
+        }
+
         #[derive(
             Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
         )]
