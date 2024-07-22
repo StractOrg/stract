@@ -25,16 +25,8 @@ pub struct Segment<'a> {
 }
 
 impl<'a> Segment<'a> {
-    pub fn script(&self) -> Script {
-        self.script
-    }
-
     pub fn text(&self) -> &'a str {
         &self.full_text[self.span.clone()]
-    }
-
-    pub fn span(&self) -> std::ops::Range<usize> {
-        self.span.clone()
     }
 
     pub fn tokenize(&self) -> impl Iterator<Item = Token> + 'a {
