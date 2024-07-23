@@ -60,7 +60,7 @@ impl tantivy::tokenizer::Tokenizer for DefaultTokenizer {
 pub struct Normal;
 
 pub struct NormalTokenStream<'a> {
-    stream: Box<dyn Iterator<Item = tokenizer::Token> + 'a>,
+    stream: Box<dyn Iterator<Item = tokenizer::Token<'a>> + 'a>,
     token: Option<tantivy::tokenizer::Token>,
     next_position: usize,
 }
@@ -103,7 +103,9 @@ impl<'a> tantivy::tokenizer::TokenStream for NormalTokenStream<'a> {
 }
 
 impl<'a> NormalTokenStream<'a> {
-    fn new_boxed(stream: Box<dyn Iterator<Item = tokenizer::Token> + 'a>) -> BoxTokenStream<'a> {
+    fn new_boxed(
+        stream: Box<dyn Iterator<Item = tokenizer::Token<'a>> + 'a>,
+    ) -> BoxTokenStream<'a> {
         BoxTokenStream::new(Self {
             stream,
             token: None,

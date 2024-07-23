@@ -29,7 +29,7 @@ impl<'a> Segment<'a> {
         &self.full_text[self.span.clone()]
     }
 
-    pub fn tokenize(&self) -> impl Iterator<Item = Token> + 'a {
+    pub fn tokenize(&self) -> impl Iterator<Item = Token<'a>> + 'a {
         let offset = self.span.start;
         let script = self.script;
 

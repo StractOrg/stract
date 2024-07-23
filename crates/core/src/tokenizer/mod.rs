@@ -23,23 +23,31 @@ mod split_preserve;
 mod split_whitespace_with_range;
 mod stemmer;
 
+use std::borrow::{Borrow, Cow};
+
 pub use fields::FieldTokenizer;
 
 use self::segmenter::Segmenter;
 
 #[derive(Debug)]
-pub struct Token {
-    text: String,
+pub struct Token<'a> {
+    text: Cow<'a, str>,
     span: std::ops::Range<usize>,
 }
 
-impl Token {
-    pub fn new(text: String, span: std::ops::Range<usize>) -> Self {
-        Token { text, span }
+impl<'a> Token<'a> {
+    pub fn new<S>(text: S, span: std::ops::Range<usize>) -> Self
+    where
+        S: Into<Cow<'a, str>>,
+    {
+        Token {
+            text: text.into(),
+            span,
+        }
     }
 
     pub fn text(&self) -> &str {
-        &self.text
+        self.text.borrow()
     }
 
     pub fn span(&self) -> std::ops::Range<usize> {

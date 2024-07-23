@@ -20,13 +20,13 @@ use super::{
 };
 
 pub trait ScriptTokenizer {
-    fn tokenize<'a>(&self, text: &'a str) -> Box<dyn Iterator<Item = Token> + 'a>;
+    fn tokenize<'a>(&self, text: &'a str) -> Box<dyn Iterator<Item = Token<'a>> + 'a>;
 }
 
 pub struct Latin;
 
 impl ScriptTokenizer for Latin {
-    fn tokenize<'a>(&self, text: &'a str) -> Box<dyn Iterator<Item = Token> + 'a> {
+    fn tokenize<'a>(&self, text: &'a str) -> Box<dyn Iterator<Item = Token<'a>> + 'a> {
         Box::new(
             text.split_whitespace_with_range()
                 .flat_map(|(txt, span)| {
@@ -37,7 +37,7 @@ impl ScriptTokenizer for Latin {
                             (txt, span)
                         })
                 })
-                .map(|(txt, span)| Token::new(txt.to_string(), span)),
+                .map(|(txt, span)| Token::new(txt, span)),
         )
     }
 }

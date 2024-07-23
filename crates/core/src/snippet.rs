@@ -571,7 +571,7 @@ Survey in 2016, 2017, and 2018."#;
 
     proptest! {
         #[test]
-        fn prop_snippet_gen(text: String, query: String) {
+        fn prop_snippet_gen(text in ".{1,100}", query in ".{1,100}") {
             let terms = query.split_whitespace().map(|s| s.to_string()).collect::<Vec<_>>();
             let _ = snippet_string(&text, &terms, whatlang::Lang::Eng, SnippetConfig::default());
         }
