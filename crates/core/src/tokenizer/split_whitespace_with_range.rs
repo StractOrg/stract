@@ -100,6 +100,22 @@ mod tests {
         assert_eq!(tokens[2], ("123", 16..19));
     }
 
+    #[test]
+    fn unicode() {
+        let txt = "best café";
+        let tokens: Vec<_> = txt.split_whitespace_with_range().collect();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0], ("best", 0..4));
+        assert_eq!(tokens[1], ("café", 5..10));
+
+        let txt = "Hello, 世界! 123";
+        let tokens: Vec<_> = txt.split_whitespace_with_range().collect();
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens[0], ("Hello,", 0..6));
+        assert_eq!(tokens[1], ("世界!", 7..14));
+        assert_eq!(tokens[2], ("123", 15..18));
+    }
+
     proptest! {
         #[test]
         fn prop_split_whitespace_with_range(s: String) {
@@ -107,6 +123,14 @@ mod tests {
             for (txt, range) in tokens {
                 assert_eq!(&s[range.clone()], txt);
             }
+        }
+
+        #[test]
+        fn consistent_with_std(s: String) {
+            let tokens: Vec<_> = s.split_whitespace().collect();
+            let tokens_with_range: Vec<_> = s.split_whitespace_with_range().collect();
+            let tokens_with_range: Vec<_> = tokens_with_range.into_iter().map(|(txt, _)| txt).collect();
+            assert_eq!(tokens, tokens_with_range);
         }
     }
 }

@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::tokenizer::{BoxTokenStream, LowerCaser, StopWordFilter, TextAnalyzer};
+use tantivy::tokenizer::{BoxTokenStream, StopWordFilter, TextAnalyzer};
 
-use crate::tokenizer::{self, Tokenize};
+use crate::tokenizer::{self, normalizer, Normalize, Tokenize};
 
 #[derive(Clone, Default)]
 pub struct DefaultTokenizer {
@@ -40,7 +40,7 @@ impl tantivy::tokenizer::Tokenizer for DefaultTokenizer {
     type TokenStream<'a> = BoxTokenStream<'a>;
 
     fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
-        let builder = TextAnalyzer::builder(Normal).filter(LowerCaser);
+        let builder = TextAnalyzer::builder(Normal);
 
         self.analyzer = if let Some(stopwords) = &self.stopwords {
             Some(
@@ -69,7 +69,12 @@ impl tantivy::tokenizer::Tokenizer for Normal {
     type TokenStream<'a> = BoxTokenStream<'a>;
 
     fn token_stream<'a>(&mut self, text: &'a str) -> Self::TokenStream<'a> {
-        let stream = Box::new(text.tokenize());
+        let stream = Box::new(
+            text.tokenize()
+                .normalize(&normalizer::Lowercase)
+                .normalize(&normalizer::UnicodeNFKD)
+                .normalize(&normalizer::UnicodeDiacritics),
+        );
 
         BoxTokenStream::new(NormalTokenStream::new_boxed(stream))
     }
@@ -190,7 +195,7 @@ mod tests {
     fn katakana() {
         assert_eq!(
             tokenize_default("test ダ.com"),
-            vec!["test", "ダ", ".", "com"]
+            vec!["test", "タ\u{3099}", ".", "com"]
         );
     }
 

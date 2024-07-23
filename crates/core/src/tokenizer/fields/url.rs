@@ -196,6 +196,7 @@ impl tantivy::tokenizer::TokenStream for SiteOperatorUrlTokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use tantivy::tokenizer::Tokenizer as _;
 
     fn tokenize_url(s: &str) -> Vec<String> {
@@ -260,5 +261,17 @@ mod tests {
                 "test",
             ]
         );
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(4096))]
+
+        #[test]
+        fn test_single_space(url: String) {
+            let tokens = tokenize_url(&url);
+
+            let num_spaces = tokens.iter().filter(|s| s.contains(' ')).count();
+            prop_assert!(num_spaces <= 1);
+        }
     }
 }

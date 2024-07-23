@@ -16,6 +16,7 @@
 
 mod add_space_last;
 pub mod fields;
+pub mod normalizer;
 mod script;
 mod script_tokenizer;
 mod segmenter;
@@ -29,7 +30,7 @@ pub use fields::FieldTokenizer;
 
 use self::segmenter::Segmenter;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Token<'a> {
     text: Cow<'a, str>,
     span: std::ops::Range<usize>,
@@ -48,6 +49,10 @@ impl<'a> Token<'a> {
 
     pub fn text(&self) -> &str {
         self.text.borrow()
+    }
+
+    pub fn mut_text(&mut self) -> &mut String {
+        self.text.to_mut()
     }
 
     pub fn span(&self) -> std::ops::Range<usize> {
@@ -69,9 +74,33 @@ impl Tokenize for str {
     }
 }
 
+pub trait Normalize<'a, N>
+where
+    N: normalizer::Normalizer<'a>,
+{
+    fn normalize(self, normalizer: &'a N) -> impl Iterator<Item = Token<'a>> + 'a;
+}
+
+impl<'a, T, N> Normalize<'a, N> for T
+where
+    T: Iterator<Item = Token<'a>> + 'a,
+    N: normalizer::Normalizer<'a>,
+{
+    fn normalize(self, normalizer: &'a N) -> impl Iterator<Item = Token<'a>> + 'a {
+        self.map(move |token| {
+            if normalizer.should_normalize(&token) {
+                normalizer.normalize(token)
+            } else {
+                token
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use normalizer::{Lowercase, UnicodeDiacritics, UnicodeNFKD};
     use proptest::prelude::*;
 
     #[test]
@@ -90,6 +119,29 @@ mod tests {
         assert_eq!(tokens[6].text(), "a");
         assert_eq!(tokens[7].text(), "test");
         assert_eq!(tokens[8].text(), ".");
+    }
+
+    #[test]
+    fn test_normalizer() {
+        let input = "Hello, world!";
+        let tokens: Vec<_> = input.tokenize().normalize(&Lowercase).collect();
+
+        assert_eq!(tokens.len(), 4);
+        assert_eq!(tokens[0].text(), "hello");
+        assert_eq!(tokens[1].text(), ",");
+        assert_eq!(tokens[2].text(), "world");
+        assert_eq!(tokens[3].text(), "!");
+
+        let input = "café";
+        let tokens = input
+            .tokenize()
+            .normalize(&Lowercase)
+            .normalize(&UnicodeNFKD)
+            .normalize(&UnicodeDiacritics)
+            .collect::<Vec<_>>();
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].text(), "cafe");
     }
 
     proptest! {

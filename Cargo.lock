@@ -4996,6 +4996,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tracing-test",
+ "unicode-normalization",
  "unicode-segmentation",
  "url",
  "utoipa",

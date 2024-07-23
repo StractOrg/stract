@@ -1284,4 +1284,68 @@ mod tests {
         assert_eq!(webpages[0].title, "C++");
         assert_eq!(webpages[0].url, "https://www.a.com/");
     }
+
+    #[test]
+    fn test_unicode_normalization() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        let webpage = Webpage::test_parse(
+            &format!(
+                r#"
+                <html>
+                    <head>
+                        <title>æble café</title>
+                    </head>
+                    <body>
+                        {CONTENT} test
+                    </body>
+                </html>
+            "#,
+                CONTENT = crate::rand_words(100)
+            ),
+            "https://www.a.com",
+        )
+        .unwrap();
+
+        index.insert(&webpage).unwrap();
+
+        index.commit().expect("failed to commit index");
+
+        let test = |q: &str| {
+            let ctx = index.local_search_ctx();
+
+            let query = Query::parse(
+                &ctx,
+                &SearchQuery {
+                    query: q.to_string(),
+                    ..Default::default()
+                },
+                &index,
+            )
+            .expect("Failed to parse query");
+
+            let ranker = Ranker::new(
+                SignalComputer::new(Some(&query)),
+                ctx.columnfield_reader.clone(),
+                CollectorConfig::default(),
+            );
+
+            let res = index
+                .search_initial(&query, &ctx, ranker.collector(ctx.clone()))
+                .unwrap();
+
+            assert_eq!(res.top_websites.len(), 1, "query: {}", q);
+
+            let webpages = index.retrieve_websites(&res.top_websites, &query).unwrap();
+
+            assert_eq!(webpages.len(), 1);
+            assert_eq!(webpages[0].title, "æble café");
+            assert_eq!(webpages[0].url, "https://www.a.com/");
+        };
+
+        test("cafe");
+        test("café");
+        test("æble");
+        test("æble café");
+    }
 }

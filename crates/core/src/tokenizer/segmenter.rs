@@ -87,7 +87,7 @@ impl<'a> Iterator for SegmentIterator<'a> {
             let next_script = Script::from(c);
 
             if let Some(script) = &script {
-                if &next_script != script {
+                if &next_script != script && next_script != Script::Other {
                     break;
                 }
             } else {
@@ -130,11 +130,11 @@ mod tests {
         let txt = "Hello, こんにちは、世界！";
         let segments: Vec<_> = txt.segments().collect();
 
-        assert_eq!(segments.len(), 2);
-        assert_eq!(segments[0].text(), "Hello, ");
+        // TODO: this should be split into multiple segments
+        // when we have more script tokenizers than just latin
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].text(), "Hello, こんにちは、世界！");
         assert_eq!(segments[0].script, Script::Latin);
-        assert_eq!(segments[1].text(), "こんにちは、世界！");
-        assert_eq!(segments[1].script, Script::Other);
     }
 
     proptest! {

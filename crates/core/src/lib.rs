@@ -81,7 +81,7 @@ pub mod similar_hosts;
 mod snippet;
 mod stopwords;
 pub mod summarizer;
-mod tokenizer;
+pub mod tokenizer;
 #[allow(unused)]
 mod ttl_cache;
 pub mod warc;

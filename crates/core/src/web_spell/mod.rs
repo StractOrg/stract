@@ -35,7 +35,6 @@ use fst::Streamer;
 use std::ops::Range;
 
 use crate::ceil_char_boundary;
-use crate::floor_char_boundary;
 use itertools::intersperse;
 
 #[derive(Debug, thiserror::Error)]
@@ -170,7 +169,7 @@ pub fn sentence_ranges(text: &str) -> Vec<Range<usize>> {
     let mut start = last_start;
 
     while start < text.len() && text[start..].starts_with(|c: char| c.is_whitespace()) {
-        start = floor_char_boundary(&text, start + 1);
+        start = ceil_char_boundary(&text, start + 1);
     }
 
     res.push(start..text.len());
