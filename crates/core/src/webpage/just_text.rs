@@ -38,26 +38,26 @@ impl<const N: usize> Preprocessor<N> {
             NodeEdge::Start(node) => {
                 if let Some(element) = node.as_element() {
                     let element_name: &str = &element.name.local;
-                    if let Some((_, n)) = self
+                    if let Some((_, open_tags)) = self
                         .removed_tags
                         .iter()
                         .zip(self.num_open_tags.iter_mut())
                         .find(|(name, _)| **name == element_name)
                     {
-                        *n += 1;
+                        *open_tags += 1;
                     }
                 }
             }
             NodeEdge::End(node) => {
                 if let Some(element) = node.as_element() {
                     let element_name: &str = &element.name.local;
-                    if let Some((_, n)) = self
+                    if let Some((_, open_tags)) = self
                         .removed_tags
                         .iter()
                         .zip(self.num_open_tags.iter_mut())
                         .find(|(name, _)| **name == element_name)
                     {
-                        *n -= 1;
+                        *open_tags -= 1;
                     }
                 }
             }

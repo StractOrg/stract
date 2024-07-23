@@ -436,3 +436,35 @@ pub fn urlencode(s: &str) -> String {
 
     percent_encoding::utf8_percent_encode(s, FRAGMENT).to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_ceil_char_boundary(s: String, index: usize) {
+            let index = if s.is_empty() {
+                0
+            } else {
+                index % s.len()
+            };
+
+            let ceil = ceil_char_boundary(&s, index);
+            prop_assert!(s.is_char_boundary(ceil));
+        }
+
+        #[test]
+        fn prop_floor_char_boundary(s: String, index: usize) {
+            let index = if s.is_empty() {
+                0
+            } else {
+                index % s.len()
+            };
+
+            let floor = floor_char_boundary(&s, index);
+            prop_assert!(s.is_char_boundary(floor));
+        }
+    }
+}

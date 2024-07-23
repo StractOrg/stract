@@ -165,10 +165,7 @@ impl EntitySnippetFragment {
 impl EntitySnippet {
     pub fn from_span(span: &Span, truncate_to: usize) -> Self {
         let (s, maybe_ellipsis) = if span.text.len() > truncate_to {
-            let mut truncate_to = truncate_to;
-            while !span.text.is_char_boundary(truncate_to) {
-                truncate_to -= 1;
-            }
+            let truncate_to = crate::floor_char_boundary(&span.text, truncate_to);
             (&span.text[0..truncate_to], "...")
         } else {
             (&*span.text, "")

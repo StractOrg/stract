@@ -158,8 +158,10 @@ impl OpticsBackend {
                                     MarkedString::String(msg.to_string()),
                                 ]),
                                 range: Some(Range {
-                                    start: offset_to_pos(start, &file.source),
-                                    end: offset_to_pos(end, &file.source),
+                                    start: offset_to_pos(start, &file.source)
+                                        .expect("start offset should be within bounds of source"),
+                                    end: offset_to_pos(end, &file.source)
+                                        .expect("end offset should be within bounds of source"),
                                 }),
                             })
                         })
@@ -238,8 +240,10 @@ fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
 
             Diagnostic {
                 range: Range {
-                    start: offset_to_pos(start, source),
-                    end: offset_to_pos(end, source),
+                    start: offset_to_pos(start, source)
+                        .expect("start offset should be within bounds of source"),
+                    end: offset_to_pos(end, source)
+                        .expect("end offset should be within bounds of source"),
                 },
                 severity: Some(DiagnosticSeverity::ERROR),
                 message,
@@ -252,8 +256,10 @@ fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
             let message = format!("Unrecognized token \"{tok}\"");
             Diagnostic {
                 range: Range {
-                    start: offset_to_pos(start, source),
-                    end: offset_to_pos(end, source),
+                    start: offset_to_pos(start, source)
+                        .expect("start offset should be within bounds of source"),
+                    end: offset_to_pos(end, source)
+                        .expect("end offset should be within bounds of source"),
                 },
                 severity: Some(DiagnosticSeverity::ERROR),
                 message,
@@ -266,8 +272,10 @@ fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
             let message = format!("Failed to parse token \"{tok}\" as a number");
             Diagnostic {
                 range: Range {
-                    start: offset_to_pos(start, source),
-                    end: offset_to_pos(end, source),
+                    start: offset_to_pos(start, source)
+                        .expect("start offset should be within bounds of source"),
+                    end: offset_to_pos(end, source)
+                        .expect("end offset should be within bounds of source"),
                 },
                 severity: Some(DiagnosticSeverity::ERROR),
                 message,
@@ -278,8 +286,10 @@ fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
             let message = "We encountered an unknown error".to_string();
             Diagnostic {
                 range: Range {
-                    start: offset_to_pos(start, source),
-                    end: offset_to_pos(end, source),
+                    start: offset_to_pos(start, source)
+                        .expect("start offset should be within bounds of source"),
+                    end: offset_to_pos(end, source)
+                        .expect("end offset should be within bounds of source"),
                 },
                 severity: Some(DiagnosticSeverity::ERROR),
                 message,
@@ -290,8 +300,10 @@ fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
             let message = "One of your patterns are unsupported".to_string();
             Diagnostic {
                 range: Range {
-                    start: offset_to_pos(0, source),
-                    end: offset_to_pos(source.len(), source),
+                    start: offset_to_pos(0, source)
+                        .expect("start offset should be within bounds of source"),
+                    end: offset_to_pos(source.len(), source)
+                        .expect("end offset should be within bounds of source"),
                 },
                 severity: Some(DiagnosticSeverity::ERROR),
                 message,
@@ -304,18 +316,22 @@ fn err_to_diagnostic(err: optics::Error, source: &str) -> Diagnostic {
     }
 }
 
-fn offset_to_pos(offset: usize, src: &str) -> Position {
+fn offset_to_pos(offset: usize, src: &str) -> Option<Position> {
+    if offset > src.len() || !src.is_char_boundary(offset) {
+        return None;
+    }
+
     if src[..offset].is_empty() {
-        return Position::new(0, 0);
+        return Some(Position::new(0, 0));
     }
 
     if src[..offset].ends_with('\n') {
         let l = src[..offset].lines().count();
-        Position::new(l as _, 0)
+        Some(Position::new(l as _, 0))
     } else {
         let l = src[..offset].lines().count() - 1;
         let c = src[..offset].lines().last().unwrap_or_default().len();
-        Position::new(l as _, c as _)
+        Some(Position::new(l as _, c as _))
     }
 }
 
@@ -328,7 +344,7 @@ fn position_to_byte_offset(pos: &Position, src: &str) -> Option<usize> {
                 if columns == 0 {
                     return true;
                 } else {
-                    columns -= 1
+                    columns -= c.len_utf8() as u32;
                 }
             } else if c == '\n' {
                 lines -= 1;
@@ -336,4 +352,25 @@ fn position_to_byte_offset(pos: &Position, src: &str) -> Option<usize> {
             false
         })
         .map(|(idx, _)| idx)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(4096))]
+        #[test]
+        fn round_trip(src in ".*", byte_offset in 0..10_000usize) {
+
+            if let Some(pos) = offset_to_pos(byte_offset, &src) {
+                if let Some(b) = position_to_byte_offset(&pos, &src) {
+                    prop_assert_eq!(byte_offset, b);
+                } else if src.is_char_boundary(byte_offset) {
+                    prop_assert!(byte_offset >= src.len());
+                }
+            }
+        }
+    }
 }

@@ -232,6 +232,7 @@ impl ErrorModel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn test_possible_errors() {
@@ -259,5 +260,17 @@ mod tests {
             possible_errors("hello", "helli"),
             Some(ErrorSequence(vec![ErrorType::Substitution('o', 'i')]))
         );
+    }
+
+    proptest! {
+        #[test]
+        fn prop_possible_errors_boundaries(a: String, b: String) {
+            let errors = possible_errors(&a, &b);
+            if a == b {
+                prop_assert_eq!(errors, None);
+            } else {
+                prop_assert!(errors.is_some());
+            }
+        }
     }
 }

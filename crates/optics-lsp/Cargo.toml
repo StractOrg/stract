@@ -1,21 +1,26 @@
 [package]
+edition = "2021"
 name = "optics-lsp"
 version = "0.1.0"
-edition = "2021"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
 console_error_panic_hook = "0.1.7"
+getrandom = {version = "0.2.8", features = ["js"]}
 itertools = "0.12.1"
 js-sys = "0.3.60"
 lsp-types = "0.95.0"
-serde = { version = "1.0.137", features = ["rc", "derive"] }
+serde = {version = "1.0.137", features = ["rc", "derive"]}
 serde-wasm-bindgen = "0.6.3"
 thiserror = "1.0.31"
 wasm-bindgen = "0.2.83"
 
-optics = { path = "../optics" }
+optics = {path = "../optics"}
+
+[dev-dependencies]
+proptest = {version = "1.2.0", default-features = false, features = ["std", "bit-set"]}
+proptest-derive = "0.4.0"
 
 [workspace]
