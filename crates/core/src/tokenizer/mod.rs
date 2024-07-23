@@ -21,7 +21,7 @@ mod script;
 mod script_tokenizer;
 mod segmenter;
 mod split_preserve;
-mod split_whitespace_with_range;
+mod split_with_range;
 mod stemmer;
 
 use std::borrow::{Borrow, Cow};

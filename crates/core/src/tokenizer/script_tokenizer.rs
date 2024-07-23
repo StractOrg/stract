@@ -15,8 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use super::{
-    split_preserve::StrSplitPreserveWithRange,
-    split_whitespace_with_range::SplitWhitespaceWithRange, Token,
+    split_preserve::StrSplitPreserveWithRange, split_with_range::SplitWhitespaceWithRange, Token,
 };
 
 pub trait ScriptTokenizer {

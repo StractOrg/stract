@@ -14,27 +14,37 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub trait SplitWhitespaceWithRange {
-    fn split_whitespace_with_range(&self) -> SplitWhitespaceWithRangeIter;
+pub trait SplitWithRange {
+    fn split_with_range<P>(&self, pred: P) -> impl Iterator<Item = (&str, std::ops::Range<usize>)>
+    where
+        P: Fn(char) -> bool;
 }
 
-pub struct SplitWhitespaceWithRangeIter<'a> {
+pub trait SplitWhitespaceWithRange {
+    fn split_whitespace_with_range(&self) -> impl Iterator<Item = (&str, std::ops::Range<usize>)>;
+}
+
+pub struct SplitWithRangeIter<'a, P> {
     s: &'a str,
+    pred: P,
     start: usize,
 }
 
-impl<'a> SplitWhitespaceWithRangeIter<'a> {
-    fn new(s: &'a str) -> Self {
-        Self { s, start: 0 }
+impl<'a, P> SplitWithRangeIter<'a, P> {
+    fn new(s: &'a str, pred: P) -> Self {
+        Self { s, pred, start: 0 }
     }
 }
 
-impl<'a> Iterator for SplitWhitespaceWithRangeIter<'a> {
+impl<'a, P> Iterator for SplitWithRangeIter<'a, P>
+where
+    P: Fn(char) -> bool,
+{
     type Item = (&'a str, std::ops::Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
         for c in self.s[self.start..].chars() {
-            if !c.is_whitespace() {
+            if !(self.pred)(c) {
                 break;
             }
             self.start += c.len_utf8();
@@ -44,10 +54,10 @@ impl<'a> Iterator for SplitWhitespaceWithRangeIter<'a> {
             return None;
         }
 
-        let start = self.s[self.start..].find(|c: char| !c.is_whitespace())?;
+        let start = self.s[self.start..].find(|c: char| !(self.pred)(c))?;
         let start = self.start + start;
         let end = self.s[start..]
-            .find(char::is_whitespace)
+            .find(|c| (self.pred)(c))
             .map(|end| start + end)
             .unwrap_or(self.s.len());
         let range = start..end;
@@ -57,14 +67,32 @@ impl<'a> Iterator for SplitWhitespaceWithRangeIter<'a> {
 }
 
 impl SplitWhitespaceWithRange for str {
-    fn split_whitespace_with_range(&self) -> SplitWhitespaceWithRangeIter {
-        SplitWhitespaceWithRangeIter::new(self)
+    fn split_whitespace_with_range(&self) -> impl Iterator<Item = (&str, std::ops::Range<usize>)> {
+        self.split_with_range(char::is_whitespace)
     }
 }
 
 impl SplitWhitespaceWithRange for String {
-    fn split_whitespace_with_range(&self) -> SplitWhitespaceWithRangeIter {
-        SplitWhitespaceWithRangeIter::new(self)
+    fn split_whitespace_with_range(&self) -> impl Iterator<Item = (&str, std::ops::Range<usize>)> {
+        self.split_with_range(char::is_whitespace)
+    }
+}
+
+impl SplitWithRange for str {
+    fn split_with_range<P>(&self, pred: P) -> impl Iterator<Item = (&str, std::ops::Range<usize>)>
+    where
+        P: Fn(char) -> bool,
+    {
+        SplitWithRangeIter::new(self, pred)
+    }
+}
+
+impl SplitWithRange for String {
+    fn split_with_range<P>(&self, pred: P) -> impl Iterator<Item = (&str, std::ops::Range<usize>)>
+    where
+        P: Fn(char) -> bool,
+    {
+        SplitWithRangeIter::new(self, pred)
     }
 }
 
