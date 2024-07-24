@@ -216,15 +216,17 @@ impl TermDict {
             return;
         }
 
+        let num_chars = term.chars().count();
+
         let punctuation_percentage =
-            term.chars().filter(|c| c.is_ascii_punctuation()).count() as f64 / term.len() as f64;
+            term.chars().filter(|c| c.is_ascii_punctuation()).count() as f64 / num_chars as f64;
 
         if punctuation_percentage > 0.5 {
             return;
         }
 
         let non_alphabetic_percentage =
-            term.chars().filter(|c| !c.is_alphabetic()).count() as f64 / term.len() as f64;
+            term.chars().filter(|c| !c.is_alphabetic()).count() as f64 / num_chars as f64;
 
         if non_alphabetic_percentage > 0.25 {
             return;

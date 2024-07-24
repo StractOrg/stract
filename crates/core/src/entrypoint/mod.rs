@@ -17,7 +17,6 @@
 //! The entrypoint module contains all entrypoints that runs the executables.
 pub mod ampc;
 pub mod api;
-pub mod autosuggest_scrape;
 pub mod canonical;
 mod centrality;
 #[cfg(feature = "dev")]

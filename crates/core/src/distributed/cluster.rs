@@ -184,4 +184,20 @@ impl Cluster {
 
         res
     }
+
+    pub async fn await_member<P>(&self, pred: P) -> Member
+    where
+        P: Fn(&Member) -> bool,
+    {
+        loop {
+            let members = self.members().await;
+            for member in members {
+                if pred(&member) {
+                    return member;
+                }
+            }
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    }
 }

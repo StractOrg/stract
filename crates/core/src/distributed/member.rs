@@ -107,6 +107,12 @@ pub enum Service {
     },
 }
 
+impl Service {
+    pub fn is_searcher(&self) -> bool {
+        matches!(self, Self::Searcher { .. })
+    }
+}
+
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Member {
     pub id: String,

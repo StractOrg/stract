@@ -23,7 +23,7 @@ use url::Url;
 use crate::collector::approx_count;
 use crate::config::{CollectorConfig, SnippetConfig};
 use crate::index::Index;
-use crate::inverted_index::{InvertedIndex, RetrievedWebpage};
+use crate::inverted_index::{InvertedIndex, KeyPhrase, RetrievedWebpage};
 use crate::models::dual_encoder::DualEncoder;
 use crate::query::Query;
 use crate::ranking::models::lambdamart::LambdaMART;
@@ -387,6 +387,10 @@ where
 
     pub fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
         self.index.guard().inverted_index().get_homepage(url)
+    }
+
+    pub fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
+        self.index.guard().inverted_index().top_key_phrases(top_n)
     }
 }
 

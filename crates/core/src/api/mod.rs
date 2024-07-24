@@ -34,7 +34,7 @@ use crate::{
     leaky_queue::LeakyQueue,
     models::dual_encoder::DualEncoder,
     ranking::models::lambdamart::LambdaMART,
-    searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher},
+    searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher, SearchClient},
     similar_hosts::SimilarHostsFinder,
     webgraph::remote::RemoteWebgraph,
 };
@@ -148,11 +148,6 @@ fn build_router(state: Arc<State>) -> Router {
 }
 
 pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
-    let autosuggest = match &config.queries_csv_path {
-        Some(queries_csv_path) => Autosuggest::load_csv(queries_csv_path)?,
-        None => Autosuggest::empty(),
-    };
-
     let lambda_model = match &config.lambda_model_path {
         Some(path) => Some(LambdaMART::open(path)?),
         None => None,
@@ -193,6 +188,23 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
 
     let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster)).await;
     let live_searcher = LiveSearcher::new(Arc::clone(&cluster));
+
+    if !cluster
+        .members()
+        .await
+        .iter()
+        .any(|m| m.service.is_searcher())
+    {
+        log::warn!("Waiting for search nodes to join the cluster");
+        cluster.await_member(|m| m.service.is_searcher()).await;
+        log::info!("Search nodes joined the cluster");
+    }
+
+    let autosuggest = Autosuggest::from_key_phrases(
+        dist_searcher
+            .top_key_phrases(config.top_phrases_for_autosuggest)
+            .await,
+    )?;
 
     let state = {
         let mut cross_encoder = None;

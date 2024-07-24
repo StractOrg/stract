@@ -31,12 +31,12 @@ use crate::{
     },
     image_store::Image,
     index::Index,
-    inverted_index::{RetrievedWebpage, WebpagePointer},
+    inverted_index::{KeyPhrase, RetrievedWebpage, WebpagePointer},
     ranking::pipeline::{PrecisionRankingWebpage, RecallRankingWebpage},
     Result,
 };
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use fnv::FnvHashMap;
 use futures::future::join_all;
@@ -92,6 +92,8 @@ pub trait SearchClient {
         max_height: Option<u64>,
         max_width: Option<u64>,
     ) -> impl Future<Output = Result<Option<Image>>> + Send;
+
+    fn top_key_phrases(&self, top_n: usize) -> impl Future<Output = Vec<KeyPhrase>> + Send;
 }
 
 #[derive(Clone, Debug)]
@@ -382,6 +384,45 @@ impl SearchClient for DistributedSearcher {
             .and_then(|(_, mut v)| v.pop())
             .and_then(|(_, v)| v)
     }
+
+    async fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
+        let client = self.conn().await;
+
+        let res = client
+            .send_with_timeout(
+                search_server::TopKeyPhrases { top_n },
+                &AllShardsSelector,
+                &RandomReplicaSelector,
+                Duration::from_secs(60 * 60),
+            )
+            .await;
+
+        match res {
+            Ok(res) => {
+                let mut phrases = HashMap::new();
+
+                for (_, v) in res {
+                    for (_, v) in v {
+                        for phrase in v {
+                            *phrases.entry(phrase.text().to_string()).or_default() +=
+                                phrase.score();
+                        }
+                    }
+                }
+
+                phrases
+                    .into_iter()
+                    .map(|(phrase, score)| KeyPhrase::new(phrase, score))
+                    .sorted_by(|a, b| b.score().partial_cmp(&a.score()).unwrap())
+                    .take(top_n)
+                    .collect()
+            }
+            Err(e) => {
+                tracing::error!("failed to get key phrases: {:?}", e);
+                Vec::new()
+            }
+        }
+    }
 }
 
 /// This should only be used for testing and benchmarks.
@@ -456,5 +497,9 @@ impl SearchClient for LocalSearchClient {
 
     async fn search_entity(&self, _query: &str) -> Option<EntityMatch> {
         None
+    }
+
+    async fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
+        self.0.top_key_phrases(top_n)
     }
 }

@@ -29,9 +29,12 @@ use crate::{
     enum_dispatch_from_discriminant,
     enum_map::InsertEnumMapKey,
     ranking::bm25::Bm25Constants,
-    tokenizer,
-    tokenizer::fields::{
-        BigramTokenizer, FieldTokenizer, Identity, JsonField, TrigramTokenizer, UrlTokenizer,
+    tokenizer::{
+        self,
+        fields::{
+            BigramTokenizer, FieldTokenizer, Identity, JsonField, NewlineTokenizer,
+            TrigramTokenizer, UrlTokenizer,
+        },
     },
     webpage::Html,
     Result,
@@ -95,6 +98,10 @@ pub trait TextField:
         false
     }
 
+    fn has_freqs(&self) -> bool {
+        true
+    }
+
     fn is_phrase_searchable(&self) -> bool {
         self.is_searchable() && self.has_pos()
     }
@@ -115,10 +122,10 @@ pub trait TextField:
     }
 
     fn record_option(&self) -> IndexRecordOption {
-        if self.has_pos() {
-            IndexRecordOption::WithFreqsAndPositions
-        } else {
-            IndexRecordOption::WithFreqs
+        match (self.has_freqs(), self.has_pos()) {
+            (true, true) => IndexRecordOption::WithFreqsAndPositions,
+            (true, false) => IndexRecordOption::WithFreqs,
+            (false, _) => IndexRecordOption::Basic,
         }
     }
 
@@ -190,6 +197,7 @@ pub enum TextFieldEnum {
     InsertionTimestamp,
     RecipeFirstIngredientTagId,
     Keywords,
+    KeyPhrases,
     Links,
 }
 
@@ -227,6 +235,7 @@ enum_dispatch_from_discriminant!(TextFieldEnumDiscriminants => TextFieldEnum,
     InsertionTimestamp,
     RecipeFirstIngredientTagId,
     Keywords,
+    KeyPhrases,
     Links,
 ]);
 
@@ -1517,6 +1526,41 @@ impl TextField for RecipeFirstIngredientTagId {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Links;
+impl TextField for Links {
+    fn name(&self) -> &str {
+        "links"
+    }
+
+    fn has_pos(&self) -> bool {
+        true
+    }
+
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Url(UrlTokenizer)
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _cache: &mut FnCache,
+        doc: &mut TantivyDocument,
+        schema: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        doc.add_text(
+            self.tantivy_field(schema)
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            html.anchor_links()
+                .into_iter()
+                .map(|l| l.destination.as_str().to_string())
+                .join("\n"),
+        );
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Keywords;
 impl TextField for Keywords {
     fn name(&self) -> &str {
@@ -1554,36 +1598,42 @@ impl TextField for Keywords {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Links;
-impl TextField for Links {
+pub struct KeyPhrases;
+impl TextField for KeyPhrases {
     fn name(&self) -> &str {
-        "links"
+        "key_phrases"
     }
 
-    fn has_pos(&self) -> bool {
+    fn is_stored(&self) -> bool {
         true
     }
 
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
-        FieldTokenizer::Url(UrlTokenizer)
-    }
-
-    fn add_html_tantivy(
+    fn add_webpage_tantivy(
         &self,
-        html: &Html,
-        _cache: &mut FnCache,
+        webpage: &crate::webpage::Webpage,
         doc: &mut TantivyDocument,
         schema: &tantivy::schema::Schema,
     ) -> Result<()> {
         doc.add_text(
             self.tantivy_field(schema)
                 .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
-            html.anchor_links()
-                .into_iter()
-                .map(|l| l.destination.as_str().to_string())
-                .join("\n"),
+            webpage.keywords.join("\n"),
         );
 
         Ok(())
+    }
+
+    fn add_html_tantivy(
+        &self,
+        _: &Html,
+        _: &mut FnCache,
+        _: &mut TantivyDocument,
+        _: &tantivy::schema::Schema,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Newline(NewlineTokenizer::default())
     }
 }

@@ -19,7 +19,6 @@ use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::Path;
 use stract::config;
-use stract::entrypoint::autosuggest_scrape::{self, Gl};
 
 #[cfg(feature = "dev")]
 use stract::entrypoint::configure;
@@ -79,14 +78,6 @@ enum Commands {
     /// the search servers, webgraph servers etc. to provide the necesarry functionality.
     Api {
         config_path: String,
-    },
-
-    /// Scrape the Google autosuggest API for search queries.
-    AutosuggestScrape {
-        num_queries: usize,
-        gl: Gl,
-        ms_sleep_between_req: u64,
-        output_dir: String,
     },
 
     /// Deploy the crawler.
@@ -374,14 +365,6 @@ fn main() -> Result<()> {
                 .enable_all()
                 .build()?
                 .block_on(entity_search_server::run(config))?;
-        }
-        Commands::AutosuggestScrape {
-            num_queries: queries_to_scrape,
-            gl,
-            ms_sleep_between_req,
-            output_dir,
-        } => {
-            autosuggest_scrape::run(queries_to_scrape, gl, ms_sleep_between_req, output_dir)?;
         }
         #[cfg(feature = "dev")]
         Commands::Configure { skip_download } => {

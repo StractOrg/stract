@@ -8,7 +8,7 @@ use std::time::Duration;
 /// A retry strategy driven by exponential back-off.
 ///
 /// The power corresponds to the number of past attempts.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExponentialBackoff {
     current: u64,
     base: u64,
@@ -21,7 +21,7 @@ impl ExponentialBackoff {
     ///
     /// The resulting duration is calculated by taking the base to the `n`-th power,
     /// where `n` denotes the number of past attempts.
-    pub fn from_millis(base: u64) -> ExponentialBackoff {
+    pub const fn from_millis(base: u64) -> ExponentialBackoff {
         ExponentialBackoff {
             current: base,
             base,
@@ -29,7 +29,7 @@ impl ExponentialBackoff {
         }
     }
 
-    pub fn with_limit(mut self, limit: Duration) -> Self {
+    pub const fn with_limit(mut self, limit: Duration) -> Self {
         self.max_delay = Some(limit);
         self
     }

@@ -56,6 +56,10 @@ impl Api {
     pub fn max_similar_hosts() -> usize {
         1_000
     }
+
+    pub fn top_phrases_for_autosuggest() -> usize {
+        1_000_000
+    }
 }
 
 pub struct Snippet;

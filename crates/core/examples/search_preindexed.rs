@@ -22,7 +22,6 @@ pub async fn main() {
     };
 
     let config = ApiConfig {
-        queries_csv_path: Some("data/queries_us.csv".to_string()),
         host: "0.0.0.0:8000".parse().unwrap(),
         prometheus_host: "0.0.0.0:8001".parse().unwrap(),
         crossencoder_model_path: None,
@@ -45,17 +44,18 @@ pub async fn main() {
         }),
         max_concurrent_searches: defaults::Api::max_concurrent_searches(),
         max_similar_hosts: defaults::Api::max_similar_hosts(),
+        top_phrases_for_autosuggest: defaults::Api::top_phrases_for_autosuggest(),
     };
 
-    let mut queries =
-        stract::autosuggest::Autosuggest::load_csv(config.queries_csv_path.as_ref().unwrap())
-            .unwrap()
-            .all()
-            .unwrap();
+    let mut searcher = LocalSearcher::new(index);
 
+    let mut queries: Vec<_> = searcher
+        .top_key_phrases(1_000_000)
+        .into_iter()
+        .map(|phrase| phrase.text().to_string())
+        .collect();
     queries.shuffle(&mut rand::thread_rng());
 
-    let mut searcher = LocalSearcher::new(index);
     searcher.set_collector_config(collector_conf);
     searcher.set_snippet_config(SnippetConfig {
         num_words_for_lang_detection: Some(250),

@@ -21,14 +21,13 @@ use url::Url;
 
 use crate::{
     config,
-    distributed::sonic::service::sonic_service,
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
-        sonic,
+        sonic::{self, service::sonic_service},
     },
     index::Index,
-    inverted_index::{self, RetrievedWebpage},
+    inverted_index::{self, KeyPhrase, RetrievedWebpage},
     models::dual_encoder::DualEncoder,
     ranking::models::{lambdamart::LambdaMART, linear::LinearRegression},
     searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
@@ -42,6 +41,7 @@ sonic_service!(
         Search,
         GetWebpage,
         GetHomepageDescriptions,
+        TopKeyPhrases,
     ]
 );
 
@@ -93,7 +93,7 @@ impl SearchService {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct RetrieveWebsites {
     pub websites: Vec<inverted_index::WebpagePointer>,
     pub query: String,
@@ -108,7 +108,7 @@ impl sonic::service::Message<SearchService> for RetrieveWebsites {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct Search {
     pub query: SearchQuery,
 }
@@ -119,7 +119,7 @@ impl sonic::service::Message<SearchService> for Search {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct GetWebpage {
     pub url: String,
 }
@@ -130,7 +130,7 @@ impl sonic::service::Message<SearchService> for GetWebpage {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct GetHomepageDescriptions {
     #[bincode(with_serde)]
     pub urls: Vec<Url>,
@@ -149,6 +149,17 @@ impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
         }
 
         crate::bincode_utils::SerdeCompat(result)
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct TopKeyPhrases {
+    pub top_n: usize,
+}
+impl sonic::service::Message<SearchService> for TopKeyPhrases {
+    type Response = Vec<KeyPhrase>;
+    async fn handle(self, server: &SearchService) -> Self::Response {
+        server.local_searcher.top_key_phrases(self.top_n)
     }
 }
 

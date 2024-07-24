@@ -41,7 +41,6 @@ fn download_files() {
         .unwrap()
         .block_on(async {
             for name in [
-                "queries_us.csv",
                 "sample.warc.gz",
                 "bangs.json",
                 "english-wordnet-2022-subset.ttl",

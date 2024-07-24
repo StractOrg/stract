@@ -224,7 +224,6 @@ pub struct ApiSpellCheck {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ApiConfig {
-    pub queries_csv_path: Option<String>,
     pub host: SocketAddr,
     pub prometheus_host: SocketAddr,
     pub crossencoder_model_path: Option<String>,
@@ -238,6 +237,9 @@ pub struct ApiConfig {
 
     #[serde(default = "defaults::Api::max_similar_hosts")]
     pub max_similar_hosts: usize,
+
+    #[serde(default = "defaults::Api::top_phrases_for_autosuggest")]
+    pub top_phrases_for_autosuggest: usize,
 
     pub spell_check: Option<ApiSpellCheck>,
 

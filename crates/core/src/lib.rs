@@ -344,14 +344,17 @@ impl<T> OneOrMany<T> {
     }
 }
 
-pub trait TopKOrderable: Ord {
+pub trait TopKOrderable {
     type SortKey: Ord + Copy;
 
     fn sort_key(&self) -> Self::SortKey;
 }
 
-impl TopKOrderable for (SortableFloat, webgraph::NodeID) {
-    type SortKey = SortableFloat;
+impl<K, T> TopKOrderable for (K, T)
+where
+    K: Ord + Copy,
+{
+    type SortKey = K;
 
     fn sort_key(&self) -> Self::SortKey {
         self.0
@@ -391,12 +394,12 @@ where
         top_k.push(hit);
         if top_k.len() >= 2 * k {
             // The standard library does all of the heavy lifting here.
-            let (_, median_el, _) = top_k.select_nth_unstable(k - 1);
+            let (_, median_el, _) = top_k.select_nth_unstable_by_key(k - 1, |el| el.sort_key());
             threshold = Some(median_el.sort_key());
             top_k.truncate(k);
         }
     }
-    top_k.sort_unstable();
+    top_k.sort_unstable_by_key(|el| el.sort_key());
     top_k.truncate(k);
     top_k
 }

@@ -7,7 +7,7 @@ host = "0.0.0.0:3000"
 bangs_path = "data/bangs.json"
 # dual_encoder_model_path = "data/dual_encoder"
 prometheus_host = "0.0.0.0:3001"
-queries_csv_path = "data/queries_us.csv"
+top_phrases_for_autosuggest = 1_000
 
 [spell_check]
 path = "data/web_spell/checker"

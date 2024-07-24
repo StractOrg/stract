@@ -21,36 +21,26 @@
 
 use fst::{automaton::Str, Automaton, IntoStreamer};
 
-use crate::Result;
-use std::path::Path;
+use crate::{inverted_index::KeyPhrase, Result};
 
 pub struct Autosuggest {
     queries: fst::Set<Vec<u8>>,
 }
 
 impl Autosuggest {
-    pub fn load_csv<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn from_key_phrases(key_phrases: Vec<KeyPhrase>) -> Result<Self> {
         let mut queries: Vec<String> = Vec::new();
 
-        let mut rdr = csv::Reader::from_path(path)?;
-        for result in rdr.records() {
-            let record = result?;
-            if let Some(query) = record.get(0) {
-                queries.push(query.to_string());
-            }
+        for key_phrase in key_phrases {
+            queries.push(key_phrase.text().to_string());
         }
 
         queries.sort();
+        queries.dedup();
 
         let queries = fst::Set::from_iter(queries)?;
 
         Ok(Self { queries })
-    }
-
-    pub fn empty() -> Self {
-        Self {
-            queries: fst::Set::default(),
-        }
     }
 
     pub fn suggestions(&self, query: &str) -> Result<Vec<String>> {
