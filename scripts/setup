@@ -1,0 +1,35 @@
+#!.venv/bin/python3
+import argparse
+import subprocess
+import sys
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("--ml", action="store_true", help="Flag to configure whether everything for machine learning should also be setup")
+
+args = parser.parse_args()
+
+necesarry_packages = [
+  "pandas",
+]
+
+ml_packages = [
+  "safetensors",
+  "datasets",
+  "torch",
+  "transformers",
+]
+
+packages_to_install = necesarry_packages
+
+if args.ml:
+  packages_to_install += ml_packages
+
+subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade"] + packages_to_install)
+
+
+subprocess.run(["cd", "crates/client-wasm", "&&", "wasm-pack", "build", "--target", "web"])
+
+if args.ml:
+  subprocess.run(["./scripts/export_crossencoder"])
+  subprocess.run(["./scripts/export_dual_encoder"])

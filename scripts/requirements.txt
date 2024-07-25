@@ -1,6 +1,0 @@
-torch
-transformers
-datasets
-gensim
-safetensors
-pandas

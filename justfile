@@ -21,19 +21,12 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
     cd frontend && npm run openapi
 
 @setup *ARGS:
-    cd crates/client-wasm && wasm-pack build --target web
     just setup_python_env
-
-@prepare_models:
-    just setup_python_env
-    ./scripts/export_crossencoder
-    ./scripts/export_dual_encoder
+    ./scripts/setup {{ARGS}}
 
 @configure *ARGS:
     just setup {{ARGS}}
-    just prepare_models
     RUST_LOG="none,stract=info" cargo run --release --all-features -- configure {{ARGS}}
 
 @setup_python_env:
     python3 -m venv .venv || true
-    .venv/bin/pip install --upgrade -r scripts/requirements.txt

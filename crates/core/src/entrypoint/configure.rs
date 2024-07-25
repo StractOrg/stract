@@ -179,6 +179,11 @@ fn create_inverted_index() -> Result<()> {
     let centrality_path = Path::new(DATA_PATH).join("centrality");
     let page_centrality_path = Path::new(DATA_PATH).join("centrality_page");
     let dual_encoder_path = Path::new(DATA_PATH).join("dual_encoder");
+    let dual_encoder_path = if !dual_encoder_path.exists() {
+        None
+    } else {
+        Some(dual_encoder_path)
+    };
 
     let worker = indexer::IndexingWorker::new(IndexerConfig {
         host_centrality_store_path: centrality_path.to_str().unwrap().to_string(),
@@ -195,8 +200,8 @@ fn create_inverted_index() -> Result<()> {
         minimum_clean_words: None,
         batch_size: defaults::Indexing::batch_size(),
         autocommit_after_num_inserts: defaults::Indexing::autocommit_after_num_inserts(),
-        dual_encoder: Some(IndexerDualEncoderConfig {
-            model_path: dual_encoder_path.to_str().unwrap().to_string(),
+        dual_encoder: dual_encoder_path.map(|p| IndexerDualEncoderConfig {
+            model_path: p.to_str().unwrap().to_string(),
             page_centrality_rank_threshold: Some(100_000),
         }),
     });

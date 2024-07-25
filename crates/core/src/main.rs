@@ -97,6 +97,8 @@ enum Commands {
     Configure {
         #[clap(long)]
         skip_download: bool,
+        #[clap(long)]
+        ml: bool,
     },
 
     // Commands for the live index.
@@ -367,7 +369,10 @@ fn main() -> Result<()> {
                 .block_on(entity_search_server::run(config))?;
         }
         #[cfg(feature = "dev")]
-        Commands::Configure { skip_download } => {
+        Commands::Configure {
+            skip_download,
+            ml: _,
+        } => {
             configure::run(skip_download)?;
         }
         Commands::Crawler { options } => match options {
