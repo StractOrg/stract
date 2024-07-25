@@ -36,49 +36,50 @@ use crate::TantivyError;
 ///
 /// let mut tokenizer = NgramTokenizer::new(2, 3, false).unwrap();
 /// let mut stream = tokenizer.token_stream("hello");
+/// let mut it = TokenStream::iter(&mut stream);
 /// {
-///     let token = stream.next().unwrap();
+///     let token = it.next().unwrap();
 ///     assert_eq!(token.text, "he");
 ///     assert_eq!(token.offset_from, 0);
 ///     assert_eq!(token.offset_to, 2);
 /// }
 /// {
-///   let token = stream.next().unwrap();
+///   let token = it.next().unwrap();
 ///     assert_eq!(token.text, "hel");
 ///     assert_eq!(token.offset_from, 0);
 ///     assert_eq!(token.offset_to, 3);
 /// }
 /// {
-///   let token = stream.next().unwrap();
+///   let token = it.next().unwrap();
 ///     assert_eq!(token.text, "el");
 ///     assert_eq!(token.offset_from, 1);
 ///     assert_eq!(token.offset_to, 3);
 /// }
 /// {
-///   let token = stream.next().unwrap();
+///   let token = it.next().unwrap();
 ///     assert_eq!(token.text, "ell");
 ///     assert_eq!(token.offset_from, 1);
 ///     assert_eq!(token.offset_to, 4);
 /// }
 /// {
-///   let token = stream.next().unwrap();
+///   let token = it.next().unwrap();
 ///     assert_eq!(token.text, "ll");
 ///     assert_eq!(token.offset_from, 2);
 ///     assert_eq!(token.offset_to, 4);
 /// }
 /// {
-///   let token = stream.next().unwrap();
+///   let token = it.next().unwrap();
 ///     assert_eq!(token.text, "llo");
 ///     assert_eq!(token.offset_from, 2);
 ///     assert_eq!(token.offset_to, 5);
 /// }
 /// {
-///   let token = stream.next().unwrap();
+///   let token = it.next().unwrap();
 ///   assert_eq!(token.text, "lo");
 ///   assert_eq!(token.offset_from, 3);
 ///   assert_eq!(token.offset_to, 5);
 /// }
-/// assert!(stream.next().is_none());
+/// assert!(it.next().is_none());
 /// ```
 #[derive(Clone, Debug)]
 pub struct NgramTokenizer {
@@ -205,7 +206,8 @@ struct StutteringIterator<T> {
 }
 
 impl<T> StutteringIterator<T>
-where T: Iterator<Item = usize>
+where
+    T: Iterator<Item = usize>,
 {
     pub fn new(mut underlying: T, min_gram: usize, max_gram: usize) -> StutteringIterator<T> {
         assert!(min_gram > 0);
@@ -234,7 +236,8 @@ where T: Iterator<Item = usize>
 }
 
 impl<T> Iterator for StutteringIterator<T>
-where T: Iterator<Item = usize>
+where
+    T: Iterator<Item = usize>,
 {
     type Item = (usize, usize);
 

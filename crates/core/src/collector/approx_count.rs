@@ -17,6 +17,7 @@
 use std::ops::Add;
 
 use itertools::Itertools;
+use lending_iter::LendingIterator;
 use tantivy::{
     collector::{Collector, SegmentCollector},
     tokenizer::Tokenizer,
@@ -113,8 +114,9 @@ impl Collector for ApproxCount {
         for term in &self.terms {
             let mut term_freq = 0;
             let mut stream = tokenizer.token_stream(term.as_str());
+            let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 
-            while let Some(term) = stream.next() {
+            while let Some(term) = it.next() {
                 term_freq += inverted_index
                     .doc_freq(&tantivy::Term::from_field_text(field, term.text.as_str()))?;
             }

@@ -26,6 +26,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 use itertools::Itertools;
+use lending_iter::LendingIterator;
 use tantivy::fieldnorm::FieldNormReader;
 use tantivy::postings::SegmentPostings;
 use tantivy::query::{Query as _, Scorer};
@@ -266,8 +267,9 @@ impl SignalComputer {
                         let mut terms = Vec::new();
                         let mut tokenizer = text_field.tokenizer(query.lang.as_ref());
                         let mut stream = tokenizer.token_stream(&simple_query);
+                        let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 
-                        while let Some(token) = stream.next() {
+                        while let Some(token) = it.next() {
                             let term = tantivy::Term::from_field_text(tv_field, &token.text);
                             terms.push(term);
                         }

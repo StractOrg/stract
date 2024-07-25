@@ -2631,6 +2631,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03087c2bad5e1034e8cace5926dec053fb3790248370865f5117a7d0213354c8"
 
 [[package]]
+name = "lending-iter"
+version = "0.1.0"
+
+[[package]]
 name = "levenshtein_automata"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4946,6 +4950,7 @@ dependencies = [
  "insta",
  "itertools 0.13.0",
  "kuchiki",
+ "lending-iter",
  "log",
  "logos",
  "lz4_flex",
@@ -5216,6 +5221,7 @@ dependencies = [
  "futures-util",
  "htmlescape",
  "itertools 0.13.0",
+ "lending-iter",
  "levenshtein_automata",
  "log",
  "lru",

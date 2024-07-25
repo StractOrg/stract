@@ -8,6 +8,7 @@
 use std::borrow::{Borrow, BorrowMut};
 use std::ops::{Deref, DerefMut};
 
+use lending_iter::LendingIterator;
 use serde::{Deserialize, Serialize};
 
 /// Token
@@ -128,22 +129,41 @@ pub trait TokenStream {
     /// Returns a mutable reference to the current token.
     fn token_mut(&mut self) -> &mut Token;
 
-    /// Helper to iterate over tokens. It
-    /// simply combines a call to `.advance()`
-    /// and `.token()`.
-    fn next(&mut self) -> Option<&Token> {
-        if self.advance() {
-            Some(self.token())
-        } else {
-            None
-        }
-    }
-
     /// Helper function to consume the entire `TokenStream`
     /// and push the tokens to a sink function.
     fn process(&mut self, sink: &mut dyn FnMut(&Token)) {
         while self.advance() {
             sink(self.token());
+        }
+    }
+
+    /// Helper function to iterate over the tokens of the `TokenStream`
+    /// using a lending iterator.
+    fn iter<'a>(&'a mut self) -> TokenIter<'a, Self>
+    where
+        Self: 'a + Sized,
+    {
+        TokenIter { token_stream: self }
+    }
+}
+
+pub struct TokenIter<'a, T> {
+    token_stream: &'a mut T,
+}
+
+impl<'a, T> LendingIterator for TokenIter<'a, T>
+where
+    T: TokenStream,
+{
+    type Item<'b> = &'b Token
+    where
+        'a: 'b;
+
+    fn next(&mut self) -> Option<Self::Item<'_>> {
+        if self.token_stream.advance() {
+            Some(self.token_stream.token())
+        } else {
+            None
         }
     }
 }

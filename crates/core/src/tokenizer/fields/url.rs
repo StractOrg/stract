@@ -196,6 +196,7 @@ impl tantivy::tokenizer::TokenStream for SiteOperatorUrlTokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lending_iter::LendingIterator;
     use proptest::prelude::*;
     use tantivy::tokenizer::Tokenizer as _;
 
@@ -203,8 +204,9 @@ mod tests {
         let mut res = Vec::new();
         let mut tokenizer = UrlTokenizer;
         let mut stream = tokenizer.token_stream(s);
+        let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 
-        while let Some(token) = stream.next() {
+        while let Some(token) = it.next() {
             res.push(token.text.clone());
         }
 

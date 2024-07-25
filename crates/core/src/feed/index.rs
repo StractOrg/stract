@@ -25,6 +25,7 @@ use crate::{
 };
 use anyhow::Result;
 use hashbrown::HashSet;
+use lending_iter::LendingIterator;
 use tantivy::{
     merge_policy::NoMergePolicy,
     query::{PhraseQuery, TermQuery},
@@ -131,8 +132,9 @@ impl FeedIndex {
         let tv_field = self.schema.get_field("url").unwrap();
 
         let mut stream = tokenizer.token_stream(query);
+        let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 
-        while let Some(token) = stream.next() {
+        while let Some(token) = it.next() {
             res.push(tantivy::Term::from_field_text(tv_field, &token.text));
         }
 

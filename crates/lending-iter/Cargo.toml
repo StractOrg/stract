@@ -1,0 +1,9 @@
+[package]
+edition = "2021"
+license = "AGPL-3.0"
+name = "lending-iter"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]

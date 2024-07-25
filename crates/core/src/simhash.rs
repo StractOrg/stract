@@ -19,6 +19,8 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+use lending_iter::LendingIterator;
+
 use crate::tokenizer::FieldTokenizer;
 
 pub type HashType = u64;
@@ -33,10 +35,11 @@ pub fn hash(text: &str) -> HashType {
     let mut tokenizer = FieldTokenizer::default();
 
     let mut stream = tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, text);
+    let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 
     let mut v = [0i64; HashType::BITS as usize];
 
-    while let Some(token) = stream.next() {
+    while let Some(token) = it.next() {
         let h = hash_token(token);
 
         for (i, item) in v.iter_mut().enumerate() {

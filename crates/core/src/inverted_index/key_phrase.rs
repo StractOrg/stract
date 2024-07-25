@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use itertools::Itertools;
+use lending_iter::LendingIterator;
 use std::str;
 use std::{cmp::Reverse, collections::HashMap};
 

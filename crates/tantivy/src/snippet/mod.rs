@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
 use htmlescape::encode_minimal;
+use lending_iter::LendingIterator;
 
 use crate::query::Query;
 use crate::schema::document::{Document, Value};
@@ -168,9 +169,10 @@ fn search_fragments(
     max_num_chars: usize,
 ) -> Vec<FragmentCandidate> {
     let mut token_stream = tokenizer.token_stream(text);
+    let mut it = crate::tokenizer::TokenStream::iter(&mut token_stream);
     let mut fragment = FragmentCandidate::new(0);
     let mut fragments: Vec<FragmentCandidate> = vec![];
-    while let Some(next) = token_stream.next() {
+    while let Some(next) = it.next() {
         if (next.offset_to - fragment.start_offset) > max_num_chars {
             if fragment.score > 0.0 {
                 fragments.push(fragment)

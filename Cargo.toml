@@ -10,6 +10,7 @@ members = [
   "crates/optics",
   "crates/speedy-kv",
   "crates/zimba",
+  "crates/lending-iter",
   "crates/robotstxt",
   "crates/tantivy",
   "fuzz",
@@ -88,6 +89,7 @@ itertools = "0.13.0"
 js-sys = "0.3.60"
 lalrpop = {version = "0.20.0", features = ["lexer"]}
 lalrpop-util = {version = "0.20.0", features = ["lexer"]}
+lending-iter = {path = "crates/lending-iter"}
 levenshtein_automata = "0.2.1"
 libc = "0.2.142"
 log = {version = "0.4", features = ["release_max_level_info"]}

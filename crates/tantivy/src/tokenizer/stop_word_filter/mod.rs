@@ -1,5 +1,6 @@
 //! # Example
 //! ```rust
+//! use lending_iter::LendingIterator;
 //! use tantivy::tokenizer::*;
 //!
 //! let mut tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
@@ -7,9 +8,10 @@
 //!   .build();
 //!
 //! let mut stream = tokenizer.token_stream("the fox is crafty");
-//! assert_eq!(stream.next().unwrap().text, "fox");
-//! assert_eq!(stream.next().unwrap().text, "crafty");
-//! assert!(stream.next().is_none());
+//! let mut it = TokenStream::iter(&mut stream);
+//! assert_eq!(it.next().unwrap().text, "fox");
+//! assert_eq!(it.next().unwrap().text, "crafty");
+//! assert!(it.next().is_none());
 //! ```
 #[cfg(feature = "stopwords")]
 #[rustfmt::skip]

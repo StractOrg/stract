@@ -3,6 +3,7 @@ use std::io;
 use crate::common::json_path_writer::JSON_END_OF_PATH;
 use crate::common::BinarySerializable;
 use fnv::FnvHashSet;
+use lending_iter::LendingIterator;
 
 use crate::directory::FileSlice;
 use crate::positions::PositionReader;

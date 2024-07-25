@@ -58,6 +58,7 @@ image.workspace = true
 indicatif.workspace = true
 itertools.workspace = true
 kuchiki = {path = "../kuchiki"}
+lending-iter.workspace = true
 log.workspace = true
 logos.workspace = true
 lz4_flex.workspace = true

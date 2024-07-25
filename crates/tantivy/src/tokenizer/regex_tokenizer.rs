@@ -24,25 +24,26 @@ use crate::TantivyError;
 ///
 /// let mut tokenizer = RegexTokenizer::new(r"'(?:\w*)'").unwrap();
 /// let mut stream = tokenizer.token_stream("'aaa' bbb 'ccc' 'ddd'");
+/// let mut it = TokenStream::iter(&mut stream);
 /// {
-///     let token = stream.next().unwrap();
+///     let token = it.next().unwrap();
 ///     assert_eq!(token.text, "'aaa'");
 ///     assert_eq!(token.offset_from, 0);
 ///     assert_eq!(token.offset_to, 5);
 /// }
 /// {
-///   let token = stream.next().unwrap();
+///   let token = it.next().unwrap();
 ///     assert_eq!(token.text, "'ccc'");
 ///     assert_eq!(token.offset_from, 10);
 ///     assert_eq!(token.offset_to, 15);
 /// }
 /// {
-///   let token = stream.next().unwrap();
+///   let token = it.next().unwrap();
 ///     assert_eq!(token.text, "'ddd'");
 ///     assert_eq!(token.offset_from, 16);
 ///     assert_eq!(token.offset_to, 21);
 /// }
-/// assert!(stream.next().is_none());
+/// assert!(it.next().is_none());
 /// ```
 
 #[derive(Clone)]

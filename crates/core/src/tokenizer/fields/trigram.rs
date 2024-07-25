@@ -47,6 +47,7 @@ impl tantivy::tokenizer::Tokenizer for TrigramTokenizer {
 
 #[cfg(test)]
 mod tests {
+    use lending_iter::LendingIterator;
     use tantivy::tokenizer::Tokenizer;
 
     use super::*;
@@ -56,8 +57,9 @@ mod tests {
 
         let mut tokenizer = TrigramTokenizer::default();
         let mut stream = tokenizer.token_stream(s);
+        let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 
-        while let Some(token) = stream.next() {
+        while let Some(token) = it.next() {
             res.push(token.text.clone());
         }
 

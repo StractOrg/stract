@@ -17,6 +17,7 @@
 mod scorer;
 mod weight;
 
+use lending_iter::LendingIterator;
 use optics::PatternPart;
 
 use tantivy::tokenizer::Tokenizer;
@@ -101,8 +102,9 @@ impl PatternQuery {
                         .unwrap()
                         .tokenizer(Some(&whatlang::Lang::Eng));
                     let mut stream = tokenizer.token_stream(text);
+                    let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 
-                    while let Some(token) = stream.next() {
+                    while let Some(token) = it.next() {
                         new_patterns.push(PatternPart::Raw(token.text.clone()));
                         let term = tantivy::Term::from_field_text(tv_field, &token.text);
                         raw_terms.push(term);

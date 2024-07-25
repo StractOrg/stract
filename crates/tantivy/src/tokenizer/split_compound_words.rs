@@ -18,7 +18,7 @@ use super::{Token, TokenFilter, TokenStream, Tokenizer};
 /// is not split in the following example.
 ///
 /// ```rust
-/// use tantivy::tokenizer::{SimpleTokenizer, SplitCompoundWords, TextAnalyzer};
+/// use tantivy::tokenizer::*;
 ///
 /// let mut tokenizer =
 ///        TextAnalyzer::builder(SimpleTokenizer::default())
@@ -31,14 +31,16 @@ use super::{Token, TokenFilter, TokenStream, Tokenizer};
 ///        .build();
 /// {
 ///     let mut stream = tokenizer.token_stream("dampfschifffahrt");
-///     assert_eq!(stream.next().unwrap().text, "dampf");
-///     assert_eq!(stream.next().unwrap().text, "schiff");
-///     assert_eq!(stream.next().unwrap().text, "fahrt");
-///     assert_eq!(stream.next(), None);
+///     let mut it = TokenStream::iter(&mut stream);
+///     assert_eq!(it.next().unwrap().text, "dampf");
+///     assert_eq!(it.next().unwrap().text, "schiff");
+///     assert_eq!(it.next().unwrap().text, "fahrt");
+///     assert_eq!(it.next(), None);
 /// }
 /// let mut stream = tokenizer.token_stream("brotbackautomat");
-/// assert_eq!(stream.next().unwrap().text, "brotbackautomat");
-/// assert_eq!(stream.next(), None);
+/// let mut it = TokenStream::iter(&mut stream);
+/// assert_eq!(it.next().unwrap().text, "brotbackautomat");
+/// assert_eq!(it.next(), None);
 /// ```
 ///
 /// [compound]: https://en.wikipedia.org/wiki/Compound_(linguistics)
@@ -189,6 +191,8 @@ impl<'a, T: TokenStream> TokenStream for SplitCompoundWordsTokenStream<'a, T> {
 
 #[cfg(test)]
 mod tests {
+    use lending_iter::LendingIterator;
+
     use super::*;
     use crate::tokenizer::{SimpleTokenizer, TextAnalyzer};
 
@@ -200,83 +204,93 @@ mod tests {
 
         {
             let mut stream = tokenizer.token_stream("");
-            assert_eq!(stream.next(), None);
+            let mut it = stream.iter();
+            assert_eq!(it.next(), None);
         }
 
         {
             let mut stream = tokenizer.token_stream("foo bar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next(), None);
+            let mut it = stream.iter();
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next(), None);
         }
 
         {
             let mut stream = tokenizer.token_stream("foobar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next(), None);
+            let mut it = stream.iter();
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next(), None);
         }
 
         {
             let mut stream = tokenizer.token_stream("foobarbaz");
-            assert_eq!(stream.next().unwrap().text, "foobarbaz");
-            assert_eq!(stream.next(), None);
+            let mut it = stream.iter();
+            assert_eq!(it.next().unwrap().text, "foobarbaz");
+            assert_eq!(it.next(), None);
         }
 
         {
             let mut stream = tokenizer.token_stream("baz foobar qux");
-            assert_eq!(stream.next().unwrap().text, "baz");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next().unwrap().text, "qux");
-            assert_eq!(stream.next(), None);
+            let mut it = stream.iter();
+            assert_eq!(it.next().unwrap().text, "baz");
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next().unwrap().text, "qux");
+            assert_eq!(it.next(), None);
         }
 
         {
             let mut stream = tokenizer.token_stream("foobar foobar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next(), None);
+            let mut it = stream.iter();
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next(), None);
         }
 
         {
             let mut stream = tokenizer.token_stream("foobar foo bar foobar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next(), None);
+            let mut it = stream.iter();
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next(), None);
         }
 
         {
             let mut stream = tokenizer.token_stream("foobazbar foo bar foobar");
-            assert_eq!(stream.next().unwrap().text, "foobazbar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next(), None);
+            let mut it = stream.iter();
+            assert_eq!(it.next().unwrap().text, "foobazbar");
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next(), None);
         }
 
         {
             let mut stream = tokenizer.token_stream("foobar qux foobar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next().unwrap().text, "qux");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next(), None);
+            let mut it = stream.iter();
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next().unwrap().text, "qux");
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next(), None);
         }
 
         {
             let mut stream = tokenizer.token_stream("barfoo");
-            assert_eq!(stream.next().unwrap().text, "bar");
-            assert_eq!(stream.next().unwrap().text, "foo");
-            assert_eq!(stream.next(), None);
+            let mut it = stream.iter();
+            assert_eq!(it.next().unwrap().text, "bar");
+            assert_eq!(it.next().unwrap().text, "foo");
+            assert_eq!(it.next(), None);
         }
     }
 }

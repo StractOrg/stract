@@ -28,6 +28,7 @@ use crate::{
     Error, Result,
 };
 use bloom::split_u128;
+use lending_iter::LendingIterator;
 use tantivy::{
     tokenizer::{PreTokenizedString, Tokenizer},
     TantivyDocument,
@@ -122,7 +123,8 @@ impl Html {
 
         {
             let mut stream = tokenizer.token_stream(&text);
-            while let Some(token) = stream.next() {
+            let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
+            while let Some(token) = it.next() {
                 tokens.push(token.clone());
             }
         }

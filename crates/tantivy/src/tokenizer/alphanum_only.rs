@@ -7,19 +7,21 @@
 //!   .build();
 //!
 //! let mut stream = tokenizer.token_stream("hello there");
+//! let mut it = TokenStream::iter(&mut stream);
 //! // is none because the raw filter emits one token that
 //! // contains a space
-//! assert!(stream.next().is_none());
+//! assert!(it.next().is_none());
 //!
 //! let mut tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
 //!   .filter(AlphaNumOnlyFilter)
 //!   .build();
 //!
 //! let mut stream = tokenizer.token_stream("hello there 💣");
-//! assert!(stream.next().is_some());
-//! assert!(stream.next().is_some());
+//! let mut it = TokenStream::iter(&mut stream);
+//! assert!(it.next().is_some());
+//! assert!(it.next().is_some());
 //! // the "emoji" is dropped because its not an alphanum
-//! assert!(stream.next().is_none());
+//! assert!(it.next().is_none());
 //! ```
 use super::{Token, TokenFilter, TokenStream, Tokenizer};
 

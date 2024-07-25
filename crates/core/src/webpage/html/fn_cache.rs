@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{webpage::schema_org, Result};
+use lending_iter::LendingIterator;
 use tantivy::tokenizer::PreTokenizedString;
 
 use super::{find_recipe_first_ingredient_tag_id, Html};
@@ -112,8 +113,9 @@ impl<'a> FnCache<'a> {
 
                         {
                             let mut stream = f.token_stream();
+                            let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 
-                            while let Some(token) = stream.next() {
+                            while let Some(token) = it.next() {
                                 tokens.push(token.clone());
                             }
                         }

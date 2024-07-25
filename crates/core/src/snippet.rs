@@ -25,6 +25,7 @@ use crate::tokenizer::fields::{
 use crate::web_spell::sentence_ranges;
 use crate::webpage::region::Region;
 use hashbrown::{HashMap, HashSet};
+use lending_iter::LendingIterator;
 use utoipa::ToSchema;
 
 use itertools::Itertools;
@@ -90,7 +91,8 @@ impl SnippetBuilder {
         ] {
             let mut stream =
                 tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, &self.fragment);
-            while let Some(tok) = stream.next() {
+            let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
+            while let Some(tok) = it.next() {
                 if terms.contains(&tok.text) {
                     self.highlights.push(tok.offset_from..tok.offset_to);
                 }
@@ -161,7 +163,8 @@ fn passages(
             {
                 let mut stream =
                     tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, &sentence);
-                while let Some(tok) = stream.next() {
+                let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
+                while let Some(tok) = it.next() {
                     *doc_terms.entry(tok.text.clone()).or_insert(0) += 1;
                 }
             }
@@ -230,7 +233,8 @@ fn snippet_string_builder(
             let mut stream = tantivy::tokenizer::Tokenizer::token_stream(&mut tokenizer, term);
 
             let mut res = Vec::new();
-            while let Some(tok) = stream.next() {
+            let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
+            while let Some(tok) = it.next() {
                 res.push(tok.text.clone());
             }
 

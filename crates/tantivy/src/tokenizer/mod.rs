@@ -155,6 +155,7 @@ pub use self::tokenized_string::{PreTokenizedStream, PreTokenizedString};
 pub use self::tokenizer::{TextAnalyzer, TextAnalyzerBuilder};
 pub use self::tokenizer_manager::TokenizerManager;
 pub use self::whitespace_tokenizer::WhitespaceTokenizer;
+pub use lending_iter::LendingIterator;
 
 /// Maximum authorized len (in bytes) for a token.
 ///

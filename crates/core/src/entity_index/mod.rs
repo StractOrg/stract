@@ -23,6 +23,7 @@ use std::{
 
 use base64::{prelude::BASE64_STANDARD as BASE64_ENGINE, Engine};
 
+use lending_iter::LendingIterator;
 use tantivy::{
     collector::TopDocs,
     query::{BooleanQuery, BoostQuery, MoreLikeThisQuery, Occur, QueryClone, TermQuery},
@@ -272,7 +273,8 @@ impl EntityIndex {
         let mut term_queries = Vec::new();
         let mut tokenizer = DefaultTokenizer::default();
         let mut stream = tokenizer.token_stream(query);
-        while let Some(token) = stream.next() {
+        let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
+        while let Some(token) = it.next() {
             if self.stopwords.contains(&token.text) {
                 continue;
             }

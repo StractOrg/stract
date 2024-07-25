@@ -7,10 +7,11 @@
 //!   .build();
 //!
 //! let mut stream = tokenizer.token_stream("toolong nice");
+//! let mut it = TokenStream::iter(&mut stream);
 //! // because `toolong` is more than 5 characters, it is filtered
 //! // out of the token stream.
-//! assert_eq!(stream.next().unwrap().text, "nice");
-//! assert!(stream.next().is_none());
+//! assert_eq!(it.next().unwrap().text, "nice");
+//! assert!(it.next().is_none());
 //! ```
 use super::{Token, TokenFilter, TokenStream, Tokenizer};
 

@@ -73,14 +73,16 @@ impl tantivy::tokenizer::TokenStream for IdentityTokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lending_iter::LendingIterator;
     use tantivy::tokenizer::Tokenizer as _;
 
     fn tokenize_identity(s: &str) -> Vec<String> {
         let mut res = Vec::new();
         let mut tokenizer = Identity {};
         let mut stream = tokenizer.token_stream(s);
+        let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 
-        while let Some(token) = stream.next() {
+        while let Some(token) = it.next() {
             res.push(token.text.clone());
         }
 

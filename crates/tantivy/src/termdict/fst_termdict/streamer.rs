@@ -3,6 +3,7 @@ use std::io;
 use fst::automaton::AlwaysMatch;
 use fst::map::{Stream, StreamBuilder};
 use fst::{Automaton, IntoStreamer, Streamer};
+use lending_iter::LendingIterator;
 
 use super::TermDictionary;
 use crate::postings::TermInfo;
@@ -132,10 +133,17 @@ where
     pub fn value(&self) -> &TermInfo {
         &self.current_value
     }
+}
 
-    /// Return the next `(key, value)` pair.
-    #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> Option<(&[u8], &TermInfo)> {
+impl<'a, A> LendingIterator for TermStreamer<'a, A>
+where
+    A: Automaton,
+{
+    type Item<'b> = (&'b [u8], &'b TermInfo)
+    where
+        Self: 'b;
+
+    fn next(&mut self) -> Option<Self::Item<'_>> {
         if self.advance() {
             Some((self.key(), self.value()))
         } else {

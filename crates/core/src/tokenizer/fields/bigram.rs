@@ -48,6 +48,7 @@ impl tantivy::tokenizer::Tokenizer for BigramTokenizer {
 
 #[cfg(test)]
 mod tests {
+    use lending_iter::LendingIterator;
     use tantivy::tokenizer::Tokenizer;
 
     use super::*;
@@ -56,7 +57,8 @@ mod tests {
         let mut tokenizer = BigramTokenizer::default();
         let mut stream = tokenizer.token_stream(s);
 
-        while let Some(token) = stream.next() {
+        let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
+        while let Some(token) = it.next() {
             res.push(token.text.clone());
         }
 

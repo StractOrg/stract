@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use std::{io, str};
 
+use lending_iter::LendingIterator;
+
 use super::{TermDictionary, TermDictionaryBuilder, TermStreamer};
 use crate::directory::{Directory, FileSlice, RamDirectory, TerminatingWrite};
 use crate::postings::TermInfo;

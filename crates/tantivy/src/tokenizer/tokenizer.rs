@@ -4,6 +4,8 @@ use crate::tokenizer_api::{BoxTokenStream, TokenFilter, Tokenizer};
 
 use crate::tokenizer::empty_tokenizer::EmptyTokenizer;
 
+pub use lending_iter::LendingIterator;
+
 /// `TextAnalyzer` tokenizes an input text into tokens and modifies the resulting `TokenStream`.
 #[derive(Clone)]
 pub struct TextAnalyzer {
@@ -123,6 +125,8 @@ impl<T: Tokenizer> TextAnalyzerBuilder<T> {
 #[cfg(test)]
 mod tests {
 
+    use lending_iter::LendingIterator;
+
     use super::*;
     use crate::tokenizer::{LowerCaser, RemoveLongFilter, SimpleTokenizer};
 
@@ -133,8 +137,9 @@ mod tests {
             .filter(LowerCaser)
             .build();
         let mut stream = analyzer.token_stream("- first bullet point");
-        assert_eq!(stream.next().unwrap().text, "first");
-        assert_eq!(stream.next().unwrap().text, "bullet");
+        let mut it = crate::tokenizer::TokenStream::iter(&mut stream);
+        assert_eq!(it.next().unwrap().text, "first");
+        assert_eq!(it.next().unwrap().text, "bullet");
     }
 
     #[test]
@@ -169,7 +174,8 @@ mod tests {
         }
         let mut analyzer = analyzer_builder.build();
         let mut stream = analyzer.token_stream("first bullet point");
-        assert_eq!(stream.next().unwrap().text, "first");
-        assert_eq!(stream.next().unwrap().text, "bullet");
+        let mut it = crate::tokenizer::TokenStream::iter(&mut stream);
+        assert_eq!(it.next().unwrap().text, "first");
+        assert_eq!(it.next().unwrap().text, "bullet");
     }
 }
