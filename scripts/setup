@@ -2,6 +2,7 @@
 import argparse
 import subprocess
 import sys
+import os
 
 parser = argparse.ArgumentParser()
 
@@ -27,8 +28,11 @@ if args.ml:
 
 subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade"] + packages_to_install)
 
+old_dir = os.getcwd()
+os.chdir("crates/client-wasm")
+subprocess.run(["wasm-pack", "build", "--target", "web"])
+os.chdir(old_dir)
 
-subprocess.run(["cd", "crates/client-wasm", "&&", "wasm-pack", "build", "--target", "web"])
 
 if args.ml:
   subprocess.run(["./scripts/export_crossencoder"])
