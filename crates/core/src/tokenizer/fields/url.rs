@@ -18,7 +18,10 @@ use std::collections::VecDeque;
 
 use tantivy::tokenizer::BoxTokenStream;
 
-use crate::tokenizer::{add_space_last::AddSpaceLast, split_preserve::StrSplitPreserve};
+use crate::{
+    tokenizer::{add_space_last::AddSpaceLast, split_preserve::StrSplitPreserve},
+    webpage::url_ext::UrlExt,
+};
 
 #[derive(Clone, Default)]
 struct ParsedUrl {
@@ -40,7 +43,7 @@ impl UrlTokenizer {
             .or_else(|_| url::Url::parse(&format!("http://{}", text)))
             .map(|url| {
                 let domain = Some(
-                    url.host_str()
+                    url.normalized_host()
                         .unwrap_or("")
                         .split_preserve(|c| matches!(c, '.'))
                         .filter(|s| !(*s).is_empty())
@@ -217,12 +220,12 @@ mod tests {
     fn url() {
         assert_eq!(
             tokenize_url("https://www.example.com"),
-            vec!["www", ".", "example", ".", "com ", "/"]
+            vec!["example", ".", "com ", "/"]
         );
 
         assert_eq!(
             tokenize_url("https://www.example.com/test"),
-            vec!["www", ".", "example", ".", "com ", "/", "test",]
+            vec!["example", ".", "com ", "/", "test",]
         );
 
         assert_eq!(
@@ -242,26 +245,17 @@ mod tests {
     fn multiple_urls() {
         assert_eq!(
             tokenize_url("https://www.example.com\nhttps://www.example.com"),
-            vec![
-                "www", ".", "example", ".", "com ", "/", "\n", "www", ".", "example", ".", "com ",
-                "/"
-            ]
+            vec!["example", ".", "com ", "/", "\n", "example", ".", "com ", "/"]
         );
 
         assert_eq!(
             tokenize_url("https://www.example.com/test\nhttps://www.abcd.com"),
-            vec![
-                "www", ".", "example", ".", "com ", "/", "test", "\n", "www", ".", "abcd", ".",
-                "com ", "/"
-            ]
+            vec!["example", ".", "com ", "/", "test", "\n", "abcd", ".", "com ", "/"]
         );
 
         assert_eq!(
             tokenize_url("https://example.com/test\nhttps://www.abcd.com/test"),
-            vec![
-                "example", ".", "com ", "/", "test", "\n", "www", ".", "abcd", ".", "com ", "/",
-                "test",
-            ]
+            vec!["example", ".", "com ", "/", "test", "\n", "abcd", ".", "com ", "/", "test",]
         );
     }
 

@@ -232,6 +232,7 @@ mod tests {
         ranking::{Ranker, SignalComputer},
         search_ctx::Ctx,
         searcher::SearchQuery,
+        webgraph::{FullEdge, Node},
         webpage::{schema_org, Html, Webpage},
         OneOrMany,
     };
@@ -502,7 +503,11 @@ mod tests {
                     "https://www.b.com",
                 )
                 .unwrap(),
-                backlink_labels: vec!["B site is great".to_string()],
+                backlinks: vec![FullEdge {
+                    from: Node::from("https://www.a.com"),
+                    to: Node::from("https://www.b.com"),
+                    label: "B site is great".to_string(),
+                }],
                 host_centrality: 1.0,
                 fetch_time_ms: 500,
                 ..Default::default()

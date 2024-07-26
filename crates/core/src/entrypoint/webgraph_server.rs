@@ -53,6 +53,7 @@ sonic_service!(
     [
         GetNode,
         IngoingEdges,
+        IngoingEdgesById,
         OutgoingEdges,
         RawIngoingEdges,
         RawOutgoingEdges,
@@ -86,6 +87,20 @@ impl Message<WebGraphService> for IngoingEdges {
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
         server.graph.ingoing_edges(self.node, self.limit)
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct IngoingEdgesById {
+    pub node: NodeID,
+    pub limit: EdgeLimit,
+}
+
+impl Message<WebGraphService> for IngoingEdgesById {
+    type Response = Vec<FullEdge>;
+
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        server.graph.ingoing_edges_by_id(&self.node, self.limit)
     }
 }
 

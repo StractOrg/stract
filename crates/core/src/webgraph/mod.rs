@@ -207,13 +207,17 @@ impl Webgraph {
     }
 
     pub fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<FullEdge> {
+        self.ingoing_edges_by_id(&node.id(), limit)
+    }
+
+    pub fn ingoing_edges_by_id(&self, node_id: &NodeID, limit: EdgeLimit) -> Vec<FullEdge> {
         let dedup = |edges: &mut Vec<SegmentEdge<String>>| {
             edges.sort_by_key(|e| e.from.node());
             edges.dedup_by_key(|e| e.from.node());
         };
 
         let mut edges = self.inner_edges(
-            |segment| segment.ingoing_edges_with_label(&node.id(), &limit),
+            |segment| segment.ingoing_edges_with_label(node_id, &limit),
             dedup,
         );
         edges.sort_by(|a, b| a.from.sort_key().cmp(&b.from.sort_key()));

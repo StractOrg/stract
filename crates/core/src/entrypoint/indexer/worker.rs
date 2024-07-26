@@ -34,8 +34,10 @@ use crate::Result;
 use crate::index::Index;
 use crate::rake::RakeModel;
 use crate::ranking::SignalComputer;
-use crate::webgraph::{self, EdgeLimit, Node, NodeID};
+use crate::webgraph::{self, EdgeLimit, FullEdge, Node, NodeID};
 use crate::webpage::{safety_classifier, Html, Webpage};
+
+const MAX_BACKLINKS: EdgeLimit = EdgeLimit::Limit(1024);
 
 pub struct Config {
     pub host_centrality_store_path: String,
@@ -84,17 +86,16 @@ impl Webgraph {
         &self,
         ids: Vec<NodeID>,
         limit: EdgeLimit,
-    ) -> Vec<Vec<String>> {
+    ) -> Vec<Vec<FullEdge>> {
         let edges = match self {
             Self::Remote(webgraph) => {
-                crate::block_on(webgraph.batch_raw_ingoing_edges_with_labels(&ids, limit))
-                    .unwrap_or_default()
+                crate::block_on(webgraph.batch_ingoing_edges_by_id(&ids, limit)).unwrap_or_default()
             }
             Self::Local(webgraph) => {
                 let mut res = Vec::new();
 
                 for id in ids {
-                    res.push(webgraph.raw_ingoing_edges_with_labels(&id, limit));
+                    res.push(webgraph.ingoing_edges_by_id(&id, limit));
                 }
 
                 res
@@ -106,10 +107,9 @@ impl Webgraph {
             .map(|edges| {
                 edges
                     .into_iter()
-                    .map(|edge| edge.label)
-                    .filter(|label| !label.is_empty())
-                    .filter(|label| {
-                        let label = label.to_lowercase();
+                    .filter(|e| !e.label.is_empty())
+                    .filter(|e| {
+                        let label = e.label.to_lowercase();
                         let stopwords = [
                             "click",
                             "click here",
@@ -393,10 +393,10 @@ impl IndexingWorker {
                 .map(|w| Node::from(w.html.url()).id())
                 .collect::<Vec<_>>();
 
-            let backlinks = graph.batch_raw_ingoing_edges_with_labels(ids, EdgeLimit::Limit(512));
+            let backlinks = graph.batch_raw_ingoing_edges_with_labels(ids, MAX_BACKLINKS);
 
-            for (page, backlink) in pages.iter_mut().zip_eq(backlinks) {
-                page.backlink_labels = backlink;
+            for (page, backlinks) in pages.iter_mut().zip_eq(backlinks) {
+                page.backlinks = backlinks;
             }
         }
     }
@@ -455,7 +455,7 @@ impl IndexingWorker {
             // make sure we remember to set everything
             let mut webpage = Webpage {
                 html: prepared.html,
-                backlink_labels: prepared.backlink_labels,
+                backlinks: prepared.backlinks,
                 page_centrality: prepared.page_centrality,
                 page_centrality_rank: prepared.page_centrality_rank,
                 host_centrality: prepared.host_centrality,

@@ -130,6 +130,7 @@ mod tests {
         index::Index,
         models::dual_encoder::DualEncoder,
         searcher::{LocalSearcher, SearchQuery},
+        webgraph::{FullEdge, Node},
         webpage::{Html, Webpage},
     };
 
@@ -249,7 +250,7 @@ mod tests {
                     "https://www.b.com",
                 )
                 .unwrap(),
-                backlink_labels: vec![],
+                backlinks: vec![],
                 fetch_time_ms: 500,
                 page_centrality: 5.0,
                 ..Default::default()
@@ -430,7 +431,11 @@ mod tests {
                     "https://www.first.com",
                 )
                 .unwrap(),
-                backlink_labels: vec!["test this is the best test site".to_string()],
+                backlinks: vec![FullEdge {
+                    from: Node::from("https://www.backlink.com"),
+                    to: Node::from("https://www.first.com"),
+                    label: "test this is the best test site".to_string(),
+                }],
                 fetch_time_ms: 500,
                 ..Default::default()
             })

@@ -16,7 +16,7 @@
 
 use crate::{
     schema::{numerical_field::NumericalField, text_field::TextField, Field},
-    webgraph::NodeID,
+    webgraph::{FullEdge, NodeID},
     Result,
 };
 use candle_core::Tensor;
@@ -41,7 +41,7 @@ pub use region::Region;
 #[derive(Debug)]
 pub struct Webpage {
     pub html: Html,
-    pub backlink_labels: Vec<String>,
+    pub backlinks: Vec<FullEdge>,
     pub host_centrality: f64,
     pub host_centrality_rank: u64,
     pub page_centrality: f64,
@@ -62,7 +62,7 @@ impl Default for Webpage {
     fn default() -> Self {
         Self {
             html: Html::parse_without_text("<html></html>", "https://example.com/").unwrap(),
-            backlink_labels: Default::default(),
+            backlinks: Default::default(),
             host_centrality: Default::default(),
             host_centrality_rank: u64::MAX,
             page_centrality: Default::default(),
@@ -84,7 +84,7 @@ impl From<Html> for Webpage {
     fn from(html: Html) -> Self {
         Self {
             html,
-            backlink_labels: Default::default(),
+            backlinks: Default::default(),
             host_centrality: Default::default(),
             host_centrality_rank: u64::MAX,
             page_centrality: Default::default(),
