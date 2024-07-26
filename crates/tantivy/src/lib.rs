@@ -129,11 +129,10 @@ pub use self::reader::{IndexReader, IndexReaderBuilder, ReloadPolicy, Warmer};
 pub mod snippet;
 
 mod docset;
-use std::fmt;
+use std::{fmt, sync::LazyLock};
 
 pub use crate::common::{f64_to_u64, i64_to_u64, u64_to_f64, u64_to_i64, HasLen};
 pub use census::{Inventory, TrackedObject};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 pub use self::docset::{DocSet, COLLECT_BLOCK_BUFFER_LEN, TERMINATED};
@@ -168,7 +167,7 @@ impl fmt::Debug for Version {
     }
 }
 
-static VERSION: Lazy<Version> = Lazy::new(|| Version {
+static VERSION: LazyLock<Version> = LazyLock::new(|| Version {
     major: env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),
     minor: env!("CARGO_PKG_VERSION_MINOR").parse().unwrap(),
     patch: env!("CARGO_PKG_VERSION_PATCH").parse().unwrap(),
@@ -185,7 +184,7 @@ impl fmt::Display for Version {
     }
 }
 
-static VERSION_STRING: Lazy<String> = Lazy::new(|| VERSION.to_string());
+static VERSION_STRING: LazyLock<String> = LazyLock::new(|| VERSION.to_string());
 
 /// Expose the current version of tantivy as found in Cargo.toml during compilation.
 /// eg. "0.11.0" as well as the compression scheme used in the docstore.

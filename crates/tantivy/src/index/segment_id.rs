@@ -5,9 +5,9 @@ use std::str::FromStr;
 #[cfg(test)]
 use std::sync::atomic;
 
-#[cfg(test)]
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+#[cfg(test)]
+use std::sync::LazyLock;
 use uuid::Uuid;
 
 /// Uuid identifying a segment.
@@ -22,7 +22,8 @@ use uuid::Uuid;
 pub struct SegmentId(Uuid);
 
 #[cfg(test)]
-static AUTO_INC_COUNTER: Lazy<atomic::AtomicUsize> = Lazy::new(atomic::AtomicUsize::default);
+static AUTO_INC_COUNTER: LazyLock<atomic::AtomicUsize> =
+    LazyLock::new(atomic::AtomicUsize::default);
 
 #[cfg(test)]
 const ZERO_ARRAY: [u8; 8] = [0u8; 8];

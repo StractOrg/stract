@@ -90,8 +90,8 @@ pub mod webgraph;
 pub mod webpage;
 mod widgets;
 
-static TOKIO_RUNTIME: once_cell::sync::Lazy<tokio::runtime::Runtime> =
-    once_cell::sync::Lazy::new(|| {
+static TOKIO_RUNTIME: std::sync::LazyLock<tokio::runtime::Runtime> =
+    std::sync::LazyLock::new(|| {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()

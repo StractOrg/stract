@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 /// A directory lock.
 ///
@@ -42,7 +42,7 @@ pub struct Lock {
 /// (creating more than one instance of the `IndexWriter`), are a spurious
 /// lock file remaining after a crash. In the latter case, removing the file after
 /// checking no process running tantivy is running is safe.
-pub static INDEX_WRITER_LOCK: Lazy<Lock> = Lazy::new(|| Lock {
+pub static INDEX_WRITER_LOCK: LazyLock<Lock> = LazyLock::new(|| Lock {
     filepath: PathBuf::from(".tantivy-writer.lock"),
     is_blocking: false,
 });
@@ -53,7 +53,7 @@ pub static INDEX_WRITER_LOCK: Lazy<Lock> = Lazy::new(|| Lock {
 /// here, but it is difficult to achieve on Windows.
 ///
 /// Opening segment readers is a very fast process.
-pub static META_LOCK: Lazy<Lock> = Lazy::new(|| Lock {
+pub static META_LOCK: LazyLock<Lock> = LazyLock::new(|| Lock {
     filepath: PathBuf::from(".tantivy-meta.lock"),
     is_blocking: true,
 });

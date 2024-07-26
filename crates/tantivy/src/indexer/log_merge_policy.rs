@@ -141,14 +141,14 @@ impl Default for LogMergePolicy {
 
 #[cfg(test)]
 mod tests {
-    use once_cell::sync::Lazy;
+    use std::sync::LazyLock;
 
     use super::*;
     use crate::index::{SegmentId, SegmentMetaInventory};
     use crate::schema;
     use crate::schema::INDEXED;
 
-    static INVENTORY: Lazy<SegmentMetaInventory> = Lazy::new(SegmentMetaInventory::default);
+    static INVENTORY: LazyLock<SegmentMetaInventory> = LazyLock::new(SegmentMetaInventory::default);
 
     use crate::Index;
 

@@ -1,6 +1,6 @@
 use fst::Automaton;
 use levenshtein_automata::{Distance, LevenshteinAutomatonBuilder, DFA};
-use once_cell::sync::OnceCell;
+use std::sync::OnceLock;
 
 use crate::query::{AutomatonWeight, EnableScoring, Query, Weight};
 use crate::schema::{Term, Type};
@@ -110,10 +110,10 @@ impl FuzzyTermQuery {
     }
 
     fn specialized_weight(&self) -> crate::Result<AutomatonWeight<DfaWrapper>> {
-        static AUTOMATON_BUILDER: [[OnceCell<LevenshteinAutomatonBuilder>; 2]; 3] = [
-            [OnceCell::new(), OnceCell::new()],
-            [OnceCell::new(), OnceCell::new()],
-            [OnceCell::new(), OnceCell::new()],
+        static AUTOMATON_BUILDER: [[OnceLock<LevenshteinAutomatonBuilder>; 2]; 3] = [
+            [OnceLock::new(), OnceLock::new()],
+            [OnceLock::new(), OnceLock::new()],
+            [OnceLock::new(), OnceLock::new()],
         ];
 
         let automaton_builder = AUTOMATON_BUILDER

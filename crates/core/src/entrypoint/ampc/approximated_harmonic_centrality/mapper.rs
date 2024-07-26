@@ -28,7 +28,7 @@ use rayon::prelude::*;
 const BATCH_SIZE: usize = 1024;
 const MAX_OUTGOING_EDGES: usize = 128;
 
-pub static SKIPPED_REL: once_cell::sync::Lazy<RelFlags> = once_cell::sync::Lazy::new(|| {
+pub static SKIPPED_REL: std::sync::LazyLock<RelFlags> = std::sync::LazyLock::new(|| {
     RelFlags::TAG
         | RelFlags::NOFOLLOW
         | RelFlags::IS_IN_FOOTER

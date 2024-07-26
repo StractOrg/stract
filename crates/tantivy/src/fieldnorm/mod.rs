@@ -30,7 +30,7 @@ pub use self::writer::FieldNormsWriter;
 mod tests {
     use std::path::Path;
 
-    use once_cell::sync::Lazy;
+    use std::sync::LazyLock;
 
     use crate::directory::{CompositeFile, Directory, RamDirectory, WritePtr};
     use crate::fieldnorm::{FieldNormReader, FieldNormsSerializer, FieldNormsWriter};
@@ -40,7 +40,7 @@ mod tests {
     };
     use crate::{Index, Term, TERMINATED};
 
-    pub static SCHEMA: Lazy<Schema> = Lazy::new(|| {
+    pub static SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
         let mut schema_builder = Schema::builder();
         schema_builder.add_text_field("field", STORED);
         schema_builder.add_text_field("txt_field", TEXT);
@@ -55,9 +55,11 @@ mod tests {
         schema_builder.build()
     });
 
-    pub static FIELD: Lazy<Field> = Lazy::new(|| SCHEMA.get_field("field").unwrap());
-    pub static TXT_FIELD: Lazy<Field> = Lazy::new(|| SCHEMA.get_field("txt_field").unwrap());
-    pub static STR_FIELD: Lazy<Field> = Lazy::new(|| SCHEMA.get_field("str_field").unwrap());
+    pub static FIELD: LazyLock<Field> = LazyLock::new(|| SCHEMA.get_field("field").unwrap());
+    pub static TXT_FIELD: LazyLock<Field> =
+        LazyLock::new(|| SCHEMA.get_field("txt_field").unwrap());
+    pub static STR_FIELD: LazyLock<Field> =
+        LazyLock::new(|| SCHEMA.get_field("str_field").unwrap());
 
     #[test]
     #[should_panic(expected = "Cannot register a given fieldnorm twice")]

@@ -75,10 +75,10 @@ mod tests {
     use std::path::Path;
 
     use crate::common::{ByteCount, DateTimePrecision, HasLen, TerminatingWrite};
-    use once_cell::sync::Lazy;
     use rand::prelude::SliceRandom;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
+    use std::sync::LazyLock;
 
     use super::*;
     use crate::directory::{Directory, RamDirectory, WritePtr};
@@ -91,12 +91,12 @@ mod tests {
     use crate::time::OffsetDateTime;
     use crate::{Index, IndexWriter, SegmentReader};
 
-    pub static SCHEMA: Lazy<Schema> = Lazy::new(|| {
+    pub static SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
         let mut schema_builder = Schema::builder();
         schema_builder.add_u64_field("field", COLUMN);
         schema_builder.build()
     });
-    pub static FIELD: Lazy<Field> = Lazy::new(|| SCHEMA.get_field("field").unwrap());
+    pub static FIELD: LazyLock<Field> = LazyLock::new(|| SCHEMA.get_field("field").unwrap());
 
     #[test]
     pub fn test_convert_i64_u64() {

@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use crate::common::{BinarySerializable, CountingWriter};
 use fst::raw::Fst;
 use fst::Automaton;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 use super::term_info_store::{TermInfoStore, TermInfoStoreWriter};
 use super::{TermStreamer, TermStreamerBuilder};
@@ -100,7 +100,7 @@ fn open_fst_index(fst_file: FileSlice) -> io::Result<fst::Map<OwnedBytes>> {
     Ok(fst::Map::from(fst))
 }
 
-static EMPTY_TERM_DICT_FILE: Lazy<FileSlice> = Lazy::new(|| {
+static EMPTY_TERM_DICT_FILE: LazyLock<FileSlice> = LazyLock::new(|| {
     let term_dictionary_data: Vec<u8> = TermDictionaryBuilder::create(Vec::<u8>::new())
         .expect("Creating a TermDictionaryBuilder in a Vec<u8> should never fail")
         .finish()

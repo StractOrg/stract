@@ -22,8 +22,8 @@ use super::lexer;
 
 lalrpop_mod!(pub parser, "/parser.rs");
 
-pub static PARSER: once_cell::sync::Lazy<parser::BlocksParser> =
-    once_cell::sync::Lazy::new(parser::BlocksParser::new);
+pub static PARSER: std::sync::LazyLock<parser::BlocksParser> =
+    std::sync::LazyLock::new(parser::BlocksParser::new);
 
 #[derive(Debug, PartialEq)]
 pub struct RawOptic {

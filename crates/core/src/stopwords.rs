@@ -35,8 +35,8 @@ macro_rules! include_stopwords {
     }};
 }
 
-static STOPWORDS: once_cell::sync::Lazy<HashMap<Lang, HashSet<String>>> =
-    once_cell::sync::Lazy::new(|| {
+static STOPWORDS: std::sync::LazyLock<HashMap<Lang, HashSet<String>>> =
+    std::sync::LazyLock::new(|| {
         include_stopwords!(
                 "../stopwords/Afrikaans.txt" => Lang::Afr,
                 "../stopwords/Arabic.txt" => Lang::Ara,

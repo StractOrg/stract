@@ -33,7 +33,7 @@ use crate::{
 
 const HYPERLOGLOG_COUNTERS: usize = 64;
 
-pub static SKIPPED_REL: once_cell::sync::Lazy<RelFlags> = once_cell::sync::Lazy::new(|| {
+pub static SKIPPED_REL: std::sync::LazyLock<RelFlags> = std::sync::LazyLock::new(|| {
     RelFlags::TAG
         | RelFlags::NOFOLLOW
         | RelFlags::IS_IN_FOOTER

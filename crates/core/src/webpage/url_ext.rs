@@ -17,13 +17,13 @@
 use crate::Result;
 use publicsuffix::Psl;
 
-static PUBLIC_SUFFIX_LIST: once_cell::sync::Lazy<publicsuffix::List> =
-    once_cell::sync::Lazy::new(|| {
+static PUBLIC_SUFFIX_LIST: std::sync::LazyLock<publicsuffix::List> =
+    std::sync::LazyLock::new(|| {
         include_str!("../../public_suffix_list.dat")
             .parse()
             .expect("Failed to parse public suffix list")
     });
-static ICANN_LIST: once_cell::sync::Lazy<publicsuffix::List> = once_cell::sync::Lazy::new(|| {
+static ICANN_LIST: std::sync::LazyLock<publicsuffix::List> = std::sync::LazyLock::new(|| {
     include_str!("../../public_icann_suffix.dat")
         .parse()
         .expect("Failed to parse public icann suffix list")

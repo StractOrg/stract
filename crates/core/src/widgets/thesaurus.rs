@@ -29,9 +29,8 @@ use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleParser;
 use std::collections::HashMap;
 
-static VALUE_STR_REGEX: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
-    regex::Regex::new(r#""(.*)"@"#).expect("Failed to compile regex")
-});
+static VALUE_STR_REGEX: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r#""(.*)"@"#).expect("Failed to compile regex"));
 
 #[derive(
     Debug,

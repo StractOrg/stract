@@ -17,8 +17,7 @@
 use std::collections::HashSet;
 
 const LIST: &str = include_str!("adservers.txt");
-pub static AD_SERVERS: once_cell::sync::Lazy<AdServers> =
-    once_cell::sync::Lazy::new(AdServers::new);
+pub static AD_SERVERS: std::sync::LazyLock<AdServers> = std::sync::LazyLock::new(AdServers::new);
 
 pub struct AdServers {
     servers: HashSet<String>,

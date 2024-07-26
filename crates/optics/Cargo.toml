@@ -1,18 +1,17 @@
 [package]
-name = "optics"
-version = "0.1.0"
 edition = "2021"
 license = "MIT"
+name = "optics"
+version = "0.1.0"
 
 [dependencies]
-thiserror = { workspace = true }
-lalrpop-util = { workspace = true }
-once_cell = { workspace = true }
-itertools = { workspace = true }
-logos = { workspace = true }
-serde = { workspace = true }
-utoipa = { workspace = true }
-bincode = { workspace = true }
+bincode = {workspace = true}
+itertools = {workspace = true}
+lalrpop-util = {workspace = true}
+logos = {workspace = true}
+serde = {workspace = true}
+thiserror = {workspace = true}
+utoipa = {workspace = true}
 
 [build-dependencies]
-lalrpop = { workspace = true }
+lalrpop = {workspace = true}

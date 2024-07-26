@@ -40,7 +40,6 @@ measure_time.workspace = true
 memmap2 = {workspace = true, optional = true}
 murmurhash32.workspace = true
 nom.workspace = true
-once_cell.workspace = true
 oneshot.workspace = true
 ownedbytes.workspace = true
 rayon.workspace = true

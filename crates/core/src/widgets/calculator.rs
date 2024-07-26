@@ -25,8 +25,8 @@ use std::{
 };
 use utoipa::ToSchema;
 
-static DICE_REGEX: once_cell::sync::Lazy<regex::Regex> =
-    once_cell::sync::Lazy::new(|| regex::Regex::new(r"^d[0-9]+").unwrap());
+static DICE_REGEX: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"^d[0-9]+").unwrap());
 
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
