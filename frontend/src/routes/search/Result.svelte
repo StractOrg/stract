@@ -8,9 +8,20 @@
   import TextSnippet from '$lib/components/TextSnippet.svelte';
   import StackOverflowSnippet from './StackOverflowSnippet.svelte';
   import ResultLink from './ResultLink.svelte';
+  import { hostRankingsStore } from '$lib/stores';
+  import type { Ranking } from '$lib/rankings';
+  import HandThumbDown from '~icons/heroicons/hand-thumb-down-20-solid';
+  import HandThumbUp from '~icons/heroicons/hand-thumb-up-20-solid';
 
   export let webpage: DisplayedWebpage;
   export let resultIndex: number;
+
+  let ranking: Ranking | undefined = undefined;
+  hostRankingsStore.subscribe((rankings) => {
+    if (rankings) {
+      ranking = rankings[webpage.site];
+    }
+  });
 
   let button: HTMLButtonElement;
 
@@ -53,13 +64,30 @@
           </div>
         </span>
       </div>
-      <button
-        class="noscript:hidden flex w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus"
-        bind:this={button}
-        on:click|stopPropagation={() => dispatch('modal', button)}
-      >
-        <AdjustVertical class="text-md" />
-      </button>
+      <div class="flex space-x-2">
+        {#if ranking}
+          <span class="flex items-center text-sm text-neutral-focus">
+            <span class="text-xs text-neutral">
+              {#if ranking == 'liked'}
+                <div title="liked site" aria-label="you have liked this site">
+                  <HandThumbUp class="w-3 text-success" />
+                </div>
+              {:else if ranking == 'disliked'}
+                <div aria-label="you have disliked this site" title="disliked site">
+                  <HandThumbDown class="w-3 text-warning" />
+                </div>
+              {/if}
+            </span>
+          </span>
+        {/if}
+        <button
+          class="noscript:hidden flex w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus"
+          bind:this={button}
+          on:click|stopPropagation={() => dispatch('modal', button)}
+        >
+          <AdjustVertical class="text-md" />
+        </button>
+      </div>
     </div>
     <p class="snippet text-sm font-normal text-neutral-focus [&>b]:font-bold">
       {#if webpage.richSnippet && webpage.richSnippet._type == 'stackOverflowQA'}

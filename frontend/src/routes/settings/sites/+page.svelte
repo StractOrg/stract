@@ -3,7 +3,7 @@
   import Button from '$lib/components/Button.svelte';
   import Site from '$lib/components/Site.svelte';
   import { getButtonTailwindStyle } from '$lib/themes';
-  import { rankingsToRanked, type RankedSites, Ranking } from '$lib/rankings';
+  import { Rankings, rankingsToRanked, type RankedSites, type Ranking } from '$lib/rankings';
   import { hostRankingsStore } from '$lib/stores';
   import { flip } from 'svelte/animate';
   import { derived } from 'svelte/store';
@@ -20,20 +20,20 @@
       title: 'Liked Sites',
       description:
         'Sites that are similar to these sites receive a boost during search. Their results are more likely to appear in your search results.',
-      section: Ranking.LIKED,
+      section: 'liked',
     },
     {
       title: 'Disliked Sites',
       description:
         'Sites that are similar to these sites gets de-prioritized during search. Their results are less likely to appear in your search results.',
-      section: Ranking.DISLIKED,
+      section: 'disliked',
     },
 
     {
       title: 'Blocked Sites',
       description:
         "These are the sites you have blocked. They won't appear in any of your searches.",
-      section: Ranking.BLOCKED,
+      section: 'blocked',
     },
   ] as const;
 
@@ -62,7 +62,7 @@
               Optic.parsePreferenceOptic(content as string),
             );
             // Iterate through all sites in each Ranking and pass them to rankSite
-            for (const [_, ranking] of Object.entries(Ranking)) {
+            for (const ranking of Rankings) {
               const sites = extractedRankings[ranking];
               sites.forEach((site) => rankSite(site, ranking));
             }

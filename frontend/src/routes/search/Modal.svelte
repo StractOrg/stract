@@ -22,7 +22,7 @@
 </script>
 
 <script lang="ts">
-  import { Ranking } from '$lib/rankings';
+  import type { Ranking } from '$lib/rankings';
   import { hostRankingsStore } from '$lib/stores';
   import type { DisplayedWebpage, SignalEnumDiscriminants, SignalScore } from '$lib/api';
   import { twJoin } from 'tailwind-merge';
@@ -141,21 +141,21 @@
 
   const rankingChoices = [
     {
-      ranking: Ranking.LIKED,
+      ranking: 'liked',
       kind: 'success',
       Icon: HandThumbUp,
       title: 'Like Site',
       aria_label: 'I want more results like this site.',
     },
     {
-      ranking: Ranking.DISLIKED,
+      ranking: 'disliked',
       kind: 'warning',
       Icon: HandThumbDown,
       title: 'Dislike Site',
       aria_label: 'I want fewer results like this site.',
     },
     {
-      ranking: Ranking.BLOCKED,
+      ranking: 'blocked',
       kind: 'error',
       Icon: NoSymbol,
       title: 'Block Site',
