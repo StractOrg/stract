@@ -38,7 +38,7 @@ use crate::ranking::SignalComputer;
 use crate::webgraph::{self, Edge, EdgeLimit, Node, NodeID};
 use crate::webpage::{safety_classifier, Html, Webpage};
 
-const MAX_BACKLINKS: EdgeLimit = EdgeLimit::Limit(1024);
+const MAX_BACKLINKS: EdgeLimit = EdgeLimit::Limit(512);
 
 pub struct Config {
     pub host_centrality_store_path: String,
