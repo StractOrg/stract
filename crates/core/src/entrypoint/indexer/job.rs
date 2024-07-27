@@ -96,7 +96,7 @@ impl Job {
                         has_page_centrality = true;
                     }
 
-                    if !webpage.backlinks.is_empty() {
+                    if !webpage.backlinks().is_empty() {
                         has_backlinks = true;
                     }
                     trace!("inserting webpage: {:?}", webpage.html.url());

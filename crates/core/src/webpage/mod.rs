@@ -15,6 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    backlink_grouper::GroupedBacklinks,
+    inverted_index::InvertedIndex,
     schema::{numerical_field::NumericalField, text_field::TextField, Field},
     webgraph::{FullEdge, NodeID},
     Result,
@@ -41,7 +43,15 @@ pub use region::Region;
 #[derive(Debug)]
 pub struct Webpage {
     pub html: Html,
+
+    #[cfg(test)]
     pub backlinks: Vec<FullEdge>,
+
+    #[cfg(not(test))]
+    backlinks: Vec<FullEdge>,
+
+    pub grouped_backlinks: GroupedBacklinks,
+
     pub host_centrality: f64,
     pub host_centrality_rank: u64,
     pub page_centrality: f64,
@@ -63,6 +73,7 @@ impl Default for Webpage {
         Self {
             html: Html::parse_without_text("<html></html>", "https://example.com/").unwrap(),
             backlinks: Default::default(),
+            grouped_backlinks: GroupedBacklinks::empty(),
             host_centrality: Default::default(),
             host_centrality_rank: u64::MAX,
             page_centrality: Default::default(),
@@ -84,6 +95,7 @@ impl From<Html> for Webpage {
     fn from(html: Html) -> Self {
         Self {
             html,
+            grouped_backlinks: GroupedBacklinks::empty(),
             backlinks: Default::default(),
             host_centrality: Default::default(),
             host_centrality_rank: u64::MAX,
@@ -129,13 +141,29 @@ impl Webpage {
         })
     }
 
-    pub fn as_tantivy(&self, schema: &tantivy::schema::Schema) -> Result<TantivyDocument> {
-        let mut doc = self.html.as_tantivy(schema)?;
+    pub fn backlinks(&self) -> &[FullEdge] {
+        &self.backlinks
+    }
+
+    pub fn set_backlinks(&mut self, backlinks: Vec<FullEdge>) {
+        self.backlinks = backlinks;
+    }
+
+    pub fn set_grouped_backlinks(&mut self, grouped_backlinks: GroupedBacklinks) {
+        self.grouped_backlinks = grouped_backlinks;
+    }
+
+    pub fn grouped_backlinks(&self) -> &GroupedBacklinks {
+        &self.grouped_backlinks
+    }
+
+    pub fn as_tantivy(&self, index: &InvertedIndex) -> Result<TantivyDocument> {
+        let mut doc = self.html.as_tantivy(index)?;
 
         for field in Field::all() {
             match field {
-                Field::Numerical(f) => f.add_webpage_tantivy(self, &mut doc, schema)?,
-                Field::Text(f) => f.add_webpage_tantivy(self, &mut doc, schema)?,
+                Field::Numerical(f) => f.add_webpage_tantivy(self, &mut doc, index)?,
+                Field::Text(f) => f.add_webpage_tantivy(self, &mut doc, index)?,
             }
         }
 

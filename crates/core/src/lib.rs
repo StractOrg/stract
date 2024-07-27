@@ -43,6 +43,7 @@ pub mod ampc;
 
 mod api;
 pub mod autosuggest;
+mod backlink_grouper;
 pub mod bangs;
 mod bincode_utils;
 pub mod canon_index;
@@ -64,6 +65,7 @@ mod intmap;
 mod kahan_sum;
 mod leaky_queue;
 mod live_index;
+mod log_group;
 mod metrics;
 mod models;
 pub mod naive_bayes;

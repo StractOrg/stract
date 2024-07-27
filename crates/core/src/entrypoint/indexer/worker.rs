@@ -23,6 +23,7 @@ use tracing::debug;
 
 pub use super::indexable_webpage::IndexableWebpage;
 pub use super::job::{Job, JobSettings};
+use crate::backlink_grouper::BacklinkGrouper;
 use crate::config::{
     IndexerConfig, IndexerDualEncoderConfig, IndexerGraphConfig, LiveIndexConfig,
     WebgraphGranularity,
@@ -176,15 +177,17 @@ impl IndexingWorker {
     {
         let config = Config::from(config);
 
+        let host_centrality_rank_store = speedy_kv::Db::open_or_create(
+            Path::new(&config.host_centrality_store_path).join("harmonic_rank"),
+        )
+        .unwrap();
+
         Self {
             host_centrality_store: speedy_kv::Db::open_or_create(
                 Path::new(&config.host_centrality_store_path).join("harmonic"),
             )
             .unwrap(),
-            host_centrality_rank_store: speedy_kv::Db::open_or_create(
-                Path::new(&config.host_centrality_store_path).join("harmonic_rank"),
-            )
-            .unwrap(),
+            host_centrality_rank_store,
             page_centrality_store: config
                 .page_centrality_store_path
                 .as_ref()
@@ -386,7 +389,7 @@ impl IndexingWorker {
         }
     }
 
-    pub fn set_backlink_labels(&self, pages: &mut [Webpage]) {
+    pub fn set_backlinks(&self, pages: &mut [Webpage]) {
         if let Some(graph) = self.page_webgraph() {
             let ids = pages
                 .iter()
@@ -396,7 +399,27 @@ impl IndexingWorker {
             let backlinks = graph.batch_raw_ingoing_edges_with_labels(ids, MAX_BACKLINKS);
 
             for (page, backlinks) in pages.iter_mut().zip_eq(backlinks) {
-                page.backlinks = backlinks;
+                page.set_backlinks(backlinks.clone());
+
+                let mut grouper =
+                    BacklinkGrouper::new(self.host_centrality_rank_store.len() as u64);
+
+                for backlink in backlinks {
+                    let node = backlink.from.clone().into_host().id();
+
+                    if Some(node) == page.node_id {
+                        continue;
+                    }
+
+                    let rank = self
+                        .host_centrality_rank_store
+                        .get(&node)
+                        .unwrap()
+                        .unwrap_or(u64::MAX);
+                    grouper.add(backlink, rank);
+                }
+
+                page.set_grouped_backlinks(grouper.groups())
             }
         }
     }
@@ -436,40 +459,21 @@ impl IndexingWorker {
         let mut signal_computer = SignalComputer::new(None);
 
         for page in batch {
-            let mut prepared = match self.prepare(page) {
+            let mut webpage = match self.prepare(page) {
                 Ok(html) => html,
                 Err(err) => {
                     debug!("skipping webpage: {}", err);
                     continue;
                 }
             };
-            if let Err(e) = self.set_host_centrality(&mut prepared) {
+            if let Err(e) = self.set_host_centrality(&mut webpage) {
                 debug!("skipping webpage: {}", e);
                 continue;
             }
 
-            self.set_page_centralities(&mut prepared);
-            self.set_keywords(&mut prepared);
-            self.set_safety_classification(&mut prepared);
-
-            // make sure we remember to set everything
-            let mut webpage = Webpage {
-                html: prepared.html,
-                backlinks: prepared.backlinks,
-                page_centrality: prepared.page_centrality,
-                page_centrality_rank: prepared.page_centrality_rank,
-                host_centrality: prepared.host_centrality,
-                host_centrality_rank: prepared.host_centrality_rank,
-                fetch_time_ms: page.fetch_time_ms,
-                pre_computed_score: 0.0,
-                node_id: prepared.node_id,
-                dmoz_description: prepared.dmoz_description,
-                safety_classification: prepared.safety_classification,
-                inserted_at: Utc::now(),
-                keywords: prepared.keywords,
-                title_embedding: None,   // set later
-                keyword_embedding: None, // set later
-            };
+            self.set_page_centralities(&mut webpage);
+            self.set_keywords(&mut webpage);
+            self.set_safety_classification(&mut webpage);
 
             signal_computer.set_current_timestamp(Utc::now().timestamp().max(0) as usize);
             webpage.pre_computed_score = signal_computer.precompute_score(&webpage);
@@ -479,7 +483,7 @@ impl IndexingWorker {
 
         self.set_title_embeddings(&mut res);
         self.set_keyword_embeddings(&mut res);
-        self.set_backlink_labels(&mut res);
+        self.set_backlinks(&mut res);
 
         res
     }

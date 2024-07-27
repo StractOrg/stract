@@ -162,7 +162,6 @@ mod tests {
                     "https://www.third.com",
                 )
                 .unwrap(),
-                backlinks: vec![],
                 host_centrality: 1.0,
                 node_id: Some(Node::from("https://www.third.com").into_host().id()),
                 ..Default::default()

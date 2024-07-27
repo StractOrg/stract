@@ -250,7 +250,6 @@ mod tests {
                     "https://www.b.com",
                 )
                 .unwrap(),
-                backlinks: vec![],
                 fetch_time_ms: 500,
                 page_centrality: 5.0,
                 ..Default::default()
@@ -415,10 +414,9 @@ mod tests {
     fn backlink_text() {
         let mut index = Index::temporary().expect("Unable to open index");
 
-        index
-            .insert(&Webpage {
-                html: Html::parse(
-                    r#"
+        let mut webpage = Webpage {
+            html: Html::parse(
+                r#"
                     <html>
                         <head>
                             <title>Test site</title>
@@ -428,18 +426,20 @@ mod tests {
                         </body>
                     </html>
                 "#,
-                    "https://www.first.com",
-                )
-                .unwrap(),
-                backlinks: vec![FullEdge {
-                    from: Node::from("https://www.backlink.com"),
-                    to: Node::from("https://www.first.com"),
-                    label: "test this is the best test site".to_string(),
-                }],
-                fetch_time_ms: 500,
-                ..Default::default()
-            })
-            .expect("failed to insert webpage");
+                "https://www.first.com",
+            )
+            .unwrap(),
+            fetch_time_ms: 500,
+            ..Default::default()
+        };
+
+        webpage.set_backlinks(vec![FullEdge {
+            from: Node::from("https://www.backlink.com"),
+            to: Node::from("https://www.first.com"),
+            label: "test this is the best test site".to_string(),
+        }]);
+
+        index.insert(&webpage).expect("failed to insert webpage");
         index
             .insert(&Webpage {
                 html: Html::parse(

@@ -198,6 +198,10 @@ impl InvertedIndex {
         Arc::clone(&self.schema)
     }
 
+    pub fn schema_ref(&self) -> &Schema {
+        &self.schema
+    }
+
     pub fn num_segments(&self) -> usize {
         self.tantivy_index.searchable_segments().unwrap().len()
     }
@@ -485,11 +489,10 @@ mod tests {
                 .unwrap(),
             )
             .expect("failed to insert webpage");
-        index
-            .insert(&Webpage {
-                html: Html::parse(
-                    &format!(
-                        r#"
+        let mut webpage = Webpage {
+            html: Html::parse(
+                &format!(
+                    r#"
             <html>
                 <head>
                     <title>Website B</title>
@@ -499,20 +502,22 @@ mod tests {
                 </body>
             </html>
             "#
-                    ),
-                    "https://www.b.com",
-                )
-                .unwrap(),
-                backlinks: vec![FullEdge {
-                    from: Node::from("https://www.a.com"),
-                    to: Node::from("https://www.b.com"),
-                    label: "B site is great".to_string(),
-                }],
-                host_centrality: 1.0,
-                fetch_time_ms: 500,
-                ..Default::default()
-            })
-            .expect("failed to insert webpage");
+                ),
+                "https://www.b.com",
+            )
+            .unwrap(),
+            host_centrality: 1.0,
+            fetch_time_ms: 500,
+            ..Default::default()
+        };
+
+        webpage.set_backlinks(vec![FullEdge {
+            from: Node::from("https://www.a.com"),
+            to: Node::from("https://www.b.com"),
+            label: "B site is great".to_string(),
+        }]);
+
+        index.insert(&webpage).expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
 

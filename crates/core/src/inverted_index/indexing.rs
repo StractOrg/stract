@@ -115,7 +115,7 @@ impl InvertedIndex {
         self.writer
             .as_ref()
             .expect("writer has not been prepared")
-            .add_document(webpage.as_tantivy(&self.schema)?)?;
+            .add_document(webpage.as_tantivy(self)?)?;
         Ok(())
     }
 

@@ -660,11 +660,11 @@ mod tests {
         )
         .unwrap();
 
-        webpage.backlinks = vec![FullEdge {
+        webpage.set_backlinks(vec![FullEdge {
             from: Node::from("https://www.second.com/example/abc"),
             to: Node::from("https://www.first.com"),
             label: String::new(),
-        }];
+        }]);
 
         index.insert(&webpage).expect("failed to insert webpage");
         let mut webpage = Webpage::test_parse(
@@ -682,7 +682,7 @@ mod tests {
             "https://www.second.com/example/abc",
         )
         .unwrap();
-        webpage.backlinks = vec![];
+        webpage.set_backlinks(vec![]);
 
         index.insert(&webpage).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");

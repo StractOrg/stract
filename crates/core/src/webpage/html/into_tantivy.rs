@@ -193,17 +193,21 @@ impl Html {
         split_u128(hash(self.title().unwrap_or_default()).0)
     }
 
-    pub fn as_tantivy(&self, schema: &tantivy::schema::Schema) -> Result<TantivyDocument> {
+    pub fn as_tantivy(
+        &self,
+        index: &crate::inverted_index::InvertedIndex,
+    ) -> Result<TantivyDocument> {
         let mut doc = TantivyDocument::new();
         let mut cache = FnCache::new(self);
 
-        for field in schema
+        for field in index
+            .schema_ref()
             .fields()
             .filter_map(|(field, _)| Field::get(field.field_id() as usize))
         {
             match field {
-                Field::Text(f) => f.add_html_tantivy(self, &mut cache, &mut doc, schema)?,
-                Field::Numerical(f) => f.add_html_tantivy(self, &mut cache, &mut doc, schema)?,
+                Field::Text(f) => f.add_html_tantivy(self, &mut cache, &mut doc, index)?,
+                Field::Numerical(f) => f.add_html_tantivy(self, &mut cache, &mut doc, index)?,
             }
         }
 

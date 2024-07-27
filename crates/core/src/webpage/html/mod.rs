@@ -489,7 +489,7 @@ mod tests {
 
     use tests::links::RelFlags;
 
-    use crate::{schema::create_schema, webpage::Link};
+    use crate::webpage::Link;
 
     use super::*;
 
@@ -734,8 +734,9 @@ mod tests {
         assert!(webpage.all_text().is_some());
         assert!(!webpage.all_text().unwrap().is_empty());
 
-        let schema = create_schema();
-        webpage.as_tantivy(&schema).unwrap();
+        let index =
+            crate::inverted_index::InvertedIndex::temporary().expect("Unable to open index");
+        webpage.as_tantivy(&index).unwrap();
     }
 
     #[test]

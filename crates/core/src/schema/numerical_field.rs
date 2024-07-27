@@ -52,14 +52,14 @@ pub trait NumericalField:
         html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()>;
 
     fn add_webpage_tantivy(
         &self,
         _webpage: &crate::webpage::Webpage,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -264,9 +264,9 @@ impl NumericalField for IsHomepage {
         html: &Html,
         _cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_bool(self.tantivy_field(schema), html.is_homepage());
+        doc.add_bool(self.tantivy_field(index.schema_ref()), html.is_homepage());
 
         Ok(())
     }
@@ -284,7 +284,7 @@ impl NumericalField for HostCentrality {
         _html: &Html,
         _cache: &mut FnCache,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -297,9 +297,12 @@ impl NumericalField for HostCentrality {
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_f64(self.tantivy_field(schema), webpage.host_centrality);
+        doc.add_f64(
+            self.tantivy_field(index.schema_ref()),
+            webpage.host_centrality,
+        );
 
         Ok(())
     }
@@ -321,7 +324,7 @@ impl NumericalField for HostCentralityRank {
         _html: &Html,
         _cache: &mut FnCache,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -330,9 +333,12 @@ impl NumericalField for HostCentralityRank {
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), webpage.host_centrality_rank);
+        doc.add_u64(
+            self.tantivy_field(index.schema_ref()),
+            webpage.host_centrality_rank,
+        );
 
         Ok(())
     }
@@ -353,7 +359,7 @@ impl NumericalField for PageCentrality {
         _html: &Html,
         _cache: &mut FnCache,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -366,9 +372,12 @@ impl NumericalField for PageCentrality {
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_f64(self.tantivy_field(schema), webpage.page_centrality);
+        doc.add_f64(
+            self.tantivy_field(index.schema_ref()),
+            webpage.page_centrality,
+        );
 
         Ok(())
     }
@@ -389,7 +398,7 @@ impl NumericalField for PageCentralityRank {
         _html: &Html,
         _cache: &mut FnCache,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -398,9 +407,12 @@ impl NumericalField for PageCentralityRank {
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), webpage.page_centrality_rank);
+        doc.add_u64(
+            self.tantivy_field(index.schema_ref()),
+            webpage.page_centrality_rank,
+        );
 
         Ok(())
     }
@@ -421,7 +433,7 @@ impl NumericalField for FetchTimeMs {
         _html: &Html,
         _cache: &mut FnCache,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -430,9 +442,12 @@ impl NumericalField for FetchTimeMs {
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), webpage.fetch_time_ms);
+        doc.add_u64(
+            self.tantivy_field(index.schema_ref()),
+            webpage.fetch_time_ms,
+        );
 
         Ok(())
     }
@@ -458,10 +473,10 @@ impl NumericalField for LastUpdated {
         html: &Html,
         _cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             html.updated_time()
                 .map_or(0, |time| time.timestamp().max(0) as u64),
         );
@@ -486,9 +501,12 @@ impl NumericalField for TrackerScore {
         html: &Html,
         _cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), html.trackers().len() as u64);
+        doc.add_u64(
+            self.tantivy_field(index.schema_ref()),
+            html.trackers().len() as u64,
+        );
 
         Ok(())
     }
@@ -514,7 +532,7 @@ impl NumericalField for Region {
         _html: &Html,
         _cache: &mut FnCache,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -523,14 +541,14 @@ impl NumericalField for Region {
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         let region = crate::webpage::region::Region::guess_from(webpage);
         if let Ok(region) = region {
-            doc.add_u64(self.tantivy_field(schema), region.id());
+            doc.add_u64(self.tantivy_field(index.schema_ref()), region.id());
         } else {
             doc.add_u64(
-                self.tantivy_field(schema),
+                self.tantivy_field(index.schema_ref()),
                 crate::webpage::region::Region::All.id(),
             );
         }
@@ -555,10 +573,10 @@ impl NumericalField for NumUrlTokens {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             cache.pretokenize_url().tokens.len() as u64,
         );
 
@@ -578,10 +596,10 @@ impl NumericalField for NumTitleTokens {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             cache
                 .pretokenize_title()
                 .as_ref()
@@ -605,10 +623,10 @@ impl NumericalField for NumCleanBodyTokens {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             cache.pretokenize_clean_text().tokens.len() as u64,
         );
         Ok(())
@@ -627,10 +645,10 @@ impl NumericalField for NumDescriptionTokens {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             cache.pretokenize_description().tokens.len() as u64,
         );
 
@@ -650,10 +668,10 @@ impl NumericalField for NumUrlForSiteOperatorTokens {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             cache.pretokenize_url_for_site_operator().tokens.len() as u64,
         );
 
@@ -673,10 +691,10 @@ impl NumericalField for NumDomainTokens {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             cache.pretokenize_domain().tokens.len() as u64,
         );
 
@@ -696,10 +714,10 @@ impl NumericalField for NumMicroformatTagsTokens {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             cache.pretokenize_microformats().tokens.len() as u64,
         );
 
@@ -719,9 +737,9 @@ impl NumericalField for SiteHash1 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), cache.site_hash()[0]);
+        doc.add_u64(self.tantivy_field(index.schema_ref()), cache.site_hash()[0]);
 
         Ok(())
     }
@@ -739,9 +757,9 @@ impl NumericalField for SiteHash2 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), cache.site_hash()[1]);
+        doc.add_u64(self.tantivy_field(index.schema_ref()), cache.site_hash()[1]);
 
         Ok(())
     }
@@ -759,10 +777,10 @@ impl NumericalField for UrlWithoutQueryHash1 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             cache.url_without_query_hash()[0],
         );
 
@@ -782,10 +800,10 @@ impl NumericalField for UrlWithoutQueryHash2 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             cache.url_without_query_hash()[1],
         );
 
@@ -805,9 +823,12 @@ impl NumericalField for TitleHash1 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), cache.title_hash()[0]);
+        doc.add_u64(
+            self.tantivy_field(index.schema_ref()),
+            cache.title_hash()[0],
+        );
 
         Ok(())
     }
@@ -825,9 +846,12 @@ impl NumericalField for TitleHash2 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), cache.title_hash()[1]);
+        doc.add_u64(
+            self.tantivy_field(index.schema_ref()),
+            cache.title_hash()[1],
+        );
 
         Ok(())
     }
@@ -845,9 +869,9 @@ impl NumericalField for UrlHash1 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), cache.url_hash()[0]);
+        doc.add_u64(self.tantivy_field(index.schema_ref()), cache.url_hash()[0]);
 
         Ok(())
     }
@@ -865,9 +889,9 @@ impl NumericalField for UrlHash2 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), cache.url_hash()[1]);
+        doc.add_u64(self.tantivy_field(index.schema_ref()), cache.url_hash()[1]);
 
         Ok(())
     }
@@ -885,9 +909,12 @@ impl NumericalField for DomainHash1 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), cache.domain_hash()[0]);
+        doc.add_u64(
+            self.tantivy_field(index.schema_ref()),
+            cache.domain_hash()[0],
+        );
 
         Ok(())
     }
@@ -905,9 +932,12 @@ impl NumericalField for DomainHash2 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), cache.domain_hash()[1]);
+        doc.add_u64(
+            self.tantivy_field(index.schema_ref()),
+            cache.domain_hash()[1],
+        );
 
         Ok(())
     }
@@ -925,9 +955,12 @@ impl NumericalField for UrlWithoutTldHash1 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), cache.url_without_tld_hash()[0]);
+        doc.add_u64(
+            self.tantivy_field(index.schema_ref()),
+            cache.url_without_tld_hash()[0],
+        );
 
         Ok(())
     }
@@ -945,9 +978,12 @@ impl NumericalField for UrlWithoutTldHash2 {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_u64(self.tantivy_field(schema), cache.url_without_tld_hash()[1]);
+        doc.add_u64(
+            self.tantivy_field(index.schema_ref()),
+            cache.url_without_tld_hash()[1],
+        );
 
         Ok(())
     }
@@ -969,7 +1005,7 @@ impl NumericalField for PreComputedScore {
         _html: &Html,
         _cache: &mut FnCache,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -982,9 +1018,12 @@ impl NumericalField for PreComputedScore {
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_f64(self.tantivy_field(schema), webpage.pre_computed_score);
+        doc.add_f64(
+            self.tantivy_field(index.schema_ref()),
+            webpage.pre_computed_score,
+        );
 
         Ok(())
     }
@@ -1006,7 +1045,7 @@ impl NumericalField for HostNodeID {
         _html: &Html,
         _cache: &mut FnCache,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -1015,14 +1054,14 @@ impl NumericalField for HostNodeID {
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         match &webpage.node_id {
             Some(node_id) => {
-                doc.add_u64(self.tantivy_field(schema), node_id.as_u64());
+                doc.add_u64(self.tantivy_field(index.schema_ref()), node_id.as_u64());
             }
             None => {
-                doc.add_u64(self.tantivy_field(schema), u64::MAX);
+                doc.add_u64(self.tantivy_field(index.schema_ref()), u64::MAX);
             }
         }
 
@@ -1050,7 +1089,7 @@ impl NumericalField for SimHash {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         let clean_text = cache.pretokenize_clean_text();
 
@@ -1059,7 +1098,7 @@ impl NumericalField for SimHash {
         } else {
             0
         };
-        doc.add_u64(self.tantivy_field(schema), hash);
+        doc.add_u64(self.tantivy_field(index.schema_ref()), hash);
 
         Ok(())
     }
@@ -1077,10 +1116,10 @@ impl NumericalField for NumFlattenedSchemaTokens {
         _html: &Html,
         cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         doc.add_u64(
-            self.tantivy_field(schema),
+            self.tantivy_field(index.schema_ref()),
             cache.pretokenized_schema_json().tokens.len() as u64,
         );
 
@@ -1104,7 +1143,7 @@ impl NumericalField for NumPathAndQuerySlashes {
         html: &Html,
         _cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         let num_slashes = html
             .url()
@@ -1112,7 +1151,7 @@ impl NumericalField for NumPathAndQuerySlashes {
             .map(|segments| segments.count())
             .unwrap_or(0);
 
-        doc.add_u64(self.tantivy_field(schema), num_slashes as u64);
+        doc.add_u64(self.tantivy_field(index.schema_ref()), num_slashes as u64);
 
         Ok(())
     }
@@ -1138,7 +1177,7 @@ impl NumericalField for NumPathAndQueryDigits {
         html: &Html,
         _cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         let num_digits = html
             .url()
@@ -1154,7 +1193,7 @@ impl NumericalField for NumPathAndQueryDigits {
                 .filter(|c| c.is_ascii_digit())
                 .count();
 
-        doc.add_u64(self.tantivy_field(schema), num_digits as u64);
+        doc.add_u64(self.tantivy_field(index.schema_ref()), num_digits as u64);
 
         Ok(())
     }
@@ -1184,9 +1223,12 @@ impl NumericalField for LikelyHasAds {
         html: &Html,
         _cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_bool(self.tantivy_field(schema), html.likely_has_ads());
+        doc.add_bool(
+            self.tantivy_field(index.schema_ref()),
+            html.likely_has_ads(),
+        );
 
         Ok(())
     }
@@ -1216,9 +1258,12 @@ impl NumericalField for LikelyHasPaywall {
         html: &Html,
         _cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_bool(self.tantivy_field(schema), html.likely_has_paywall());
+        doc.add_bool(
+            self.tantivy_field(index.schema_ref()),
+            html.likely_has_paywall(),
+        );
 
         Ok(())
     }
@@ -1248,9 +1293,9 @@ impl NumericalField for LinkDensity {
         html: &Html,
         _cache: &mut FnCache,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
-        doc.add_f64(self.tantivy_field(schema), html.link_density());
+        doc.add_f64(self.tantivy_field(index.schema_ref()), html.link_density());
 
         Ok(())
     }
@@ -1280,7 +1325,7 @@ impl NumericalField for TitleEmbeddings {
         _html: &Html,
         _cache: &mut FnCache,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -1289,15 +1334,15 @@ impl NumericalField for TitleEmbeddings {
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         if let Some(emb) = &webpage.title_embedding {
             let mut serialized = Vec::new();
             emb.write_bytes(&mut serialized)?;
 
-            doc.add_bytes(self.tantivy_field(schema), &serialized);
+            doc.add_bytes(self.tantivy_field(index.schema_ref()), &serialized);
         } else {
-            doc.add_bytes(self.tantivy_field(schema), &[]);
+            doc.add_bytes(self.tantivy_field(index.schema_ref()), &[]);
         }
 
         Ok(())
@@ -1324,7 +1369,7 @@ impl NumericalField for KeywordEmbeddings {
         _html: &Html,
         _cache: &mut FnCache,
         _doc: &mut TantivyDocument,
-        _schema: &tantivy::schema::Schema,
+        _index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         Ok(())
     }
@@ -1333,15 +1378,15 @@ impl NumericalField for KeywordEmbeddings {
         &self,
         webpage: &Webpage,
         doc: &mut TantivyDocument,
-        schema: &tantivy::schema::Schema,
+        index: &crate::inverted_index::InvertedIndex,
     ) -> Result<()> {
         if let Some(emb) = &webpage.keyword_embedding {
             let mut serialized = Vec::new();
             emb.write_bytes(&mut serialized)?;
 
-            doc.add_bytes(self.tantivy_field(schema), &serialized);
+            doc.add_bytes(self.tantivy_field(index.schema_ref()), &serialized);
         } else {
-            doc.add_bytes(self.tantivy_field(schema), &[]);
+            doc.add_bytes(self.tantivy_field(index.schema_ref()), &[]);
         }
 
         Ok(())
