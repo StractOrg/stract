@@ -82,7 +82,7 @@ impl SimilarHostsFinder {
         let backlink_nodes = in_edges
             .iter()
             .flatten()
-            .map(|e| e.from)
+            .map(|e| e.from.node())
             .unique()
             .collect::<Vec<_>>();
 
@@ -95,7 +95,7 @@ impl SimilarHostsFinder {
         let potential_nodes: Vec<_> = outgoing_edges
             .iter()
             .flatten()
-            .map(|e| e.to)
+            .map(|e| e.to.node())
             .unique()
             .filter(|n| !nodes.contains(n))
             .collect();

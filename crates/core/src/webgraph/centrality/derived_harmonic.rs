@@ -83,7 +83,7 @@ impl DerivedCentrality {
         let has_outgoing = BloomMap::new(8, num_nodes as u64, 0.01);
 
         page_graph.par_edges().for_each(|edge| {
-            has_outgoing.insert(&edge.from);
+            has_outgoing.insert(&edge.from.node());
         });
 
         let has_outgoing = has_outgoing.finalize();
@@ -103,7 +103,7 @@ impl DerivedCentrality {
                     let mut ingoing: Vec<_> = page_graph
                         .raw_ingoing_edges(&id, EdgeLimit::Limit(128))
                         .into_iter()
-                        .filter_map(|e| page_graph.id2node(&e.from))
+                        .filter_map(|e| page_graph.id2node(&e.from.node()))
                         .map(|n| n.into_host())
                         .collect();
                     ingoing.sort();

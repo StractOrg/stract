@@ -199,7 +199,6 @@ pub enum TextFieldEnum {
     Keywords,
     KeyPhrases,
     Links,
-    Backlinks,
     BacklinkLabelsGroup0,
     BacklinkLabelsGroup1,
     BacklinkLabelsGroup2,
@@ -248,7 +247,6 @@ enum_dispatch_from_discriminant!(TextFieldEnumDiscriminants => TextFieldEnum,
     Keywords,
     KeyPhrases,
     Links,
-    Backlinks,
     BacklinkLabelsGroup0,
     BacklinkLabelsGroup1,
     BacklinkLabelsGroup2,
@@ -1582,51 +1580,6 @@ impl TextField for Links {
                 .join("\n"),
         );
 
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Backlinks;
-impl TextField for Backlinks {
-    fn name(&self) -> &str {
-        "backlinks"
-    }
-
-    fn has_pos(&self) -> bool {
-        true
-    }
-
-    fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
-        FieldTokenizer::Url(UrlTokenizer)
-    }
-
-    fn add_webpage_tantivy(
-        &self,
-        webpage: &crate::webpage::Webpage,
-        doc: &mut TantivyDocument,
-        index: &crate::inverted_index::InvertedIndex,
-    ) -> Result<()> {
-        doc.add_text(
-            self.tantivy_field(index.schema_ref())
-                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
-            webpage
-                .backlinks()
-                .iter()
-                .map(|l| l.from.as_str().to_string())
-                .join("\n"),
-        );
-
-        Ok(())
-    }
-
-    fn add_html_tantivy(
-        &self,
-        _: &Html,
-        _: &mut FnCache,
-        _: &mut TantivyDocument,
-        _: &crate::inverted_index::InvertedIndex,
-    ) -> Result<()> {
         Ok(())
     }
 }

@@ -179,7 +179,7 @@ impl<'a, L> Iterator for EdgeMerger<'a, L> {
 
         if let Some(edge) = &res {
             while let Some(mut peek) = self.iters.peek_mut() {
-                if peek.0.peek().map(|x| x.other.id) == Some(edge.other.id) {
+                if peek.0.peek().map(|x| x.other.node()) == Some(edge.other.node()) {
                     peek.0.next().unwrap();
                 } else {
                     break;
@@ -190,59 +190,6 @@ impl<'a, L> Iterator for EdgeMerger<'a, L> {
         }
 
         res
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct NodeDatum {
-    id: NodeID,
-    sort_key: u64,
-}
-
-impl PartialOrd for NodeDatum {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for NodeDatum {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.sort_key
-            .cmp(&other.sort_key)
-            .then_with(|| self.id.cmp(&other.id))
-    }
-}
-
-impl PartialEq for NodeDatum {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.sort_key == other.sort_key
-    }
-}
-
-impl Eq for NodeDatum {}
-
-impl Hash for NodeDatum {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-        self.sort_key.hash(state);
-    }
-}
-
-impl NodeDatum {
-    pub fn new(node: NodeID, sort_key: u64) -> Self {
-        Self { id: node, sort_key }
-    }
-}
-
-impl NodeDatum {
-    #[inline]
-    pub fn node(&self) -> NodeID {
-        self.id
-    }
-
-    #[inline]
-    pub fn sort_key(&self) -> u64 {
-        self.sort_key
     }
 }
 
@@ -274,7 +221,7 @@ impl<L> Hash for StoredEdge<L> {
 
 #[cfg(test)]
 mod tests {
-    use crate::webpage::html::links::RelFlags;
+    use crate::{webgraph::NodeDatum, webpage::html::links::RelFlags};
 
     use super::*;
 
@@ -354,46 +301,46 @@ mod tests {
     #[test]
     fn test_datum_merge() {
         let a = vec![
-            StoredEdge::new(NodeDatum::new(1u64.into(), 1), RelFlags::default()),
-            StoredEdge::new(NodeDatum::new(2u64.into(), 4), RelFlags::default()),
-            StoredEdge::new(NodeDatum::new(3u64.into(), 5), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(1u64, 1), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(2u64, 4), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(3u64, 5), RelFlags::default()),
         ];
 
         let b = vec![
-            StoredEdge::new(NodeDatum::new(4u64.into(), 2), RelFlags::default()),
-            StoredEdge::new(NodeDatum::new(5u64.into(), 3), RelFlags::default()),
-            StoredEdge::new(NodeDatum::new(3u64.into(), 5), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(4u64, 2), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(5u64, 3), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(3u64, 5), RelFlags::default()),
         ];
 
         let mut merger = EdgeMerger::new(vec![a.into_iter(), b.into_iter()]);
 
-        assert_eq!(merger.next().unwrap().other.sort_key(), 1);
-        assert_eq!(merger.next().unwrap().other.sort_key(), 2);
-        assert_eq!(merger.next().unwrap().other.sort_key(), 3);
-        assert_eq!(merger.next().unwrap().other.sort_key(), 4);
-        assert_eq!(merger.next().unwrap().other.sort_key(), 5);
+        assert_eq!(merger.next().unwrap().other.host_rank(), 1);
+        assert_eq!(merger.next().unwrap().other.host_rank(), 2);
+        assert_eq!(merger.next().unwrap().other.host_rank(), 3);
+        assert_eq!(merger.next().unwrap().other.host_rank(), 4);
+        assert_eq!(merger.next().unwrap().other.host_rank(), 5);
         assert!(merger.next().is_none());
     }
 
     #[test]
     fn test_datum_merge_unequal_len() {
         let a = vec![
-            StoredEdge::new(NodeDatum::new(1u64.into(), 1), RelFlags::default()),
-            StoredEdge::new(NodeDatum::new(2u64.into(), 4), RelFlags::default()),
-            StoredEdge::new(NodeDatum::new(3u64.into(), 5), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(1u64, 1), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(2u64, 4), RelFlags::default()),
+            StoredEdge::new(NodeDatum::new(3u64, 5), RelFlags::default()),
         ];
 
         let b = vec![StoredEdge::new(
-            NodeDatum::new(4u64.into(), 2),
+            NodeDatum::new(4u64, 2),
             RelFlags::default(),
         )];
 
         let mut merger = EdgeMerger::new(vec![a.into_iter(), b.into_iter()]);
 
-        assert_eq!(merger.next().unwrap().other.sort_key(), 1);
-        assert_eq!(merger.next().unwrap().other.sort_key(), 2);
-        assert_eq!(merger.next().unwrap().other.sort_key(), 4);
-        assert_eq!(merger.next().unwrap().other.sort_key(), 5);
+        assert_eq!(merger.next().unwrap().other.host_rank(), 1);
+        assert_eq!(merger.next().unwrap().other.host_rank(), 2);
+        assert_eq!(merger.next().unwrap().other.host_rank(), 4);
+        assert_eq!(merger.next().unwrap().other.host_rank(), 5);
         assert!(merger.next().is_none());
     }
 }

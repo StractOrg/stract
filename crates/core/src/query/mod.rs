@@ -206,13 +206,7 @@ impl tantivy::query::Query for Query {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        index::Index,
-        rand_words,
-        searcher::LocalSearcher,
-        webgraph::{FullEdge, Node},
-        webpage::Webpage,
-    };
+    use crate::{index::Index, rand_words, searcher::LocalSearcher, webpage::Webpage};
     use proptest::prelude::*;
 
     use super::*;
@@ -634,86 +628,6 @@ mod tests {
 
         let query = SearchQuery {
             query: "test linkto:second.com".to_string(),
-            ..Default::default()
-        };
-        let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.first.com/");
-    }
-
-    #[test]
-    fn link_from_query() {
-        let mut index = Index::temporary().expect("Unable to open index");
-
-        let mut webpage = Webpage::test_parse(
-            r#"
-                        <html>
-                            <head>
-                                <title>Test website</title>
-                            </head>
-                            <body>
-                                This is a test website
-                            </body>
-                        </html>
-                    "#,
-            "https://www.first.com",
-        )
-        .unwrap();
-
-        webpage.set_backlinks(vec![FullEdge {
-            from: Node::from("https://www.second.com/example/abc"),
-            to: Node::from("https://www.first.com"),
-            label: String::new(),
-        }]);
-
-        index.insert(&webpage).expect("failed to insert webpage");
-        let mut webpage = Webpage::test_parse(
-            r#"
-                <html>
-                    <head>
-                        <title>Test test</title>
-                    </head>
-                    <body>
-                        This test page does not contain the forbidden word
-                        <a href="https://www.first.com">First</a>
-                    </body>
-                </html>
-            "#,
-            "https://www.second.com/example/abc",
-        )
-        .unwrap();
-        webpage.set_backlinks(vec![]);
-
-        index.insert(&webpage).expect("failed to insert webpage");
-        index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
-
-        let query = SearchQuery {
-            query: "test linkfrom:second.com".to_string(),
-            ..Default::default()
-        };
-        let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.first.com/");
-
-        let query = SearchQuery {
-            query: "test linkfrom:www.second.com".to_string(),
-            ..Default::default()
-        };
-        let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.first.com/");
-
-        let query = SearchQuery {
-            query: "test linkfrom:second.com/example".to_string(),
-            ..Default::default()
-        };
-        let result = searcher.search(&query).expect("Search failed");
-        assert_eq!(result.webpages.len(), 1);
-        assert_eq!(result.webpages[0].url, "https://www.first.com/");
-
-        let query = SearchQuery {
-            query: "test linksfrom:second.com/example/abc".to_string(),
             ..Default::default()
         };
         let result = searcher.search(&query).expect("Search failed");

@@ -220,7 +220,7 @@ impl Webgraph {
             |segment| segment.ingoing_edges_with_label(node_id, &limit),
             dedup,
         );
-        edges.sort_by(|a, b| a.from.sort_key().cmp(&b.from.sort_key()));
+        edges.sort_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()));
 
         limit
             .apply(edges.into_iter())
@@ -257,13 +257,13 @@ impl Webgraph {
         };
 
         let mut edges = self.inner_edges(|segment| segment.ingoing_edges(node, &limit), dedup);
-        edges.sort_by(|a, b| a.from.sort_key().cmp(&b.from.sort_key()));
+        edges.sort_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()));
 
         limit
             .apply(edges.into_iter())
             .map(|e| Edge {
-                from: e.from.node(),
-                to: e.to.node(),
+                from: e.from,
+                to: e.to,
                 label: e.label,
                 rel: e.rel,
             })
@@ -284,13 +284,13 @@ impl Webgraph {
             |segment| segment.ingoing_edges_with_label(node, &limit),
             dedup,
         );
-        edges.sort_by(|a, b| a.from.sort_key().cmp(&b.from.sort_key()));
+        edges.sort_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()));
 
         limit
             .apply(edges.into_iter())
             .map(|e| Edge {
-                from: e.from.node(),
-                to: e.to.node(),
+                from: e.from,
+                to: e.to,
                 label: e.label,
                 rel: e.rel,
             })
@@ -312,13 +312,13 @@ impl Webgraph {
             dedup,
         );
 
-        edges.sort_by(|a, b| a.to.sort_key().cmp(&b.to.sort_key()));
+        edges.sort_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()));
 
         limit
             .apply(edges.into_iter())
             .map(|e| Edge {
-                from: e.from.node(),
-                to: e.to.node(),
+                from: e.from,
+                to: e.to,
                 label: e.label,
                 rel: e.rel,
             })
@@ -335,7 +335,7 @@ impl Webgraph {
             |segment| segment.outgoing_edges_with_label(&node.id(), &limit),
             dedup,
         );
-        edges.sort_by(|a, b| a.to.sort_key().cmp(&b.to.sort_key()));
+        edges.sort_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()));
 
         limit
             .apply(edges.into_iter())
@@ -354,13 +354,13 @@ impl Webgraph {
         };
 
         let mut edges = self.inner_edges(|segment| segment.outgoing_edges(node, &limit), dedup);
-        edges.sort_by(|a, b| a.to.sort_key().cmp(&b.to.sort_key()));
+        edges.sort_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()));
 
         limit
             .apply(edges.into_iter())
             .map(|e| Edge {
-                from: e.from.node(),
-                to: e.to.node(),
+                from: e.from,
+                to: e.to,
                 label: e.label,
                 rel: e.rel,
             })
@@ -398,7 +398,7 @@ impl Webgraph {
         let mut rng = rand::thread_rng();
         let mut nodes = self
             .edges()
-            .map(|e| e.from)
+            .map(|e| e.from.node())
             .unique()
             .choose_multiple(&mut rng, num);
         nodes.shuffle(&mut rng);

@@ -33,7 +33,7 @@ use crate::{
         },
     },
     entrypoint::webgraph_server::{
-        GetNode, IngoingEdges, IngoingEdgesById, OutgoingEdges, PagesByHosts, RawIngoingEdges,
+        GetNode, IngoingEdges, OutgoingEdges, PagesByHosts, RawIngoingEdges,
         RawIngoingEdgesWithLabels, RawOutgoingEdges, RawOutgoingEdgesWithLabels, WebGraphService,
     },
     Result,
@@ -277,37 +277,6 @@ impl RemoteWebgraph {
         let reqs: Vec<_> = ids
             .iter()
             .map(|id| RawIngoingEdges { node: *id, limit })
-            .collect();
-
-        let res = self
-            .conn()
-            .await
-            .batch_send(&reqs, &AllShardsSelector, &RandomReplicaSelector)
-            .await?;
-
-        let mut edges = vec![vec![]; ids.len()];
-
-        for (_, res) in res {
-            debug_assert!(res.len() <= 1);
-
-            for (_, res) in res {
-                for (i, rep) in res.into_iter().enumerate() {
-                    edges[i].extend(rep);
-                }
-            }
-        }
-
-        Ok(edges)
-    }
-
-    pub async fn batch_ingoing_edges_by_id(
-        &self,
-        ids: &[NodeID],
-        limit: EdgeLimit,
-    ) -> Result<Vec<Vec<FullEdge>>> {
-        let reqs: Vec<_> = ids
-            .iter()
-            .map(|id| IngoingEdgesById { node: *id, limit })
             .collect();
 
         let res = self

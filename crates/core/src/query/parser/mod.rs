@@ -130,17 +130,6 @@ fn links_to_field(input: &str) -> nom::IResult<&str, Term> {
     Ok((input, Term::LinkTo(output.to_string())))
 }
 
-fn links_from_field(input: &str) -> nom::IResult<&str, Term> {
-    // parse 'linksfrom:' and then a simple term
-    let (input, _) = nom::branch::alt((
-        nom::bytes::complete::tag("linksfrom:"),
-        nom::bytes::complete::tag("linkfrom:"),
-    ))(input)?;
-    let (input, output) = simple_str(input)?;
-
-    Ok((input, Term::LinkFrom(output.to_string())))
-}
-
 fn title_field(input: &str) -> nom::IResult<&str, Term> {
     // parse 'title:' and then a simple term
     let (input, _) = nom::bytes::complete::tag("intitle:")(input)?;
@@ -169,7 +158,6 @@ fn field_selector(input: &str) -> nom::IResult<&str, Term> {
     nom::branch::alt((
         site_field,
         links_to_field,
-        links_from_field,
         title_field,
         body_field,
         url_field,

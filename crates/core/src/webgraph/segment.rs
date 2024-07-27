@@ -209,7 +209,7 @@ impl Segment {
 #[cfg(test)]
 mod test {
     use crate::{
-        webgraph::{Edge, FullNodeID},
+        webgraph::{Edge, FullNodeID, NodeDatum},
         webpage::html::links::RelFlags,
     };
 
@@ -285,15 +285,15 @@ mod test {
             out,
             vec![
                 Edge {
-                    from: a.id,
-                    to: b.id,
+                    from: NodeDatum::new(a.id, u64::MAX),
+                    to: NodeDatum::new(b.id, u64::MAX),
                     label: (),
                     rel: RelFlags::default(),
                 }
                 .into(),
                 Edge {
-                    from: a.id,
-                    to: c.id,
+                    from: NodeDatum::new(a.id, u64::MAX),
+                    to: NodeDatum::new(c.id, u64::MAX),
                     label: (),
                     rel: RelFlags::default(),
                 }
@@ -306,8 +306,8 @@ mod test {
         assert_eq!(
             out,
             vec![Edge {
-                from: b.id,
-                to: c.id,
+                from: NodeDatum::new(b.id, u64::MAX),
+                to: NodeDatum::new(c.id, u64::MAX),
                 label: (),
                 rel: RelFlags::default(),
             }
@@ -319,8 +319,8 @@ mod test {
         assert_eq!(
             out,
             vec![Edge {
-                from: c.id,
-                to: a.id,
+                from: NodeDatum::new(c.id, u64::MAX),
+                to: NodeDatum::new(a.id, u64::MAX),
                 label: (),
                 rel: RelFlags::default(),
             }
@@ -331,8 +331,8 @@ mod test {
         assert_eq!(
             out,
             vec![Edge {
-                from: c.id,
-                to: a.id,
+                from: NodeDatum::new(c.id, u64::MAX),
+                to: NodeDatum::new(a.id, u64::MAX),
                 label: (),
                 rel: RelFlags::default(),
             }
@@ -343,8 +343,8 @@ mod test {
         assert_eq!(
             out,
             vec![Edge {
-                from: a.id,
-                to: b.id,
+                from: NodeDatum::new(a.id, u64::MAX),
+                to: NodeDatum::new(b.id, u64::MAX),
                 label: (),
                 rel: RelFlags::default(),
             }
@@ -357,15 +357,15 @@ mod test {
             out,
             vec![
                 Edge {
-                    from: a.id,
-                    to: c.id,
+                    from: NodeDatum::new(a.id, u64::MAX),
+                    to: NodeDatum::new(c.id, u64::MAX),
                     label: (),
                     rel: RelFlags::default(),
                 }
                 .into(),
                 Edge {
-                    from: b.id,
-                    to: c.id,
+                    from: NodeDatum::new(b.id, u64::MAX),
+                    to: NodeDatum::new(c.id, u64::MAX),
                     label: (),
                     rel: RelFlags::default(),
                 }

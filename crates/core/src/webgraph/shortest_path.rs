@@ -90,7 +90,7 @@ impl ShortestPaths for Webgraph {
         dijkstra_multi(
             &[source],
             |node| self.raw_outgoing_edges(&node, super::EdgeLimit::Unlimited),
-            |edge| edge.to,
+            |edge| edge.to.node(),
             Some(max_dist),
         )
     }
@@ -99,7 +99,7 @@ impl ShortestPaths for Webgraph {
         dijkstra_multi(
             &[source],
             |node| self.raw_outgoing_edges(&node, super::EdgeLimit::Unlimited),
-            |edge| edge.to,
+            |edge| edge.to.node(),
             None,
         )
     }
@@ -108,7 +108,7 @@ impl ShortestPaths for Webgraph {
         dijkstra_multi(
             &[source],
             |node| self.raw_ingoing_edges(&node, super::EdgeLimit::Unlimited),
-            |edge| edge.from,
+            |edge| edge.from.node(),
             None,
         )
     }

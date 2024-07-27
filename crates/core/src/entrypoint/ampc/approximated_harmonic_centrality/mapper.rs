@@ -77,13 +77,13 @@ impl Workers {
             {
                 let d = dist + 1;
 
-                let current_dist = distances.entry(outgoing).or_insert(u8::MAX);
+                let current_dist = distances.entry(outgoing.node()).or_insert(u8::MAX);
 
                 if d < *current_dist {
                     *current_dist = d;
 
                     if d < max_dist {
-                        queue.push(cmp::Reverse((d, outgoing)));
+                        queue.push(cmp::Reverse((d, outgoing.node())));
                     }
                 }
             }

@@ -33,8 +33,8 @@ use fst::Automaton;
 use itertools::Itertools;
 
 use super::{
-    merge::{MergeNode, MergeSegmentOrd, NodeDatum},
-    Compression, EdgeLimit, FullNodeID, NodeID, SegmentEdge, StoredEdge,
+    merge::{MergeNode, MergeSegmentOrd},
+    Compression, EdgeLimit, FullNodeID, NodeDatum, NodeID, SegmentEdge, StoredEdge,
 };
 
 #[derive(
@@ -107,12 +107,12 @@ impl HostDb {
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct EdgeRange {
     range: std::ops::Range<u64>,
-    sort_key: u64,
+    host_rank: u64,
 }
 
 impl EdgeRange {
-    pub fn new(range: std::ops::Range<u64>, sort_key: u64) -> Self {
-        Self { range, sort_key }
+    pub fn new(range: std::ops::Range<u64>, host_rank: u64) -> Self {
+        Self { range, host_rank }
     }
 }
 
@@ -219,14 +219,14 @@ impl ConstSerializable for NodeDatum {
 
     fn serialize(&self, buf: &mut [u8]) {
         self.node().serialize(&mut buf[..NodeID::BYTES]);
-        self.sort_key().serialize(&mut buf[NodeID::BYTES..]);
+        self.host_rank().serialize(&mut buf[NodeID::BYTES..]);
     }
 
     fn deserialize(buf: &[u8]) -> Self {
         let node = NodeID::deserialize(&buf[..NodeID::BYTES]);
-        let sort_key = u64::deserialize(&buf[NodeID::BYTES..]);
+        let host_rank = u64::deserialize(&buf[NodeID::BYTES..]);
 
-        Self::new(node, sort_key)
+        Self::new(node, host_rank)
     }
 }
 
@@ -236,15 +236,15 @@ impl ConstSerializable for EdgeRange {
     fn serialize(&self, buf: &mut [u8]) {
         const RANGE_BYTES: usize = std::mem::size_of::<u64>() * 2;
         self.range.serialize(&mut buf[..RANGE_BYTES]);
-        self.sort_key.serialize(&mut buf[RANGE_BYTES..]);
+        self.host_rank.serialize(&mut buf[RANGE_BYTES..]);
     }
 
     fn deserialize(buf: &[u8]) -> Self {
         const RANGE_BYTES: usize = std::mem::size_of::<u64>() * 2;
         let range: Range<u64> = Range::deserialize(&buf[..RANGE_BYTES]);
-        let sort_key = u64::deserialize(&buf[RANGE_BYTES..]);
+        let host_rank = u64::deserialize(&buf[RANGE_BYTES..]);
 
-        Self { range, sort_key }
+        Self { range, host_rank }
     }
 }
 
@@ -401,7 +401,7 @@ impl EdgeStore {
             let edges = Self::merge_postings_for_node(&buf, stores);
 
             // write postings
-            let node_sort_key = buf[0].range().sort_key;
+            let node_host_rank = buf[0].range().host_rank;
             let node_id = buf[0].id();
             let mut first_label_offset = None;
             let mut last_label_offset = None;
@@ -444,7 +444,7 @@ impl EdgeStore {
                     start: first_node_offset.unwrap().start,
                     end: last_node_offset.unwrap().start + last_node_offset.unwrap().num_bytes,
                 },
-                node_sort_key,
+                node_host_rank,
             );
             let node_range_bytes = node_range.serialize_to_vec();
 
@@ -528,13 +528,13 @@ impl EdgeStore {
                         if self.reversed {
                             SegmentEdge {
                                 from: edge.other,
-                                to: NodeDatum::new(*node, node_range.sort_key),
+                                to: NodeDatum::new(*node, node_range.host_rank),
                                 rel: edge.rel,
                                 label,
                             }
                         } else {
                             SegmentEdge {
-                                from: NodeDatum::new(*node, node_range.sort_key),
+                                from: NodeDatum::new(*node, node_range.host_rank),
                                 to: edge.other,
                                 rel: edge.rel,
                                 label,
@@ -564,13 +564,13 @@ impl EdgeStore {
                         if self.reversed {
                             SegmentEdge {
                                 from: edge.other,
-                                to: NodeDatum::new(*node, edge_range.sort_key),
+                                to: NodeDatum::new(*node, edge_range.host_rank),
                                 rel: edge.rel,
                                 label: (),
                             }
                         } else {
                             SegmentEdge {
-                                from: NodeDatum::new(*node, edge_range.sort_key),
+                                from: NodeDatum::new(*node, edge_range.host_rank),
                                 to: edge.other,
                                 rel: edge.rel,
                                 label: (),
@@ -603,13 +603,13 @@ impl EdgeStore {
                 if self.reversed {
                     SegmentEdge {
                         from: edge.other,
-                        to: NodeDatum::new(node, edge_range.sort_key),
+                        to: NodeDatum::new(node, edge_range.host_rank),
                         rel: edge.rel,
                         label: (),
                     }
                 } else {
                     SegmentEdge {
-                        from: NodeDatum::new(node, edge_range.sort_key),
+                        from: NodeDatum::new(node, edge_range.host_rank),
                         to: edge.other,
                         rel: edge.rel,
                         label: (),
@@ -657,7 +657,7 @@ mod tests {
         let edges: Vec<_> = store.get_with_label(&NodeID::from(0_u64), &EdgeLimit::Unlimited);
 
         assert_eq!(edges.len(), 1);
-        assert_eq!(&edges[0], &SegmentEdge::from(e.clone()));
+        assert_eq!(&edges[0].to.node(), &SegmentEdge::from(e.clone()).to.node());
 
         let edges: Vec<_> = store.get_with_label(&NodeID::from(1_u64), &EdgeLimit::Unlimited);
 
@@ -801,8 +801,17 @@ mod tests {
 
         assert_eq!(edges.len(), 3);
 
-        assert_eq!(Edge::from(edges[0].clone()), Edge::from(e2.clone()));
-        assert_eq!(Edge::from(edges[1].clone()), Edge::from(e3.clone()));
-        assert_eq!(Edge::from(edges[2].clone()), Edge::from(e1.clone()));
+        assert_eq!(
+            Edge::from(edges[0].clone()).from.node(),
+            Edge::from(e2.clone()).from.node()
+        );
+        assert_eq!(
+            Edge::from(edges[1].clone()).from.node(),
+            Edge::from(e3.clone()).from.node()
+        );
+        assert_eq!(
+            Edge::from(edges[2].clone()).from.node(),
+            Edge::from(e1.clone()).from.node()
+        );
     }
 }

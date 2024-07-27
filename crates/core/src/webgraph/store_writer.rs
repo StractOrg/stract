@@ -39,9 +39,8 @@ use file_store::{
 };
 
 use super::{
-    merge::NodeDatum,
     store::{CompressedLabelBlock, EdgeStore, HostDb, LabelBlock, RangesDb},
-    Compression, EdgeLabel, InsertableEdge, NodeID, StoredEdge,
+    Compression, EdgeLabel, InsertableEdge, NodeDatum, NodeID, StoredEdge,
 };
 
 #[derive(bincode::Encode, bincode::Decode)]
@@ -315,13 +314,13 @@ impl FinalEdgeStoreWriter {
                 (edge.to.id, edge.to.host)
             };
 
-            let sort_key = self
+            let host_rank = self
                 .host_centrality_rank_store
                 .as_ref()
                 .map(|store| store.get(&host).unwrap().unwrap_or(u64::MAX))
-                .unwrap_or(0);
+                .unwrap_or(u64::MAX);
 
-            let datum = NodeDatum::new(node, sort_key);
+            let datum = NodeDatum::new(node, host_rank);
             let rel = edge.rel;
             stored_edges.push(StoredEdge::new(datum, rel));
         }
@@ -367,7 +366,7 @@ impl FinalEdgeStoreWriter {
             .host_centrality_rank_store
             .as_ref()
             .map(|store| store.get(&node.host).unwrap().unwrap_or(u64::MAX))
-            .unwrap_or(0);
+            .unwrap_or(u64::MAX);
 
         let node_range: EdgeRange = EdgeRange::new(
             Range {

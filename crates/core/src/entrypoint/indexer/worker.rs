@@ -35,7 +35,7 @@ use crate::Result;
 use crate::index::Index;
 use crate::rake::RakeModel;
 use crate::ranking::SignalComputer;
-use crate::webgraph::{self, EdgeLimit, FullEdge, Node, NodeID};
+use crate::webgraph::{self, Edge, EdgeLimit, Node, NodeID};
 use crate::webpage::{safety_classifier, Html, Webpage};
 
 const MAX_BACKLINKS: EdgeLimit = EdgeLimit::Limit(1024);
@@ -87,16 +87,17 @@ impl Webgraph {
         &self,
         ids: Vec<NodeID>,
         limit: EdgeLimit,
-    ) -> Vec<Vec<FullEdge>> {
+    ) -> Vec<Vec<Edge<String>>> {
         let edges = match self {
             Self::Remote(webgraph) => {
-                crate::block_on(webgraph.batch_ingoing_edges_by_id(&ids, limit)).unwrap_or_default()
+                crate::block_on(webgraph.batch_raw_ingoing_edges_with_labels(&ids, limit))
+                    .unwrap_or_default()
             }
             Self::Local(webgraph) => {
                 let mut res = Vec::new();
 
                 for id in ids {
-                    res.push(webgraph.ingoing_edges_by_id(&id, limit));
+                    res.push(webgraph.raw_ingoing_edges_with_labels(&id, limit));
                 }
 
                 res
@@ -405,18 +406,7 @@ impl IndexingWorker {
                     BacklinkGrouper::new(self.host_centrality_rank_store.len() as u64);
 
                 for backlink in backlinks {
-                    let node = backlink.from.clone().into_host().id();
-
-                    if Some(node) == page.node_id {
-                        continue;
-                    }
-
-                    let rank = self
-                        .host_centrality_rank_store
-                        .get(&node)
-                        .unwrap()
-                        .unwrap_or(u64::MAX);
-                    grouper.add(backlink, rank);
+                    grouper.add(backlink);
                 }
 
                 page.set_grouped_backlinks(grouper.groups())

@@ -51,7 +51,7 @@ impl CentralityMapper {
         batch: &[webgraph::Edge<()>],
         dht: &DhtConn<CentralityTables>,
     ) -> BTreeMap<webgraph::NodeID, HyperLogLog<64>> {
-        let nodes: Vec<_> = batch.iter().map(|edge| edge.from).collect();
+        let nodes: Vec<_> = batch.iter().map(|edge| edge.from.node()).collect();
 
         if nodes.is_empty() {
             return BTreeMap::new();
@@ -95,9 +95,12 @@ impl CentralityMapper {
         let updates: Vec<_> = batch
             .iter()
             .map(|edge| {
-                let mut counter = old_counters.get(&edge.from).cloned().unwrap_or_default();
-                counter.add(edge.from.as_u64());
-                (edge.to, counter)
+                let mut counter = old_counters
+                    .get(&edge.from.node())
+                    .cloned()
+                    .unwrap_or_default();
+                counter.add(edge.from.node().as_u64());
+                (edge.to.node(), counter)
             })
             .collect();
 
@@ -270,7 +273,7 @@ impl CentralityMapper {
                 .graph()
                 .edges()
                 .filter(|e| !e.rel_flags().intersects(*SKIPPED_REL))
-                .filter(|e| changed_nodes.contains(e.from.as_u64()))
+                .filter(|e| changed_nodes.contains(e.from.node().as_u64()))
             {
                 batch.push(edge);
                 if batch.len() >= batch_size {

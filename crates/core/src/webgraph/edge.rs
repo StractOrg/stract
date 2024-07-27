@@ -18,7 +18,7 @@ use utoipa::ToSchema;
 
 use crate::webpage::html::links::RelFlags;
 
-use super::{merge::NodeDatum, FullNodeID, Node, NodeID};
+use super::{FullNodeID, Node, NodeDatum, NodeID};
 
 pub const MAX_LABEL_LENGTH: usize = 1024;
 
@@ -55,8 +55,8 @@ pub struct Edge<L>
 where
     L: EdgeLabel,
 {
-    pub from: NodeID,
-    pub to: NodeID,
+    pub from: NodeDatum,
+    pub to: NodeDatum,
     pub rel: RelFlags,
     pub label: L,
 }
@@ -88,8 +88,8 @@ where
 {
     fn from(edge: InsertableEdge<L>) -> Self {
         Edge {
-            from: edge.from.id,
-            to: edge.to.id,
+            from: NodeDatum::new(edge.from.id, u64::MAX),
+            to: NodeDatum::new(edge.to.id, u64::MAX),
             rel: edge.rel,
             label: edge.label,
         }
@@ -132,8 +132,8 @@ where
 {
     fn from(edge: SegmentEdge<L>) -> Self {
         Edge {
-            from: edge.from.node(),
-            to: edge.to.node(),
+            from: edge.from,
+            to: edge.to,
             rel: edge.rel,
             label: edge.label,
         }
@@ -147,8 +147,8 @@ where
 {
     fn from(edge: Edge<L>) -> Self {
         SegmentEdge {
-            from: NodeDatum::new(edge.from, 0),
-            to: NodeDatum::new(edge.to, 0),
+            from: edge.from,
+            to: edge.to,
             rel: edge.rel,
             label: edge.label,
         }
@@ -162,8 +162,8 @@ where
 {
     fn from(edge: InsertableEdge<L>) -> Self {
         SegmentEdge {
-            from: NodeDatum::new(edge.from.id, 0),
-            to: NodeDatum::new(edge.to.id, 0),
+            from: NodeDatum::new(edge.from.id, u64::MAX),
+            to: NodeDatum::new(edge.to.id, u64::MAX),
             rel: edge.rel,
             label: edge.label,
         }
@@ -209,5 +209,10 @@ impl<L> StoredEdge<L> {
     #[inline]
     pub fn rel(&self) -> RelFlags {
         self.rel
+    }
+
+    #[inline]
+    pub fn other_host_rank(&self) -> u64 {
+        self.other.host_rank()
     }
 }

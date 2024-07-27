@@ -236,7 +236,7 @@ mod tests {
         ranking::{Ranker, SignalComputer},
         search_ctx::Ctx,
         searcher::SearchQuery,
-        webgraph::{FullEdge, Node},
+        webgraph::{Edge, NodeDatum},
         webpage::{schema_org, Html, Webpage},
         OneOrMany,
     };
@@ -511,10 +511,11 @@ mod tests {
             ..Default::default()
         };
 
-        webpage.set_backlinks(vec![FullEdge {
-            from: Node::from("https://www.a.com"),
-            to: Node::from("https://www.b.com"),
+        webpage.set_backlinks(vec![Edge {
+            from: NodeDatum::new(0u64, 0),
+            to: NodeDatum::new(1u64, 0),
             label: "B site is great".to_string(),
+            rel: Default::default(),
         }]);
 
         index.insert(&webpage).expect("failed to insert webpage");

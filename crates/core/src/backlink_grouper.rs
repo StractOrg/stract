@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{log_group::HarmonicRankGroup, webgraph::FullEdge};
+use crate::{log_group::HarmonicRankGroup, webgraph::Edge};
 
 /// Number of groups to divide the backlinks into.
 /// If this is changed, also change the grouped backlink fields in the schema.
@@ -23,7 +23,7 @@ const NUM_GROUPS: u64 = 10;
 #[derive(Debug)]
 pub struct Group {
     group: u64,
-    backlinks: Vec<FullEdge>,
+    backlinks: Vec<Edge<String>>,
 }
 
 impl Group {
@@ -34,7 +34,7 @@ impl Group {
         }
     }
 
-    fn insert(&mut self, backlink: FullEdge) {
+    fn insert(&mut self, backlink: Edge<String>) {
         self.backlinks.push(backlink);
     }
 
@@ -42,7 +42,7 @@ impl Group {
         self.group
     }
 
-    pub fn backlinks(&self) -> &[FullEdge] {
+    pub fn backlinks(&self) -> &[Edge<String>] {
         &self.backlinks
     }
 }
@@ -66,7 +66,7 @@ impl GroupedBacklinks {
         self.groups.get(group as usize)
     }
 
-    fn add(&mut self, group: u64, backlink: FullEdge) {
+    fn add(&mut self, group: u64, backlink: Edge<String>) {
         if let Some(group) = self.groups.get_mut(group as usize) {
             group.insert(backlink)
         }
@@ -93,7 +93,9 @@ impl BacklinkGrouper {
         }
     }
 
-    pub fn add(&mut self, backlink: FullEdge, rank: u64) {
+    pub fn add(&mut self, backlink: Edge<String>) {
+        let rank = backlink.from.host_rank();
+
         let group = self.grouper.group(rank);
         self.groups.add(group, backlink);
     }
@@ -105,93 +107,73 @@ impl BacklinkGrouper {
 
 #[cfg(test)]
 mod tests {
-    use crate::webgraph::Node;
+    use crate::webgraph::NodeDatum;
 
     use super::*;
 
     #[test]
     fn test_grouped_backlinks() {
         let mut grouper = BacklinkGrouper::new(10);
-        grouper.add(
-            FullEdge {
-                from: Node::from("https://a.com"),
-                to: Node::from("https://b.com"),
-                label: String::new(),
-            },
-            0,
-        );
-        grouper.add(
-            FullEdge {
-                from: Node::from("https://a.com"),
-                to: Node::from("https://b.com"),
-                label: String::new(),
-            },
-            1,
-        );
-        grouper.add(
-            FullEdge {
-                from: Node::from("https://a.com"),
-                to: Node::from("https://b.com"),
-                label: String::new(),
-            },
-            2,
-        );
-        grouper.add(
-            FullEdge {
-                from: Node::from("https://a.com"),
-                to: Node::from("https://b.com"),
-                label: String::new(),
-            },
-            3,
-        );
-        grouper.add(
-            FullEdge {
-                from: Node::from("https://a.com"),
-                to: Node::from("https://b.com"),
-                label: String::new(),
-            },
-            4,
-        );
-        grouper.add(
-            FullEdge {
-                from: Node::from("https://a.com"),
-                to: Node::from("https://b.com"),
-                label: String::new(),
-            },
-            5,
-        );
-        grouper.add(
-            FullEdge {
-                from: Node::from("https://a.com"),
-                to: Node::from("https://b.com"),
-                label: String::new(),
-            },
-            6,
-        );
-        grouper.add(
-            FullEdge {
-                from: Node::from("https://a.com"),
-                to: Node::from("https://b.com"),
-                label: String::new(),
-            },
-            7,
-        );
-        grouper.add(
-            FullEdge {
-                from: Node::from("https://a.com"),
-                to: Node::from("https://b.com"),
-                label: String::new(),
-            },
-            8,
-        );
-        grouper.add(
-            FullEdge {
-                from: Node::from("https://a.com"),
-                to: Node::from("https://b.com"),
-                label: String::new(),
-            },
-            9,
-        );
+        grouper.add(Edge {
+            from: NodeDatum::new(0u64, 0u64),
+            to: NodeDatum::new(1u64, 0u64),
+            label: String::new(),
+            rel: Default::default(),
+        });
+        grouper.add(Edge {
+            from: NodeDatum::new(0u64, 1u64),
+            to: NodeDatum::new(1u64, 0u64),
+            label: String::new(),
+            rel: Default::default(),
+        });
+        grouper.add(Edge {
+            from: NodeDatum::new(0u64, 2u64),
+            to: NodeDatum::new(1u64, 0u64),
+            label: String::new(),
+            rel: Default::default(),
+        });
+        grouper.add(Edge {
+            from: NodeDatum::new(0u64, 3u64),
+            to: NodeDatum::new(1u64, 0u64),
+            label: String::new(),
+            rel: Default::default(),
+        });
+        grouper.add(Edge {
+            from: NodeDatum::new(0u64, 4u64),
+            to: NodeDatum::new(1u64, 0u64),
+            label: String::new(),
+            rel: Default::default(),
+        });
+        grouper.add(Edge {
+            from: NodeDatum::new(0u64, 5u64),
+            to: NodeDatum::new(1u64, 0u64),
+            label: String::new(),
+            rel: Default::default(),
+        });
+        grouper.add(Edge {
+            from: NodeDatum::new(0u64, 6u64),
+            to: NodeDatum::new(1u64, 0u64),
+            label: String::new(),
+            rel: Default::default(),
+        });
+        grouper.add(Edge {
+            from: NodeDatum::new(0u64, 7u64),
+            to: NodeDatum::new(1u64, 0u64),
+            label: String::new(),
+            rel: Default::default(),
+        });
+        grouper.add(Edge {
+            from: NodeDatum::new(0u64, 8u64),
+            to: NodeDatum::new(1u64, 0u64),
+            label: String::new(),
+            rel: Default::default(),
+        });
+        grouper.add(Edge {
+            from: NodeDatum::new(0u64, 9u64),
+            to: NodeDatum::new(1u64, 0u64),
+            label: String::new(),
+            rel: Default::default(),
+        });
 
         {
             let groups = grouper.groups();

@@ -71,7 +71,7 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
         while let Some(v) = q.pop_front() {
             stack.push(v);
             for edge in graph.raw_outgoing_edges(&v, EdgeLimit::Unlimited) {
-                let w = edge.to;
+                let w = edge.to.node();
 
                 if !distances.contains_key(&w) {
                     let dist_v = distances.get(&v).unwrap();
