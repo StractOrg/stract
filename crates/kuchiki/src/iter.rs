@@ -231,9 +231,8 @@ impl Iterator for Ancestors {
 
     #[inline]
     fn next(&mut self) -> Option<NodeRef> {
-        self.0.take().map(|node| {
+        self.0.take().inspect(|node| {
             self.0 = node.parent();
-            node
         })
     }
 }

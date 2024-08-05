@@ -3,8 +3,22 @@ import numpy as np
 import json
 from pprint import pprint
 import sqlite3
+from sklearn import metrics
+import itertools
 
 CATEGORICAL_FEATURES = ["is_homepage"]
+
+param_grid = {
+    "objective": ["lambdarank"],
+    "verbosity": [-1],
+    "metric": ["ndcg"],
+    "ndcg_at": [[1, 2, 3, 5, 10]],
+    "learning_rate": [0.025],
+    "max_depth": [-1, 2, 4, 8],
+    "num_leaves": [7, 15, 31],
+    "lambda_l2": [0.1, 0.5, 1.0],
+}
+
 
 con = sqlite3.connect("data/auto-ranking-annotation.sqlite")
 cur = con.cursor()
@@ -105,54 +119,96 @@ q_test = np.array([len(queries[qid]) for qid in q_test])
 print("Train size:", len(X_train))
 print("Test size:", len(X_test))
 
+
+params = [
+    dict(zip(param_grid.keys(), values))
+    for values in itertools.product(*param_grid.values())
+]
+
+
+best_param = None
+best_score = 0
+
+for param in params:
+    dataset = lgb.Dataset(
+        X_train,
+        y_train,
+        group=q_train,
+        feature_name=[k for k in feature2id],
+        categorical_feature=[feature2id[k] for k in CATEGORICAL_FEATURES],
+    )
+
+    res = lgb.cv(
+        train_set=dataset,
+        params=param,
+        nfold=5,
+        return_cvbooster=True,
+    )
+
+    scores = []
+
+    for metric, vals in res.items():
+        if metric in ['cvbooster']:
+            continue
+
+        if 'stdv' in metric:
+            continue
+        scores.append(vals[0])
+
+    score = np.mean(scores)
+
+    if score > best_score:
+        best_score = score
+        best_param = param
+
+print("Best param:")
+pprint(best_param)
+
+
 # Train model
-n_estimators = 50
-model = lgb.LGBMRanker(
-    objective="lambdarank",
-    metric="ndcg",
-    importance_type="gain",
-    num_leaves=50,
-    n_estimators=n_estimators,
-    categorical_features=[feature2id[k] for k in CATEGORICAL_FEATURES],
-    max_depth=10,
-    learning_rate=0.1,
-    label_gain=[i for i in range(max(y_train.max(), y_test.max()) + 1)],
-)
-model.fit(
+dataset = lgb.Dataset(
     X_train,
     y_train,
     group=q_train,
     feature_name=[k for k in feature2id],
-    eval_set=[(X_test, y_test)],
-    eval_group=[q_test],
-    eval_at=[1, 2, 3, 5, 10],
-    eval_metric="ndcg",
+    categorical_feature=[feature2id[k] for k in CATEGORICAL_FEATURES],
+)
+booster = lgb.train(
+    best_param,
+    dataset,
 )
 
 # dump model
-model.booster_.save_model(
+booster.save_model(
     "data/lambdamart.txt",
 )
-
 # print feature importance
+print()
+print("Feature importance:")
 pprint(
     sorted(
-        [(id2feature[i], v) for i, v in enumerate(model.feature_importances_) if v > 0],
+        [(id2feature[i], v) for i, v in enumerate(booster.feature_importance()) if v > 0],
         key=lambda x: x[1],
         reverse=True,
     )
 )
+print()
+print("Test set:")
+for k in [1, 2, 3, 5, 10]:
+    print(f"NDCG@{k}: {metrics.ndcg_score([y_test], [booster.predict(X_test)], k=k)}")
 
 # verify that the saved model outputs the same scores
 # for the same input
 saved_model = lgb.Booster(model_file="data/lambdamart.txt")
 
 for i in range(len(X_test)):
-    assert model.predict(X_test[i : i + 1]) == saved_model.predict(X_test[i : i + 1])
+    assert booster.predict(X_test[i : i + 1]) == saved_model.predict(X_test[i : i + 1])
+
 
 # print an example
+# print()
 # print("Example:")
 # t = X_test[0]
 # print("Features:")
 # pprint({id2feature[i]: v for i, v in enumerate(t)})
-# print("Score:", model.predict(t.reshape(1, -1))[0])
+# print("Score:", booster.predict(t.reshape(1, -1))[0])

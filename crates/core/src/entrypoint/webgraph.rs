@@ -29,11 +29,6 @@ use tokio::pin;
 use tracing::{info, trace};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
-struct GraphPointer {
-    path: String,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
 pub enum JobConfig {
     Http(config::HttpConfig),
     Local(config::LocalConfig),

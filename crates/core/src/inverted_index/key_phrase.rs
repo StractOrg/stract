@@ -174,6 +174,13 @@ impl KeyPhrase {
                     continue;
                 }
 
+                let left_paren = term_str.chars().filter(|c| c == &'(').count();
+                let right_paren = term_str.chars().filter(|c| c == &')').count();
+
+                if left_paren != right_paren {
+                    continue;
+                }
+
                 let words = term_str.split_whitespace().collect::<Vec<_>>();
                 let score = scorer.score(&words, info.doc_freq);
 

@@ -431,7 +431,7 @@ struct BertEncoder {
 impl BertEncoder {
     fn load(vb: VarBuilder, config: &Config) -> Result<Self> {
         let layers = (0..config.num_hidden_layers)
-            .map(|index| BertLayer::load(vb.pp(&format!("layer.{index}")), config))
+            .map(|index| BertLayer::load(vb.pp(format!("layer.{index}")), config))
             .collect::<Result<Vec<_>>>()?;
         let span = tracing::span!(tracing::Level::TRACE, "encoder");
         Ok(BertEncoder { layers, span })
@@ -488,8 +488,8 @@ impl BertModel {
             (Err(err), _) | (_, Err(err)) => {
                 if let Some(model_type) = &config.model_type {
                     if let (Ok(embeddings), Ok(encoder)) = (
-                        BertEmbeddings::load(vb.pp(&format!("{model_type}.embeddings")), config),
-                        BertEncoder::load(vb.pp(&format!("{model_type}.encoder")), config),
+                        BertEmbeddings::load(vb.pp(format!("{model_type}.embeddings")), config),
+                        BertEncoder::load(vb.pp(format!("{model_type}.encoder")), config),
                     ) {
                         (embeddings, encoder)
                     } else {
@@ -504,7 +504,7 @@ impl BertModel {
         let pooler = BertPooler::load(vb.pp("pooler"), config)
             .or_else(|e| {
                 if let Some(model_type) = &config.model_type {
-                    BertPooler::load(vb.pp(&format!("{model_type}.pooler")), config)
+                    BertPooler::load(vb.pp(format!("{model_type}.pooler")), config)
                 } else {
                     Err(e)
                 }

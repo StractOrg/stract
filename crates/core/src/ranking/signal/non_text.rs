@@ -39,7 +39,14 @@ fn score_timestamp(page_timestamp: usize, signal_computer: &SignalComputer) -> f
 
 #[inline]
 fn score_rank(rank: f64) -> f64 {
-    1.0 / (rank + 1.0)
+    // 10 groups with log base 8 gives us
+    // 1.1 billion ranks we can score without
+    // exceeding the groups.
+
+    const NUM_GROUPS: f64 = 10.0;
+    const BASE: f64 = 8.0;
+
+    (NUM_GROUPS - (1.0 + rank).log(BASE)).max(NUM_GROUPS)
 }
 
 #[inline]
@@ -101,7 +108,7 @@ fn score_region(webpage_region: crate::webpage::Region, computer: &SignalCompute
 pub struct HostCentrality;
 impl Signal for HostCentrality {
     fn default_coefficient(&self) -> f64 {
-        0.5
+        2.0
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -141,7 +148,7 @@ impl Signal for HostCentrality {
 pub struct HostCentralityRank;
 impl Signal for HostCentralityRank {
     fn default_coefficient(&self) -> f64 {
-        0.0
+        0.4
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -181,7 +188,7 @@ impl Signal for HostCentralityRank {
 pub struct PageCentrality;
 impl Signal for PageCentrality {
     fn default_coefficient(&self) -> f64 {
-        0.25
+        2.0
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -221,7 +228,7 @@ impl Signal for PageCentrality {
 pub struct PageCentralityRank;
 impl Signal for PageCentralityRank {
     fn default_coefficient(&self) -> f64 {
-        0.0
+        0.4
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -261,7 +268,7 @@ impl Signal for PageCentralityRank {
 pub struct IsHomepage;
 impl Signal for IsHomepage {
     fn default_coefficient(&self) -> f64 {
-        0.0005
+        0.01
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -401,7 +408,7 @@ impl Signal for UpdateTimestamp {
 pub struct TrackerScore;
 impl Signal for TrackerScore {
     fn default_coefficient(&self) -> f64 {
-        0.05
+        0.1
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -620,7 +627,7 @@ impl Signal for UrlDigits {
 pub struct UrlSlashes;
 impl Signal for UrlSlashes {
     fn default_coefficient(&self) -> f64 {
-        0.01
+        0.1
     }
 
     fn as_field(&self) -> Option<Field> {

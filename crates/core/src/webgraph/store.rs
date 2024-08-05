@@ -37,23 +37,6 @@ use super::{
     Compression, EdgeLimit, FullNodeID, NodeDatum, NodeID, SegmentEdge, StoredEdge,
 };
 
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
-struct SerializedEdge {
-    from_host: NodeID,
-    to_host: NodeID,
-    label: Vec<u8>,
-}
-
 pub struct HostDb {
     db: speedy_kv::Db<Vec<u8>, ()>,
 }
