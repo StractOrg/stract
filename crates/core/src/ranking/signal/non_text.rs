@@ -46,7 +46,7 @@ fn score_rank(rank: f64) -> f64 {
     const NUM_GROUPS: f64 = 10.0;
     const BASE: f64 = 8.0;
 
-    (NUM_GROUPS - (1.0 + rank).log(BASE)).max(NUM_GROUPS)
+    (NUM_GROUPS - (1.0 + rank).log(BASE)).max(0.0)
 }
 
 #[inline]
