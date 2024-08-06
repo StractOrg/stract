@@ -44,6 +44,7 @@ crossbeam-channel.workspace = true
 csv.workspace = true
 dashmap.workspace = true
 deadpool.workspace = true
+dirs.workspace = true
 encoding_rs.workspace = true
 enum_dispatch.workspace = true
 fend-core.workspace = true

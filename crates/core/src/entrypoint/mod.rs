@@ -36,6 +36,7 @@ pub use centrality::Centrality;
 pub use entity::EntityIndexer;
 use tracing::{debug, log::error};
 pub use webgraph::Webgraph;
+pub mod admin;
 pub mod live_index;
 
 use crate::{config, warc::WarcFile};

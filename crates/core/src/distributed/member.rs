@@ -34,6 +34,12 @@ use crate::config::WebgraphGranularity;
 )]
 pub struct ShardId(u64);
 
+impl std::fmt::Display for ShardId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ShardId({})", self.0)
+    }
+}
+
 impl ShardId {
     pub fn new(id: u64) -> Self {
         Self(id)
@@ -107,13 +113,40 @@ pub enum Service {
     },
 }
 
+impl std::fmt::Display for Service {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Searcher { host, shard } => write!(f, "Searcher {} {}", host, shard),
+            Self::EntitySearcher { host } => write!(f, "EntitySearcher {}", host),
+            Self::LiveIndex { host, split_id } => write!(f, "LiveIndex {} {}", host, split_id),
+            Self::Api { host } => write!(f, "Api {}", host),
+            Self::Webgraph {
+                host,
+                shard,
+                granularity,
+            } => {
+                write!(f, "Webgraph {} {} {}", host, shard, granularity)
+            }
+            Self::Dht { host, shard } => write!(f, "Dht {} {}", host, shard),
+            Self::HarmonicWorker { host, shard } => write!(f, "HarmonicWorker {} {}", host, shard),
+            Self::HarmonicCoordinator { host } => write!(f, "HarmonicCoordinator {}", host),
+            Self::ApproxHarmonicWorker { host, shard } => {
+                write!(f, "ApproxHarmonicWorker {} {}", host, shard)
+            }
+            Self::ApproxHarmonicCoordinator { host } => {
+                write!(f, "ApproxHarmonicCoordinator {}", host)
+            }
+        }
+    }
+}
+
 impl Service {
     pub fn is_searcher(&self) -> bool {
         matches!(self, Self::Searcher { .. })
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug, bincode::Encode, bincode::Decode)]
 pub struct Member {
     pub id: String,
     pub service: Service,

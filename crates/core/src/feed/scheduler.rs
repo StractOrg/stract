@@ -68,6 +68,12 @@ impl From<&Url> for Domain {
 )]
 pub struct SplitId(#[bincode(with_serde)] uuid::Uuid);
 
+impl std::fmt::Display for SplitId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SplitId({})", self.0)
+    }
+}
+
 impl SplitId {
     pub fn id(&self) -> uuid::Uuid {
         self.0

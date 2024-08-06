@@ -3,6 +3,7 @@ cluster_id = "dev_api"
 gossip_addr = "0.0.0.0:3005"
 gossip_seed_nodes = ["0.0.0.0:3006", "0.0.0.0:3007"]
 host = "0.0.0.0:3000"
+management_host = "0.0.0.0:3011"
 # lambda_model_path = "data/lambdamart.txt"
 bangs_path = "data/bangs.json"
 # dual_encoder_model_path = "data/dual_encoder"

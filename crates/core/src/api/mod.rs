@@ -26,10 +26,7 @@ use crate::{
     autosuggest::Autosuggest,
     bangs::Bangs,
     config::ApiConfig,
-    distributed::{
-        cluster::Cluster,
-        member::{Member, Service},
-    },
+    distributed::cluster::Cluster,
     improvement::{store_improvements_loop, ImprovementEvent},
     leaky_queue::LeakyQueue,
     models::dual_encoder::DualEncoder,
@@ -147,7 +144,11 @@ fn build_router(state: Arc<State>) -> Router {
         .with_state(state)
 }
 
-pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
+pub async fn router(
+    config: &ApiConfig,
+    counters: Counters,
+    cluster: Arc<Cluster>,
+) -> Result<Router> {
     let lambda_model = match &config.lambda_model_path {
         Some(path) => Some(LambdaMART::open(path)?),
         None => None,
@@ -168,18 +169,6 @@ pub async fn router(config: &ApiConfig, counters: Counters) -> Result<Router> {
         Some(bangs_path) => Bangs::from_path(bangs_path),
         None => Bangs::empty(),
     };
-
-    let cluster = Arc::new(
-        Cluster::join(
-            Member {
-                id: config.cluster_id.clone(),
-                service: Service::Api { host: config.host },
-            },
-            config.gossip_addr,
-            config.gossip_seed_nodes.clone().unwrap_or_default(),
-        )
-        .await?,
-    );
 
     let host_webgraph =
         RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Host).await;

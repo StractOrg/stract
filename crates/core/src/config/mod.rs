@@ -235,6 +235,8 @@ pub struct ApiConfig {
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
 
+    pub management_host: SocketAddr,
+
     #[serde(default = "defaults::Api::max_similar_hosts")]
     pub max_similar_hosts: usize,
 
@@ -397,6 +399,15 @@ pub enum AcceleratorDevice {
 pub enum WebgraphGranularity {
     Host,
     Page,
+}
+
+impl std::fmt::Display for WebgraphGranularity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WebgraphGranularity::Host => write!(f, "host"),
+            WebgraphGranularity::Page => write!(f, "page"),
+        }
+    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]

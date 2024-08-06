@@ -24,6 +24,7 @@ pub async fn main() {
     let config = ApiConfig {
         host: "0.0.0.0:8000".parse().unwrap(),
         prometheus_host: "0.0.0.0:8001".parse().unwrap(),
+        management_host: "0.0.0.0:8003".parse().unwrap(),
         crossencoder_model_path: None,
         lambda_model_path: None,
         dual_encoder_model_path: None,

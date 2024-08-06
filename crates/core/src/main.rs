@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::de::DeserializeOwned;
 use std::fs;
+use std::net::SocketAddr;
 use std::path::Path;
 use stract::config;
 
@@ -117,6 +118,12 @@ enum Commands {
         #[clap(subcommand)]
         options: AmpcOptions,
     },
+
+    /// Commands for the admin interface to manage stract.
+    Admin {
+        #[clap(subcommand)]
+        options: AdminOptions,
+    },
 }
 
 #[derive(Subcommand)]
@@ -139,6 +146,13 @@ enum AmpcOptions {
     /// Start a coordinator to distribute the approximation of the harmonic centrality computation.
     /// Workers needs to be started before the coordinator.
     ApproxHarmonicCoordinator { config_path: String },
+}
+
+#[derive(Subcommand)]
+enum AdminOptions {
+    Init { host: SocketAddr },
+    Status,
+    TopKeyphrases { top: usize },
 }
 
 #[derive(Subcommand)]
@@ -461,6 +475,26 @@ fn main() -> Result<()> {
             AmpcOptions::ApproxHarmonicCoordinator { config_path } => {
                 let config: config::ApproxHarmonicCoordinatorConfig = load_toml_config(config_path);
                 entrypoint::ampc::approximated_harmonic_centrality::coordinator::run(config)?;
+            }
+        },
+
+        Commands::Admin { options } => match options {
+            AdminOptions::Init { host } => {
+                entrypoint::admin::init(host)?;
+            }
+
+            AdminOptions::Status => {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::admin::status())?;
+            }
+
+            AdminOptions::TopKeyphrases { top } => {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::admin::top_keyphrases(top))?;
             }
         },
     }
