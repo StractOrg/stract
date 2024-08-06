@@ -148,7 +148,7 @@ impl Signal for HostCentrality {
 pub struct HostCentralityRank;
 impl Signal for HostCentralityRank {
     fn default_coefficient(&self) -> f64 {
-        0.4
+        0.02
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -228,7 +228,7 @@ impl Signal for PageCentrality {
 pub struct PageCentralityRank;
 impl Signal for PageCentralityRank {
     fn default_coefficient(&self) -> f64 {
-        0.4
+        0.02
     }
 
     fn as_field(&self) -> Option<Field> {

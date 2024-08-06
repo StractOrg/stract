@@ -141,7 +141,10 @@ impl sonic::service::Message<ManagementService> for ClusterStatus {
 async fn run_management(addr: SocketAddr, cluster: Arc<Cluster>) -> Result<()> {
     let server = ManagementService::new(cluster).await?.bind(addr).await?;
 
-    info!("search server is ready to accept requests on {}", addr);
+    info!(
+        "management interface is ready to accept requests on {}",
+        addr
+    );
 
     loop {
         if let Err(e) = server.accept().await {

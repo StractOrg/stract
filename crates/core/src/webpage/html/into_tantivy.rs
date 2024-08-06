@@ -79,8 +79,16 @@ impl Html {
         )
     }
 
+    pub fn root_domain(&self) -> String {
+        self.url().root_domain().unwrap_or_default().to_string()
+    }
+
+    pub fn icann_domain(&self) -> String {
+        self.url().icann_domain().unwrap_or_default().to_string()
+    }
+
     pub fn pretokenize_domain(&self) -> PreTokenizedString {
-        let domain = self.url().root_domain().unwrap_or_default().to_string();
+        let domain = self.root_domain();
 
         self.pretokenize_string(domain, text_field::Domain.into())
     }
@@ -133,10 +141,9 @@ impl Html {
     }
 
     pub fn domain_name(&self) -> String {
-        let domain = self.url().domain().unwrap_or_default();
-        self.url()
-            .root_domain()
-            .unwrap_or_default()
+        let domain = &self.root_domain();
+
+        domain
             .find('.')
             .map(|index| &domain[..ceil_char_boundary(domain, index).min(domain.len())])
             .unwrap_or_default()
@@ -212,5 +219,45 @@ impl Html {
         }
 
         Ok(doc)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use url::Url;
+
+    use super::*;
+
+    #[test]
+    fn test_domain_name() {
+        let url = Url::parse("https://www.example.com").unwrap();
+        let html = Html::parse_without_text("", url.as_str()).unwrap();
+
+        assert_eq!(html.domain_name(), "example");
+        assert_eq!(html.root_domain(), "example.com");
+
+        let url = Url::parse("https://example.com").unwrap();
+        let html = Html::parse_without_text("", url.as_str()).unwrap();
+
+        assert_eq!(html.domain_name(), "example");
+        assert_eq!(html.root_domain(), "example.com");
+
+        let url = Url::parse("https://example.co.uk").unwrap();
+        let html = Html::parse_without_text("", url.as_str()).unwrap();
+
+        assert_eq!(html.domain_name(), "example");
+        assert_eq!(html.root_domain(), "example.co.uk");
+
+        let url = Url::parse("https://this.is.a.test.example.co.uk").unwrap();
+        let html = Html::parse_without_text("", url.as_str()).unwrap();
+
+        assert_eq!(html.domain_name(), "example");
+        assert_eq!(html.root_domain(), "example.co.uk");
+
+        let url = Url::parse("https://example").unwrap();
+        let html = Html::parse_without_text("", url.as_str()).unwrap();
+
+        assert_eq!(html.domain_name(), "");
+        assert_eq!(html.root_domain(), "");
     }
 }

@@ -8,7 +8,8 @@ import time
 import requests
 import random
 
-API = "https://stract.com/beta/api/search"
+# API = "https://stract.com/beta/api/search"
+API = "http://localhost:3000/beta/api/search"
 NUM_RESULTS_PER_QUERY = 20
 
 ELO_K = 32
@@ -160,6 +161,10 @@ def get_search_results(query):
         "query": query,
         "numResults": NUM_RESULTS_PER_QUERY,
         "returnRankingSignals": True,
+        'signalCoefficients': {
+            'host_centrality_rank': 0.022,
+            'page_centrality_rank': 0.022,
+            }
     }
 
     return [

@@ -89,7 +89,7 @@ pub async fn status() -> Result<()> {
     let config = Config::load()?;
     let mut conn = sonic::service::Connection::create(config.host).await?;
 
-    let status = conn.send(api::ClusterStatus).await?;
+    let status = conn.send_without_timeout(api::ClusterStatus).await?;
 
     println!("Members:");
     for member in status.members {
@@ -103,7 +103,9 @@ pub async fn top_keyphrases(top: usize) -> Result<()> {
     let config = Config::load()?;
     let mut conn = sonic::service::Connection::create(config.host).await?;
 
-    let keyphrases = conn.send(api::TopKeyphrases { top }).await?;
+    let keyphrases = conn
+        .send_without_timeout(api::TopKeyphrases { top })
+        .await?;
 
     println!("id,text,score");
     for (i, keyphrase) in keyphrases.iter().enumerate() {

@@ -16,6 +16,7 @@
 
 use bitflags::bitflags;
 use enum_dispatch::enum_dispatch;
+use rustc_hash::FxHashMap;
 use strum::{EnumDiscriminants, VariantArray};
 use tantivy::{
     schema::{BytesOptions, NumericOptions},
@@ -26,7 +27,7 @@ use crate::{
     enum_dispatch_from_discriminant,
     enum_map::InsertEnumMapKey,
     simhash,
-    webpage::{html::FnCache, Html, Webpage},
+    webpage::{html::FnCache, url_ext::UrlExt, Html, Webpage},
     Result,
 };
 
@@ -170,6 +171,7 @@ pub enum NumericalFieldEnum {
     LinkDensity,
     TitleEmbeddings,
     KeywordEmbeddings,
+    SuffixId,
 }
 
 enum_dispatch_from_discriminant!(NumericalFieldEnumDiscriminants => NumericalFieldEnum,
@@ -213,6 +215,7 @@ enum_dispatch_from_discriminant!(NumericalFieldEnumDiscriminants => NumericalFie
     LinkDensity,
     TitleEmbeddings,
     KeywordEmbeddings,
+    SuffixId,
 ]);
 
 impl NumericalFieldEnum {
@@ -1388,6 +1391,41 @@ impl NumericalField for KeywordEmbeddings {
         } else {
             doc.add_bytes(self.tantivy_field(index.schema_ref()), &[]);
         }
+
+        Ok(())
+    }
+}
+
+static SUFFIX_ID: std::sync::LazyLock<FxHashMap<String, u32>> = std::sync::LazyLock::new(|| {
+    include_str!("../../public_suffix_list.dat")
+        .lines()
+        .filter(|l| !l.starts_with("//") && !l.chars().all(|c| c.is_whitespace()) && !l.is_empty())
+        .enumerate()
+        .map(|(i, l)| (l.to_string(), i as u32))
+        .collect()
+});
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SuffixId;
+impl NumericalField for SuffixId {
+    fn name(&self) -> &str {
+        "suffix_id"
+    }
+
+    fn is_stored(&self) -> bool {
+        true
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _: &mut FnCache,
+        doc: &mut TantivyDocument,
+        index: &crate::inverted_index::InvertedIndex,
+    ) -> Result<()> {
+        let tld = html.url().tld().map(|s| s.to_string()).unwrap_or_default();
+        let suffix_id = SUFFIX_ID.get(&tld).copied().unwrap_or(u32::MAX);
+        doc.add_u64(self.tantivy_field(index.schema_ref()), suffix_id as u64);
 
         Ok(())
     }
