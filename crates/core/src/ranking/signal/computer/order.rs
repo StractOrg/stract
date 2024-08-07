@@ -71,24 +71,29 @@ impl SignalComputeOrder {
         &'a self,
         doc: DocId,
         signal_computer: &'a SignalComputer,
-    ) -> impl Iterator<Item = Option<ComputedSignal>> + 'a {
+    ) -> impl Iterator<Item = ComputedSignal> + 'a {
         self.text_signals
             .values()
             .flat_map(move |ngram| ngram.compute(doc, signal_computer))
-            .map(Some)
-            .chain(
-                self.other_signals
-                    .iter()
-                    .filter(|signal| signal_computer.coefficient(signal) > 0.0)
-                    .map(move |signal| {
-                        signal
-                            .compute(doc, signal_computer)
-                            .map(|score| ComputedSignal {
-                                signal: *signal,
-                                score,
-                            })
-                    }),
-            )
+            .chain(self.other_signals.iter().map(move |signal| {
+                if signal_computer.coefficient(signal) == 0.0 {
+                    return ComputedSignal {
+                        signal: *signal,
+                        score: 0.0,
+                    };
+                }
+
+                signal
+                    .compute(doc, signal_computer)
+                    .map(|score| ComputedSignal {
+                        signal: *signal,
+                        score,
+                    })
+                    .unwrap_or_else(|| ComputedSignal {
+                        signal: *signal,
+                        score: 0.0,
+                    })
+            }))
     }
 }
 
@@ -118,25 +123,26 @@ impl NGramComputeOrder {
     ) -> impl Iterator<Item = ComputedSignal> + 'a {
         let mut hits = 0;
 
-        self.signals
-            .iter()
-            .map(|(_, s)| s)
-            .filter_map(move |signal| {
-                signal
-                    .compute(doc, signal_computer)
-                    .map(|score| ComputedSignal {
-                        signal: *signal,
-                        score,
-                    })
-                    .map(|mut c| {
-                        c.score *= NGRAM_DAMPENING.powi(hits);
+        self.signals.iter().map(|(_, s)| s).map(move |signal| {
+            signal
+                .compute(doc, signal_computer)
+                .map(|score| ComputedSignal {
+                    signal: *signal,
+                    score,
+                })
+                .map(|mut c| {
+                    c.score *= NGRAM_DAMPENING.powi(hits);
 
-                        if c.score > 0.0 {
-                            hits += 1;
-                        }
+                    if c.score > 0.0 {
+                        hits += 1;
+                    }
 
-                        c
-                    })
-            })
+                    c
+                })
+                .unwrap_or_else(|| ComputedSignal {
+                    signal: *signal,
+                    score: 0.0,
+                })
+        })
     }
 }

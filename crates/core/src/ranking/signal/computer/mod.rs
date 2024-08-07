@@ -390,12 +390,12 @@ impl SignalComputer {
 
     /// Computes the scored signals for a given document.
     ///
-    /// Important: This function assues that the docs a scored in ascending order of docid
+    /// Important: This function assumes that the docs a scored in ascending order of docid
     /// within their segment. If this invariant is not upheld, the documents will not have
     /// scores calculated for their text related signals. The wrong ranking will most likely
     /// be returned.
     /// This function also assumes that the segment reader has been set.
-    pub fn compute_signals(&self, doc: DocId) -> impl Iterator<Item = Option<ComputedSignal>> + '_ {
+    pub fn compute_signals(&self, doc: DocId) -> impl Iterator<Item = ComputedSignal> + '_ {
         self.order.compute(doc, self)
     }
 

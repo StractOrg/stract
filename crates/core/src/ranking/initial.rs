@@ -81,7 +81,6 @@ impl ScoreSegmentTweaker<Score> for InitialSegmentScoreTweaker {
         let mut total = self
             .computer
             .compute_signals(doc)
-            .flatten()
             .map(|computed| self.computer.coefficient(&computed.signal) * computed.score)
             .sum();
 

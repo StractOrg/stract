@@ -185,7 +185,7 @@ impl LocalRecallRankingWebpage {
             host_id,
         };
 
-        for computed_signal in computer.compute_signals(pointer.address.doc_id).flatten() {
+        for computed_signal in computer.compute_signals(pointer.address.doc_id) {
             res.signals
                 .insert(computed_signal.signal, computed_signal.score);
         }
