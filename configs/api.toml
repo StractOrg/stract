@@ -1,11 +1,11 @@
 cluster_id = "dev_api"
 # crossencoder_model_path = "data/cross_encoder"
+bangs_path = "data/bangs.json"
 gossip_addr = "0.0.0.0:3005"
 gossip_seed_nodes = ["0.0.0.0:3006", "0.0.0.0:3007"]
 host = "0.0.0.0:3000"
-management_host = "0.0.0.0:3011"
 # lambda_model_path = "data/lambdamart.txt"
-bangs_path = "data/bangs.json"
+management_host = "0.0.0.0:3011"
 # dual_encoder_model_path = "data/dual_encoder"
 prometheus_host = "0.0.0.0:3001"
 top_phrases_for_autosuggest = 1_000
