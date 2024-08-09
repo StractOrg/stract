@@ -14,119 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use itertools::Itertools;
 use lending_iter::LendingIterator;
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::str;
-use std::{cmp::Reverse, collections::HashMap};
 
 use crate::{
     schema::text_field::{self, TextField},
     SortableFloat,
 };
 
-const DONT_SCORE_TOP_PERCENT_OF_WORDS: f64 = 0.002;
 const NON_ALPHABETIC_CHAR_THRESHOLD: f64 = 0.25;
-
-struct Scorer {
-    word_freq: HashMap<String, u64>,
-    word_docs: HashMap<String, u64>,
-    num_docs: u64,
-    word_freq_threshold: u64,
-}
-
-impl Scorer {
-    fn new(searcher: &tantivy::Searcher, field: tantivy::schema::Field) -> Self {
-        let mut word_freq = HashMap::new();
-        let mut word_docs = HashMap::new();
-        let mut num_docs = 0;
-
-        for seg_reader in searcher.segment_readers() {
-            let inv_index = seg_reader.inverted_index(field).unwrap();
-            let mut stream = inv_index.terms().stream().unwrap();
-
-            while let Some((term, _)) = stream.next() {
-                let term_str = str::from_utf8(term).unwrap().to_string();
-
-                let words = term_str.split_whitespace().collect::<Vec<_>>();
-                if words.is_empty() {
-                    continue;
-                }
-
-                for word in &words {
-                    *word_freq.entry(word.to_string()).or_insert(0) += 1;
-                }
-
-                for word in words.into_iter().unique() {
-                    *word_docs.entry(word.to_string()).or_insert(0) += 1;
-                }
-            }
-
-            num_docs += inv_index.terms().num_terms() as u64;
-        }
-
-        let num_words = word_freq.len() as f64;
-        let word_freq_threshold = *word_freq
-            .values()
-            .sorted_by(|a, b| b.cmp(a))
-            .nth((num_words * DONT_SCORE_TOP_PERCENT_OF_WORDS).ceil() as usize)
-            .unwrap_or(&0);
-
-        Self {
-            word_freq,
-            word_docs,
-            num_docs,
-            word_freq_threshold,
-        }
-    }
-
-    #[inline]
-    fn word_freq(&self) -> &HashMap<String, u64> {
-        &self.word_freq
-    }
-
-    #[inline]
-    fn word_docs(&self) -> &HashMap<String, u64> {
-        &self.word_docs
-    }
-
-    #[inline]
-    fn num_docs(&self) -> u64 {
-        self.num_docs
-    }
-
-    #[inline]
-    fn word_freq_threshold(&self) -> u64 {
-        self.word_freq_threshold
-    }
-
-    fn score(&self, words: &[&str]) -> f64 {
-        let word_freq_threshold = self.word_freq_threshold();
-        let mut score = 0.0;
-        let num_words = words.len();
-        for word in words.iter().unique() {
-            let word_chars = word.chars().count();
-            if word.chars().filter(|c| !c.is_alphabetic()).count() as f64 / word_chars as f64
-                > NON_ALPHABETIC_CHAR_THRESHOLD
-            {
-                continue;
-            }
-
-            let word_docs = self.word_docs().get(*word).unwrap_or(&0);
-            let wf = *self.word_freq().get(*word).unwrap_or(&0);
-
-            if wf > word_freq_threshold {
-                continue;
-            }
-
-            let tf = (wf as f64) / num_words as f64;
-            let idf = ((self.num_docs() as f64) / (*word_docs as f64) + 1.0).ln();
-
-            score += tf * idf;
-        }
-
-        score
-    }
-}
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct KeyPhrase {
@@ -146,14 +44,13 @@ impl KeyPhrase {
             .get_field(text_field::KeyPhrases.name())
             .unwrap();
 
-        let scorer = Scorer::new(&searcher, field);
-
-        let mut keywords: HashMap<String, f64> = HashMap::new();
+        let mut keywords: BinaryHeap<(Reverse<SortableFloat>, String)> =
+            BinaryHeap::with_capacity(top_n);
 
         for seg_reader in searcher.segment_readers() {
             let inv_index = seg_reader.inverted_index(field).unwrap();
             let mut stream = inv_index.terms().stream().unwrap();
-            while let Some((term, _)) = stream.next() {
+            while let Some((term, info)) = stream.next() {
                 let term_str = str::from_utf8(term).unwrap().to_string();
                 let num_chars = term_str.chars().count();
 
@@ -176,24 +73,28 @@ impl KeyPhrase {
                     continue;
                 }
 
-                let score = words.len().min(5) as f64 * scorer.score(&words);
+                let score = info.doc_freq as f64;
 
                 if score.is_normal() {
                     let term_str = words.join(" ");
-                    *keywords.entry(term_str).or_default() += score;
+
+                    if keywords.len() >= top_n {
+                        if let Some(mut min) = keywords.peek_mut() {
+                            if score > min.0 .0.into() {
+                                *min = (Reverse(score.into()), term_str);
+                            }
+                        }
+                    } else {
+                        keywords.push((Reverse(score.into()), term_str));
+                    }
                 }
             }
         }
 
-        crate::sorted_k(
-            keywords
-                .into_iter()
-                .map(|(phrase, score)| (Reverse(SortableFloat::from(score)), phrase)),
-            top_n,
-        )
-        .into_iter()
-        .map(|(Reverse(score), phrase)| KeyPhrase::new(phrase, score.into()))
-        .collect()
+        keywords
+            .into_iter()
+            .map(|(Reverse(score), phrase)| KeyPhrase::new(phrase, score.into()))
+            .collect()
     }
 
     pub fn score(&self) -> f64 {
