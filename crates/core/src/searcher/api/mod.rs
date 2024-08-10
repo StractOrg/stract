@@ -684,4 +684,15 @@ where
             .get_entity_image(image_id, max_height, max_width)
             .await
     }
+
+    pub async fn warmup(&self, queries: impl Iterator<Item = String>) {
+        for query in queries {
+            self.search_websites(&SearchQuery {
+                query,
+                ..Default::default()
+            })
+            .await
+            .ok();
+        }
+    }
 }

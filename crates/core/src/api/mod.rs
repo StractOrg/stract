@@ -61,6 +61,8 @@ pub mod search;
 pub mod user_count;
 mod webgraph;
 
+const WARMUP_QUERIES: usize = 100;
+
 pub struct Counters {
     pub search_counter_success: crate::metrics::Counter,
     pub search_counter_fail: crate::metrics::Counter,
@@ -189,6 +191,7 @@ pub async fn router(
         log::info!("Search nodes joined the cluster");
     }
 
+    log::info!("Building autosuggest");
     let autosuggest = Autosuggest::from_key_phrases(
         dist_searcher
             .top_key_phrases(config.top_phrases_for_autosuggest)
@@ -215,6 +218,16 @@ pub async fn router(
 
         if let Some(dual_encoder_model) = dual_encoder_model {
             searcher = searcher.with_dual_encoder(dual_encoder_model);
+        }
+
+        if cluster.members().await.into_iter().all(|m| {
+            !matches!(m.service, crate::distributed::member::Service::Api { .. })
+                && cluster.self_node().unwrap().id < m.id
+        }) {
+            log::info!("Warming up searchers");
+            searcher
+                .warmup(autosuggest.scores().keys().take(WARMUP_QUERIES).cloned())
+                .await;
         }
 
         let host_webgraph = Arc::new(host_webgraph);
