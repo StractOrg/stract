@@ -81,6 +81,7 @@ fn alive_nodes_updater(chitchat: Arc<Mutex<Chitchat>>) -> Arc<RwLock<HashSet<Mem
 
 pub struct Cluster {
     alive_nodes: Arc<RwLock<HashSet<Member>>>,
+    self_node: Option<Member>,
     // dropping the handle leaves the cluster
     _chitchat_handle: ChitchatHandle,
 }
@@ -121,6 +122,7 @@ impl Cluster {
                 SERVICE_KEY.to_string(),
                 serde_json::to_string(&self_node.service)?,
             )],
+            Some(self_node),
         )
         .await
     }
@@ -154,12 +156,13 @@ impl Cluster {
             is_ready_predicate: None,
         };
 
-        Self::join_with_config(config, vec![]).await
+        Self::join_with_config(config, vec![], None).await
     }
 
     async fn join_with_config(
         config: ChitchatConfig,
         key_values: Vec<(String, String)>,
+        self_node: Option<Member>,
     ) -> Result<Self> {
         let transport = UdpTransport;
 
@@ -170,6 +173,7 @@ impl Cluster {
 
         Ok(Self {
             alive_nodes,
+            self_node,
             _chitchat_handle: chitchat_handle,
         })
     }
@@ -199,5 +203,9 @@ impl Cluster {
 
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
+    }
+
+    pub fn self_node(&self) -> Option<&Member> {
+        self.self_node.as_ref()
     }
 }
