@@ -7,41 +7,18 @@ import json
 import time
 import requests
 import random
-
-# API = "https://stract.com/beta/api/search"
-API = "http://localhost:3000/beta/api/search"
-NUM_RESULTS_PER_QUERY = 20
+from db import Db
+import stract
 
 ELO_K = 32
 ELO_SCALE = 400
 ELO_ROUNDS_MULT = 5
 NUM_LABELS = 4
 
-# PROMPT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-# 
-# You are a helpful, smart, kind, and efficient AI assistant. You always fulfill the user's requests to the best of your ability.<|eot_id|><|start_header_id|>user<|end_header_id|>
-# 
-# Think about this step-by-step. You are a search engine evaluator and your task is to evaluate search results based on how well the result matches the query
-# You will be shown two results for each query and most choose which result is best for the users query. A good result most answer the users query and come from an authoritative source.
-# To choose the best result, write "Best: RESULT_A" or "Best: RESULT_B". Before choosing the best result, you should first evaluate the relevance of each result to the query.
-# 
-# Query: "{}"
-# 
-# RESULT_A:
-# Url: "{}"
-# Title: "{}"
-# Snippet: "{}"
-# 
-# RESULT_B:
-# Url: "{}"
-# Title: "{}"
-# Snippet: "{}"
-# 
-# Evaluation:<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-# 
-# """
+PROMPT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-PROMPT = """<start_of_turn>user
+You are a helpful, smart, kind, and efficient AI assistant. You always fulfill the user's requests to the best of your ability.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
 Think about this step-by-step. You are a search engine evaluator and your task is to evaluate search results based on how well the result matches the query
 You will be shown two results for each query and most choose which result is best for the users query. A good result most answer the users query and come from an authoritative source.
 To choose the best result, write "Best: RESULT_A" or "Best: RESULT_B". Before choosing the best result, you should first evaluate the relevance of each result to the query.
@@ -56,14 +33,16 @@ Snippet: "{}"
 RESULT_B:
 Url: "{}"
 Title: "{}"
-Snippet: "{}"<end_of_turn>
-<start_of_turn>model
+Snippet: "{}"
+
+Evaluation:<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
 """
+
 llm = Llama(
     n_gpu_layers=-1,
     n_ctx=8000,
-    # model_path="data/Meta-Llama-3.1-8B-Instruct-Q8_0.gguf",
-    model_path="data/gemma-2-2b-it-abliterated-Q6_K_L.gguf",
+    model_path="data/Meta-Llama-3.1-8B-Instruct-Q8_0.gguf",
     repeat_penalty=False,
     no_penalize_nl=True,
     verbose=False,
@@ -77,39 +56,8 @@ with open("data/queries_us.csv") as f:
 np.random.shuffle(all_queries)
 
 
-def setup_db():
-    db = sqlite3.connect("data/auto-ranking-annotation.sqlite")
+db = Db("data/auto-ranking-annotation.sqlite")
 
-    cur = db.cursor()
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS queries (
-            qid UUID PRIMARY KEY DEFAULT (HEX(RANDOMBLOB(16))),
-            query TEXT NOT NULL UNIQUE
-        );"""
-    )
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS search_results (
-            qid UUID NOT NULL,
-            url TEXT NOT NULL,
-            orig_rank INTEGER NOT NULL,
-            webpage_json TEXT NOT NULL,
-            annotation INTEGER DEFAULT NULL,
-            PRIMARY KEY (qid, url)
-        );"""
-    )
-
-    db.commit()
-
-    return db
-
-
-db = setup_db()
-
-cur = db.cursor()
 for query in all_queries:
     if len(query) < 3:
         continue
@@ -125,82 +73,15 @@ for query in all_queries:
     if len(query) > 100:
         continue
 
-    cur.execute(
-        """
-        INSERT OR IGNORE INTO queries (query)
-        VALUES (?)
-        """,
-        (query,),
-    )
-
-db.commit()
-
-unannotated_queries = cur.execute(
-    """
-    SELECT qid, query
-    FROM queries
-    WHERE NOT EXISTS (
-        SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotation IS NOT NULL
-    )
-    ORDER BY qid
-    """,
-).fetchall()
-
-unannotated_queries = {qid: query for qid, query in unannotated_queries}
+    db.add_query(query)
 
 
-def simplify_snippet(snippet):
-    if "text" not in snippet:
-        return ""
+unannotated_queries = db.get_unannotated_queries()
 
-    return "".join([f["text"] for f in snippet["text"]["fragments"]])
-
-
-def get_search_results(query):
-    payload = {
-        "query": query,
-        "numResults": NUM_RESULTS_PER_QUERY,
-        "returnRankingSignals": True,
-        'signalCoefficients': {
-            'host_centrality_rank': 0.022,
-            'page_centrality_rank': 0.022,
-            }
-    }
-
-    return [
-        {
-            "url": w["url"],
-            "title": w["title"],
-            "rankingSignals": {s: v["value"] for (s, v) in w["rankingSignals"].items()},
-            "snippet": simplify_snippet(w["snippet"]),
-        }
-        for w in requests.post(API, json=payload).json()["webpages"][
-            :NUM_RESULTS_PER_QUERY
-        ]
-    ]
-
-
-def add_results(query):
-    has_results = (
-        cur.execute("SELECT 1 FROM search_results WHERE qid = ?", (qid,)).fetchone()
-        is not None
-    )
-    if has_results:
-        return
-
-    results = get_search_results(query)
+def add_results(qid, query):
+    results = stract.search(query)
     time.sleep(1)
-
-    for i, result in enumerate(results):
-        cur.execute(
-            """
-            INSERT OR IGNORE INTO search_results (qid, url, orig_rank, webpage_json)
-            VALUES (?, ?, ?, ?)
-            """,
-            (qid, result["url"], i, json.dumps(result)),
-        )
-
-    db.commit()
+    db.insert_results(qid, results)
 
 
 def get_prompt(query, url_a, title_a, snippet_a, url_b, title_b, snippet_b):
@@ -233,16 +114,8 @@ def elo_update(winner, loser, elo):
 
 
 for qid, query in tqdm(unannotated_queries.items()):
-    add_results(query)
-    unnanotated_results = cur.execute(
-        """
-        SELECT url, orig_rank, webpage_json
-        FROM search_results
-        WHERE qid = ? AND annotation IS NULL
-        ORDER BY orig_rank
-        """,
-        (qid,),
-    ).fetchall()
+    add_results(qid, query)
+    unnanotated_results = db.get_unannotated_results(qid)
 
     elo = {url: ELO_SCALE // 2 for url, _, _ in unnanotated_results}
 
@@ -274,7 +147,6 @@ for qid, query in tqdm(unannotated_queries.items()):
     elo = [{"url": url} for url, _ in elo]
 
     for i in range(len(elo)):
-        # elo[i]['label'] = (NUM_LABELS - i // (len(elo) // NUM_LABELS))
         elo[i]['label'] = NUM_LABELS - int(np.log2(i + 1))
 
     print(query)
@@ -282,12 +154,4 @@ for qid, query in tqdm(unannotated_queries.items()):
     for website in elo:
         url = website['url']
         relevancy = website['label']
-        cur.execute(
-            """
-            UPDATE search_results
-            SET annotation = ?
-            WHERE qid = ? AND url = ?
-            """,
-            (relevancy, qid, url),
-        )
-        db.commit()
+        db.annotate(qid, url, relevancy)

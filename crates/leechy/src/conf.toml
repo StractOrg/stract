@@ -1,0 +1,4 @@
+[[engines]]
+name = "startpage"
+search = "https://www.startpage.com/search?q={query}&qsr=en_US"
+xpath = "./div[contains(@class, 'result')]/a"

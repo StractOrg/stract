@@ -189,3 +189,83 @@ fn specificity() {
     assert!(specificities[0] > specificities[2]);
     assert!(specificities[1] > specificities[2]);
 }
+
+#[test]
+fn select_xpath() {
+    let html = r"
+<title>Test case</title>
+<p class=foo>Foo</p>
+<p>Bar</p>
+<p class=foo>Foo</p>
+";
+
+    let document = parse_html().one(html);
+    let nodes: Vec<_> = document.select_xpath("/html/body/p").collect();
+
+    assert_eq!(nodes.len(), 3);
+
+    let node = &nodes[0];
+    assert_eq!(node.name.local.as_ref(), "p");
+    assert_eq!(node.attributes.borrow().get("class"), Some("foo"));
+
+    let node = &nodes[1];
+    assert_eq!(node.name.local.as_ref(), "p");
+    assert_eq!(node.attributes.borrow().get("class"), None);
+
+    let node = &nodes[2];
+    assert_eq!(node.name.local.as_ref(), "p");
+    assert_eq!(node.attributes.borrow().get("class"), Some("foo"));
+
+    let nodes: Vec<_> = document.select_xpath("/html/body/p[2]").collect();
+
+    assert_eq!(nodes.len(), 1);
+
+    let node = &nodes[0];
+    assert_eq!(node.name.local.as_ref(), "p");
+    assert_eq!(node.attributes.borrow().get("class"), None);
+
+    let nodes: Vec<_> = document.select_xpath("/html/head/title").collect();
+    assert_eq!(nodes.len(), 1);
+}
+
+#[test]
+fn xpath_wildcard() {
+    let html = r"
+<title>Test case</title>
+";
+
+    let document = parse_html().one(html);
+
+    let nodes: Vec<_> = document.select_xpath("/title").collect();
+    assert_eq!(nodes.len(), 0);
+
+    let nodes: Vec<_> = document.select_xpath("./title").collect();
+    assert_eq!(nodes.len(), 1);
+
+    let nodes: Vec<_> = document.select_xpath("/./title").collect();
+    assert_eq!(nodes.len(), 1);
+}
+
+#[test]
+fn xpath_contains() {
+    let html = r#"
+<p class="foo bar">Test case</p>
+"#;
+
+    let document = parse_html().one(html);
+
+    let nodes: Vec<_> = document
+        .select_xpath("./p[contains(@class, 'foo')]")
+        .collect();
+    assert_eq!(nodes.len(), 1);
+
+    let nodes: Vec<_> = document
+        .select_xpath("./p[contains(@class, 'bar')]")
+        .collect();
+    assert_eq!(nodes.len(), 1);
+
+    let nodes: Vec<_> = document
+        .select_xpath("./p[contains(@class, 'baz')]")
+        .collect();
+    assert_eq!(nodes.len(), 0);
+}

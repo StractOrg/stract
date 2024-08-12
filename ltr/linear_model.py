@@ -20,7 +20,7 @@ res = cur.execute(
         SELECT qid, query
 		FROM queries
         WHERE EXISTS (
-			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotation IS NOT NULL
+			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotation > 0
 		)
 """
 )
@@ -108,14 +108,18 @@ y_test = jnp.array(y_test)
 # jax model
 w = jnp.zeros(X_train.shape[1])
 
+
 def model(w, X):
     return jnp.dot(X, w)
 
+
 def loss(w, batch):
     features, labels, mask = batch
-    scores = model(w, features)
+    # scores = model(w, features)
+    # return rax.approx_t12n(rax.mrr_metric)(scores, labels)
 
-    return rax.approx_t12n(rax.mrr_metric)(scores, labels) 
+    return ((w * features - jnp.ones_like(w)) ** 2).sum()
+
 
 grad_fn = jax.jit(jax.grad(loss))
 
@@ -123,10 +127,13 @@ grad_fn = jax.jit(jax.grad(loss))
 for i in range(128):
     batch_size = 20
     for j in range(0, len(X_train), batch_size):
-        batch = (X_train[j : j + batch_size], y_train[j : j + batch_size], jnp.ones(batch_size))
+        batch = (
+            X_train[j : j + batch_size],
+            y_train[j : j + batch_size],
+            jnp.ones(batch_size),
+        )
         w = w - grad_fn(w, batch) * 3e-4
         w = w.clip(0, 10)
-
 
 
 # model = LinearRegression(fit_intercept=False, positive=True)
@@ -136,13 +143,14 @@ for i in range(128):
 
 print("TRAIN")
 for k in [1, 2, 5, 10]:
-    print(f"NDCG@{k}: ", sklearn.metrics.ndcg_score([y_train], [model(w, X_train)], k=k))
+    print(
+        f"NDCG@{k}: ", sklearn.metrics.ndcg_score([y_train], [model(w, X_train)], k=k)
+    )
 
 print()
 print("TEST")
 for k in [1, 2, 5, 10]:
     print(f"NDCG@{k}: ", sklearn.metrics.ndcg_score([y_test], [model(w, X_test)], k=k))
-
 
 
 weights = {id2feature[i]: float(v) for (i, v) in enumerate(w)}

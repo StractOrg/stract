@@ -18,6 +18,7 @@ mod node_data_ref;
 mod parser;
 mod select;
 mod serializer;
+mod xpath;
 
 #[cfg(test)]
 mod tests;

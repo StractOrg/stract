@@ -4,6 +4,8 @@ use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::iter::Rev;
 
+use selectors::Element;
+
 use crate::node_data_ref::NodeDataRef;
 use crate::select::Selectors;
 use crate::tree::{ElementData, NodeRef};
@@ -170,12 +172,81 @@ impl NodeRef {
         self.inclusive_descendants().select(selectors)
     }
 
+    /// Return the node that matches the given xpath expression.
+    #[inline]
+    pub fn select_xpath(&self, xpath: &str) -> XPathSelect<Elements<Descendants>> {
+        XPathSelect::new(self.inclusive_descendants().elements(), xpath)
+    }
+
     /// Return the first inclusive descendants element that match the given selector list.
     #[inline]
     #[must_use]
     pub fn select_first(&self, selectors: &str) -> Option<NodeDataRef<ElementData>> {
         let mut elements = self.select(selectors).ok()?;
         elements.next()
+    }
+}
+
+/// An iterator of nodes that match a given xpath selector.
+pub struct XPathSelect<I> {
+    iter: I,
+    xpath: Vec<crate::xpath::Expr>,
+}
+
+impl<I> XPathSelect<I> {
+    /// Create a new `XPathSelect` iterator.
+    pub fn new(iter: I, xpath: &str) -> Self {
+        let xpath = crate::xpath::Expr::parse(xpath);
+        Self { iter, xpath }
+    }
+}
+
+impl<I> Iterator for XPathSelect<I>
+where
+    I: Iterator<Item = NodeDataRef<ElementData>>,
+{
+    type Item = NodeDataRef<ElementData>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.by_ref().find(|elem| {
+            let mut elem = Some(elem.clone());
+            let mut expr_index = self.xpath.len();
+
+            while expr_index > 0 {
+                let expr = &self.xpath[expr_index - 1];
+
+                elem = match elem {
+                    Some(elem) => {
+                        if !expr.matches(&elem) {
+                            return false;
+                        }
+
+                        elem.parent_element()
+                    }
+
+                    None => {
+                        return matches!(
+                            expr,
+                            crate::xpath::Expr::Root | crate::xpath::Expr::Wildcard
+                        );
+                    }
+                };
+
+                if matches!(expr, crate::xpath::Expr::Wildcard)
+                    && expr_index > 1
+                    && elem
+                        .as_ref()
+                        .map(|elem| !self.xpath[expr_index - 2].matches(elem))
+                        .unwrap_or(false)
+                {
+                    expr_index -= 0;
+                } else {
+                    expr_index -= 1;
+                }
+            }
+
+            true
+        })
     }
 }
 

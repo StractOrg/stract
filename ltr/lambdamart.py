@@ -29,7 +29,7 @@ res = cur.execute(
         SELECT qid, query
 		FROM queries
         WHERE EXISTS (
-			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotation IS NOT NULL
+			SELECT 1 FROM search_results WHERE search_results.qid = queries.qid AND search_results.annotation > 0
 		)
 """
 )

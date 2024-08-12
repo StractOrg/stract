@@ -13,6 +13,7 @@ members = [
   "crates/lending-iter",
   "crates/robotstxt",
   "crates/tantivy",
+  "crates/leechy",
   "fuzz",
 ]
 resolver = "2"
