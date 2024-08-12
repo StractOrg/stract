@@ -102,6 +102,7 @@ pub enum Term {
     Title(SimpleOrPhrase),
     Body(SimpleOrPhrase),
     Url(SimpleOrPhrase),
+    ExactUrl(String),
     PossibleBang { prefix: char, bang: String },
     Not(Box<Term>),
 }
@@ -116,6 +117,7 @@ impl std::fmt::Display for Term {
             Term::Title(title) => write!(f, "intitle:{}", title),
             Term::Body(body) => write!(f, "inbody:{}", body),
             Term::Url(url) => write!(f, "inurl:{}", url),
+            Term::ExactUrl(url) => write!(f, "exacturl:{}", url),
             Term::PossibleBang { prefix, bang } => write!(f, "{}{}", prefix, bang),
         }
     }
@@ -137,6 +139,7 @@ impl Term {
             Term::Title(s) => Term::Title(s.truncate()),
             Term::Body(s) => Term::Body(s.truncate()),
             Term::Url(s) => Term::Url(s.truncate()),
+            Term::ExactUrl(s) => Term::ExactUrl(s),
             Term::Not(n) => Term::Not(Box::new(n.truncate())),
             Term::PossibleBang { prefix, bang } => Term::PossibleBang {
                 prefix,

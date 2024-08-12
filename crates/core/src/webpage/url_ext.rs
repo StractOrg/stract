@@ -36,7 +36,16 @@ pub trait UrlExt {
     fn icann_domain(&self) -> Option<&str>;
     fn root_domain(&self) -> Option<&str>;
     fn normalized_host(&self) -> Option<&str>;
-    fn normalize(&mut self);
+    fn normalize_in_place(&mut self);
+
+    fn normalize(mut self) -> Self
+    where
+        Self: Sized,
+    {
+        self.normalize_in_place();
+        self
+    }
+
     fn subdomain(&self) -> Option<&str>;
     fn is_homepage(&self) -> bool;
     fn tld(&self) -> Option<&str>;
@@ -60,7 +69,7 @@ impl UrlExt for url::Url {
         self.host_str().map(|host| host.trim_start_matches("www."))
     }
 
-    fn normalize(&mut self) {
+    fn normalize_in_place(&mut self) {
         self.set_fragment(None); // remove fragment (e.g. #comments
 
         let queries: Vec<_> = self

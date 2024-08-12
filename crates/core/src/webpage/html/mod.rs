@@ -86,7 +86,7 @@ impl Html {
             }
         }
 
-        res.url.normalize();
+        res.url.normalize_in_place();
         res.robots = res.parse_robots_meta();
 
         Ok(res)

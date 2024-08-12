@@ -147,6 +147,10 @@ impl Node {
                 text: u,
                 field: text_field::Url.into(),
             }),
+            ParserTerm::ExactUrl(u) => Node::Term(Term {
+                text: SimpleOrPhrase::Simple(SimpleTerm::from(u)),
+                field: text_field::UrlNoTokenizer.into(),
+            }),
             ParserTerm::PossibleBang { prefix, bang } => {
                 let mut s = String::new();
                 s.push(prefix);

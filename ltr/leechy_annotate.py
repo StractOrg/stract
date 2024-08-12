@@ -42,7 +42,7 @@ for qid, query in tqdm(unannotated_queries.items()):
         try:
             data = next(
                 res
-                for res in stract.search(f"{query} site:{result}")
+                for res in stract.search(f"{query} exacturl:{result}")
                 if res["url"] == result
             )
         except StopIteration:

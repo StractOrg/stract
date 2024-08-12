@@ -189,7 +189,7 @@ impl<S: DatumStream> JobExecutor<S> {
             .into_iter()
             .chain(self.sitemap_urls.drain().map(|url| (url.clone(), 0.0)))
             .map(|(mut url, score)| {
-                url.normalize();
+                url.normalize_in_place();
                 (url, score)
             })
             .filter(|(url, _)| !self.crawled_urls.contains(url))
@@ -206,7 +206,7 @@ impl<S: DatumStream> JobExecutor<S> {
             .into_iter()
             .map(|(url, _)| url)
             .map(|mut url| {
-                url.normalize();
+                url.normalize_in_place();
                 url
             })
             .filter(|url| !self.crawled_urls.contains(url))
@@ -345,7 +345,7 @@ impl<S: DatumStream> JobExecutor<S> {
             .into_iter()
             .map(|link| link.destination)
             .map(|mut url| {
-                url.normalize();
+                url.normalize_in_place();
                 url
             })
             .filter(|url| url.as_str().len() <= MAX_URL_LEN_BYTES)
@@ -495,7 +495,7 @@ impl<S: DatumStream> JobExecutor<S> {
 
     async fn crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
         let mut url = url;
-        url.normalize();
+        url.normalize_in_place();
 
         if self.crawled_urls.contains(&url) {
             return Err(Error::from(anyhow!("url already crawled: {}", url)));
@@ -526,7 +526,7 @@ impl<S: DatumStream> JobExecutor<S> {
         }
 
         let mut res_url = res.url().clone();
-        res_url.normalize();
+        res_url.normalize_in_place();
 
         self.crawled_urls.insert(res_url.clone());
 

@@ -171,7 +171,7 @@ impl From<Url> for Node {
 
 pub fn normalize_url(url: &Url) -> String {
     let mut url = url.clone();
-    url.normalize();
+    url.normalize_in_place();
 
     let scheme = url.scheme();
     let mut normalized = url

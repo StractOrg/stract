@@ -16,7 +16,7 @@
 
 pub const MAX_TERMS_PER_QUERY: usize = 32;
 
-use crate::bangs::BANG_PREFIXES;
+use crate::{bangs::BANG_PREFIXES, webpage::url_ext::UrlExt};
 
 mod term;
 
@@ -119,6 +119,19 @@ fn site_field(input: &str) -> nom::IResult<&str, Term> {
     Ok((input, Term::Site(output.to_string())))
 }
 
+fn exact_url(orig_input: &str) -> nom::IResult<&str, Term> {
+    let (input, _) = nom::bytes::complete::tag("exacturl:")(orig_input)?;
+    let (input, output) = simple_str(input)?;
+
+    match url::Url::parse(output) {
+        Ok(url) => Ok((input, Term::ExactUrl(url.normalize().to_string()))),
+        Err(_) => Err(nom::Err::Error(nom::error::Error::new(
+            orig_input,
+            nom::error::ErrorKind::Fail,
+        ))),
+    }
+}
+
 fn links_to_field(input: &str) -> nom::IResult<&str, Term> {
     // parse 'linksto:' and then a simple term
     let (input, _) = nom::branch::alt((
@@ -147,7 +160,7 @@ fn body_field(input: &str) -> nom::IResult<&str, Term> {
 }
 
 fn url_field(input: &str) -> nom::IResult<&str, Term> {
-    // parse 'url:' and then a simple term
+    // parse 'inurl:' and then a simple term
     let (input, _) = nom::bytes::complete::tag("inurl:")(input)?;
     let (input, output) = simple_or_phrase(input)?;
 
@@ -161,6 +174,7 @@ fn field_selector(input: &str) -> nom::IResult<&str, Term> {
         title_field,
         body_field,
         url_field,
+        exact_url,
     ))(input)
 }
 
