@@ -104,18 +104,18 @@ pub struct MergeIter<'a> {
 }
 impl<'a> MergeIter<'a> {
     pub fn new(iters: Vec<impl Iterator<Item = MergeNode> + 'a>) -> Self {
-        let mut heap = MinHeap::new();
+        let iters = iters
+            .into_iter()
+            .enumerate()
+            .map(|(ord, iter)| {
+                let it = Box::new(iter.map(move |node| node.with_ord(MergeSegmentOrd::new(ord))))
+                    as Box<dyn Iterator<Item = _>>;
 
-        for item in iters.into_iter().enumerate().map(|(ord, iter)| {
-            let it = Box::new(iter.map(move |node| node.with_ord(MergeSegmentOrd::new(ord))))
-                as Box<dyn Iterator<Item = _>>;
+                Reverse(file_store::Peekable::new(it))
+            })
+            .collect();
 
-            Reverse(file_store::Peekable::new(it))
-        }) {
-            heap.push(item);
-        }
-
-        Self { iters: heap }
+        Self { iters }
     }
 
     pub fn advance(&mut self, buf: &mut Vec<MergeNode<MergeSegmentOrd>>) -> bool {
@@ -160,15 +160,15 @@ pub struct EdgeMerger<'a, L = String> {
 
 impl<'a, L> EdgeMerger<'a, L> {
     pub fn new(iters: Vec<impl Iterator<Item = StoredEdge<L>> + 'a>) -> Self {
-        let mut heap = MinHeap::new();
-        for item in iters.into_iter().map(|iter| {
-            let it = Box::new(iter) as Box<dyn Iterator<Item = _>>;
-            Reverse(file_store::Peekable::new(it))
-        }) {
-            heap.push(item);
-        }
+        let iters = iters
+            .into_iter()
+            .map(|iter| {
+                let it = Box::new(iter) as Box<dyn Iterator<Item = _>>;
+                Reverse(file_store::Peekable::new(it))
+            })
+            .collect();
 
-        Self { iters: heap }
+        Self { iters }
     }
 }
 

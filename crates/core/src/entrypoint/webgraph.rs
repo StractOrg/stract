@@ -21,6 +21,7 @@ use crate::{
     webpage::{url_ext::UrlExt, Html},
     Result,
 };
+use anyhow::bail;
 use itertools::Itertools;
 use url::Url;
 
@@ -94,8 +95,8 @@ fn canonical_or_self(index: &CanonicalIndex, url: Url) -> Url {
 }
 
 pub struct WebgraphWorker {
-    pub host_graph: webgraph::WebgraphWriter,
-    pub page_graph: webgraph::WebgraphWriter,
+    pub host_graph: Option<webgraph::WebgraphWriter>,
+    pub page_graph: Option<webgraph::WebgraphWriter>,
     pub canonical_index: Option<Arc<CanonicalIndex>>,
 }
 
@@ -141,12 +142,14 @@ impl WebgraphWorker {
                     let mut destination = Node::from(destination);
 
                     trace!("inserting link {:?}", link);
-                    self.page_graph.insert(
-                        source.clone(),
-                        destination.clone(),
-                        link.text.clone(),
-                        link.rel,
-                    );
+                    if let Some(graph) = self.page_graph.as_mut() {
+                        graph.insert(
+                            source.clone(),
+                            destination.clone(),
+                            link.text.clone(),
+                            link.rel,
+                        )
+                    }
 
                     let dest_domain = link.destination.root_domain();
                     let source_domain = link.source.root_domain();
@@ -157,14 +160,19 @@ impl WebgraphWorker {
                         source = source.into_host();
                         destination = destination.into_host();
 
-                        self.host_graph
-                            .insert(source, destination, link.text, link.rel);
+                        if let Some(graph) = self.host_graph.as_mut() {
+                            graph.insert(source, destination, link.text, link.rel)
+                        }
                     }
                 }
             }
 
-            self.host_graph.commit();
-            self.page_graph.commit();
+            if let Some(graph) = self.host_graph.as_mut() {
+                graph.commit()
+            }
+            if let Some(graph) = self.page_graph.as_mut() {
+                graph.commit()
+            }
         }
 
         info!("{} done", name);
@@ -175,6 +183,10 @@ pub struct Webgraph {}
 
 impl Webgraph {
     pub fn run(config: &WebgraphConstructConfig) -> Result<()> {
+        if config.page_graph_base_path.is_none() && config.host_graph_base_path.is_none() {
+            bail!("either page_graph_base_path or host_graph_base_path must be set");
+        }
+
         let warc_paths = config.warc_source.paths()?;
 
         let job_config = JobConfig::from(config.warc_source.clone());
@@ -219,16 +231,22 @@ impl Webgraph {
 
         for i in 0..num_workers {
             let host_path = host_path.clone();
-            let host_path = Path::new(&host_path);
-            let host_path = host_path.join(format!("worker_{i}"));
+            let host_path = host_path
+                .as_ref()
+                .map(|p| Path::new(p).join(format!("worker_{i}")));
 
             let page_path = page_path.clone();
-            let page_path = Path::new(&page_path);
-            let page_path = page_path.join(format!("worker_{i}"));
+            let page_path = page_path
+                .as_ref()
+                .map(|p| Path::new(p).join(format!("worker_{i}")));
 
             let mut worker = WebgraphWorker {
-                host_graph: open_host_graph_writer(host_path, host_centrality_rank_store.clone()),
-                page_graph: open_page_graph_writer(page_path, host_centrality_rank_store.clone()),
+                host_graph: host_path
+                    .as_ref()
+                    .map(|p| open_host_graph_writer(p, host_centrality_rank_store.clone())),
+                page_graph: page_path
+                    .as_ref()
+                    .map(|p| open_page_graph_writer(p, host_centrality_rank_store.clone())),
                 canonical_index: canonical_index.clone(),
             };
 
@@ -241,8 +259,8 @@ impl Webgraph {
 
                 r.recv().unwrap();
 
-                let host = worker.host_graph.finalize();
-                let page = worker.page_graph.finalize();
+                let host = worker.host_graph.map(|graph| graph.finalize());
+                let page = worker.page_graph.map(|graph| graph.finalize());
 
                 s.send(()).unwrap();
                 (host, page)
@@ -257,22 +275,36 @@ impl Webgraph {
         let (mut host_graph, mut page_graph) = graphs.pop().unwrap();
 
         for (other_host, other_page) in graphs {
-            host_graph.merge(other_host)?;
-            page_graph.merge(other_page)?;
+            if let (Some(graph), Some(other)) = (host_graph.as_mut(), other_host) {
+                graph.merge(other)?;
+            }
+
+            if let (Some(graph), Some(other)) = (page_graph.as_mut(), other_page) {
+                graph.merge(other)?;
+            }
         }
 
         if config.merge_all_segments {
-            host_graph.optimize_read(); // save space in id2node db
-            page_graph.optimize_read(); // save space in id2node db
-            host_graph.merge_all_segments(Default::default())?;
-            page_graph.merge_all_segments(Default::default())?;
+            if let Some(host) = host_graph.as_mut() {
+                host.optimize_read(); // save space in id2node db
+                host.merge_all_segments(Default::default())?;
+            }
+
+            if let Some(page) = page_graph.as_mut() {
+                page.optimize_read(); // save space in id2node db
+                page.merge_all_segments(Default::default())?;
+            }
         }
 
-        host_graph.optimize_read();
-        page_graph.optimize_read();
+        if let Some(host) = host_graph.as_mut() {
+            host.optimize_read();
+            crate::mv(host.path(), config.host_graph_base_path.as_ref().unwrap())?;
+        }
 
-        crate::mv(host_graph.path(), &config.host_graph_base_path)?;
-        crate::mv(page_graph.path(), &config.page_graph_base_path)?;
+        if let Some(page) = page_graph.as_mut() {
+            page.optimize_read();
+            crate::mv(page.path(), config.page_graph_base_path.as_ref().unwrap())?;
+        }
 
         Ok(())
     }

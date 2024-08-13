@@ -120,15 +120,15 @@ fn create_webgraph() -> Result<()> {
     };
 
     let mut worker = webgraph::WebgraphWorker {
-        host_graph: webgraph::open_host_graph_writer(&out_path_host, None),
-        page_graph: webgraph::open_page_graph_writer(&out_path_page, None),
+        host_graph: Some(webgraph::open_host_graph_writer(&out_path_host, None)),
+        page_graph: Some(webgraph::open_page_graph_writer(&out_path_page, None)),
         canonical_index: None,
     };
 
     worker.process_job(&job);
 
-    worker.host_graph.finalize();
-    worker.page_graph.finalize();
+    worker.host_graph.unwrap().finalize();
+    worker.page_graph.unwrap().finalize();
 
     Ok(())
 }
