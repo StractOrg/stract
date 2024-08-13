@@ -57,7 +57,7 @@ impl<T> Chunk<T> {
         let mut wrt = BufWriter::new(file);
 
         for item in self.data {
-            let bytes = bincode::encode_to_vec(&item, bincode::config::standard())?;
+            let bytes = bincode::encode_to_vec(&item, common::bincode_config())?;
             let size = bytes.len() as u64;
 
             wrt.write_all(&size.to_le_bytes())?;
@@ -179,7 +179,7 @@ impl<T> StoredChunk<T> {
 
         self.data.read_exact(&mut self.buf).ok()?;
 
-        let (next, _) = bincode::decode_from_slice(&self.buf, bincode::config::standard()).ok()?;
+        let (next, _) = bincode::decode_from_slice(&self.buf, common::bincode_config()).ok()?;
 
         Some(next)
     }

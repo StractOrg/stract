@@ -274,7 +274,7 @@ impl RaftSnapshotBuilder<TypeConfig> for Arc<StateMachineStore> {
         {
             // Serialize the data of the state machine.
             let state_machine = self.state_machine.read().await;
-            let encoded = bincode::encode_to_vec(&*state_machine, bincode::config::standard())
+            let encoded = bincode::encode_to_vec(&*state_machine, common::bincode_config())
                 .map_err(|e| StorageIOError::read_state_machine(&e))?;
             data = encoded;
 
@@ -433,10 +433,9 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
         // Update the state machine.
         {
             let (data, _): (Db, _) =
-                bincode::decode_from_slice(&new_snapshot.data, bincode::config::standard())
-                    .map_err(|e| {
-                        StorageIOError::read_snapshot(Some(new_snapshot.meta.signature()), &e)
-                    })?;
+                bincode::decode_from_slice(&new_snapshot.data, common::bincode_config()).map_err(
+                    |e| StorageIOError::read_snapshot(Some(new_snapshot.meta.signature()), &e),
+                )?;
 
             let mut state_machine = self.state_machine.write().await;
             state_machine.db = data;

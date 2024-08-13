@@ -143,7 +143,7 @@ impl StupidBackoffTrainer {
         let f = File::create(path.as_ref().join("n_counts.bin"))?;
         let mut wrt = BufWriter::new(f);
 
-        bincode::encode_into_std_write(&self.n_counts, &mut wrt, bincode::config::standard())?;
+        bincode::encode_into_std_write(&self.n_counts, &mut wrt, common::bincode_config())?;
         wrt.flush()?;
 
         Ok(())
@@ -226,7 +226,7 @@ impl StupidBackoff {
 
         let file = File::open(folder.as_ref().join("n_counts.bin"))?;
         let mut reader = std::io::BufReader::new(file);
-        let n_counts = bincode::decode_from_std_read(&mut reader, bincode::config::standard())?;
+        let n_counts = bincode::decode_from_std_read(&mut reader, common::bincode_config())?;
 
         Ok(Self {
             ngrams,
@@ -257,7 +257,7 @@ impl StupidBackoff {
             .open(folder.as_ref().join("n_counts.bin"))?;
 
         let mut wrt = BufWriter::new(file);
-        bincode::encode_into_std_write(&n_counts, &mut wrt, bincode::config::standard())?;
+        bincode::encode_into_std_write(&n_counts, &mut wrt, common::bincode_config())?;
         wrt.flush()?;
 
         let file = OpenOptions::new()

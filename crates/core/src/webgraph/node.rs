@@ -40,6 +40,14 @@ impl NodeID {
     pub fn as_u64(self) -> u64 {
         self.0
     }
+
+    pub fn from_be_bytes(bytes: [u8; 8]) -> Self {
+        NodeID(u64::from_be_bytes(bytes))
+    }
+
+    pub fn to_be_bytes(self) -> [u8; 8] {
+        self.0.to_be_bytes()
+    }
 }
 
 impl From<u128> for NodeID {
@@ -111,6 +119,13 @@ pub struct Node {
 }
 
 impl Node {
+    #[cfg(test)]
+    pub fn new_for_test(name: &str) -> Self {
+        Node {
+            name: name.to_string(),
+        }
+    }
+
     pub fn into_host(self) -> Node {
         let url = if self.name.contains("://") {
             Url::parse(&self.name)

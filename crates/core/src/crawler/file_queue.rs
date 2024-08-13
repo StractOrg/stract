@@ -61,7 +61,7 @@ where
     }
 
     pub fn push(&mut self, item: T) -> Result<()> {
-        let body = bincode::encode_to_vec(&item, bincode::config::standard())?;
+        let body = bincode::encode_to_vec(&item, common::bincode_config())?;
         let header = Header {
             body_size: body.len(),
         };
@@ -177,7 +177,7 @@ where
 
         let body =
             &self.file[cur_pointer + header_size..cur_pointer + header_size + header.body_size];
-        let (item, _) = bincode::decode_from_slice(body, bincode::config::standard())?;
+        let (item, _) = bincode::decode_from_slice(body, common::bincode_config())?;
 
         self.pointer
             .set(cur_pointer + header_size + header.body_size)?;

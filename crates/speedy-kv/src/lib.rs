@@ -446,11 +446,11 @@ where
     V: bincode::Decode,
 {
     pub fn get(&self, key: &K) -> Result<Option<V>> {
-        let key = bincode::encode_to_vec(key, bincode::config::standard())?;
+        let key = bincode::encode_to_vec(key, common::bincode_config())?;
 
         match self.get_raw(key.as_slice()) {
             Some(v) => {
-                let (v, _) = bincode::decode_from_slice(v.as_bytes(), bincode::config::standard())?;
+                let (v, _) = bincode::decode_from_slice(v.as_bytes(), common::bincode_config())?;
                 Ok(Some(v))
             }
             None => Ok(None),
@@ -467,10 +467,8 @@ where
         A: fst::Automaton + Clone + 'a,
     {
         self.search_raw(query).filter_map(|(k, v)| {
-            let (k, _) =
-                bincode::decode_from_slice(k.as_bytes(), bincode::config::standard()).ok()?;
-            let (v, _) =
-                bincode::decode_from_slice(v.as_bytes(), bincode::config::standard()).ok()?;
+            let (k, _) = bincode::decode_from_slice(k.as_bytes(), common::bincode_config()).ok()?;
+            let (v, _) = bincode::decode_from_slice(v.as_bytes(), common::bincode_config()).ok()?;
 
             Some((k, v))
         })
@@ -492,10 +490,8 @@ where
 {
     pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
         self.iter_raw().filter_map(|(k, v)| {
-            let (k, _) =
-                bincode::decode_from_slice(k.as_bytes(), bincode::config::standard()).ok()?;
-            let (v, _) =
-                bincode::decode_from_slice(v.as_bytes(), bincode::config::standard()).ok()?;
+            let (k, _) = bincode::decode_from_slice(k.as_bytes(), common::bincode_config()).ok()?;
+            let (v, _) = bincode::decode_from_slice(v.as_bytes(), common::bincode_config()).ok()?;
 
             Some((k, v))
         })
@@ -503,10 +499,8 @@ where
 
     pub fn sorted_iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
         self.sorted_iter_raw().filter_map(|(k, v)| {
-            let (k, _) =
-                bincode::decode_from_slice(k.as_bytes(), bincode::config::standard()).ok()?;
-            let (v, _) =
-                bincode::decode_from_slice(v.as_bytes(), bincode::config::standard()).ok()?;
+            let (k, _) = bincode::decode_from_slice(k.as_bytes(), common::bincode_config()).ok()?;
+            let (v, _) = bincode::decode_from_slice(v.as_bytes(), common::bincode_config()).ok()?;
 
             Some((k, v))
         })

@@ -243,9 +243,9 @@ mod tests {
             .into(),
         );
 
-        let bytes = bincode::encode_to_vec(&image, bincode::config::standard()).unwrap();
+        let bytes = bincode::encode_to_vec(&image, common::bincode_config()).unwrap();
         let (decoded_image, _) =
-            bincode::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+            bincode::decode_from_slice(&bytes, common::bincode_config()).unwrap();
 
         assert_eq!(image, decoded_image);
     }

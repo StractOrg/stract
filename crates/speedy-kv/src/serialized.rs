@@ -84,7 +84,7 @@ where
     T: bincode::Encode,
 {
     pub fn new(value: &T) -> Result<Self> {
-        let bytes = bincode::encode_to_vec(value, bincode::config::standard())?;
+        let bytes = bincode::encode_to_vec(value, common::bincode_config())?;
         Ok(Self {
             bytes,
             _marker: std::marker::PhantomData,

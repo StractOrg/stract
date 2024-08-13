@@ -187,7 +187,7 @@ impl Model {
             .truncate(true)
             .open(path)?;
 
-        bincode::encode_into_std_write(&self, &mut file, bincode::config::standard())?;
+        bincode::encode_into_std_write(&self, &mut file, common::bincode_config())?;
         file.flush()?;
 
         Ok(())
@@ -197,7 +197,7 @@ impl Model {
         let file = OpenOptions::new().read(true).open(path)?;
         let mut reader = std::io::BufReader::new(file);
 
-        let model = bincode::decode_from_std_read(&mut reader, bincode::config::standard())?;
+        let model = bincode::decode_from_std_read(&mut reader, common::bincode_config())?;
 
         Ok(model)
     }

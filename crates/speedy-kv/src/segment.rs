@@ -79,7 +79,7 @@ where
         self.writers.store.finish()?;
 
         let mut wrt = BufWriter::new(self.writers.bloom);
-        bincode::encode_into_std_write(self.bloom, &mut wrt, bincode::config::standard())?;
+        bincode::encode_into_std_write(self.bloom, &mut wrt, common::bincode_config())?;
         wrt.flush()?;
 
         Ok(())
@@ -117,7 +117,7 @@ impl<K, V> Segment<K, V> {
             .read(true)
             .open(folder.as_ref().join(Segment::<K, V>::bloom_file_name(uuid)))?;
 
-        let bloom = bincode::decode_from_std_read(&mut bloom, bincode::config::standard())?;
+        let bloom = bincode::decode_from_std_read(&mut bloom, common::bincode_config())?;
 
         Ok(Self {
             uuid,
@@ -363,13 +363,17 @@ where
     I: Iterator<Item = (SerializedRef<'a, K>, SerializedRef<'a, V>)>,
 {
     pub fn new(segments: Vec<Peekable<I>>) -> Self {
-        Self {
-            segments: segments
-                .into_iter()
-                .enumerate()
-                .map(|(segment_ord, iter)| SortedPeekable { segment_ord, iter })
-                .collect(),
+        let mut heap = BinaryHeap::new();
+
+        for item in segments
+            .into_iter()
+            .enumerate()
+            .map(|(segment_ord, iter)| SortedPeekable { segment_ord, iter })
+        {
+            heap.push(item);
         }
+
+        Self { segments: heap }
     }
 }
 

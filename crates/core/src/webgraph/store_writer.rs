@@ -297,7 +297,7 @@ impl FinalEdgeStoreWriter {
         }
 
         self.hosts.insert(&node);
-        let node_bytes = node.id.serialize_to_vec();
+        let node_bytes = node.id.as_u64().to_be_bytes().to_vec();
 
         debug_assert!(self.ranges.nodes_get_raw(&node_bytes).is_none());
         debug_assert!(self.ranges.labels_get_raw(&node_bytes).is_none());

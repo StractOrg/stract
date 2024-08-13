@@ -4,6 +4,7 @@ import stract
 import numpy as np
 from tqdm import tqdm
 import time
+import sys
 
 NUM_LABELS = 4
 
@@ -34,7 +35,16 @@ unannotated_queries = db.get_unannotated_queries()
 eng = leechy.Engine()
 for qid, query in tqdm(unannotated_queries.items()):
     tqdm.write(query)
-    leechy_results = eng.search(query)
+    leechy_results = []
+
+    for i in range(3):
+        leechy_results = eng.search(query)
+        if len(leechy_results) > 0:
+            break
+
+    if len(leechy_results) == 0:
+        tqdm.write(f"No results found for {query}")
+        sys.exit(-1)
 
     for i, result in enumerate(leechy_results):
         label = NUM_LABELS - int(np.log2(i + 1))

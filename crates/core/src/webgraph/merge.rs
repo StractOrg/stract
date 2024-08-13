@@ -19,6 +19,7 @@ use std::{cmp::Reverse, collections::BinaryHeap};
 use super::{store::EdgeRange, NodeID, StoredEdge};
 use std::hash::Hash;
 
+#[derive(Debug)]
 pub struct MergeNode<O = ()> {
     node: NodeID,
     range: EdgeRange,
@@ -83,7 +84,7 @@ impl<O> PartialEq for MergeNode<O> {
 }
 impl<O> Eq for MergeNode<O> {}
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct MergeSegmentOrd(usize);
 impl MergeSegmentOrd {
     pub fn new(ord: usize) -> Self {
@@ -103,18 +104,18 @@ pub struct MergeIter<'a> {
 }
 impl<'a> MergeIter<'a> {
     pub fn new(iters: Vec<impl Iterator<Item = MergeNode> + 'a>) -> Self {
-        let iters = iters
-            .into_iter()
-            .enumerate()
-            .map(|(ord, iter)| {
-                let it = Box::new(iter.map(move |node| node.with_ord(MergeSegmentOrd::new(ord))))
-                    as Box<dyn Iterator<Item = _>>;
+        let mut heap = MinHeap::new();
 
-                Reverse(file_store::Peekable::new(it))
-            })
-            .collect();
+        for item in iters.into_iter().enumerate().map(|(ord, iter)| {
+            let it = Box::new(iter.map(move |node| node.with_ord(MergeSegmentOrd::new(ord))))
+                as Box<dyn Iterator<Item = _>>;
 
-        Self { iters }
+            Reverse(file_store::Peekable::new(it))
+        }) {
+            heap.push(item);
+        }
+
+        Self { iters: heap }
     }
 
     pub fn advance(&mut self, buf: &mut Vec<MergeNode<MergeSegmentOrd>>) -> bool {
@@ -159,15 +160,15 @@ pub struct EdgeMerger<'a, L = String> {
 
 impl<'a, L> EdgeMerger<'a, L> {
     pub fn new(iters: Vec<impl Iterator<Item = StoredEdge<L>> + 'a>) -> Self {
-        let iters = iters
-            .into_iter()
-            .map(|iter| {
-                let it = Box::new(iter) as Box<dyn Iterator<Item = _>>;
-                Reverse(file_store::Peekable::new(it))
-            })
-            .collect();
+        let mut heap = MinHeap::new();
+        for item in iters.into_iter().map(|iter| {
+            let it = Box::new(iter) as Box<dyn Iterator<Item = _>>;
+            Reverse(file_store::Peekable::new(it))
+        }) {
+            heap.push(item);
+        }
 
-        Self { iters }
+        Self { iters: heap }
     }
 }
 
@@ -222,6 +223,7 @@ impl<L> Hash for StoredEdge<L> {
 #[cfg(test)]
 mod tests {
     use crate::{webgraph::NodeDatum, webpage::html::links::RelFlags};
+    use proptest::prelude::*;
 
     use super::*;
 
@@ -267,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_nodes_unequal_len() {
+    fn test_merge_nodes_unequal_len1() {
         let a = vec![
             MergeNode::new(1u64.into(), EdgeRange::new(0..10, 1), 0..10),
             MergeNode::new(4u64.into(), EdgeRange::new(0..10, 2), 0..10),
@@ -275,6 +277,37 @@ mod tests {
         ];
 
         let b = vec![MergeNode::new(2u64.into(), EdgeRange::new(0..10, 4), 0..10)];
+
+        let mut merger = MergeIter::new(vec![a.into_iter(), b.into_iter()]);
+        let mut buf = Vec::new();
+
+        assert!(merger.advance(&mut buf));
+        assert_eq!(buf.len(), 1);
+        assert_eq!(buf[0].id(), 1u64.into());
+
+        assert!(merger.advance(&mut buf));
+        assert_eq!(buf.len(), 1);
+        assert_eq!(buf[0].id(), 2u64.into());
+
+        assert!(merger.advance(&mut buf));
+        assert_eq!(buf.len(), 1);
+        assert_eq!(buf[0].id(), 4u64.into());
+
+        assert!(merger.advance(&mut buf));
+        assert_eq!(buf.len(), 1);
+        assert_eq!(buf[0].id(), 5u64.into());
+
+        assert!(!merger.advance(&mut buf));
+    }
+
+    #[test]
+    fn test_merge_nodes_unequal_len2() {
+        let a = vec![MergeNode::new(2u64.into(), EdgeRange::new(0..10, 4), 0..10)];
+        let b = vec![
+            MergeNode::new(1u64.into(), EdgeRange::new(0..10, 1), 0..10),
+            MergeNode::new(4u64.into(), EdgeRange::new(0..10, 2), 0..10),
+            MergeNode::new(5u64.into(), EdgeRange::new(0..10, 3), 0..10),
+        ];
 
         let mut merger = MergeIter::new(vec![a.into_iter(), b.into_iter()]);
         let mut buf = Vec::new();
@@ -342,5 +375,66 @@ mod tests {
         assert_eq!(merger.next().unwrap().other.host_rank(), 4);
         assert_eq!(merger.next().unwrap().other.host_rank(), 5);
         assert!(merger.next().is_none());
+    }
+
+    #[test]
+    fn test_mergenode_heap_order() {
+        let mut heap = MinHeap::new();
+
+        heap.push(Reverse(MergeNode::new(
+            15414505588350686497u64.into(),
+            EdgeRange::new(0..10, 1),
+            0..10,
+        )));
+        heap.push(Reverse(MergeNode::new(
+            470624832116206178u64.into(),
+            EdgeRange::new(0..10, 1),
+            0..10,
+        )));
+        heap.push(Reverse(MergeNode::new(
+            15414505588350686497u64.into(),
+            EdgeRange::new(0..10, 1),
+            0..10,
+        )));
+
+        assert_eq!(
+            heap.into_iter()
+                .map(|x| x.0.id().as_u64())
+                .collect::<Vec<_>>(),
+            vec![
+                470624832116206178,
+                15414505588350686497,
+                15414505588350686497
+            ]
+        );
+    }
+
+    proptest! {
+        #[test]
+        fn merge(mut ids: Vec<u64>) {
+            ids.sort();
+
+            let mut a: Vec<MergeNode> = Vec::new();
+            let mut b: Vec<MergeNode> = Vec::new();
+
+            for id in ids.clone() {
+                if rand::random() {
+                    a.push(MergeNode::new(NodeID::from(id), EdgeRange::new(0..10, 4), 0..10));
+                } else {
+                    b.push(MergeNode::new(NodeID::from(id), EdgeRange::new(0..10, 4), 0..10));
+                }
+            }
+
+            let mut merge = MergeIter::new(vec![a.into_iter() , b.into_iter()]);
+
+            let mut merged = Vec::new();
+            let mut buf = Vec::new();
+
+            while merge.advance(&mut buf) {
+                merged.extend(buf.iter().map(|n| n.id().as_u64()));
+            }
+
+            prop_assert_eq!(merged, ids);
+        }
     }
 }

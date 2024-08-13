@@ -170,7 +170,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct StoredEdge<L = ()> {
     pub other: NodeDatum,
     pub rel: RelFlags,

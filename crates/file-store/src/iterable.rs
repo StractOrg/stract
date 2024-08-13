@@ -102,7 +102,7 @@ where
     }
 
     pub fn write(&mut self, item: &T) -> Result<WrittenOffset> {
-        let serialized = bincode::encode_to_vec(item, bincode::config::standard())?;
+        let serialized = bincode::encode_to_vec(item, common::bincode_config())?;
         let header = IterableHeader {
             num_upcoming_bytes: serialized.len() as u64,
         };
@@ -187,8 +187,7 @@ where
         let serialized = &self.data[self.offset..self.offset + header.num_upcoming_bytes as usize];
 
         self.offset += header.num_upcoming_bytes as usize;
-        let (item, _) =
-            bincode::decode_from_slice(serialized, bincode::config::standard()).unwrap();
+        let (item, _) = bincode::decode_from_slice(serialized, common::bincode_config()).unwrap();
 
         Some(item)
     }

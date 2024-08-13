@@ -108,3 +108,15 @@ where
     T: Eq,
 {
 }
+
+impl<I, T> std::fmt::Debug for Peekable<I>
+where
+    I: Iterator<Item = T>,
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Peekable")
+            .field("peeked", &self.peeked)
+            .finish()
+    }
+}

@@ -928,6 +928,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+]
+
+[[package]]
 name = "console"
 version = "0.15.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1603,6 +1610,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
+ "common",
  "memmap2",
  "ownedbytes",
 ]
@@ -4906,6 +4914,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "bloom",
+ "common",
  "file_store",
  "fst",
  "memmap2",
@@ -4970,6 +4979,7 @@ dependencies = [
  "chitchat",
  "chrono",
  "clap",
+ "common",
  "criterion",
  "crossbeam-channel",
  "csv",

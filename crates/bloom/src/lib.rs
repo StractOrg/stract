@@ -210,22 +210,22 @@ mod tests {
     #[test]
     fn test_bloom_filter_bytes() {
         let mut bf = BytesBloomFilter::new(100, 0.01);
-        bf.insert(&1u64.to_be_bytes());
-        bf.insert(&2u64.to_be_bytes());
-        bf.insert(&3u64.to_be_bytes());
-        bf.insert(&4u64.to_be_bytes());
-        bf.insert(&5u64.to_be_bytes());
+        bf.insert(&1u64.to_le_bytes());
+        bf.insert(&2u64.to_le_bytes());
+        bf.insert(&3u64.to_le_bytes());
+        bf.insert(&4u64.to_le_bytes());
+        bf.insert(&5u64.to_le_bytes());
 
-        assert!(bf.contains(&1u64.to_be_bytes()));
-        assert!(bf.contains(&2u64.to_be_bytes()));
-        assert!(bf.contains(&3u64.to_be_bytes()));
-        assert!(bf.contains(&4u64.to_be_bytes()));
-        assert!(bf.contains(&5u64.to_be_bytes()));
-        assert!(!bf.contains(&6u64.to_be_bytes()));
-        assert!(!bf.contains(&7u64.to_be_bytes()));
-        assert!(!bf.contains(&8u64.to_be_bytes()));
-        assert!(!bf.contains(&9u64.to_be_bytes()));
-        assert!(!bf.contains(&10u64.to_be_bytes()));
+        assert!(bf.contains(&1u64.to_le_bytes()));
+        assert!(bf.contains(&2u64.to_le_bytes()));
+        assert!(bf.contains(&3u64.to_le_bytes()));
+        assert!(bf.contains(&4u64.to_le_bytes()));
+        assert!(bf.contains(&5u64.to_le_bytes()));
+        assert!(!bf.contains(&6u64.to_le_bytes()));
+        assert!(!bf.contains(&7u64.to_le_bytes()));
+        assert!(!bf.contains(&8u64.to_le_bytes()));
+        assert!(!bf.contains(&9u64.to_le_bytes()));
+        assert!(!bf.contains(&10u64.to_le_bytes()));
     }
 
     #[test]

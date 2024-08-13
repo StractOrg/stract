@@ -121,7 +121,7 @@ where
 
     async fn send_without_timeout(&mut self, request: &Req) -> Result<Res> {
         self.awaiting_res = true;
-        let bytes = bincode::encode_to_vec(request, bincode::config::standard()).unwrap();
+        let bytes = bincode::encode_to_vec(request, common::bincode_config()).unwrap();
 
         let header = Header {
             body_size: bytes.len(),
@@ -147,7 +147,7 @@ where
         self.stream.flush().await?;
 
         tracing::debug!("deserializing {:?}", std::any::type_name::<(Req, Res)>());
-        let (res, _) = bincode::decode_from_slice(&buf, bincode::config::standard()).unwrap();
+        let (res, _) = bincode::decode_from_slice(&buf, common::bincode_config()).unwrap();
 
         self.awaiting_res = false;
 
@@ -249,7 +249,7 @@ where
 
         self.stream.read_exact(&mut buf).await?;
 
-        let (body, _) = bincode::decode_from_slice(&buf, bincode::config::standard()).unwrap();
+        let (body, _) = bincode::decode_from_slice(&buf, common::bincode_config()).unwrap();
 
         Ok(Request {
             conn: self,
@@ -268,7 +268,7 @@ where
     Res: bincode::Encode,
 {
     async fn respond_without_timeout(self, response: Res) -> Result<()> {
-        let bytes = bincode::encode_to_vec(&response, bincode::config::standard()).unwrap();
+        let bytes = bincode::encode_to_vec(&response, common::bincode_config()).unwrap();
         let header = Header {
             body_size: bytes.len(),
         };

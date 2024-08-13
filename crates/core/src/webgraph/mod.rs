@@ -438,6 +438,7 @@ pub mod tests {
     use crate::webpage::html::links::RelFlags;
 
     use super::*;
+    use proptest::prelude::*;
 
     pub fn test_edges() -> Vec<(Node, Node, String)> {
         vec![
@@ -545,6 +546,13 @@ pub mod tests {
 
         assert_eq!(
             graph.distances(Node::from("A")).get(&Node::from("H")),
+            Some(&7)
+        );
+
+        assert_eq!(
+            graph
+                .reversed_distances(Node::from("H"))
+                .get(&Node::from("A")),
             Some(&7)
         );
     }
@@ -709,6 +717,27 @@ pub mod tests {
                 .len(),
             4
         );
+
+        assert_eq!(
+            graph
+                .ingoing_edges(Node::from("B"), EdgeLimit::Unlimited)
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            graph
+                .ingoing_edges(Node::from("C"), EdgeLimit::Unlimited)
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            graph
+                .ingoing_edges(Node::from("D"), EdgeLimit::Unlimited)
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -745,6 +774,162 @@ pub mod tests {
                 .len(),
             4
         );
+
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("B"), EdgeLimit::Unlimited)
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("C"), EdgeLimit::Unlimited)
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            graph
+                .outgoing_edges(Node::from("D"), EdgeLimit::Unlimited)
+                .len(),
+            1
+        );
+    }
+
+    proptest! {
+        #[test]
+        fn prop_merge(
+            nodes in
+            proptest::collection::vec(
+                ("[a-z]", "[a-z]"), 0..100
+            )
+        ) {
+            let mut graphs = Vec::new();
+                let mut wrt = WebgraphWriter::new(
+                    crate::gen_temp_path(),
+                    Executor::single_thread(),
+                    Compression::default(),
+                    None,
+                );
+            for (from, to) in nodes.clone() {
+                wrt.insert(Node::new_for_test(from.as_str()), Node::new_for_test(to.as_str()), String::new(), RelFlags::default());
+
+                if rand::random::<usize>() % 10 == 0 {
+                    graphs.push(wrt.finalize());
+                    wrt = WebgraphWriter::new(
+                        crate::gen_temp_path(),
+                        Executor::single_thread(),
+                        Compression::default(),
+                        None,
+                    );
+                }
+            }
+
+            if graphs.is_empty() {
+                return Ok(());
+            }
+
+            graphs.push(wrt.finalize());
+
+            let mut graph = graphs.pop().unwrap();
+
+
+            for other in graphs {
+                graph.merge(other).unwrap();
+            }
+
+            graph.merge_all_segments(Compression::default()).unwrap();
+
+            for (from, to) in nodes {
+                if from == to {
+                    continue;
+                }
+
+                let from = Node::new_for_test(from.as_str());
+                let to = Node::new_for_test(to.as_str());
+
+                let outgoing = graph.outgoing_edges(from.clone(), EdgeLimit::Unlimited);
+                let ingoing = graph.ingoing_edges(to.clone(), EdgeLimit::Unlimited);
+
+                prop_assert!(outgoing.iter().any(|e| e.to == to));
+                prop_assert!(ingoing.iter().any(|e| e.from == from));
+            }
+        }
+    }
+
+    fn proptest_case(nodes: &[(&str, &str)]) {
+        let mut graphs = Vec::new();
+        let mut wrt = WebgraphWriter::new(
+            crate::gen_temp_path(),
+            Executor::single_thread(),
+            Compression::default(),
+            None,
+        );
+
+        for (i, (from, to)) in nodes.iter().enumerate() {
+            wrt.insert(
+                Node::new_for_test(from),
+                Node::new_for_test(to),
+                String::new(),
+                RelFlags::default(),
+            );
+
+            if i % 2 == 0 {
+                graphs.push(wrt.finalize());
+                wrt = WebgraphWriter::new(
+                    crate::gen_temp_path(),
+                    Executor::single_thread(),
+                    Compression::default(),
+                    None,
+                );
+            }
+        }
+
+        graphs.push(wrt.finalize());
+
+        let mut graph = graphs.pop().unwrap();
+
+        for other in graphs {
+            graph.merge(other).unwrap();
+        }
+
+        graph.merge_all_segments(Compression::default()).unwrap();
+
+        for (from, to) in nodes {
+            if from == to {
+                continue;
+            }
+
+            let from = Node::new_for_test(from);
+            let to = Node::new_for_test(to);
+
+            let outgoing = graph.outgoing_edges(from.clone(), EdgeLimit::Unlimited);
+            let ingoing = graph.ingoing_edges(to.clone(), EdgeLimit::Unlimited);
+
+            assert!(outgoing.iter().any(|e| e.to == to));
+            assert!(ingoing.iter().any(|e| e.from == from));
+        }
+    }
+
+    #[test]
+    fn merge_proptest_case1() {
+        let nodes = [("k", "d"), ("k", "t"), ("y", "m")];
+        proptest_case(&nodes);
+    }
+
+    #[test]
+    fn merge_proptest_case2() {
+        let nodes = [("i", "k"), ("k", "g"), ("y", "m"), ("q", "r"), ("e", "g")];
+
+        proptest_case(&nodes);
+    }
+
+    #[test]
+    fn merge_proptest_case3() {
+        let nodes = [("h", "c"), ("r", "r")];
+
+        proptest_case(&nodes);
     }
 
     #[test]

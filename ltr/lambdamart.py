@@ -13,10 +13,12 @@ param_grid = {
     "verbosity": [-1],
     "metric": ["ndcg"],
     "ndcg_at": [[1, 2, 3, 5, 10]],
-    "learning_rate": [0.025],
-    "max_depth": [-1, 2, 4, 8],
-    "num_leaves": [7, 15, 31],
-    "lambda_l2": [0.1, 0.5, 1.0],
+    "learning_rate": [0.003],
+    # "max_depth": [-1, 2, 4, 8],
+    "max_depth": [-1],
+    # "num_leaves": [7, 15, 31],
+    "num_leaves": [31],
+    "lambda_l2": [1.0, 1.5, 2.0],
     "linear_tree": [False],
 }
 
@@ -149,10 +151,10 @@ for param in params:
     scores = []
 
     for metric, vals in res.items():
-        if metric in ['cvbooster']:
+        if metric in ["cvbooster"]:
             continue
 
-        if 'stdv' in metric:
+        if "stdv" in metric:
             continue
         scores.append(vals[0])
 
@@ -188,7 +190,11 @@ print()
 print("Feature importance:")
 pprint(
     sorted(
-        [(id2feature[i], v) for i, v in enumerate(booster.feature_importance()) if v > 0],
+        [
+            (id2feature[i], v)
+            for i, v in enumerate(booster.feature_importance())
+            if v > 0
+        ],
         key=lambda x: x[1],
         reverse=True,
     )

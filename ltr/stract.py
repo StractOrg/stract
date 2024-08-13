@@ -4,6 +4,7 @@ import requests
 API = "http://localhost:3000/beta/api/search"
 NUM_RESULTS_PER_QUERY = 20
 
+
 def simplify_snippet(snippet):
     if "text" not in snippet:
         return ""
@@ -15,7 +16,7 @@ def search(query, page=0):
     payload = {
         "query": query,
         "numResults": NUM_RESULTS_PER_QUERY,
-        'page': page,
+        "page": page,
         "returnRankingSignals": True,
     }
 

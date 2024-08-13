@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{ops::Add, sync::Arc};
 
 use crate::{
     collector::{self, BucketCollector},
@@ -25,7 +25,7 @@ use crate::{
 
 use super::{
     models::lambdamart::{self, LambdaMART},
-    SignalCoefficient, SignalEnum, SignalScore,
+    InboundSimilarity, SignalCoefficient, SignalEnum, SignalScore,
 };
 
 mod scorers;
@@ -105,7 +105,13 @@ impl<T: RankableWebpage> RankingStage<T> {
                         .map(|(signal, score)| self.coefficients.get(&signal) * score)
                         .sum()
                 } else {
-                    coeff * model.predict(signals)
+                    signals
+                        .get(InboundSimilarity.into())
+                        .copied()
+                        .unwrap_or(0.0)
+                        .add(1.0)
+                        * coeff
+                        * model.predict(signals)
                 }
             }
             None => signals

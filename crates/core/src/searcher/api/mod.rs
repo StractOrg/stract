@@ -198,7 +198,7 @@ where
     T: Graph,
 {
     async fn batch_ingoing(&self, nodes: &[webgraph::NodeID]) -> Vec<Vec<webgraph::NodeID>> {
-        self.batch_raw_ingoing(nodes, EdgeLimit::Limit(128))
+        self.batch_raw_ingoing(nodes, EdgeLimit::Limit(4096))
             .await
             .into_iter()
             .map(|edges| edges.into_iter().map(|edge| edge.from.node()).collect())

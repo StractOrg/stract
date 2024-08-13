@@ -83,7 +83,7 @@ impl<F: Frequency> InnerUserCount<F> {
         // It is first hashed with a salt for good measure, and then we only use
         // the id for a probabilistic count using hyperloglog.
         self.maybe_reset();
-        let bytes = bincode::encode_to_vec(user_id, bincode::config::standard())?;
+        let bytes = bincode::encode_to_vec(user_id, common::bincode_config())?;
         let mut hash = [0u8; digest::SHA512_OUTPUT_LEN];
 
         pbkdf2::derive(

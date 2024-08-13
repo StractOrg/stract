@@ -96,11 +96,11 @@ fn entity_to_tantivy(entity: Entity, schema: &tantivy::schema::Schema) -> Tantiv
     );
     doc.add_bytes(
         schema.get_field("info").unwrap(),
-        &bincode::encode_to_vec(&entity.info, bincode::config::standard()).unwrap(),
+        &bincode::encode_to_vec(&entity.info, common::bincode_config()).unwrap(),
     );
     doc.add_bytes(
         schema.get_field("links").unwrap(),
-        &bincode::encode_to_vec(&entity.page_abstract.links, bincode::config::standard()).unwrap(),
+        &bincode::encode_to_vec(&entity.page_abstract.links, common::bincode_config()).unwrap(),
     );
     let has_image = if entity.image.is_some() {
         "true"
@@ -346,7 +346,7 @@ impl EntityIndex {
         let info = if decode_info {
             let (info, _) = bincode::decode_from_slice(
                 doc.get_first(info).and_then(|val| val.as_bytes()).unwrap(),
-                bincode::config::standard(),
+                common::bincode_config(),
             )
             .unwrap();
 
@@ -383,7 +383,7 @@ impl EntityIndex {
         let links: Vec<Link> = if get_links {
             let (links, _) = bincode::decode_from_slice(
                 doc.get_first(links).and_then(|val| val.as_bytes()).unwrap(),
-                bincode::config::standard(),
+                common::bincode_config(),
             )
             .unwrap();
 
