@@ -233,6 +233,8 @@ pub async fn router(
         let host_webgraph = Arc::new(host_webgraph);
         let page_webgraph = Arc::new(page_webgraph);
 
+        searcher = searcher.with_webgraph(Arc::clone(&host_webgraph));
+
         let similar_hosts =
             SimilarHostsFinder::new(Arc::clone(&host_webgraph), config.max_similar_hosts);
 

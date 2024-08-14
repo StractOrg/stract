@@ -34,6 +34,8 @@ mod stages;
 pub use scorers::{ReRanker, Recall, Scorer};
 pub use stages::{LocalRecallRankingWebpage, PrecisionRankingWebpage, RecallRankingWebpage};
 
+const INBOUND_SIMILARITY_SMOOTHING: f64 = 8.0;
+
 pub trait RankableWebpage: collector::Doc + Send + Sync {
     fn set_score(&mut self, score: f64);
     fn boost(&self) -> Option<f64>;
@@ -109,7 +111,7 @@ impl<T: RankableWebpage> RankingStage<T> {
                         .get(InboundSimilarity.into())
                         .copied()
                         .unwrap_or(0.0)
-                        .add(1.0)
+                        .add(INBOUND_SIMILARITY_SMOOTHING)
                         * coeff
                         * model.predict(signals)
                 }
