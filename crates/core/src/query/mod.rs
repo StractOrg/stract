@@ -1175,6 +1175,169 @@ mod tests {
         assert_eq!(result.webpages.len(), 1);
     }
 
+    #[test]
+    fn exact_url_operator() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.first.com/example",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.third.io",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+
+        let query = SearchQuery {
+            query: "test exacturl:https://www.first.com/example".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+
+        let query = SearchQuery {
+            query: "test exacturl:https://www.first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 0);
+    }
+
+    #[test]
+    fn mix_phrase_term_query() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.first.com/example",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.second.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test test</title>
+                            </head>
+                            <body>
+                                This is a test website {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.third.io",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::from(index);
+
+        let query = SearchQuery {
+            query: "\"test test\" website".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 2);
+    }
+
     fn fixture(query: &str) -> Result<(), TestCaseError> {
         if query.trim().is_empty() {
             return Ok(());

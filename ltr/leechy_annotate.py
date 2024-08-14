@@ -34,6 +34,9 @@ unannotated_queries = db.get_unannotated_queries()
 
 eng = leechy.Engine()
 for qid, query in tqdm(unannotated_queries.items()):
+    if query not in all_queries:
+        continue
+
     tqdm.write(query)
     leechy_results = []
 

@@ -80,11 +80,18 @@ impl Html {
             robots: None,
         };
 
-        if let Some(canonical) = res.canonical_url() {
-            if canonical.root_domain() == res.url.root_domain() {
-                res.url = canonical;
-            }
-        }
+        // TODO: need to figure out when to respect
+        // the canonical url, it's not always the case that
+        // the website use the tag correctly.
+        // for instance, https://www.elastic.co/CN/blog/author/brian-bergholm
+        // has a canonical url to https://www.elastic.co/ but it's not the
+        // same content.
+        //
+        // if let Some(canonical) = res.canonical_url() {
+        //     if canonical.root_domain() == res.url.root_domain() {
+        //         res.url = canonical;
+        //     }
+        // }
 
         res.url.normalize_in_place();
         res.robots = res.parse_robots_meta();
@@ -983,6 +990,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn canonical_url() {
         let html = Html::parse(
             r#"

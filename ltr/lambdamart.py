@@ -14,6 +14,7 @@ param_grid = {
     "metric": ["ndcg"],
     "ndcg_at": [[1, 2, 3, 5, 10]],
     "learning_rate": [0.003],
+    # "num_iterations": [100],
     # "max_depth": [-1, 2, 4, 8],
     "max_depth": [-1],
     # "num_leaves": [7, 15, 31],
@@ -22,6 +23,11 @@ param_grid = {
     "linear_tree": [False],
 }
 
+
+accepted_queries = set()
+with open("data/queries_us.csv") as f:
+    for query in f.readlines():
+        accepted_queries.add(query.strip().lower())
 
 con = sqlite3.connect("data/auto-ranking-annotation.sqlite")
 cur = con.cursor()
@@ -36,6 +42,11 @@ res = cur.execute(
 """
 )
 queries = {qid: {"query": query} for qid, query in res.fetchall()}
+qids = list(queries.keys())
+
+for qid in qids:
+    if not queries[qid]["query"].lower() in accepted_queries:
+        del queries[qid]
 
 for qid in queries:
     res = cur.execute(

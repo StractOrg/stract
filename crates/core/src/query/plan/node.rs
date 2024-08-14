@@ -116,8 +116,7 @@ impl Node {
                     .reduce(|left, right| left.or(right))
                     .expect("fields should not be empty"),
                 SimpleOrPhrase::Phrase(p) => TextFieldEnum::all()
-                    .filter(|f| f.is_searchable())
-                    .filter(|f| f.is_phrase_searchable())
+                    .filter(|f| f.is_searchable() && f.is_phrase_searchable())
                     .map(|field| {
                         Node::Term(Term {
                             text: SimpleOrPhrase::Phrase(p.clone()),

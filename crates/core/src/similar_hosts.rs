@@ -75,7 +75,7 @@ impl SimilarHostsFinder {
 
         let in_edges = self
             .webgraph
-            .batch_raw_ingoing_edges(&nodes, EdgeLimit::Limit(128))
+            .batch_raw_ingoing_edges(&nodes, EdgeLimit::Limit(64))
             .await
             .unwrap_or_default();
 
@@ -88,7 +88,7 @@ impl SimilarHostsFinder {
 
         let outgoing_edges = self
             .webgraph
-            .batch_raw_outgoing_edges(&backlink_nodes, EdgeLimit::Limit(4096))
+            .batch_raw_outgoing_edges(&backlink_nodes, EdgeLimit::Limit(512))
             .await
             .unwrap_or_default();
 

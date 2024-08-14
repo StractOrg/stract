@@ -123,7 +123,13 @@ fn exact_url(orig_input: &str) -> nom::IResult<&str, Term> {
     let (input, _) = nom::bytes::complete::tag("exacturl:")(orig_input)?;
     let (input, output) = simple_str(input)?;
 
-    match url::Url::parse(output) {
+    let url = if output.starts_with("http://") || output.starts_with("https://") {
+        url::Url::parse(output)
+    } else {
+        url::Url::parse(&format!("https://{}", output))
+    };
+
+    match url {
         Ok(url) => Ok((input, Term::ExactUrl(url.normalize().to_string()))),
         Err(_) => Err(nom::Err::Error(nom::error::Error::new(
             orig_input,

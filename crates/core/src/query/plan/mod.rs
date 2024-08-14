@@ -242,7 +242,7 @@ pub fn initial(terms: Vec<super::Term>) -> Option<Node> {
         let mut adjacent = Vec::new();
 
         if augment_with_adjacent {
-            if let super::Term::SimpleOrPhrase(_) = &term {
+            if let super::Term::SimpleOrPhrase(SimpleOrPhrase::Simple(_)) = &term {
                 for window_size in 2..=3 {
                     for (start, end) in sliding_window(window_size, i) {
                         let mut compounds = Vec::new();
