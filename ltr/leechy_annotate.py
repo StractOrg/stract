@@ -9,23 +9,30 @@ import sys
 NUM_LABELS = 4
 
 with open("data/queries_us.csv") as f:
-    all_queries = [line.strip() for line in f.readlines()]
+    all_queries = []
+    for query in [line.strip() for line in f.readlines()]:
+        if len(query) < 3:
+            continue
+
+        # check if query has large percentage of non-alphanumeric characters
+        if sum([c.isalnum() for c in query]) / len(query) < 0.5:
+            continue
+
+        if len(query) > 100:
+            continue
+
+        if len(query.split()) <= 1:
+            continue
+
+        all_queries.append(query)
 
 # shuffle queries
+
 np.random.shuffle(all_queries)
 
 db = Db("data/auto-ranking-annotation.sqlite")
 
 for query in all_queries:
-    if len(query) < 3:
-        continue
-
-    # check if query has large percentage of non-alphanumeric characters
-    if sum([c.isalnum() for c in query]) / len(query) < 0.5:
-        continue
-
-    if len(query) > 100:
-        continue
 
     db.add_query(query)
 

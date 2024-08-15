@@ -13,13 +13,13 @@ param_grid = {
     "verbosity": [-1],
     "metric": ["ndcg"],
     "ndcg_at": [[1, 2, 3, 5, 10]],
-    "learning_rate": [0.003],
+    # "learning_rate": [0.003],
     # "num_iterations": [100],
     # "max_depth": [-1, 2, 4, 8],
     "max_depth": [-1],
     # "num_leaves": [7, 15, 31],
-    "num_leaves": [31],
-    "lambda_l2": [1.0, 1.5, 2.0],
+    "num_leaves": [63],
+    "lambda_l2": [2.0, 2.5],
     "linear_tree": [False],
 }
 
@@ -27,7 +27,8 @@ param_grid = {
 accepted_queries = set()
 with open("data/queries_us.csv") as f:
     for query in f.readlines():
-        accepted_queries.add(query.strip().lower())
+        if len(query.strip()) > 1:
+            accepted_queries.add(query.strip().lower())
 
 con = sqlite3.connect("data/auto-ranking-annotation.sqlite")
 cur = con.cursor()

@@ -12,7 +12,7 @@ import stract
 
 ELO_K = 32
 ELO_SCALE = 400
-ELO_ROUNDS_MULT = 5
+ELO_ROUNDS_MULT = 7
 NUM_LABELS = 4
 
 PROMPT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -21,6 +21,7 @@ You are a helpful, smart, kind, and efficient AI assistant. You always fulfill t
 
 Think about this step-by-step. You are a search engine evaluator and your task is to evaluate search results based on how well the result matches the query
 You will be shown two results for each query and most choose which result is best for the users query. A good result most answer the users query and come from an authoritative source.
+A good result should be in the same language as the query or in english.
 To choose the best result, write "Best: RESULT_A" or "Best: RESULT_B". Before choosing the best result, you should first evaluate the relevance of each result to the query.
 
 Query: "{}"
@@ -59,24 +60,11 @@ np.random.shuffle(all_queries)
 db = Db("data/auto-ranking-annotation.sqlite")
 
 for query in all_queries:
-    if len(query) < 3:
-        continue
-
-    # check if query has large percentage of non-alphanumeric characters
-    if sum([c.isalnum() for c in query]) / len(query) < 0.5:
-        continue
-
-    # only consider queries with at least two words
-    if len(query.split()) < 2:
-        continue
-
-    if len(query) > 100:
-        continue
-
     db.add_query(query)
 
 
 unannotated_queries = db.get_unannotated_queries()
+
 
 def add_results(qid, query):
     results = stract.search(query)
@@ -103,6 +91,7 @@ def get_best(res):
         return 0
     return None
 
+
 def elo_update(winner, loser, elo):
     p_winner = 1 / (1 + 10 ** ((elo[loser] - elo[winner]) / ELO_SCALE))
     p_loser = 1 - p_winner
@@ -120,11 +109,19 @@ for qid, query in tqdm(unannotated_queries.items()):
     elo = {url: ELO_SCALE // 2 for url, _, _ in unnanotated_results}
 
     for _ in tqdm(range(0, ELO_ROUNDS_MULT * len(unnanotated_results))):
-        (url_a, _, json_a), (url_b, _, json_b)= random.sample(unnanotated_results, 2)
+        (url_a, _, json_a), (url_b, _, json_b) = random.sample(unnanotated_results, 2)
 
         webpage_a = json.loads(json_a)
         webpage_b = json.loads(json_b)
-        prompt = get_prompt(query, url_a, webpage_a["title"], webpage_a["snippet"], url_b, webpage_b["title"], webpage_b["snippet"])
+        prompt = get_prompt(
+            query,
+            url_a,
+            webpage_a["title"],
+            webpage_a["snippet"],
+            url_b,
+            webpage_b["title"],
+            webpage_b["snippet"],
+        )
         output = llm.create_completion(
             prompt,
             max_tokens=1024,
@@ -147,11 +144,15 @@ for qid, query in tqdm(unannotated_queries.items()):
     elo = [{"url": url} for url, _ in elo]
 
     for i in range(len(elo)):
-        elo[i]['label'] = NUM_LABELS - int(np.log2(i + 1))
+        elo[i]["label"] = NUM_LABELS - int(np.log2(i + 1))
 
-    print(query)
-    pprint(elo)
+    tqdm.write(query)
+
     for website in elo:
-        url = website['url']
-        relevancy = website['label']
+        tqdm.write(f"{website['url']} - {website['label']}")
+    tqdm.write("")
+
+    for website in elo:
+        url = website["url"]
+        relevancy = website["label"]
         db.annotate(qid, url, relevancy)

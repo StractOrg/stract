@@ -37,7 +37,7 @@ mod leechy {
     #[pymethods]
     impl Engine {
         #[new]
-        #[pyo3(signature = (name = "startpage"))]
+        #[pyo3(signature = (name = "google"))]
         fn new(name: &str) -> PyResult<Self> {
             match lchy::Engine::by_name(name) {
                 Some(engine) => Ok(Self { inner: engine }),

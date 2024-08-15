@@ -2,3 +2,8 @@
 name = "startpage"
 search = "https://www.startpage.com/sp/search?q={query}&qsr=en_US"
 xpath = "./div[contains(@class, 'result')]/a"
+
+[[engines]]
+name = "google"
+search = "https://www.google.com/search?q={query}&udm=14&hl=en-US"
+xpath = "./div[contains(@jscontroller, 'SC7lYd')]/./a[contains(@jsname, 'UWckNb')]"
