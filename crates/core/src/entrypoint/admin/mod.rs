@@ -114,3 +114,15 @@ pub async fn top_keyphrases(top: usize) -> Result<()> {
 
     Ok(())
 }
+
+pub async fn index_size() -> Result<()> {
+    let config = Config::load()?;
+    let mut conn: sonic::service::Connection<api::ManagementService> =
+        sonic::service::Connection::create(config.host).await?;
+
+    let size: api::SizeResponse = conn.send_without_timeout(api::Size).await?;
+
+    println!("Number of pages in index: {}", size.pages);
+
+    Ok(())
+}

@@ -206,6 +206,10 @@ impl InvertedIndex {
         self.tantivy_index.searchable_segments().unwrap().len()
     }
 
+    pub fn num_documents(&self) -> u64 {
+        self.reader.searcher().num_docs()
+    }
+
     #[cfg(test)]
     pub fn temporary() -> Result<Self> {
         let path = crate::gen_temp_path();

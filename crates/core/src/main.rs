@@ -150,9 +150,22 @@ enum AmpcOptions {
 
 #[derive(Subcommand)]
 enum AdminOptions {
-    Init { host: SocketAddr },
+    Init {
+        host: SocketAddr,
+    },
     Status,
-    TopKeyphrases { top: usize },
+    TopKeyphrases {
+        top: usize,
+    },
+
+    #[clap(subcommand)]
+    Index(AdminIndexOptions),
+}
+
+#[derive(Subcommand)]
+enum AdminIndexOptions {
+    /// Get the size of the index
+    Size,
 }
 
 #[derive(Subcommand)]
@@ -496,6 +509,15 @@ fn main() -> Result<()> {
                     .build()?
                     .block_on(entrypoint::admin::top_keyphrases(top))?;
             }
+
+            AdminOptions::Index(index_options) => match index_options {
+                AdminIndexOptions::Size => {
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()?
+                        .block_on(entrypoint::admin::index_size())?;
+                }
+            },
         },
     }
 

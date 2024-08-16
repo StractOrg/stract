@@ -30,9 +30,11 @@ use crate::{
     inverted_index::{self, KeyPhrase, RetrievedWebpage},
     models::dual_encoder::DualEncoder,
     ranking::models::{lambdamart::LambdaMART, linear::LinearRegression},
-    searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
+    searcher::{InitialWebsiteResult, LocalSearcher, SearchGuard, SearchQuery, SearchableIndex},
     Result,
 };
+
+use super::api::{Size, SizeResponse};
 
 sonic_service!(
     SearchService,
@@ -42,6 +44,7 @@ sonic_service!(
         GetWebpage,
         GetHomepageDescriptions,
         TopKeyPhrases,
+        Size,
     ]
 );
 
@@ -172,6 +175,20 @@ pub async fn run(config: config::SearchServerConfig) -> Result<()> {
     loop {
         if let Err(e) = server.accept().await {
             tracing::error!("{:?}", e);
+        }
+    }
+}
+
+impl sonic::service::Message<SearchService> for Size {
+    type Response = SizeResponse;
+    async fn handle(self, server: &SearchService) -> Self::Response {
+        SizeResponse {
+            pages: server
+                .local_searcher
+                .index()
+                .guard()
+                .inverted_index()
+                .num_documents(),
         }
     }
 }
