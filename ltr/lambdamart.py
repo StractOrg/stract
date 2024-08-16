@@ -19,7 +19,7 @@ param_grid = {
     "max_depth": [-1],
     # "num_leaves": [7, 15, 31],
     "num_leaves": [63],
-    "lambda_l2": [2.0, 2.5],
+    "lambda_l2": [2.5],
     "linear_tree": [False],
 }
 

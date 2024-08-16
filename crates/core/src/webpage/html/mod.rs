@@ -156,16 +156,35 @@ impl Html {
     }
 
     pub fn title(&self) -> Option<String> {
-        if let Some(title) = self.root.select_first("title") {
-            let title = title.text_contents().trim().to_string();
-            if title.is_empty() {
-                None
-            } else {
-                Some(title)
+        let mut preprocessor =
+            super::just_text::Preprocessor::new(["script", "style", "embed", "iframe", "svg"]);
+
+        for edge in self.root.traverse() {
+            preprocessor.update(&edge);
+
+            if preprocessor.is_inside_removed() {
+                continue;
             }
-        } else {
-            None
+
+            if let kuchiki::iter::NodeEdge::Start(node) = edge {
+                if let Some(title) = node.as_element().and_then(|e| {
+                    if &e.name.local == "title" {
+                        let title = node.text_contents().trim().to_string();
+                        if !title.is_empty() {
+                            Some(title)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }) {
+                    return Some(title);
+                }
+            }
         }
+
+        None
     }
 
     pub fn url(&self) -> &Url {
@@ -565,6 +584,29 @@ mod tests {
         let webpage = Html::parse(&raw, "https://www.example.com/whatever").unwrap();
 
         assert_eq!(webpage.title(), None);
+    }
+
+    #[test]
+    fn title_in_svg() {
+        let raw = format!(
+            r#"
+            <html>
+                <head>
+                    <svg>
+                        <title>SVG title</title>
+                    </svg>
+                    <title>Best website</title>
+                </head>
+                <body>
+                    <p>{CONTENT}</p>
+                </body>
+            </html>
+        "#
+        );
+
+        let webpage = Html::parse(&raw, "https://www.example.com/whatever").unwrap();
+
+        assert_eq!(webpage.title(), Some("Best website".to_string()));
     }
 
     #[test]

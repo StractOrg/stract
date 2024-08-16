@@ -239,8 +239,9 @@ impl JustText {
     pub fn paragraphs(root: NodeRef) -> Vec<Paragraph> {
         let mut res = Vec::new();
 
-        let mut preprocessor =
-            Preprocessor::new(["script", "style", "embed", "head", "noscript", "iframe"]);
+        let mut preprocessor = Preprocessor::new([
+            "script", "style", "embed", "head", "noscript", "iframe", "svg",
+        ]);
 
         let mut br = false;
         let mut link = false;
