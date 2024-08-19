@@ -76,7 +76,7 @@ for qid, query in tqdm(unannotated_queries.items()):
         db.annotate(qid, result, label)
 
     for page in range(2, 2 + 1):
-        bad_results = stract.search(query, page=page)
+        bad_results = stract.search(query, page)
 
         for i, result in enumerate(bad_results):
             if result["url"] in leechy_results:

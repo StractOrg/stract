@@ -108,7 +108,7 @@ fn score_region(webpage_region: crate::webpage::Region, computer: &SignalCompute
 pub struct HostCentrality;
 impl Signal for HostCentrality {
     fn default_coefficient(&self) -> f64 {
-        2.9659120948746986
+        2.0
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -148,7 +148,7 @@ impl Signal for HostCentrality {
 pub struct HostCentralityRank;
 impl Signal for HostCentralityRank {
     fn default_coefficient(&self) -> f64 {
-        9.143798189215966
+        0.02
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -188,7 +188,7 @@ impl Signal for HostCentralityRank {
 pub struct PageCentrality;
 impl Signal for PageCentrality {
     fn default_coefficient(&self) -> f64 {
-        0.7649287808734062
+        2.0
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -228,7 +228,7 @@ impl Signal for PageCentrality {
 pub struct PageCentralityRank;
 impl Signal for PageCentralityRank {
     fn default_coefficient(&self) -> f64 {
-        5.21833938812728
+        0.02
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -268,7 +268,7 @@ impl Signal for PageCentralityRank {
 pub struct IsHomepage;
 impl Signal for IsHomepage {
     fn default_coefficient(&self) -> f64 {
-        9.266952696093686
+        0.01
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -311,7 +311,7 @@ impl Signal for IsHomepage {
 pub struct FetchTimeMs;
 impl Signal for FetchTimeMs {
     fn default_coefficient(&self) -> f64 {
-        5.116256200778887
+        0.001
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -361,7 +361,7 @@ impl Signal for FetchTimeMs {
 pub struct UpdateTimestamp;
 impl Signal for UpdateTimestamp {
     fn default_coefficient(&self) -> f64 {
-        7.287059491944903
+        0.001
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -408,7 +408,7 @@ impl Signal for UpdateTimestamp {
 pub struct TrackerScore;
 impl Signal for TrackerScore {
     fn default_coefficient(&self) -> f64 {
-        6.849809317789405
+        0.1
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -449,7 +449,7 @@ impl Signal for TrackerScore {
 pub struct Region;
 impl Signal for Region {
     fn default_coefficient(&self) -> f64 {
-        2.1051568804700302
+        0.15
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -571,7 +571,7 @@ impl Signal for LambdaMart {
 pub struct UrlDigits;
 impl Signal for UrlDigits {
     fn default_coefficient(&self) -> f64 {
-        3.3068818007086835
+        0.01
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -627,7 +627,7 @@ impl Signal for UrlDigits {
 pub struct UrlSlashes;
 impl Signal for UrlSlashes {
     fn default_coefficient(&self) -> f64 {
-        7.059663870068346
+        0.1
     }
 
     fn as_field(&self) -> Option<Field> {
