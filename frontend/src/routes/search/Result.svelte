@@ -82,6 +82,7 @@
         {/if}
         <button
           class="noscript:hidden flex w-5 min-w-fit items-center justify-center bg-transparent text-neutral hover:cursor-pointer hover:text-neutral-focus"
+          aria-label="Open modal for result number: {resultIndex}"
           bind:this={button}
           on:click|stopPropagation={() => dispatch('modal', button)}
         >

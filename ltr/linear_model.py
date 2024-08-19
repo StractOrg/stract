@@ -1,16 +1,14 @@
-import sklearn
 import numpy as np
 import json
-import random
-from sklearn.linear_model import LinearRegression, LogisticRegression
-from pprint import pprint
-import jax
-import jax.numpy as jnp
-import rax
-
-TRAIN_PERCENT = 0.8
-
 import sqlite3
+import stract
+from scipy.optimize import differential_evolution
+import random
+from pprint import pprint
+
+
+MAX_WEIGHT = 10
+NUM_QUERIES_FOR_EVAL = 40
 
 con = sqlite3.connect("data/auto-ranking-annotation.sqlite")
 cur = con.cursor()
@@ -24,7 +22,18 @@ res = cur.execute(
 		)
 """
 )
-queries = {qid: {"query": query} for qid, query in res.fetchall()}
+
+accepted_queries = set()
+with open("data/queries_us.csv") as f:
+    for query in f.readlines():
+        if len(query.strip()) > 1:
+            accepted_queries.add(query.strip().lower())
+
+queries = {
+    qid: {"query": query}
+    for qid, query in res.fetchall()
+    if query.lower() in accepted_queries
+}
 
 for qid in queries:
     res = cur.execute(
@@ -57,7 +66,6 @@ for qid in queries:
     urls = sorted(urls, key=sorting_key)
     queries[qid]["urls"] = urls
 
-
 feature2id = {}
 id2feature = {}
 
@@ -69,95 +77,67 @@ for qid, data in queries.items():
                 feature2id[feature] = id
                 id2feature[id] = feature
 
-# convert to [{ranking_signals, score}]
-scores = []
+queries = [
+    (q["query"], [u[0] for u in q["urls"] if u[1] > 0]) for q in queries.values()
+]
+queries = random.sample(queries, NUM_QUERIES_FOR_EVAL)
+pprint([q for q, _ in queries])
 
-random.shuffle(scores)
-
-sorted_features = sorted(feature2id.items(), key=lambda x: x[1])
-
-for qid, data in queries.items():
-    sum_scores = sum([score for _, score, _, _ in data["urls"]])
-    for i, (url, score, _, signals) in enumerate(data["urls"]):
-        signals = {feature2id[k]: v for k, v in signals.items()}
-
-        signals = [signals.get(k, 0) for _, k in sorted_features]
-
-        scores.append({"ranking_signals": signals, "score": score})
-
-train = scores[: int(len(scores) * TRAIN_PERCENT)]
-test = scores[int(len(scores) * TRAIN_PERCENT) :]
-
-X_train = []
-y_train = []
-for score in train:
-    X_train.append(score["ranking_signals"])
-    y_train.append(score["score"])
-
-X_test = []
-y_test = []
-for score in test:
-    X_test.append(score["ranking_signals"])
-    y_test.append(score["score"])
-
-X_train = jnp.array(X_train)
-y_train = jnp.array(y_train)
-X_test = jnp.array(X_test)
-y_test = jnp.array(y_test)
-
-# jax model
-w = jnp.zeros(X_train.shape[1])
+bounds = [(0, MAX_WEIGHT) for _ in range(len(feature2id))]
 
 
-def model(w, X):
-    return jnp.dot(X, w)
+def eval_query(query, expected_urls, weights):
+    coeffs = None
+
+    if len(weights) != 0:
+        coeffs = {id2feature[i]: w for i, w in enumerate(weights)}
+        coeffs["lambda_mart"] = 10.0
+
+    res = stract.search(query, signal_coefficients=coeffs)
+    return sum([1 for r in res if r["url"] in expected_urls])
 
 
-def loss(w, batch):
-    features, labels, mask = batch
-    # scores = model(w, features)
-    # return rax.approx_t12n(rax.mrr_metric)(scores, labels)
-
-    return ((w * features - jnp.ones_like(w)) ** 2).sum()
+cache = {}
 
 
-grad_fn = jax.jit(jax.grad(loss))
+def eval_weights(weights):
+    if tuple(weights) in cache:
+        return cache[tuple(weights)]
 
-# train
-for i in range(128):
-    batch_size = 20
-    for j in range(0, len(X_train), batch_size):
-        batch = (
-            X_train[j : j + batch_size],
-            y_train[j : j + batch_size],
-            jnp.ones(batch_size),
-        )
-        w = w - grad_fn(w, batch) * 3e-4
-        w = w.clip(0, 10)
+    _queries = queries
+    total = sum([len(urls) for _, urls in _queries])
 
+    res = sum([eval_query(q, urls, weights) for q, urls in _queries]) / total
 
-# model = LinearRegression(fit_intercept=False, positive=True)
-# model = SVR(kernel="linear")
-# model = DecisionTreeRegressor()
-# model.fit(X_train, y_train)
+    cache[tuple(weights)] = res
 
-print("TRAIN")
-for k in [1, 2, 5, 10]:
-    print(
-        f"NDCG@{k}: ", sklearn.metrics.ndcg_score([y_train], [model(w, X_train)], k=k)
-    )
-
-print()
-print("TEST")
-for k in [1, 2, 5, 10]:
-    print(f"NDCG@{k}: ", sklearn.metrics.ndcg_score([y_test], [model(w, X_test)], k=k))
+    return res
 
 
-weights = {id2feature[i]: float(v) for (i, v) in enumerate(w)}
-print()
-print("Weights:")
-for k, v in sorted(weights.items(), key=lambda x: -x[1]):
-    print(k, v)
-linear_model = {"weights": weights}
-with open("data/linear_model.json", "w") as f:
-    json.dump(linear_model, f, indent=2)
+def optim(weights):
+    res = -eval_weights(weights)
+    print("Score:", res)
+    return res
+
+
+def callback(intermediate_result):
+    pprint({id2feature[i]: w for i, w in enumerate(intermediate_result.x)})
+    print("Score:", -intermediate_result.fun)
+
+
+print("baseline", eval_weights([]))
+
+result = differential_evolution(
+    optim,
+    bounds,
+    maxiter=100,
+    popsize=1,
+    disp=False,
+    polish=False,
+    callback=callback,
+)
+
+weights = {id2feature[i]: w for i, w in enumerate(result.x)}
+
+print("Best weights")
+pprint(weights)

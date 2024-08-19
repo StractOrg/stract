@@ -12,12 +12,13 @@ def simplify_snippet(snippet):
     return "".join([f["text"] for f in snippet["text"]["fragments"]])
 
 
-def search(query, page=0):
+def search(query, num_resuts=NUM_RESULTS_PER_QUERY, page=0, signal_coefficients=None):
     payload = {
         "query": query,
-        "numResults": NUM_RESULTS_PER_QUERY,
+        "numResults": num_resuts,
         "page": page,
         "returnRankingSignals": True,
+        "signalCoefficients": signal_coefficients,
     }
 
     return [

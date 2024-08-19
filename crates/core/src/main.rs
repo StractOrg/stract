@@ -210,13 +210,13 @@ enum SafetyClassifierOptions {
 
 #[derive(Subcommand)]
 enum CentralityMode {
-    /// Calculate metrics for the host webgraph.
-    Host {
+    /// Calculate harmonic centrality for the webgraph.
+    Harmonic {
         webgraph_path: String,
         output_path: String,
     },
-    /// Calculate metrics for the page webgraph.
-    Page {
+    /// Calculate approximate harmonic centrality for the page webgraph.
+    ApproxHarmonic {
         webgraph_path: String,
         output_path: String,
     },
@@ -324,13 +324,13 @@ fn main() -> Result<()> {
         },
         Commands::Centrality { mode } => {
             match mode {
-                CentralityMode::Host {
+                CentralityMode::Harmonic {
                     webgraph_path,
                     output_path,
                 } => {
                     entrypoint::Centrality::build_harmonic(&webgraph_path, &output_path);
                 }
-                CentralityMode::Page {
+                CentralityMode::ApproxHarmonic {
                     webgraph_path,
                     output_path,
                 } => entrypoint::Centrality::build_approx_harmonic(webgraph_path, output_path)?,
