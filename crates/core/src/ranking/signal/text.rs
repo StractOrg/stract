@@ -35,7 +35,7 @@ use super::{Signal, SignalComputer};
 pub struct Bm25F;
 impl Signal for Bm25F {
     fn default_coefficient(&self) -> f64 {
-        0.1
+        0.1820132194220756
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -102,7 +102,7 @@ impl Signal for Bm25Title {
 pub struct Bm25TitleBigrams;
 impl Signal for Bm25TitleBigrams {
     fn default_coefficient(&self) -> f64 {
-        0.005
+        8.891498184948324
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -134,7 +134,7 @@ impl Signal for Bm25TitleBigrams {
 pub struct Bm25TitleTrigrams;
 impl Signal for Bm25TitleTrigrams {
     fn default_coefficient(&self) -> f64 {
-        0.005
+        7.271941728505791
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -166,7 +166,7 @@ impl Signal for Bm25TitleTrigrams {
 pub struct Bm25CleanBody;
 impl Signal for Bm25CleanBody {
     fn default_coefficient(&self) -> f64 {
-        0.005
+        6.176695902218496
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -198,7 +198,7 @@ impl Signal for Bm25CleanBody {
 pub struct Bm25CleanBodyBigrams;
 impl Signal for Bm25CleanBodyBigrams {
     fn default_coefficient(&self) -> f64 {
-        0.005
+        2.2352412543414357
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -230,7 +230,7 @@ impl Signal for Bm25CleanBodyBigrams {
 pub struct Bm25CleanBodyTrigrams;
 impl Signal for Bm25CleanBodyTrigrams {
     fn default_coefficient(&self) -> f64 {
-        0.005
+        6.800453858962986
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -262,7 +262,7 @@ impl Signal for Bm25CleanBodyTrigrams {
 pub struct Bm25StemmedTitle;
 impl Signal for Bm25StemmedTitle {
     fn default_coefficient(&self) -> f64 {
-        0.003
+        5.747253223706083
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -294,7 +294,7 @@ impl Signal for Bm25StemmedTitle {
 pub struct Bm25StemmedCleanBody;
 impl Signal for Bm25StemmedCleanBody {
     fn default_coefficient(&self) -> f64 {
-        0.001
+        2.77296645471509
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -358,7 +358,7 @@ impl Signal for Bm25AllBody {
 pub struct Bm25Keywords;
 impl Signal for Bm25Keywords {
     fn default_coefficient(&self) -> f64 {
-        0.001
+        2.385257402981021
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -390,7 +390,7 @@ impl Signal for Bm25Keywords {
 pub struct Bm25BacklinkText;
 impl Signal for Bm25BacklinkText {
     fn default_coefficient(&self) -> f64 {
-        0.003
+        0.15795085970840717
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -422,7 +422,7 @@ impl Signal for Bm25BacklinkText {
 pub struct IdfSumUrl;
 impl Signal for IdfSumUrl {
     fn default_coefficient(&self) -> f64 {
-        0.0006
+        4.829485047194098
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -454,7 +454,7 @@ impl Signal for IdfSumUrl {
 pub struct IdfSumSite;
 impl Signal for IdfSumSite {
     fn default_coefficient(&self) -> f64 {
-        0.00015
+        7.160439598002364
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -486,7 +486,7 @@ impl Signal for IdfSumSite {
 pub struct IdfSumDomain;
 impl Signal for IdfSumDomain {
     fn default_coefficient(&self) -> f64 {
-        0.0003
+        1.9285185409464924
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -518,7 +518,7 @@ impl Signal for IdfSumDomain {
 pub struct IdfSumSiteNoTokenizer;
 impl Signal for IdfSumSiteNoTokenizer {
     fn default_coefficient(&self) -> f64 {
-        0.00015
+        1.2430639379064399
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -550,7 +550,7 @@ impl Signal for IdfSumSiteNoTokenizer {
 pub struct IdfSumDomainNoTokenizer;
 impl Signal for IdfSumDomainNoTokenizer {
     fn default_coefficient(&self) -> f64 {
-        0.0036
+        0.7742207284655196
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -582,7 +582,7 @@ impl Signal for IdfSumDomainNoTokenizer {
 pub struct IdfSumDomainNameNoTokenizer;
 impl Signal for IdfSumDomainNameNoTokenizer {
     fn default_coefficient(&self) -> f64 {
-        0.0002
+        0.49281735909508484
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -616,7 +616,7 @@ impl Signal for IdfSumDomainNameNoTokenizer {
 pub struct IdfSumDomainIfHomepage;
 impl Signal for IdfSumDomainIfHomepage {
     fn default_coefficient(&self) -> f64 {
-        0.0004
+        4.849842977684016
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -648,7 +648,7 @@ impl Signal for IdfSumDomainIfHomepage {
 pub struct IdfSumDomainNameIfHomepageNoTokenizer;
 impl Signal for IdfSumDomainNameIfHomepageNoTokenizer {
     fn default_coefficient(&self) -> f64 {
-        0.0036
+        5.122026248358028
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -682,7 +682,7 @@ impl Signal for IdfSumDomainNameIfHomepageNoTokenizer {
 pub struct IdfSumDomainIfHomepageNoTokenizer;
 impl Signal for IdfSumDomainIfHomepageNoTokenizer {
     fn default_coefficient(&self) -> f64 {
-        0.0036
+        7.974638346224731
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -716,7 +716,7 @@ impl Signal for IdfSumDomainIfHomepageNoTokenizer {
 pub struct IdfSumTitleIfHomepage;
 impl Signal for IdfSumTitleIfHomepage {
     fn default_coefficient(&self) -> f64 {
-        0.001
+        9.299807604028546
     }
 
     fn as_field(&self) -> Option<Field> {
