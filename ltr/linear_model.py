@@ -131,7 +131,7 @@ result = differential_evolution(
     optim,
     bounds,
     maxiter=100,
-    popsize=5,
+    popsize=2,
     disp=False,
     polish=False,
     callback=callback,

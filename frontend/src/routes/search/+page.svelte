@@ -14,7 +14,7 @@
   import { browser } from '$app/environment';
   import Serp from './Serp.svelte';
   import Result from './Result.svelte';
-  import { search } from '$lib/search';
+  import { search, type SearchParams } from '$lib/search';
   import { Keybind, searchCb, type Refs } from '$lib/keybind';
   import SpellCorrection from './SpellCorrection.svelte';
   import type { Count } from '$lib/api';
@@ -53,11 +53,11 @@
     return rankingsToRanked(rankings);
   });
 
-  const clientSearch = async (hostRankings: RankedSites) => {
+  const clientSearch = async (dataParams: SearchParams, hostRankings: RankedSites) => {
     if (!browser) return;
 
     const params = {
-      ...data.params,
+      ...dataParams,
       showRankingSignals: $showRankingSignals,
       hostRankings,
     };
@@ -132,7 +132,7 @@
       .exhaustive();
   };
 
-  $: clientResults = clientSearch($hostRankings);
+  $: clientResults = clientSearch(data.params, $hostRankings);
 </script>
 
 <svelte:window on:keydown={onKeyDown} />
