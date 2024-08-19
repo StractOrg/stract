@@ -3,7 +3,12 @@
   import Searchbar from '$lib/components/Searchbar.svelte';
   import type { PageData } from './$types';
   import RegionSelect from '$lib/components/RegionSelect.svelte';
-  import { searchQueryStore, showRankingSignals, useKeyboardShortcuts } from '$lib/stores';
+  import {
+    searchQueryStore,
+    showRankingSignals,
+    useKeyboardShortcuts,
+    hostRankingsStore,
+  } from '$lib/stores';
   import { page } from '$app/stores';
   import { updateQueryId } from '$lib/improvements';
   import { browser } from '$app/environment';
@@ -14,6 +19,8 @@
   import SpellCorrection from './SpellCorrection.svelte';
   import type { Count } from '$lib/api';
   import { match } from 'ts-pattern';
+  import { rankingsToRanked, type RankedSites } from '$lib/rankings';
+  import { derived } from 'svelte/store';
 
   export let data: PageData;
   $: results = data.results;
@@ -42,12 +49,17 @@
 
   let serp: Serp | undefined = undefined;
 
-  const clientSearch = async () => {
+  const hostRankings = derived(hostRankingsStore, (rankings) => {
+    return rankingsToRanked(rankings);
+  });
+
+  const clientSearch = async (hostRankings: RankedSites) => {
     if (!browser) return;
 
     const params = {
       ...data.params,
       showRankingSignals: $showRankingSignals,
+      hostRankings,
     };
 
     const res = await search(params, { fetch: fetch });
@@ -119,6 +131,8 @@
       })
       .exhaustive();
   };
+
+  $: clientResults = clientSearch($hostRankings);
 </script>
 
 <svelte:window on:keydown={onKeyDown} />
@@ -173,7 +187,7 @@
       bind:this={serp}
     />
   {:else}
-    {#await clientSearch() then results}
+    {#await clientResults then results}
       {#if results}
         <Serp
           {results}

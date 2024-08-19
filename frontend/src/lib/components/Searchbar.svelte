@@ -4,10 +4,8 @@
   import MagnifyingGlass from '~icons/heroicons/magnifying-glass';
   import Button from '$lib/components/Button.svelte';
   import { api, type HighlightedFragment } from '$lib/api';
-  import { safeSearchStore, hostRankingsStore, postSearchStore } from '$lib/stores';
+  import { safeSearchStore, postSearchStore } from '$lib/stores';
   import { browser } from '$app/environment';
-  import { derived } from 'svelte/store';
-  import { compressRanked, rankingsToRanked } from '$lib/rankings';
   import { twJoin } from 'tailwind-merge';
   import { P, match } from 'ts-pattern';
 
@@ -39,10 +37,6 @@
 
   $: if (didChangeInput) lastRealQuery = query;
   $: if (browser) updateSuggestions(lastRealQuery);
-
-  const compressedRanked = derived(hostRankingsStore, ($host_rankings) =>
-    compressRanked(rankingsToRanked($host_rankings)),
-  );
 
   const selectSuggestion = (s: HighlightedFragment[]) => (query = suggestionText(s));
 
@@ -102,7 +96,6 @@
   bind:this={formElem}
 >
   <input type="hidden" value={$safeSearchStore ? 'true' : 'false'} name="ss" />
-  <input type="hidden" value={$compressedRanked} name="sr" id="host_rankingsUuid" />
 
   <label
     for="searchbar"

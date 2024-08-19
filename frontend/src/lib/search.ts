@@ -10,7 +10,7 @@ import {
   api,
 } from './api';
 import { fetchRemoteOptic } from './optics';
-import { decompressRanked, type RankedSites } from './rankings';
+import { type RankedSites } from './rankings';
 
 export type SearchParams = {
   query: string;
@@ -18,7 +18,6 @@ export type SearchParams = {
   optic: string | undefined;
   selectedRegion: Region | undefined;
   safeSearch: boolean;
-  compressedHostRankings: string | null;
   hostRankings: RankedSites | undefined;
   showRankingSignals?: boolean;
 };
@@ -43,10 +42,6 @@ export const extractSearchParams = (searchParams: URLSearchParams | FormData): S
     | Region
     | undefined;
   const safeSearch = (searchParams.get('ss') as string | undefined) == 'true';
-  const compressedhost_rankings = (searchParams.get('sr') as string | undefined) || null;
-  const host_rankings = compressedhost_rankings
-    ? decompressRanked(compressedhost_rankings)
-    : void 0;
 
   return {
     query,
@@ -54,8 +49,7 @@ export const extractSearchParams = (searchParams: URLSearchParams | FormData): S
     optic,
     selectedRegion,
     safeSearch,
-    compressedHostRankings: compressedhost_rankings,
-    hostRankings: host_rankings,
+    hostRankings: undefined,
   };
 };
 
