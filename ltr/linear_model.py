@@ -8,7 +8,7 @@ from pprint import pprint
 
 
 MAX_WEIGHT = 10
-NUM_QUERIES_FOR_EVAL = 40
+NUM_QUERIES_FOR_EVAL = 80
 
 con = sqlite3.connect("data/auto-ranking-annotation.sqlite")
 cur = con.cursor()
@@ -131,7 +131,7 @@ result = differential_evolution(
     optim,
     bounds,
     maxiter=100,
-    popsize=1,
+    popsize=5,
     disp=False,
     polish=False,
     callback=callback,

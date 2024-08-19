@@ -44,7 +44,7 @@
         <span class="flex flex-col-reverse">
           <h3 class="flex">
             <ResultLink
-              _class="title truncate max-w-[calc(100%-30px)] text-xl font-medium text-link visited:text-link-visited hover:underline"
+              _class="title line-clamp-2 md:line-clamp-1 max-w-[calc(100%-30px)] text-xl font-medium text-link visited:text-link-visited hover:underline"
               title={webpage.title}
               href={webpage.url}
               {resultIndex}
@@ -97,7 +97,7 @@
           answers={webpage.richSnippet.answers}
         />
       {:else}
-        <div class="line-clamp-3">
+        <div class="line-clamp-4 md:line-clamp-3">
           <div class="inline">
             <span id="snippet-text" class="snippet-text">
               {#if webpage.likelyHasAds && $markPagesWithAdsStore && webpage.likelyHasPaywall && $markPagesWithPaywallStore}
