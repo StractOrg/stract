@@ -1,5 +1,3 @@
-import LZString from 'lz-string';
-
 export type Ranking = 'liked' | 'disliked' | 'blocked';
 export const Rankings = ['liked', 'disliked', 'blocked'] as Ranking[];
 
@@ -31,8 +29,3 @@ export const rankedToRankings = (ranked: RankedSites): SiteRankings => {
 
   return result;
 };
-
-export const compressRanked = (ranked: RankedSites): string =>
-  LZString.compressToBase64(JSON.stringify(ranked));
-export const decompressRanked = (compressedRanked: string): RankedSites =>
-  JSON.parse(LZString.decompressFromBase64(compressedRanked));
