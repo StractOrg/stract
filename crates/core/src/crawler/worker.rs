@@ -49,6 +49,8 @@ const IGNORED_EXTENSIONS: [&str; 27] = [
     ".flac", ".aac", ".ogg", ".m4a", ".m4v",
 ];
 
+const INITIAL_WANDER_STEPS: u64 = 4;
+
 enum UrlVisit {
     Skip,
     CanCrawl,
@@ -168,7 +170,28 @@ impl<S: DatumStream> JobExecutor<S> {
 
     pub async fn run(mut self) {
         tracing::info!("Processing job: {:?}", self.job.domain);
+        for site in self
+            .job
+            .urls
+            .iter()
+            .filter_map(|url| url.url().normalized_host())
+        {
+            if let Ok(url) = Url::parse(format!("https://{}", site).as_str()) {
+                self.wander_prioritiser.inc(url, 1.0);
+            }
+        }
+
+        let mut wander_steps = 0;
+        while self.wandered_urls < self.job.wandering_urls
+            && self.wander_prioritiser.known_urls() > 0
+            && wander_steps < INITIAL_WANDER_STEPS
+        {
+            self.wander().await;
+            wander_steps += 1;
+        }
+
         self.scheduled_urls().await;
+        self.crawl_sitemaps().await;
 
         while self.wandered_urls < self.job.wandering_urls
             && self.wander_prioritiser.known_urls() > 0
@@ -179,7 +202,7 @@ impl<S: DatumStream> JobExecutor<S> {
 
     async fn scheduled_urls(&mut self) {
         let urls = self.job.urls.drain(..).collect();
-        self.process_urls(urls, true).await;
+        self.process_urls(urls).await;
     }
 
     async fn wander(&mut self) {
@@ -217,7 +240,7 @@ impl<S: DatumStream> JobExecutor<S> {
 
         self.wandered_urls += urls.len() as u64;
 
-        self.process_urls(urls, false).await;
+        self.process_urls(urls).await;
     }
 
     async fn verify_url(&mut self, retryable_url: &RetrieableUrl) -> UrlVisit {
@@ -252,7 +275,23 @@ impl<S: DatumStream> JobExecutor<S> {
         UrlVisit::CanCrawl
     }
 
-    async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>, fetch_sitemap: bool) {
+    async fn crawl_sitemaps(&mut self) {
+        for url in self.job.urls.iter().map(|url| url.url()) {
+            let site = Site(url.host_str().unwrap_or_default().to_string());
+            if !self.crawled_sitemaps.contains(&site) {
+                self.crawled_sitemaps.insert(site.clone());
+
+                let sitemaps = self.robotstxt.sitemaps(url).await;
+
+                for sitemap in sitemaps {
+                    self.sitemap_urls
+                        .extend(self.urls_from_sitemap(sitemap, 5).await);
+                }
+            }
+        }
+    }
+
+    async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>) {
         while let Some(retryable_url) = urls.pop_front() {
             if let UrlVisit::Skip = self.verify_url(&retryable_url).await {
                 continue;
@@ -261,24 +300,6 @@ impl<S: DatumStream> JobExecutor<S> {
             if let Some(delay) = self.robotstxt.crawl_delay(retryable_url.url()).await {
                 if delay > self.min_crawl_delay {
                     self.min_crawl_delay = delay.min(self.max_crawl_delay);
-                }
-            }
-
-            let site = Site(
-                retryable_url
-                    .url()
-                    .host_str()
-                    .unwrap_or_default()
-                    .to_string(),
-            );
-            if fetch_sitemap && !self.crawled_sitemaps.contains(&site) {
-                self.crawled_sitemaps.insert(site.clone());
-
-                let sitemaps = self.robotstxt.sitemaps(retryable_url.url()).await;
-
-                for sitemap in sitemaps {
-                    self.sitemap_urls
-                        .extend(self.urls_from_sitemap(sitemap, 5).await);
                 }
             }
 
