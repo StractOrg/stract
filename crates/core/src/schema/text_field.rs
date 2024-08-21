@@ -1072,6 +1072,13 @@ impl TextField for BacklinkText {
 
         Ok(())
     }
+
+    fn bm25_constants(&self) -> Bm25Constants {
+        Bm25Constants {
+            b: 0.5,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
