@@ -145,17 +145,23 @@ impl Robots {
                         match &lines[idx] {
                             Line::Allow(path) => {
                                 has_captured_directive = true;
-                                rules.push(Rule {
-                                    pattern: Pattern::new(path),
-                                    directive: Directive::Allow,
-                                });
+
+                                if !path.is_empty() {
+                                    rules.push(Rule {
+                                        pattern: Pattern::new(path),
+                                        directive: Directive::Allow,
+                                    });
+                                }
                             }
                             Line::Disallow(path) => {
                                 has_captured_directive = true;
-                                rules.push(Rule {
-                                    pattern: Pattern::new(path),
-                                    directive: Directive::Disallow,
-                                });
+
+                                if !path.is_empty() {
+                                    rules.push(Rule {
+                                        pattern: Pattern::new(path),
+                                        directive: Directive::Disallow,
+                                    });
+                                }
                             }
                             Line::UserAgent(_) if has_captured_directive => break,
                             Line::CrawlDelay(Some(delay)) => {
@@ -1617,5 +1623,14 @@ Allow: /
 
         let robots = Robots::parse("BarBot", &robotstxt).unwrap();
         assert_eq!(robots.crawl_delay(), None);
+    }
+
+    #[test]
+    fn test_empty_disallow() {
+        let robotstxt = "User-Agent: FooBot
+        Disallow:
+        ";
+
+        assert!(is_user_agent_allowed(robotstxt, "FooBot", "/"));
     }
 }

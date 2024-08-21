@@ -12,14 +12,13 @@ param_grid = {
     "objective": ["lambdarank"],
     "verbosity": [-1],
     "metric": ["ndcg"],
-    "ndcg_at": [[1, 2, 3, 5, 10]],
+    "ndcg_at": [[1, 2, 3, 5]],
     # "learning_rate": [0.003],
     # "num_iterations": [100],
     # "max_depth": [-1, 2, 4, 8],
     "max_depth": [-1],
-    # "num_leaves": [7, 15, 31],
-    "num_leaves": [31, 63],
-    "lambda_l2": [2.5],
+    "num_leaves": [15],
+    "lambda_l2": [2.0, 2.5],
     "linear_tree": [False],
 }
 
