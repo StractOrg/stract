@@ -31,13 +31,6 @@ pub struct SignalComputeOrder {
 }
 
 impl SignalComputeOrder {
-    pub fn empty() -> Self {
-        Self {
-            text_signals: EnumMap::new(),
-            other_signals: Vec::new(),
-        }
-    }
-
     pub fn new() -> Self {
         let mut text_signals = EnumMap::new();
         let mut other_signals = Vec::new();
