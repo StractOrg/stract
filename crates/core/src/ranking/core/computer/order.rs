@@ -37,14 +37,18 @@ impl SignalComputeOrder {
 
         for signal in SignalEnum::all() {
             if let Some(text_field) = signal.as_textfield() {
-                let mono = text_field.monogram_field();
+                if signal.has_sibling_ngrams() {
+                    let mono = text_field.monogram_field();
 
-                if !text_signals.contains_key(mono) {
-                    text_signals.insert(mono, NGramComputeOrder::default());
+                    if !text_signals.contains_key(mono) {
+                        text_signals.insert(mono, NGramComputeOrder::default());
+                    }
+
+                    let ngram = text_field.ngram_size();
+                    text_signals.get_mut(mono).unwrap().push(signal, ngram);
+                } else {
+                    other_signals.push(signal);
                 }
-
-                let ngram = text_field.ngram_size();
-                text_signals.get_mut(mono).unwrap().push(signal, ngram);
             } else {
                 other_signals.push(signal);
             }

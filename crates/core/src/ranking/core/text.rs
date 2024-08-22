@@ -77,6 +77,10 @@ impl Signal for Bm25Title {
         Some(Field::Text(schema::text_field::Title.into()))
     }
 
+    fn has_sibling_ngrams(&self) -> bool {
+        true
+    }
+
     fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
@@ -99,10 +103,46 @@ impl Signal for Bm25Title {
     bincode::Encode,
     bincode::Decode,
 )]
+pub struct TitleCoverage;
+impl Signal for TitleCoverage {
+    fn default_coefficient(&self) -> f64 {
+        0.01
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::Title.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
+
+        seg_reader
+            .text_fields_mut()
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| field.coverage(doc))
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25TitleBigrams;
 impl Signal for Bm25TitleBigrams {
     fn default_coefficient(&self) -> f64 {
         0.005
+    }
+
+    fn has_sibling_ngrams(&self) -> bool {
+        true
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -137,6 +177,10 @@ impl Signal for Bm25TitleTrigrams {
         0.005
     }
 
+    fn has_sibling_ngrams(&self) -> bool {
+        true
+    }
+
     fn as_field(&self) -> Option<Field> {
         Some(Field::Text(schema::text_field::TitleTrigrams.into()))
     }
@@ -169,6 +213,10 @@ impl Signal for Bm25CleanBody {
         0.005
     }
 
+    fn has_sibling_ngrams(&self) -> bool {
+        true
+    }
+
     fn as_field(&self) -> Option<Field> {
         Some(Field::Text(schema::text_field::CleanBody.into()))
     }
@@ -195,10 +243,46 @@ impl Signal for Bm25CleanBody {
     bincode::Encode,
     bincode::Decode,
 )]
+pub struct CleanBodyCoverage;
+impl Signal for CleanBodyCoverage {
+    fn default_coefficient(&self) -> f64 {
+        0.01
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::CleanBody.into()))
+    }
+
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
+
+        seg_reader
+            .text_fields_mut()
+            .get_mut(self.as_textfield().unwrap())
+            .map(|field| field.coverage(doc))
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 pub struct Bm25CleanBodyBigrams;
 impl Signal for Bm25CleanBodyBigrams {
     fn default_coefficient(&self) -> f64 {
         0.005
+    }
+
+    fn has_sibling_ngrams(&self) -> bool {
+        true
     }
 
     fn as_field(&self) -> Option<Field> {
@@ -231,6 +315,10 @@ pub struct Bm25CleanBodyTrigrams;
 impl Signal for Bm25CleanBodyTrigrams {
     fn default_coefficient(&self) -> f64 {
         0.005
+    }
+
+    fn has_sibling_ngrams(&self) -> bool {
+        true
     }
 
     fn as_field(&self) -> Option<Field> {

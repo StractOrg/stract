@@ -48,6 +48,10 @@ pub trait Signal:
         self.as_field().and_then(|field| field.as_text())
     }
 
+    fn has_sibling_ngrams(&self) -> bool {
+        false
+    }
+
     fn as_numericalfield(&self) -> Option<NumericalFieldEnum> {
         self.as_field().and_then(|field| field.as_numerical())
     }
@@ -82,9 +86,11 @@ pub trait Signal:
 pub enum SignalEnum {
     Bm25F,
     Bm25Title,
+    TitleCoverage,
     Bm25TitleBigrams,
     Bm25TitleTrigrams,
     Bm25CleanBody,
+    CleanBodyCoverage,
     Bm25CleanBodyBigrams,
     Bm25CleanBodyTrigrams,
     Bm25StemmedTitle,
@@ -129,9 +135,11 @@ enum_dispatch_from_discriminant!(SignalEnumDiscriminants => SignalEnum,
 [
     Bm25F,
     Bm25Title,
+    TitleCoverage,
     Bm25TitleBigrams,
     Bm25TitleTrigrams,
     Bm25CleanBody,
+    CleanBodyCoverage,
     Bm25CleanBodyBigrams,
     Bm25CleanBodyTrigrams,
     Bm25StemmedTitle,

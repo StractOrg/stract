@@ -45,9 +45,14 @@ use super::{ComputedSignal, Signal, SignalCoefficient, SignalEnum};
 mod order;
 pub use order::SignalComputeOrder;
 
+fn posting_contains(posting: &mut SegmentPostings, doc: DocId) -> bool {
+    posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc)
+}
+
 #[derive(Clone)]
 pub struct TextFieldData {
     postings: Vec<SegmentPostings>,
+    num_query_terms: usize,
     bm25: MultiBm25Weight,
     bm25f: MultiBm25FWeight,
     fieldnorm_reader: FieldNormReader,
@@ -55,6 +60,24 @@ pub struct TextFieldData {
 }
 
 impl TextFieldData {
+    pub fn coverage(&mut self, doc: DocId) -> f64 {
+        if self.postings.is_empty() {
+            return 0.0;
+        }
+
+        self.postings
+            .iter_mut()
+            .map(|posting| {
+                if posting_contains(posting, doc) {
+                    1.0
+                } else {
+                    0.0
+                }
+            })
+            .sum::<f64>()
+            / self.num_query_terms as f64
+    }
+
     pub fn bm25(&mut self, doc: DocId) -> f64 {
         if self.postings.is_empty() {
             return 0.0;
@@ -64,7 +87,7 @@ impl TextFieldData {
 
         self.bm25
             .score(self.postings.iter_mut().map(move |posting| {
-                if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
+                if posting_contains(posting, doc) {
                     (fieldnorm_id, posting.term_freq())
                 } else {
                     (fieldnorm_id, 0)
@@ -82,7 +105,7 @@ impl TextFieldData {
             .iter_mut()
             .zip_eq(idf)
             .filter_map(|(posting, idf)| {
-                if posting.doc() == doc || (posting.doc() < doc && posting.seek(doc) == doc) {
+                if posting_contains(posting, doc) {
                     Some(idf)
                 } else {
                     None
@@ -313,6 +336,7 @@ impl SignalComputer {
                                 bm25f,
                                 fieldnorm_reader,
                                 signal_coefficient: self.coefficient(&signal),
+                                num_query_terms: terms.len(),
                             },
                         );
                     }

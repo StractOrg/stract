@@ -940,4 +940,156 @@ mod tests {
         assert_eq!(result.webpages.len(), 2);
         assert_eq!(result.webpages[0].url, "https://www.a.com/");
     }
+
+    #[test]
+    fn title_coverage() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        index
+            .insert(&Webpage {
+                html: Html::parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                {CONTENT} {}
+                            </body>
+                        </html>
+                    "#,
+                        crate::rand_words(100)
+                    ),
+                    "https://www.first.com",
+                )
+                .unwrap(),
+                host_centrality: 1.0,
+                fetch_time_ms: 2,
+                ..Default::default()
+            })
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::new(index);
+
+        let result = searcher
+            .search(&SearchQuery {
+                query: "test website".to_string(),
+                return_ranking_signals: true,
+                ..Default::default()
+            })
+            .expect("Search failed");
+
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(
+            result.webpages[0]
+                .ranking_signals
+                .as_ref()
+                .unwrap()
+                .get(&crate::ranking::SignalEnum::from(crate::ranking::core::TitleCoverage).into())
+                .unwrap()
+                .value,
+            1.0,
+        );
+
+        let result = searcher
+            .search(&SearchQuery {
+                query: "test example".to_string(),
+                return_ranking_signals: true,
+                ..Default::default()
+            })
+            .expect("Search failed");
+
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(
+            result.webpages[0]
+                .ranking_signals
+                .as_ref()
+                .unwrap()
+                .get(&crate::ranking::SignalEnum::from(crate::ranking::core::TitleCoverage).into())
+                .unwrap()
+                .value,
+            0.5,
+        );
+    }
+
+    #[test]
+    fn clean_body_coverage() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let mut page = Webpage {
+            html: Html::parse(
+                &format!(
+                    r#"
+                    <html>
+                        <head>
+                            <title>a b c</title>
+                        </head>
+                        <body>
+                            {CONTENT} {}
+                        </body>
+                    </html>
+                "#,
+                    crate::rand_words(100)
+                ),
+                "https://www.first.com",
+            )
+            .unwrap(),
+            host_centrality: 1.0,
+            fetch_time_ms: 2,
+            ..Default::default()
+        };
+
+        page.html.set_clean_text("test website".to_string());
+
+        index.insert(&page).expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+        let searcher = LocalSearcher::new(index);
+
+        let result = searcher
+            .search(&SearchQuery {
+                query: "test website".to_string(),
+                return_ranking_signals: true,
+                ..Default::default()
+            })
+            .expect("Search failed");
+
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(
+            result.webpages[0]
+                .ranking_signals
+                .as_ref()
+                .unwrap()
+                .get(
+                    &crate::ranking::SignalEnum::from(crate::ranking::core::CleanBodyCoverage)
+                        .into()
+                )
+                .unwrap()
+                .value,
+            1.0,
+        );
+
+        let result = searcher
+            .search(&SearchQuery {
+                query: "test b".to_string(),
+                return_ranking_signals: true,
+                ..Default::default()
+            })
+            .expect("Search failed");
+
+        assert_eq!(result.webpages.len(), 1);
+        assert_eq!(
+            result.webpages[0]
+                .ranking_signals
+                .as_ref()
+                .unwrap()
+                .get(
+                    &crate::ranking::SignalEnum::from(crate::ranking::core::CleanBodyCoverage)
+                        .into()
+                )
+                .unwrap()
+                .value,
+            0.5,
+        );
+    }
 }
