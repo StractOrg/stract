@@ -38,15 +38,11 @@ impl SignalComputeOrder {
         }
     }
 
-    pub fn new(signal_computer: &SignalComputer) -> Self {
+    pub fn new() -> Self {
         let mut text_signals = EnumMap::new();
         let mut other_signals = Vec::new();
 
         for signal in SignalEnum::all() {
-            if signal_computer.coefficient(&signal) == 0.0 {
-                continue;
-            }
-
             if let Some(text_field) = signal.as_textfield() {
                 let mono = text_field.monogram_field();
 
@@ -76,13 +72,6 @@ impl SignalComputeOrder {
             .values()
             .flat_map(move |ngram| ngram.compute(doc, signal_computer))
             .chain(self.other_signals.iter().map(move |signal| {
-                if signal_computer.coefficient(signal) == 0.0 {
-                    return ComputedSignal {
-                        signal: *signal,
-                        score: 0.0,
-                    };
-                }
-
                 signal
                     .compute(doc, signal_computer)
                     .map(|score| ComputedSignal {

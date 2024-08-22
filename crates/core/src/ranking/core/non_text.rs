@@ -498,7 +498,8 @@ impl Signal for QueryCentrality {
     }
 
     fn compute(&self, _doc: DocId, _signal_computer: &SignalComputer) -> Option<f64> {
-        unimplemented!()
+        // unimplemented!()
+        None
     }
 }
 

@@ -1,4 +1,3 @@
-use crate::enum_dispatch_from_discriminant;
 // Stract is an open source web search engine.
 // Copyright (C) 2024 Stract ApS
 //
@@ -14,6 +13,8 @@ use crate::enum_dispatch_from_discriminant;
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
+
+use crate::enum_dispatch_from_discriminant;
 use crate::enum_map::{GetEnumMapKey, InsertEnumMapKey};
 
 use crate::schema::Field;
@@ -26,6 +27,7 @@ use enum_dispatch::enum_dispatch;
 use strum::{EnumDiscriminants, VariantArray};
 
 use super::non_text::*;
+use super::query::*;
 use super::text::*;
 use super::SignalComputer;
 use tantivy::DocId;
@@ -120,6 +122,7 @@ pub enum SignalEnum {
     TitleEmbeddingSimilarity,
     KeywordEmbeddingSimilarity,
     HasAds,
+    NumQueryTerms,
 }
 
 enum_dispatch_from_discriminant!(SignalEnumDiscriminants => SignalEnum,
@@ -166,6 +169,7 @@ enum_dispatch_from_discriminant!(SignalEnumDiscriminants => SignalEnum,
     TitleEmbeddingSimilarity,
     KeywordEmbeddingSimilarity,
     HasAds,
+    NumQueryTerms
 ]);
 
 impl SignalEnum {

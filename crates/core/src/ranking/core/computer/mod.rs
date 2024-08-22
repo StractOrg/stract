@@ -146,6 +146,10 @@ impl QueryData {
     pub fn selected_region(&self) -> Option<crate::webpage::Region> {
         self.selected_region
     }
+
+    pub fn simple_terms(&self) -> &[String] {
+        &self.simple_terms
+    }
 }
 
 pub struct SignalComputer {
@@ -228,10 +232,9 @@ impl SignalComputer {
             current_timestamp: None,
             linear_regression: None,
             query_data: query,
-            order: SignalComputeOrder::empty(),
+            order: SignalComputeOrder::new(),
         };
 
-        s.order = SignalComputeOrder::new(&s);
         s.set_current_timestamp(chrono::Utc::now().timestamp() as usize);
 
         s

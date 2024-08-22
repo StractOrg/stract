@@ -24,6 +24,7 @@ use utoipa::ToSchema;
 mod computer;
 mod non_text;
 mod prelude;
+mod query;
 mod text;
 
 pub use computer::SignalComputer;
