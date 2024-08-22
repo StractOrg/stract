@@ -119,6 +119,7 @@ pub enum SignalEnum {
     LinkDensity,
     TitleEmbeddingSimilarity,
     KeywordEmbeddingSimilarity,
+    HasAds,
 }
 
 enum_dispatch_from_discriminant!(SignalEnumDiscriminants => SignalEnum,
@@ -164,6 +165,7 @@ enum_dispatch_from_discriminant!(SignalEnumDiscriminants => SignalEnum,
     LinkDensity,
     TitleEmbeddingSimilarity,
     KeywordEmbeddingSimilarity,
+    HasAds,
 ]);
 
 impl SignalEnum {

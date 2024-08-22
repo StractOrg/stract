@@ -16,11 +16,11 @@
 
 use std::{path::Path, str::FromStr};
 
-use signal::SignalEnumDiscriminants;
+use core::SignalEnumDiscriminants;
 
 use crate::{
     enum_map::EnumMap,
-    ranking::{signal, SignalEnum},
+    ranking::{core, SignalEnum},
 };
 
 type Result<T> = std::result::Result<T, Error>;
@@ -36,7 +36,7 @@ pub enum Error {
     NoEndOfTrees,
 
     #[error("Signal error: {0}")]
-    Signal(#[from] signal::Error),
+    Signal(#[from] core::Error),
 
     #[error("ParseInt error: {0}")]
     ParseInt(#[from] std::num::ParseIntError),
@@ -314,44 +314,41 @@ mod tests {
         assert!(!model.trees.is_empty());
 
         let mut features = EnumMap::new();
-        features.insert(ranking::signal::Bm25BacklinkText.into(), 85.7750244140625);
-        features.insert(ranking::signal::Bm25CleanBody.into(), 67.41311645507812);
-        features.insert(ranking::signal::Bm25CleanBodyBigrams.into(), 0.0);
-        features.insert(ranking::signal::Bm25CleanBodyTrigrams.into(), 0.0);
-        features.insert(ranking::signal::IdfSumDomain.into(), 43.332096099853516);
-        features.insert(ranking::signal::IdfSumDomainIfHomepage.into(), 0.0);
+        features.insert(ranking::core::Bm25BacklinkText.into(), 85.7750244140625);
+        features.insert(ranking::core::Bm25CleanBody.into(), 67.41311645507812);
+        features.insert(ranking::core::Bm25CleanBodyBigrams.into(), 0.0);
+        features.insert(ranking::core::Bm25CleanBodyTrigrams.into(), 0.0);
+        features.insert(ranking::core::IdfSumDomain.into(), 43.332096099853516);
+        features.insert(ranking::core::IdfSumDomainIfHomepage.into(), 0.0);
+        features.insert(ranking::core::IdfSumDomainIfHomepageNoTokenizer.into(), 0.0);
         features.insert(
-            ranking::signal::IdfSumDomainIfHomepageNoTokenizer.into(),
+            ranking::core::IdfSumDomainNameIfHomepageNoTokenizer.into(),
             0.0,
         );
+        features.insert(ranking::core::IdfSumDomainNameNoTokenizer.into(), 0.0);
+        features.insert(ranking::core::IdfSumDomainNoTokenizer.into(), 0.0);
+        features.insert(ranking::core::IdfSumSite.into(), 61.47410202026367);
+        features.insert(ranking::core::IdfSumSiteNoTokenizer.into(), 0.0);
         features.insert(
-            ranking::signal::IdfSumDomainNameIfHomepageNoTokenizer.into(),
-            0.0,
-        );
-        features.insert(ranking::signal::IdfSumDomainNameNoTokenizer.into(), 0.0);
-        features.insert(ranking::signal::IdfSumDomainNoTokenizer.into(), 0.0);
-        features.insert(ranking::signal::IdfSumSite.into(), 61.47410202026367);
-        features.insert(ranking::signal::IdfSumSiteNoTokenizer.into(), 0.0);
-        features.insert(
-            ranking::signal::Bm25StemmedCleanBody.into(),
+            ranking::core::Bm25StemmedCleanBody.into(),
             65.94627380371094,
         );
-        features.insert(ranking::signal::Bm25StemmedTitle.into(), 0.0);
-        features.insert(ranking::signal::Bm25Title.into(), 59.817813873291016);
-        features.insert(ranking::signal::Bm25TitleBigrams.into(), 0.0);
-        features.insert(ranking::signal::IdfSumTitleIfHomepage.into(), 0.0);
-        features.insert(ranking::signal::Bm25TitleTrigrams.into(), 0.0);
-        features.insert(ranking::signal::IdfSumUrl.into(), 57.07925033569336);
-        features.insert(ranking::signal::FetchTimeMs.into(), 0.023255813953488372);
-        features.insert(ranking::signal::HostCentrality.into(), 0.017958538);
-        features.insert(ranking::signal::InboundSimilarity.into(), 0.0);
-        features.insert(ranking::signal::IsHomepage.into(), 0.0);
-        features.insert(ranking::signal::PageCentrality.into(), 0.008253236);
-        features.insert(ranking::signal::Region.into(), 0.16622349570454012);
-        features.insert(ranking::signal::TrackerScore.into(), 0.07692307692307693);
-        features.insert(ranking::signal::UpdateTimestamp.into(), 0.0);
-        features.insert(ranking::signal::UrlDigits.into(), 0.25);
-        features.insert(ranking::signal::UrlSlashes.into(), 0.3333333333333333);
+        features.insert(ranking::core::Bm25StemmedTitle.into(), 0.0);
+        features.insert(ranking::core::Bm25Title.into(), 59.817813873291016);
+        features.insert(ranking::core::Bm25TitleBigrams.into(), 0.0);
+        features.insert(ranking::core::IdfSumTitleIfHomepage.into(), 0.0);
+        features.insert(ranking::core::Bm25TitleTrigrams.into(), 0.0);
+        features.insert(ranking::core::IdfSumUrl.into(), 57.07925033569336);
+        features.insert(ranking::core::FetchTimeMs.into(), 0.023255813953488372);
+        features.insert(ranking::core::HostCentrality.into(), 0.017958538);
+        features.insert(ranking::core::InboundSimilarity.into(), 0.0);
+        features.insert(ranking::core::IsHomepage.into(), 0.0);
+        features.insert(ranking::core::PageCentrality.into(), 0.008253236);
+        features.insert(ranking::core::Region.into(), 0.16622349570454012);
+        features.insert(ranking::core::TrackerScore.into(), 0.07692307692307693);
+        features.insert(ranking::core::UpdateTimestamp.into(), 0.0);
+        features.insert(ranking::core::UrlDigits.into(), 0.25);
+        features.insert(ranking::core::UrlSlashes.into(), 0.3333333333333333);
 
         assert_eq!((model.predict(&features) * 1000.0) as u64, 1050);
     }

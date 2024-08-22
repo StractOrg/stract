@@ -164,7 +164,7 @@ pub trait EmbeddingSignal<W>: Send + Sync {
 
 impl EmbeddingSignal<ScoredWebpagePointer> for TitleEmbeddings {
     fn signal() -> SignalEnum {
-        ranking::signal::TitleEmbeddingSimilarity.into()
+        ranking::core::TitleEmbeddingSimilarity.into()
     }
 
     fn has_embedding(webpage: &ScoredWebpagePointer) -> bool {
@@ -183,7 +183,7 @@ impl EmbeddingSignal<ScoredWebpagePointer> for TitleEmbeddings {
 
 impl EmbeddingSignal<LocalRecallRankingWebpage> for TitleEmbeddings {
     fn signal() -> SignalEnum {
-        ranking::signal::TitleEmbeddingSimilarity.into()
+        ranking::core::TitleEmbeddingSimilarity.into()
     }
 
     fn has_embedding(webpage: &LocalRecallRankingWebpage) -> bool {
@@ -203,7 +203,7 @@ impl EmbeddingSignal<LocalRecallRankingWebpage> for TitleEmbeddings {
 
 impl EmbeddingSignal<ScoredWebpagePointer> for KeywordEmbeddings {
     fn signal() -> SignalEnum {
-        ranking::signal::KeywordEmbeddingSimilarity.into()
+        ranking::core::KeywordEmbeddingSimilarity.into()
     }
 
     fn has_embedding(webpage: &ScoredWebpagePointer) -> bool {
@@ -222,7 +222,7 @@ impl EmbeddingSignal<ScoredWebpagePointer> for KeywordEmbeddings {
 
 impl EmbeddingSignal<LocalRecallRankingWebpage> for KeywordEmbeddings {
     fn signal() -> SignalEnum {
-        ranking::signal::KeywordEmbeddingSimilarity.into()
+        ranking::core::KeywordEmbeddingSimilarity.into()
     }
 
     fn has_embedding(webpage: &LocalRecallRankingWebpage) -> bool {

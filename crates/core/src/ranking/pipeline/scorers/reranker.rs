@@ -54,12 +54,12 @@ impl<M: CrossEncoder> ReRanker<M> {
             webpage
                 .ranking_mut()
                 .signals_mut()
-                .insert(ranking::signal::CrossEncoderSnippet.into(), snippet);
+                .insert(ranking::core::CrossEncoderSnippet.into(), snippet);
 
             webpage
                 .ranking_mut()
                 .signals_mut()
-                .insert(ranking::signal::CrossEncoderTitle.into(), title);
+                .insert(ranking::core::CrossEncoderTitle.into(), title);
         }
     }
 }

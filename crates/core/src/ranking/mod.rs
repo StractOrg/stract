@@ -17,12 +17,12 @@
 pub mod bitvec_similarity;
 pub mod bm25;
 pub mod bm25f;
+pub mod core;
 pub mod inbound_similarity;
 pub mod initial;
 pub mod models;
 pub mod optics;
 pub mod pipeline;
-pub mod signal;
 
 use initial::InitialScoreTweaker;
 
@@ -34,7 +34,7 @@ use crate::{
     searcher::NUM_RESULTS_PER_PAGE,
 };
 
-pub use self::signal::*;
+pub use self::core::*;
 
 #[derive(Clone)]
 pub struct Ranker {
@@ -331,7 +331,7 @@ mod tests {
                 query: "title".to_string(),
                 return_ranking_signals: true,
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::UpdateTimestamp) => 100_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::core::UpdateTimestamp) => 100_000.0,
                 }.into(),
                 ..Default::default()
             })
@@ -556,8 +556,8 @@ mod tests {
                 query: "example".to_string(),
 
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::Bm25Title) => 20_000_000.0,
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::HostCentrality) => 0.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::core::Bm25Title) => 20_000_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::core::HostCentrality) => 0.0,
                 }.into(),
 
                 ..Default::default()
@@ -572,7 +572,7 @@ mod tests {
                 query: "example".to_string(),
 
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::HostCentrality) => 2_000_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::core::HostCentrality) => 2_000_000.0,
                 }.into(),
 
                 ..Default::default()
@@ -641,7 +641,7 @@ mod tests {
             .search(&SearchQuery {
                 query: "test".to_string(),
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::FetchTimeMs) => 100_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::core::FetchTimeMs) => 100_000.0,
                 }.into(),
                 ..Default::default()
             })
@@ -735,9 +735,10 @@ mod tests {
                 query: "test".to_string(),
 
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::UrlSlashes) => 100_000.0,
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::UrlDigits) => 100_000.0,
-                }.into(),
+                    crate::ranking::SignalEnum::from(crate::ranking::core::UrlSlashes) => 100_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::core::UrlDigits) => 100_000.0,
+                }
+                .into(),
 
                 ..Default::default()
             })
@@ -841,7 +842,7 @@ mod tests {
                 query: "best chocolate cake".to_string(),
 
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::TitleEmbeddingSimilarity) => 100_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::core::TitleEmbeddingSimilarity) => 100_000.0,
                 }.into(),
 
                 ..Default::default()
@@ -929,7 +930,7 @@ mod tests {
                 query: "best chocolate cake".to_string(),
 
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::KeywordEmbeddingSimilarity) => 100_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::core::KeywordEmbeddingSimilarity) => 100_000.0,
                 }.into(),
 
                 ..Default::default()

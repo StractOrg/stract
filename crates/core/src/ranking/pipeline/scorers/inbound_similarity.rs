@@ -17,7 +17,7 @@
 use std::sync::Mutex;
 
 use crate::{
-    ranking::{inbound_similarity, signal},
+    ranking::{core, inbound_similarity},
     searcher::api::ScoredWebpagePointer,
 };
 
@@ -47,7 +47,7 @@ impl Scorer<ScoredWebpagePointer> for InboundScorer {
             webpage
                 .as_ranking_mut()
                 .signals_mut()
-                .insert(signal::InboundSimilarity.into(), score);
+                .insert(core::InboundSimilarity.into(), score);
         }
     }
 }

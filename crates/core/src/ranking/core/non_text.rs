@@ -699,3 +699,52 @@ impl Signal for LinkDensity {
         Some(score_link_density(val))
     }
 }
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
+pub struct HasAds;
+impl Signal for HasAds {
+    fn default_coefficient(&self) -> f64 {
+        0.01
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Numerical(
+            schema::numerical_field::LikelyHasAds.into(),
+        ))
+    }
+
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
+        if !webpage.html.likely_has_ads() {
+            Some(1.0)
+        } else {
+            Some(0.0)
+        }
+    }
+
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+        let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
+        let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
+
+        let has_ads = numericalfield_reader
+            .get(self.as_numericalfield().unwrap())
+            .and_then(|v| v.as_bool())
+            .unwrap();
+
+        if !has_ads {
+            Some(1.0)
+        } else {
+            Some(0.0)
+        }
+    }
+}

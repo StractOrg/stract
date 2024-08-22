@@ -351,10 +351,11 @@ mod tests {
         let res = searcher
             .search(&SearchQuery {
                 query: "website".to_string(),
-                signal_coefficients: enum_map!{
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::Bm25Title) => 1_000_000.0
-                
-                }.into(),
+                signal_coefficients: enum_map! {
+                    crate::ranking::SignalEnum::from(crate::ranking::core::Bm25Title) => 1_000_000.0
+
+                }
+                .into(),
                 ..Default::default()
             })
             .unwrap()
@@ -640,33 +641,33 @@ mod tests {
             Node::from("https://www.e.com").into_host(),
             Node::from("https://www.a.com").into_host(),
             String::new(),
-            RelFlags::default()
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("https://www.a.com").into_host(),
             Node::from("https://www.e.com").into_host(),
             String::new(),
-            RelFlags::default()
+            RelFlags::default(),
         );
 
         writer.insert(
             Node::from("https://www.c.com").into_host(),
             Node::from("https://www.c.com").into_host(),
             String::new(),
-            RelFlags::default()
+            RelFlags::default(),
         );
 
         writer.insert(
             Node::from("https://www.b.com").into_host(),
             Node::from("https://www.e.com").into_host(),
             String::new(),
-            RelFlags::default()
+            RelFlags::default(),
         );
         writer.insert(
             Node::from("https://www.e.com").into_host(),
             Node::from("https://www.b.com").into_host(),
             String::new(),
-            RelFlags::default()
+            RelFlags::default(),
         );
 
         let graph = writer.finalize();
@@ -759,7 +760,7 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::signal::InboundSimilarity) => 100_000.0
+                    crate::ranking::SignalEnum::from(crate::ranking::core::InboundSimilarity) => 100_000.0
                 }.into(),
 
                 optic: Some(Optic {

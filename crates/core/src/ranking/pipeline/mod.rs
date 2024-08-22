@@ -100,7 +100,7 @@ impl<T: RankableWebpage> RankingStage<T> {
     fn calculate_score(&self, signals: &EnumMap<SignalEnum, f64>) -> f64 {
         match self.model.as_ref() {
             Some(model) => {
-                let coeff = self.coefficients.get(&super::signal::LambdaMart.into());
+                let coeff = self.coefficients.get(&super::core::LambdaMart.into());
                 if coeff == 0.0 {
                     signals
                         .iter()
@@ -205,7 +205,7 @@ mod tests {
                 };
 
                 let mut signals = EnumMap::new();
-                signals.insert(ranking::signal::HostCentrality.into(), 1.0 / i as f64);
+                signals.insert(ranking::core::HostCentrality.into(), 1.0 / i as f64);
                 LocalRecallRankingWebpage::new_testing(pointer, signals, 1.0 / i as f64)
             })
             .collect()
