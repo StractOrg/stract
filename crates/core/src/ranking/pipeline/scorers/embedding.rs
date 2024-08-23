@@ -197,7 +197,7 @@ impl EmbeddingSignal<LocalRecallRankingWebpage> for TitleEmbeddings {
     fn insert_signal(webpage: &mut LocalRecallRankingWebpage, score: f64) {
         let sig = <TitleEmbeddings as EmbeddingSignal<LocalRecallRankingWebpage>>::signal();
 
-        webpage.mut_signals().insert(sig, score);
+        webpage.signals_mut().insert(sig, score);
     }
 }
 
@@ -235,7 +235,7 @@ impl EmbeddingSignal<LocalRecallRankingWebpage> for KeywordEmbeddings {
 
     fn insert_signal(webpage: &mut LocalRecallRankingWebpage, score: f64) {
         let sig = <KeywordEmbeddings as EmbeddingSignal<LocalRecallRankingWebpage>>::signal();
-        webpage.mut_signals().insert(sig, score);
+        webpage.signals_mut().insert(sig, score);
     }
 }
 

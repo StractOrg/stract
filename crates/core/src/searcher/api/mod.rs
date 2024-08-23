@@ -86,10 +86,21 @@ impl RankableWebpage for ScoredWebpagePointer {
         self.as_ranking().boost()
     }
 
+    fn as_local_recall(&self) -> &crate::ranking::pipeline::LocalRecallRankingWebpage {
+        self.as_ranking().as_local_recall()
+    }
+
     fn signals(&self) -> &EnumMap<SignalEnum, f64> {
         match self {
             ScoredWebpagePointer::Normal(p) => p.website.signals(),
             ScoredWebpagePointer::Live(p) => p.website.signals(),
+        }
+    }
+
+    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
+        match self {
+            ScoredWebpagePointer::Normal(p) => p.website.signals_mut(),
+            ScoredWebpagePointer::Live(p) => p.website.signals_mut(),
         }
     }
 }

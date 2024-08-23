@@ -932,3 +932,57 @@ impl Signal for KeywordEmbeddingSimilarity {
         None // computed in later ranking stage
     }
 }
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
+pub struct MinTitleSlop;
+impl Signal for MinTitleSlop {
+    fn default_coefficient(&self) -> f64 {
+        0.1
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::Title.into()))
+    }
+
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
+        None // computed in later ranking stage
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
+pub struct MinCleanBodySlop;
+impl Signal for MinCleanBodySlop {
+    fn default_coefficient(&self) -> f64 {
+        0.1
+    }
+
+    fn as_field(&self) -> Option<Field> {
+        Some(Field::Text(schema::text_field::CleanBody.into()))
+    }
+
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
+        None // computed in later ranking stage
+    }
+}

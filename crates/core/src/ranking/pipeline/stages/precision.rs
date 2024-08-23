@@ -77,6 +77,14 @@ impl RankableWebpage for PrecisionRankingWebpage {
     fn signals(&self) -> &EnumMap<SignalEnum, f64> {
         self.ranking.signals()
     }
+
+    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
+        self.ranking.signals_mut()
+    }
+
+    fn as_local_recall(&self) -> &super::LocalRecallRankingWebpage {
+        self.ranking.as_local_recall()
+    }
 }
 
 impl PrecisionRankingWebpage {

@@ -29,7 +29,7 @@ use crate::{
         pipeline::{RankableWebpage, RankingPipeline, RankingStage, Recall, Scorer},
         SignalComputer, SignalEnum,
     },
-    schema::numerical_field,
+    schema::{numerical_field, text_field},
     searcher::{api, SearchQuery},
     webgraph,
 };
@@ -77,7 +77,7 @@ impl RecallRankingWebpage {
     }
 
     pub fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
-        self.local.mut_signals()
+        self.local.signals_mut()
     }
 
     pub fn boost(&self) -> Option<f64> {
@@ -119,12 +119,22 @@ impl RankableWebpage for RecallRankingWebpage {
     fn signals(&self) -> &EnumMap<SignalEnum, f64> {
         self.local.signals()
     }
+
+    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
+        self.local.signals_mut()
+    }
+
+    fn as_local_recall(&self) -> &LocalRecallRankingWebpage {
+        &self.local
+    }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct LocalRecallRankingWebpage {
     pointer: WebpagePointer,
     signals: EnumMap<SignalEnum, f64>,
+    title_positions: Vec<Vec<u32>>,
+    clean_body_positions: Vec<Vec<u32>>,
     optic_boost: Option<f64>,
     title_embedding: Option<StoredEmbeddings>,
     keyword_embedding: Option<StoredEmbeddings>,
@@ -142,6 +152,8 @@ impl LocalRecallRankingWebpage {
         LocalRecallRankingWebpage {
             pointer,
             signals,
+            title_positions: Vec::new(),
+            clean_body_positions: Vec::new(),
             optic_boost: None,
             title_embedding: None,
             keyword_embedding: None,
@@ -175,6 +187,14 @@ impl LocalRecallRankingWebpage {
             .unwrap()
             .into();
 
+        let title_positions = computer
+            .get_field_positions(text_field::Title.into(), pointer.address.doc_id)
+            .unwrap_or_default();
+
+        let clean_body_positions = computer
+            .get_field_positions(text_field::CleanBody.into(), pointer.address.doc_id)
+            .unwrap_or_default();
+
         let mut res = LocalRecallRankingWebpage {
             signals: EnumMap::new(),
             score: pointer.score.total,
@@ -182,6 +202,8 @@ impl LocalRecallRankingWebpage {
             pointer: pointer.clone(),
             title_embedding: title_embedding.map(StoredEmbeddings),
             keyword_embedding: keyword_embedding.map(StoredEmbeddings),
+            title_positions,
+            clean_body_positions,
             host_id,
         };
 
@@ -217,7 +239,7 @@ impl LocalRecallRankingWebpage {
         &self.signals
     }
 
-    pub fn mut_signals(&mut self) -> &mut EnumMap<SignalEnum, f64> {
+    pub fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
         &mut self.signals
     }
 
@@ -232,6 +254,14 @@ impl LocalRecallRankingWebpage {
     pub fn host_id(&self) -> &webgraph::NodeID {
         &self.host_id
     }
+
+    pub fn iter_title_positions(&self) -> impl Iterator<Item = &[u32]> {
+        self.title_positions.iter().map(|v| v.as_slice())
+    }
+
+    pub fn iter_clean_body_positions(&self) -> impl Iterator<Item = &[u32]> {
+        self.clean_body_positions.iter().map(|v| v.as_slice())
+    }
 }
 
 impl RankableWebpage for LocalRecallRankingWebpage {
@@ -245,6 +275,14 @@ impl RankableWebpage for LocalRecallRankingWebpage {
 
     fn signals(&self) -> &EnumMap<SignalEnum, f64> {
         &self.signals
+    }
+
+    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
+        &mut self.signals
+    }
+
+    fn as_local_recall(&self) -> &LocalRecallRankingWebpage {
+        self
     }
 }
 

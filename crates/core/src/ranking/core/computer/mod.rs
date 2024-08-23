@@ -60,6 +60,21 @@ pub struct TextFieldData {
 }
 
 impl TextFieldData {
+    pub fn positions(&mut self, doc: DocId) -> Vec<Vec<u32>> {
+        self.postings
+            .iter_mut()
+            .map(|posting| {
+                if posting_contains(posting, doc) {
+                    let mut positions = Vec::new();
+                    posting.positions(&mut positions);
+                    positions
+                } else {
+                    Vec::new()
+                }
+            })
+            .collect()
+    }
+
     pub fn coverage(&mut self, doc: DocId) -> f64 {
         if self.postings.is_empty() {
             return 0.0;
@@ -307,24 +322,24 @@ impl SignalComputer {
                         let fieldnorm_reader = segment_reader.get_fieldnorms_reader(tv_field)?;
                         let inverted_index = segment_reader.inverted_index(tv_field)?;
 
-                        let mut matching_terms = Vec::with_capacity(terms.len());
                         let mut postings = Vec::with_capacity(terms.len());
                         for term in &terms {
                             if let Some(p) =
                                 inverted_index.read_postings(term, text_field.record_option())?
                             {
                                 postings.push(p);
-                                matching_terms.push(term.clone());
+                            } else {
+                                postings.push(SegmentPostings::empty())
                             }
                         }
                         let bm25 = MultiBm25Weight::for_terms(
                             tv_searcher,
-                            &matching_terms,
+                            &terms,
                             text_field.bm25_constants(),
                         )?;
                         let bm25f = MultiBm25FWeight::for_terms(
                             tv_searcher,
-                            &matching_terms,
+                            &terms,
                             text_field.bm25_constants(),
                         );
 
@@ -479,6 +494,17 @@ impl SignalComputer {
 
     pub fn segment_reader(&self) -> Option<&RefCell<SegmentReader>> {
         self.segment_reader.as_ref()
+    }
+
+    pub fn get_field_positions(
+        &mut self,
+        field: TextFieldEnum,
+        doc: DocId,
+    ) -> Option<Vec<Vec<u32>>> {
+        self.segment_reader
+            .as_mut()
+            .and_then(|reader| reader.get_mut().text_fields_mut().get_mut(field))
+            .map(|textfield_data| textfield_data.positions(doc))
     }
 
     pub fn fetch_time_ms_cache(&self) -> &[f64] {

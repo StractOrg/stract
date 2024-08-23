@@ -31,7 +31,7 @@ use crate::{
 use super::{
     embedding::{EmbeddingScorer, KeywordEmbeddings, TitleEmbeddings},
     inbound_similarity::InboundScorer,
-    MultiScorer, Scorer,
+    term_distance, MultiScorer, Scorer,
 };
 
 pub struct Recall<T: RankableWebpage> {
@@ -70,6 +70,8 @@ impl Recall<LocalRecallRankingWebpage> {
     pub fn new(dual_encoder: Option<Arc<DualEncoder>>) -> Self {
         Self {
             scorer: MultiScorer::new(vec![
+                Box::new(term_distance::TitleDistanceScorer),
+                Box::new(term_distance::BodyDistanceScorer),
                 Box::new(
                     EmbeddingScorer::<LocalRecallRankingWebpage, TitleEmbeddings>::new(
                         dual_encoder.clone(),

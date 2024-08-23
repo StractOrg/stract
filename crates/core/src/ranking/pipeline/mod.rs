@@ -40,6 +40,9 @@ pub trait RankableWebpage: collector::Doc + Send + Sync {
     fn set_score(&mut self, score: f64);
     fn boost(&self) -> Option<f64>;
     fn signals(&self) -> &EnumMap<SignalEnum, f64>;
+    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64>;
+
+    fn as_local_recall(&self) -> &LocalRecallRankingWebpage;
 
     fn boost_score(&mut self) {
         if let Some(boost) = self.boost() {

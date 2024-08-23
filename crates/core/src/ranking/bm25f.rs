@@ -135,6 +135,10 @@ impl Bm25FWeight {
 
     #[inline]
     pub fn tf_factor(&self, coefficient: Score, fieldnorm_id: u8, term_freq: u32) -> Score {
+        if term_freq == 0 {
+            return 0.0;
+        }
+
         let term_freq = term_freq as Score * coefficient;
         let norm = self.cache[fieldnorm_id as usize];
         (term_freq * (self.constants.k1 + 1.0)) / (term_freq + norm)

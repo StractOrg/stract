@@ -18,6 +18,7 @@ pub mod embedding;
 pub mod inbound_similarity;
 pub mod recall;
 pub mod reranker;
+pub mod term_distance;
 
 pub use recall::Recall;
 pub use reranker::ReRanker;
