@@ -55,12 +55,6 @@ fn min_slop<'a>(positions: impl Iterator<Item = &'a [u32]>) -> u32 {
 #[derive(Debug, Default)]
 pub struct TitleDistanceScorer;
 
-impl TitleDistanceScorer {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
 impl<W: RankableWebpage> super::Scorer<W> for TitleDistanceScorer {
     fn score(&self, webpages: &mut [W]) {
         for webpage in webpages {
@@ -76,12 +70,6 @@ impl<W: RankableWebpage> super::Scorer<W> for TitleDistanceScorer {
 
 #[derive(Debug, Default)]
 pub struct BodyDistanceScorer;
-
-impl BodyDistanceScorer {
-    pub fn new() -> Self {
-        Self
-    }
-}
 
 impl<W: RankableWebpage> super::Scorer<W> for BodyDistanceScorer {
     fn score(&self, webpages: &mut [W]) {
