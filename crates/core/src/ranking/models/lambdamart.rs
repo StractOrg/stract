@@ -20,7 +20,7 @@ use core::SignalEnumDiscriminants;
 
 use crate::{
     enum_map::EnumMap,
-    ranking::{core, SignalEnum},
+    ranking::{core, SignalCalculation, SignalEnum},
 };
 
 type Result<T> = std::result::Result<T, Error>;
@@ -61,6 +61,12 @@ pub trait AsValue {
 impl AsValue for f64 {
     fn as_value(&self) -> f64 {
         *self
+    }
+}
+
+impl AsValue for SignalCalculation {
+    fn as_value(&self) -> f64 {
+        self.score
     }
 }
 

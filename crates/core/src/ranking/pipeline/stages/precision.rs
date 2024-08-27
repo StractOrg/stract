@@ -18,24 +18,21 @@ use std::sync::Arc;
 
 use crate::{
     collector,
-    config::CollectorConfig,
     enum_map::EnumMap,
     inverted_index::RetrievedWebpage,
     ranking::{
-        models::{cross_encoder::CrossEncoder, lambdamart::LambdaMART},
+        models::{self, cross_encoder::CrossEncoder},
         pipeline::{
-            scorers::IdentityScorer, RankableWebpage, RankingPipeline, RankingStage, ReRanker,
-            Scorer,
+            scorers::lambdamart::PrecisionLambda, RankableWebpage, RankingPipeline, ReRanker,
         },
-        SignalEnum,
+        SignalCalculation, SignalEnum,
     },
     searcher::SearchQuery,
-    Result,
 };
 
 use super::RecallRankingWebpage;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Clone, Debug, bincode::Encode, bincode::Decode)]
 pub struct PrecisionRankingWebpage {
     retrieved_webpage: RetrievedWebpage,
     ranking: RecallRankingWebpage,
@@ -57,7 +54,7 @@ impl PrecisionRankingWebpage {
 
 impl collector::Doc for PrecisionRankingWebpage {
     fn score(&self) -> f64 {
-        self.ranking.score()
+        RankableWebpage::score(self)
     }
 
     fn hashes(&self) -> collector::Hashes {
@@ -66,19 +63,27 @@ impl collector::Doc for PrecisionRankingWebpage {
 }
 
 impl RankableWebpage for PrecisionRankingWebpage {
-    fn set_score(&mut self, score: f64) {
-        self.ranking.set_score(score);
+    fn set_raw_score(&mut self, score: f64) {
+        self.ranking.set_raw_score(score);
     }
 
-    fn boost(&self) -> Option<f64> {
+    fn unboosted_score(&self) -> f64 {
+        self.ranking.unboosted_score()
+    }
+
+    fn boost(&self) -> f64 {
         self.ranking.boost()
     }
 
-    fn signals(&self) -> &EnumMap<SignalEnum, f64> {
+    fn set_boost(&mut self, boost: f64) {
+        self.ranking.set_boost(boost)
+    }
+
+    fn signals(&self) -> &EnumMap<SignalEnum, SignalCalculation> {
         self.ranking.signals()
     }
 
-    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
+    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, SignalCalculation> {
         self.ranking.signals_mut()
     }
 
@@ -101,46 +106,18 @@ impl PrecisionRankingWebpage {
 }
 
 impl RankingPipeline<PrecisionRankingWebpage> {
-    fn create_reranking_stage<M: CrossEncoder + 'static>(
-        crossencoder: Option<Arc<M>>,
-        lambda: Option<Arc<LambdaMART>>,
-        collector_config: CollectorConfig,
-        top_n_considered: usize,
-    ) -> Result<Self> {
-        let scorer = match crossencoder {
-            Some(cross_encoder) => {
-                Box::new(ReRanker::new(cross_encoder)) as Box<dyn Scorer<PrecisionRankingWebpage>>
-            }
-            None => Box::new(IdentityScorer) as Box<dyn Scorer<PrecisionRankingWebpage>>,
-        };
-
-        let stage = RankingStage {
-            scorer,
-            stage_top_n: top_n_considered,
-            derank_similar: true,
-            model: lambda,
-            coefficients: Default::default(),
-        };
-
-        Ok(Self {
-            stage,
-            page: 0,
-            top_n: 0,
-            collector_config,
-        })
-    }
-
     pub fn reranker<M: CrossEncoder + 'static>(
-        query: &mut SearchQuery,
-        crossencoder: Option<Arc<M>>,
-        lambda: Option<Arc<LambdaMART>>,
-        collector_config: CollectorConfig,
-        top_n_considered: usize,
-    ) -> Result<Self> {
-        let mut pipeline =
-            Self::create_reranking_stage(crossencoder, lambda, collector_config, top_n_considered)?;
-        pipeline.set_query_info(query);
+        query: &SearchQuery,
+        crossencoder: Arc<M>,
+        lambda: Option<Arc<models::LambdaMART>>,
+    ) -> Self {
+        let mut s = Self::new().add_stage(ReRanker::new(query.text().to_string(), crossencoder));
 
-        Ok(pipeline)
+        if let Some(lambda) = lambda {
+            let lambda = PrecisionLambda::from(lambda);
+            s = s.add_stage(lambda);
+        }
+
+        s
     }
 }

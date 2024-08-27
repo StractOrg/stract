@@ -18,7 +18,6 @@ use std::sync::Arc;
 
 use crate::{
     collector,
-    config::CollectorConfig,
     enum_map::EnumMap,
     inverted_index::WebpagePointer,
     models::dual_encoder::DualEncoder,
@@ -26,8 +25,16 @@ use crate::{
     ranking::{
         bitvec_similarity, inbound_similarity,
         models::lambdamart::LambdaMART,
-        pipeline::{RankableWebpage, RankingPipeline, RankingStage, Recall, Scorer},
-        SignalComputer, SignalEnum,
+        pipeline::{
+            modifiers,
+            scorers::{
+                embedding::{EmbeddingScorer, KeywordEmbeddings, TitleEmbeddings},
+                inbound_similarity::InboundScorer,
+                term_distance,
+            },
+            RankableWebpage, RankingPipeline,
+        },
+        SignalCalculation, SignalComputer, SignalEnum,
     },
     schema::{numerical_field, text_field},
     searcher::{api, SearchQuery},
@@ -42,7 +49,7 @@ impl StoredEmbeddings {
         &self.0
     }
 }
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Clone, Debug, bincode::Encode, bincode::Decode)]
 pub struct RecallRankingWebpage {
     local: LocalRecallRankingWebpage,
     inbound_edges: bitvec_similarity::BitVec,
@@ -68,26 +75,6 @@ impl RecallRankingWebpage {
         self.local.keyword_embedding()
     }
 
-    pub fn score(&self) -> f64 {
-        self.local.score()
-    }
-
-    pub fn signals(&self) -> &EnumMap<SignalEnum, f64> {
-        self.local.signals()
-    }
-
-    pub fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
-        self.local.signals_mut()
-    }
-
-    pub fn boost(&self) -> Option<f64> {
-        self.local.boost()
-    }
-
-    pub fn set_score(&mut self, score: f64) {
-        self.local.set_score(score)
-    }
-
     pub fn inbound_edges(&self) -> &bitvec_similarity::BitVec {
         &self.inbound_edges
     }
@@ -108,19 +95,27 @@ impl collector::Doc for RecallRankingWebpage {
 }
 
 impl RankableWebpage for RecallRankingWebpage {
-    fn set_score(&mut self, score: f64) {
+    fn set_raw_score(&mut self, score: f64) {
         self.local.set_score(score);
     }
 
-    fn boost(&self) -> Option<f64> {
+    fn unboosted_score(&self) -> f64 {
+        self.local.unboosted_score()
+    }
+
+    fn boost(&self) -> f64 {
         self.local.boost()
     }
 
-    fn signals(&self) -> &EnumMap<SignalEnum, f64> {
+    fn set_boost(&mut self, boost: f64) {
+        self.local.set_boost(boost)
+    }
+
+    fn signals(&self) -> &EnumMap<SignalEnum, SignalCalculation> {
         self.local.signals()
     }
 
-    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
+    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, SignalCalculation> {
         self.local.signals_mut()
     }
 
@@ -129,13 +124,13 @@ impl RankableWebpage for RecallRankingWebpage {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Clone, Debug, bincode::Encode, bincode::Decode)]
 pub struct LocalRecallRankingWebpage {
     pointer: WebpagePointer,
-    signals: EnumMap<SignalEnum, f64>,
+    signals: EnumMap<SignalEnum, SignalCalculation>,
     title_positions: Vec<Vec<u32>>,
     clean_body_positions: Vec<Vec<u32>>,
-    optic_boost: Option<f64>,
+    boost: f64,
     title_embedding: Option<StoredEmbeddings>,
     keyword_embedding: Option<StoredEmbeddings>,
     score: f64,
@@ -146,7 +141,7 @@ impl LocalRecallRankingWebpage {
     #[cfg(test)]
     pub fn new_testing(
         pointer: WebpagePointer,
-        signals: EnumMap<SignalEnum, f64>,
+        signals: EnumMap<SignalEnum, SignalCalculation>,
         score: f64,
     ) -> Self {
         LocalRecallRankingWebpage {
@@ -154,7 +149,7 @@ impl LocalRecallRankingWebpage {
             signals,
             title_positions: Vec::new(),
             clean_body_positions: Vec::new(),
-            optic_boost: None,
+            boost: 1.0,
             title_embedding: None,
             keyword_embedding: None,
             score,
@@ -198,7 +193,7 @@ impl LocalRecallRankingWebpage {
         let mut res = LocalRecallRankingWebpage {
             signals: EnumMap::new(),
             score: pointer.score.total,
-            optic_boost: None,
+            boost: 1.0,
             pointer: pointer.clone(),
             title_embedding: title_embedding.map(StoredEmbeddings),
             keyword_embedding: keyword_embedding.map(StoredEmbeddings),
@@ -209,11 +204,11 @@ impl LocalRecallRankingWebpage {
 
         for computed_signal in computer.compute_signals(pointer.address.doc_id) {
             res.signals
-                .insert(computed_signal.signal, computed_signal.score);
+                .insert(computed_signal.signal, computed_signal.calc);
         }
 
         if let Some(boost) = computer.boosts(pointer.address.doc_id) {
-            res.optic_boost = Some(boost);
+            res.boost *= boost;
         }
 
         res
@@ -232,19 +227,15 @@ impl LocalRecallRankingWebpage {
     }
 
     pub fn score(&self) -> f64 {
-        self.score
+        self.score * self.boost
     }
 
-    pub fn signals(&self) -> &EnumMap<SignalEnum, f64> {
+    pub fn signals(&self) -> &EnumMap<SignalEnum, SignalCalculation> {
         &self.signals
     }
 
-    pub fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
+    pub fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, SignalCalculation> {
         &mut self.signals
-    }
-
-    pub fn boost(&self) -> Option<f64> {
-        self.optic_boost
     }
 
     pub fn set_score(&mut self, score: f64) {
@@ -265,19 +256,27 @@ impl LocalRecallRankingWebpage {
 }
 
 impl RankableWebpage for LocalRecallRankingWebpage {
-    fn set_score(&mut self, score: f64) {
+    fn set_raw_score(&mut self, score: f64) {
         self.score = score;
     }
 
-    fn boost(&self) -> Option<f64> {
-        self.optic_boost
+    fn unboosted_score(&self) -> f64 {
+        self.score
     }
 
-    fn signals(&self) -> &EnumMap<SignalEnum, f64> {
+    fn boost(&self) -> f64 {
+        self.boost
+    }
+
+    fn set_boost(&mut self, boost: f64) {
+        self.boost = boost;
+    }
+
+    fn signals(&self) -> &EnumMap<SignalEnum, SignalCalculation> {
         &self.signals
     }
 
-    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
+    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, SignalCalculation> {
         &mut self.signals
     }
 
@@ -288,7 +287,7 @@ impl RankableWebpage for LocalRecallRankingWebpage {
 
 impl collector::Doc for LocalRecallRankingWebpage {
     fn score(&self) -> f64 {
-        self.score
+        RankableWebpage::score(self)
     }
 
     fn hashes(&self) -> collector::Hashes {
@@ -296,89 +295,33 @@ impl collector::Doc for LocalRecallRankingWebpage {
     }
 }
 
-impl RankingPipeline<LocalRecallRankingWebpage> {
-    fn create_recall_stage(
-        lambdamart: Option<Arc<LambdaMART>>,
-        dual_encoder: Option<Arc<DualEncoder>>,
-        collector_config: CollectorConfig,
-        stage_top_n: usize,
-    ) -> Self {
-        let last_stage = RankingStage {
-            scorer: Box::new(Recall::<LocalRecallRankingWebpage>::new(dual_encoder))
-                as Box<dyn Scorer<LocalRecallRankingWebpage>>,
-            stage_top_n,
-            derank_similar: true,
-            model: lambdamart,
-            coefficients: Default::default(),
-        };
-
-        Self {
-            stage: last_stage,
-            page: 0,
-            top_n: 0,
-            collector_config,
-        }
-    }
-
-    pub fn recall_stage(
-        query: &mut SearchQuery,
-        lambdamart: Option<Arc<LambdaMART>>,
-        dual_encoder: Option<Arc<DualEncoder>>,
-        collector_config: CollectorConfig,
-        top_n_considered: usize,
-    ) -> Self {
-        let mut pipeline =
-            Self::create_recall_stage(lambdamart, dual_encoder, collector_config, top_n_considered);
-        pipeline.set_query_info(query);
-
-        pipeline
-    }
-}
-
 impl RankingPipeline<api::ScoredWebpagePointer> {
-    fn create_recall_stage(
-        inbound: inbound_similarity::Scorer,
-        lambdamart: Option<Arc<LambdaMART>>,
-        dual_encoder: Option<Arc<DualEncoder>>,
-        collector_config: CollectorConfig,
-        stage_top_n: usize,
-    ) -> Self {
-        let last_stage = RankingStage {
-            scorer: Box::new(Recall::<api::ScoredWebpagePointer>::new(
-                inbound,
-                dual_encoder,
-            )),
-            stage_top_n,
-            derank_similar: true,
-            model: lambdamart,
-            coefficients: Default::default(),
-        };
-
-        Self {
-            stage: last_stage,
-            page: 0,
-            top_n: 0,
-            collector_config,
-        }
-    }
-
     pub fn recall_stage(
-        query: &mut SearchQuery,
+        query: &SearchQuery,
         inbound: inbound_similarity::Scorer,
         lambdamart: Option<Arc<LambdaMART>>,
         dual_encoder: Option<Arc<DualEncoder>>,
-        collector_config: CollectorConfig,
-        top_n_considered: usize,
     ) -> Self {
-        let mut pipeline = Self::create_recall_stage(
-            inbound,
-            lambdamart,
-            dual_encoder,
-            collector_config,
-            top_n_considered,
-        );
-        pipeline.set_query_info(query);
+        let mut s = Self::new()
+            .add_stage(term_distance::TitleDistanceScorer)
+            .add_stage(term_distance::BodyDistanceScorer)
+            .add_stage(
+                EmbeddingScorer::<api::ScoredWebpagePointer, TitleEmbeddings>::new(
+                    query.text().to_string(),
+                    dual_encoder.clone(),
+                ),
+            )
+            .add_stage(EmbeddingScorer::<
+                api::ScoredWebpagePointer,
+                KeywordEmbeddings,
+            >::new(query.text().to_string(), dual_encoder))
+            .add_stage(InboundScorer::new(inbound))
+            .add_modifier(modifiers::InboundSimilarity);
 
-        pipeline
+        if let Some(lambda) = lambdamart {
+            s = s.add_stage(lambda);
+        }
+
+        s
     }
 }

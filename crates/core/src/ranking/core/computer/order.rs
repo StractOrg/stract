@@ -18,7 +18,7 @@ use tantivy::DocId;
 
 use crate::{
     enum_map::EnumMap,
-    ranking::{ComputedSignal, Signal, SignalEnum},
+    ranking::{ComputedSignal, Signal, SignalCalculation, SignalEnum},
     schema::{text_field::TextField, TextFieldEnum},
 };
 
@@ -71,13 +71,16 @@ impl SignalComputeOrder {
             .chain(self.other_signals.iter().map(move |signal| {
                 signal
                     .compute(doc, signal_computer)
-                    .map(|score| ComputedSignal {
+                    .map(|calc| ComputedSignal {
                         signal: *signal,
-                        score,
+                        calc,
                     })
                     .unwrap_or_else(|| ComputedSignal {
                         signal: *signal,
-                        score: 0.0,
+                        calc: SignalCalculation {
+                            score: 0.0,
+                            value: 0.0,
+                        },
                     })
             }))
     }
@@ -112,14 +115,14 @@ impl NGramComputeOrder {
         self.signals.iter().map(|(_, s)| s).map(move |signal| {
             signal
                 .compute(doc, signal_computer)
-                .map(|score| ComputedSignal {
+                .map(|calc| ComputedSignal {
                     signal: *signal,
-                    score,
+                    calc,
                 })
                 .map(|mut c| {
-                    c.score *= NGRAM_DAMPENING.powi(hits);
+                    c.calc.score *= NGRAM_DAMPENING.powi(hits);
 
-                    if c.score > 0.0 {
+                    if c.calc.score > 0.0 {
                         hits += 1;
                     }
 
@@ -127,7 +130,10 @@ impl NGramComputeOrder {
                 })
                 .unwrap_or_else(|| ComputedSignal {
                     signal: *signal,
-                    score: 0.0,
+                    calc: SignalCalculation {
+                        value: 0.0,
+                        score: 0.0,
+                    },
                 })
         })
     }

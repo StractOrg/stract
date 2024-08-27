@@ -272,7 +272,6 @@ export type DisplayedWebpage = {
   prettyUrl: string;
   rankingSignals?: {};
   richSnippet?: RichSnippet;
-  score?: number;
   site: string;
   snippet: Snippet;
   structuredData?: StructuredData[];
@@ -373,9 +372,11 @@ export type SidebarQuery = {
 export type SignalEnumDiscriminants =
   | 'bm25_f'
   | 'bm25_title'
+  | 'title_coverage'
   | 'bm25_title_bigrams'
   | 'bm25_title_trigrams'
   | 'bm25_clean_body'
+  | 'clean_body_coverage'
   | 'bm25_clean_body_bigrams'
   | 'bm25_clean_body_trigrams'
   | 'bm25_stemmed_title'
@@ -411,13 +412,19 @@ export type SignalEnumDiscriminants =
   | 'url_slashes'
   | 'link_density'
   | 'title_embedding_similarity'
-  | 'keyword_embedding_similarity';
+  | 'keyword_embedding_similarity'
+  | 'has_ads'
+  | 'num_query_terms'
+  | 'min_title_slop'
+  | 'min_clean_body_slop';
 export const SIGNAL_ENUM_DISCRIMINANTS = [
   'bm25_f',
   'bm25_title',
+  'title_coverage',
   'bm25_title_bigrams',
   'bm25_title_trigrams',
   'bm25_clean_body',
+  'clean_body_coverage',
   'bm25_clean_body_bigrams',
   'bm25_clean_body_trigrams',
   'bm25_stemmed_title',
@@ -454,6 +461,10 @@ export const SIGNAL_ENUM_DISCRIMINANTS = [
   'link_density',
   'title_embedding_similarity',
   'keyword_embedding_similarity',
+  'has_ads',
+  'num_query_terms',
+  'min_title_slop',
+  'min_clean_body_slop',
 ] satisfies SignalEnumDiscriminants[];
 export type SignalScore = {
   coefficient: number;

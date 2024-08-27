@@ -16,48 +16,60 @@
 
 pub mod embedding;
 pub mod inbound_similarity;
-pub mod recall;
+pub mod lambdamart;
 pub mod reranker;
 pub mod term_distance;
 
-pub use recall::Recall;
 pub use reranker::ReRanker;
 
-use crate::searcher::SearchQuery;
+use crate::ranking::{SignalCalculation, SignalCoefficients, SignalEnum};
 
-use super::RankableWebpage;
+use super::{RankableWebpage, Top};
 
-pub trait Scorer<T: RankableWebpage>: Send + Sync {
-    fn score(&self, webpages: &mut [T]);
-    fn set_query_info(&mut self, _query: &SearchQuery) {}
-}
+pub trait FullRankingStage: Send + Sync {
+    type Webpage: RankableWebpage;
 
-pub struct IdentityScorer;
-
-impl<T: RankableWebpage> Scorer<T> for IdentityScorer {
-    fn score(&self, _webpages: &mut [T]) {}
-}
-
-pub struct MultiScorer<T: RankableWebpage> {
-    scorers: Vec<Box<dyn Scorer<T>>>,
-}
-
-impl<T: RankableWebpage> MultiScorer<T> {
-    pub fn new(scorers: Vec<Box<dyn Scorer<T>>>) -> Self {
-        Self { scorers }
+    fn compute(&self, webpages: &mut [Self::Webpage]);
+    fn top_n(&self) -> Top {
+        Top::Unlimited
     }
-}
 
-impl<T: RankableWebpage> Scorer<T> for MultiScorer<T> {
-    fn score(&self, webpages: &mut [T]) {
-        for scorer in &self.scorers {
-            scorer.score(webpages);
+    fn update_scores(&self, webpages: &mut [Self::Webpage], coefficients: &SignalCoefficients) {
+        for webpage in webpages.iter_mut() {
+            webpage.set_raw_score(webpage.signals().iter().fold(0.0, |acc, (signal, calc)| {
+                acc + calc.score * coefficients.get(&signal)
+            }));
         }
     }
 
-    fn set_query_info(&mut self, query: &SearchQuery) {
-        for scorer in &mut self.scorers {
-            scorer.set_query_info(query);
+    fn rank(&self, webpages: &mut [Self::Webpage]) {
+        webpages.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
+    }
+}
+
+pub trait RankingStage: Send + Sync {
+    type Webpage: RankableWebpage;
+
+    fn compute(&self, webpage: &Self::Webpage) -> (SignalEnum, SignalCalculation);
+    fn top_n(&self) -> Top {
+        Top::Unlimited
+    }
+}
+
+impl<T> FullRankingStage for T
+where
+    T: RankingStage,
+{
+    type Webpage = <T as RankingStage>::Webpage;
+
+    fn compute(&self, webpages: &mut [Self::Webpage]) {
+        for webpage in webpages.iter_mut() {
+            let (signal, signal_calculation) = self.compute(webpage);
+            webpage.signals_mut().insert(signal, signal_calculation);
         }
+    }
+
+    fn top_n(&self) -> Top {
+        self.top_n()
     }
 }

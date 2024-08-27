@@ -456,7 +456,6 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "logos",
- "once_cell",
  "serde",
  "thiserror",
  "utoipa",

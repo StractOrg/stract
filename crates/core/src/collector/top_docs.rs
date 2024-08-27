@@ -426,10 +426,12 @@ where
             }
         }
 
-        Ok(collector
-            .into_sorted_vec(self.top_docs.de_rank_similar)
+        let docs = collector.into_sorted_vec(self.top_docs.de_rank_similar);
+
+        Ok(docs
             .into_iter()
             .skip(self.top_docs.offset)
+            .take(self.top_docs.top_n)
             .map(|doc| WebpagePointer {
                 score: doc.score,
                 hashes: doc.hashes,

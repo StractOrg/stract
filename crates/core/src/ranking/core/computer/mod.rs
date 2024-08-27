@@ -40,7 +40,7 @@ use crate::webpage::region::RegionCount;
 use crate::ranking::bm25::MultiBm25Weight;
 use crate::ranking::models::linear::LinearRegression;
 
-use super::{ComputedSignal, Signal, SignalCoefficient, SignalEnum};
+use super::{ComputedSignal, Signal, SignalCoefficients, SignalEnum};
 
 mod order;
 pub use order::SignalComputeOrder;
@@ -192,7 +192,7 @@ impl QueryData {
 
 pub struct SignalComputer {
     query_data: Option<QueryData>,
-    query_signal_coefficients: Option<SignalCoefficient>,
+    query_signal_coefficients: Option<SignalCoefficients>,
     segment_reader: Option<RefCell<SegmentReader>>,
     fetch_time_ms_cache: Vec<f64>,
     update_time_cache: Vec<f64>,
@@ -474,9 +474,9 @@ impl SignalComputer {
             .filter_map(|signal| {
                 signal
                     .precompute(webpage, self)
-                    .map(|score| ComputedSignal { signal, score })
+                    .map(|calc| ComputedSignal { signal, calc })
             })
-            .map(|computed| self.coefficient(&computed.signal) * computed.score)
+            .map(|computed| self.coefficient(&computed.signal) * computed.calc.score)
             .sum()
     }
 

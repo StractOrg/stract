@@ -16,23 +16,20 @@
 
 use std::sync::Arc;
 
-use crate::{
-    ranking::{self, models::cross_encoder::CrossEncoder},
-    searcher::SearchQuery,
-};
+use crate::ranking::{self, models::cross_encoder::CrossEncoder, pipeline::RankableWebpage};
 
-use crate::ranking::pipeline::{PrecisionRankingWebpage, Scorer};
+use crate::ranking::pipeline::{FullRankingStage, PrecisionRankingWebpage, Top};
 
 pub struct ReRanker<M: CrossEncoder> {
     crossencoder: Arc<M>,
-    query: Option<SearchQuery>,
+    query: String,
 }
 
 impl<M: CrossEncoder> ReRanker<M> {
-    pub fn new(crossencoder: Arc<M>) -> Self {
+    pub fn new(query: String, crossencoder: Arc<M>) -> Self {
         Self {
             crossencoder,
-            query: None,
+            query,
         }
     }
 
@@ -45,31 +42,33 @@ impl<M: CrossEncoder> ReRanker<M> {
             snippets.push(webpage.retrieved_webpage().snippet.unhighlighted_string());
         }
 
-        let query = &self.query.as_ref().unwrap().query;
+        let query = &self.query;
         let snippet_scores = self.crossencoder.run(query, &snippets);
         let title_scores = self.crossencoder.run(query, &titles);
 
         for ((webpage, snippet), title) in webpage.iter_mut().zip(snippet_scores).zip(title_scores)
         {
-            webpage
-                .ranking_mut()
-                .signals_mut()
-                .insert(ranking::core::CrossEncoderSnippet.into(), snippet);
+            webpage.ranking_mut().signals_mut().insert(
+                ranking::core::CrossEncoderSnippet.into(),
+                ranking::SignalCalculation::new_symmetrical(snippet),
+            );
 
-            webpage
-                .ranking_mut()
-                .signals_mut()
-                .insert(ranking::core::CrossEncoderTitle.into(), title);
+            webpage.ranking_mut().signals_mut().insert(
+                ranking::core::CrossEncoderTitle.into(),
+                ranking::SignalCalculation::new_symmetrical(title),
+            );
         }
     }
 }
 
-impl<M: CrossEncoder> Scorer<PrecisionRankingWebpage> for ReRanker<M> {
-    fn score(&self, webpages: &mut [PrecisionRankingWebpage]) {
+impl<M: CrossEncoder> FullRankingStage for ReRanker<M> {
+    type Webpage = PrecisionRankingWebpage;
+
+    fn compute(&self, webpages: &mut [Self::Webpage]) {
         self.crossencoder_score_webpages(webpages);
     }
 
-    fn set_query_info(&mut self, query: &SearchQuery) {
-        self.query = Some(query.clone());
+    fn top_n(&self) -> Top {
+        Top::Limit(20)
     }
 }

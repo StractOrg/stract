@@ -16,8 +16,9 @@
 
 use itertools::Itertools;
 
-use crate::ranking;
 use crate::ranking::pipeline::RankableWebpage;
+use crate::ranking::{self, SignalCalculation, SignalEnum};
+use crate::searcher::api;
 
 fn min_slop_two_positions(pos_a: &[u32], pos_b: &[u32]) -> u32 {
     let mut cur_min = u32::MAX;
@@ -52,35 +53,47 @@ fn min_slop<'a>(positions: impl Iterator<Item = &'a [u32]>) -> u32 {
         .unwrap_or(u32::MAX)
 }
 
+fn score_slop(slop: f64) -> f64 {
+    1.0 / (slop + 1.0)
+}
+
 #[derive(Debug, Default)]
 pub struct TitleDistanceScorer;
 
-impl<W: RankableWebpage> super::Scorer<W> for TitleDistanceScorer {
-    fn score(&self, webpages: &mut [W]) {
-        for webpage in webpages {
-            let min_slop = min_slop(webpage.as_local_recall().iter_title_positions());
+impl super::RankingStage for TitleDistanceScorer {
+    type Webpage = api::ScoredWebpagePointer;
 
-            webpage.signals_mut().insert(
-                ranking::core::MinTitleSlop.into(),
-                1.0 / (min_slop as f64 + 1.0),
-            );
-        }
+    fn compute(&self, webpage: &Self::Webpage) -> (SignalEnum, SignalCalculation) {
+        let min_slop = min_slop(webpage.as_local_recall().iter_title_positions()) as f64;
+        let score = score_slop(min_slop);
+
+        (
+            ranking::core::MinTitleSlop.into(),
+            ranking::SignalCalculation {
+                value: min_slop,
+                score,
+            },
+        )
     }
 }
 
 #[derive(Debug, Default)]
 pub struct BodyDistanceScorer;
 
-impl<W: RankableWebpage> super::Scorer<W> for BodyDistanceScorer {
-    fn score(&self, webpages: &mut [W]) {
-        for webpage in webpages {
-            let min_slop = min_slop(webpage.as_local_recall().iter_clean_body_positions());
+impl super::RankingStage for BodyDistanceScorer {
+    type Webpage = api::ScoredWebpagePointer;
 
-            webpage.signals_mut().insert(
-                ranking::core::MinCleanBodySlop.into(),
-                1.0 / (min_slop as f64 + 1.0),
-            );
-        }
+    fn compute(&self, webpage: &Self::Webpage) -> (SignalEnum, SignalCalculation) {
+        let min_slop = min_slop(webpage.as_local_recall().iter_clean_body_positions()) as f64;
+        let score = score_slop(min_slop);
+
+        (
+            ranking::core::MinCleanBodySlop.into(),
+            ranking::SignalCalculation {
+                value: min_slop,
+                score,
+            },
+        )
     }
 }
 

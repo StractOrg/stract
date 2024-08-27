@@ -27,7 +27,7 @@ use url::Url;
 use ahash::AHashMap as HashMap;
 
 use crate::bangs::{Bang, BangHit};
-use crate::collector::{self, approx_count, Doc};
+use crate::collector::{self, approx_count};
 use crate::config::{ApiConfig, ApiSpellCheck, ApiThresholds, CollectorConfig, WidgetsConfig};
 use crate::enum_map::EnumMap;
 use crate::image_store::Image;
@@ -36,7 +36,8 @@ use crate::models::dual_encoder::DualEncoder;
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
 use crate::ranking::pipeline::{PrecisionRankingWebpage, RankableWebpage, RecallRankingWebpage};
 use crate::ranking::{
-    bitvec_similarity, inbound_similarity, SignalCoefficient, SignalEnum, SignalScore,
+    bitvec_similarity, inbound_similarity, SignalCalculation, SignalCoefficients, SignalEnum,
+    SignalScore,
 };
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::web_spell::SpellChecker;
@@ -54,6 +55,8 @@ use self::sidebar::SidebarManager;
 use self::widget::WidgetManager;
 
 use super::{distributed, live, SearchQuery, SearchResult, WebsitesResult};
+
+const NUM_PIPELINE_RANKING_RESULTS: usize = 300;
 
 #[derive(Clone)]
 pub enum ScoredWebpagePointer {
@@ -78,26 +81,34 @@ impl ScoredWebpagePointer {
 }
 
 impl RankableWebpage for ScoredWebpagePointer {
-    fn set_score(&mut self, score: f64) {
-        self.as_ranking_mut().set_score(score);
+    fn set_raw_score(&mut self, score: f64) {
+        self.as_ranking_mut().set_raw_score(score);
     }
 
-    fn boost(&self) -> Option<f64> {
+    fn unboosted_score(&self) -> f64 {
+        self.as_ranking().unboosted_score()
+    }
+
+    fn boost(&self) -> f64 {
         self.as_ranking().boost()
+    }
+
+    fn set_boost(&mut self, boost: f64) {
+        self.as_ranking_mut().set_boost(boost)
     }
 
     fn as_local_recall(&self) -> &crate::ranking::pipeline::LocalRecallRankingWebpage {
         self.as_ranking().as_local_recall()
     }
 
-    fn signals(&self) -> &EnumMap<SignalEnum, f64> {
+    fn signals(&self) -> &EnumMap<SignalEnum, SignalCalculation> {
         match self {
             ScoredWebpagePointer::Normal(p) => p.website.signals(),
             ScoredWebpagePointer::Live(p) => p.website.signals(),
         }
     }
 
-    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64> {
+    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, SignalCalculation> {
         match self {
             ScoredWebpagePointer::Normal(p) => p.website.signals_mut(),
             ScoredWebpagePointer::Live(p) => p.website.signals_mut(),
@@ -107,7 +118,7 @@ impl RankableWebpage for ScoredWebpagePointer {
 
 impl collector::Doc for ScoredWebpagePointer {
     fn score(&self) -> f64 {
-        self.as_ranking().score()
+        RankableWebpage::score(self)
     }
 
     fn hashes(&self) -> collector::Hashes {
@@ -118,7 +129,7 @@ impl collector::Doc for ScoredWebpagePointer {
 pub fn add_ranking_signals(
     websites: &mut [DisplayedWebpage],
     pointers: &[ScoredWebpagePointer],
-    coeffs: &SignalCoefficient,
+    coeffs: &SignalCoefficients,
 ) {
     for (website, pointer) in websites.iter_mut().zip(pointers.iter()) {
         let mut signals = std::collections::HashMap::new();
@@ -128,7 +139,7 @@ pub fn add_ranking_signals(
                 signals.insert(
                     signal.into(),
                     SignalScore {
-                        value: *signal_value,
+                        value: signal_value.score,
                         coefficient: coeffs.get(&signal),
                     },
                 );
@@ -469,12 +480,12 @@ where
 
     async fn combine_results(
         &self,
-        collector_config: CollectorConfig,
+        query: &SearchQuery,
         initial_results: Vec<distributed::InitialSearchResultShard>,
         live_results: Vec<live::InitialSearchResultSplit>,
-        pipeline: RankingPipeline<ScoredWebpagePointer>,
     ) -> (Vec<ScoredWebpagePointer>, bool) {
-        let mut collector = BucketCollector::new(pipeline.collector_top_n(), collector_config);
+        let mut collector =
+            BucketCollector::new(NUM_PIPELINE_RANKING_RESULTS, self.collector_config.clone());
 
         let initial_host_nodes = initial_results
             .iter()
@@ -502,12 +513,10 @@ where
             .map(|(v, n)| (n, v))
             .collect::<HashMap<_, _>>();
 
-        let mut has_more = false;
-        for result in initial_results {
-            if result.local_result.has_more {
-                has_more = true;
-            }
+        let mut num_results = 0;
 
+        for result in initial_results {
+            num_results += result.local_result.websites.len();
             for website in result.local_result.websites {
                 let inbound = host_nodes
                     .get(website.host_id())
@@ -525,10 +534,7 @@ where
         }
 
         for result in live_results {
-            if result.local_result.has_more {
-                has_more = true;
-            }
-
+            num_results += result.local_result.websites.len();
             for website in result.local_result.websites {
                 let inbound = host_nodes
                     .get(website.host_id())
@@ -545,13 +551,13 @@ where
             }
         }
 
-        let top_websites = collector
+        let has_more = query.offset() + query.num_results() < num_results;
+
+        let res = collector
             .into_sorted_vec(true)
             .into_iter()
-            .take(pipeline.collector_top_n())
+            .take(NUM_PIPELINE_RANKING_RESULTS)
             .collect::<Vec<_>>();
-
-        let res = pipeline.apply(top_websites);
 
         (res, has_more)
     }
@@ -578,6 +584,57 @@ where
         }
     }
 
+    async fn search_websites_approx_offsets(&self, query: &SearchQuery) -> Result<WebsitesResult> {
+        let start = Instant::now();
+
+        let search_query = SearchQuery {
+            num_results: query.num_results + 1,
+            ..query.clone()
+        };
+
+        let results = self
+            .distributed_searcher
+            .search_initial(&search_query)
+            .await;
+
+        let has_more_results = results
+            .iter()
+            .any(|res| res.local_result.websites.len() > query.num_results());
+
+        let num_docs = results
+            .iter()
+            .map(|result| result.local_result.num_websites)
+            .fold(approx_count::Count::Exact(0), |acc, count| acc + count);
+
+        let (combined, _) = self.combine_results(query, results, vec![]).await;
+        let combined: Vec<_> = combined.into_iter().take(query.num_results).collect();
+
+        let mut retrieved_webpages: Vec<_> = self
+            .retrieve_webpages(&query.query, &combined)
+            .await
+            .into_iter()
+            .map(|webpage| webpage.into_retrieved_webpage())
+            .map(|webpage| DisplayedWebpage::new(webpage, query))
+            .collect();
+
+        if query.return_ranking_signals {
+            add_ranking_signals(
+                &mut retrieved_webpages,
+                &combined,
+                &query.signal_coefficients(),
+            );
+        }
+
+        let search_duration_ms = start.elapsed().as_millis();
+
+        Ok(WebsitesResult {
+            num_hits: num_docs,
+            webpages: retrieved_webpages,
+            search_duration_ms,
+            has_more_results,
+        })
+    }
+
     async fn search_websites(&self, query: &SearchQuery) -> Result<WebsitesResult> {
         let start = Instant::now();
 
@@ -585,22 +642,17 @@ where
             return Err(distributed::Error::EmptyQuery.into());
         }
 
-        let mut search_query = query.clone();
-        let inbound_scorer = self.inbound_scorer(&search_query).await;
+        if query.offset() + query.num_results() > NUM_PIPELINE_RANKING_RESULTS {
+            // this is most likely a bot
+            // let's not spend too much time correctly offsetting+ranking results
+            return self.search_websites_approx_offsets(query).await;
+        }
 
-        let top_n = search_query.num_results;
-
-        // This pipeline should be created before the first search is performed
-        // so the query knows how many results to fetch from the indices
-        let recall_pipeline: RankingPipeline<ScoredWebpagePointer> =
-            RankingPipeline::<ScoredWebpagePointer>::recall_stage(
-                &mut search_query,
-                inbound_scorer,
-                self.lambda_model.clone(),
-                self.dual_encoder.clone(),
-                self.collector_config.clone(),
-                top_n,
-            );
+        let search_query = SearchQuery {
+            num_results: NUM_PIPELINE_RANKING_RESULTS,
+            page: 0,
+            ..query.clone()
+        };
 
         let (initial_results, live_results) = tokio::join!(
             self.distributed_searcher.search_initial(&search_query),
@@ -613,38 +665,45 @@ where
             .fold(approx_count::Count::Exact(0), |acc, count| acc + count);
 
         let (top_websites, has_more_results) = self
-            .combine_results(
-                self.collector_config.clone(),
-                initial_results,
-                live_results.unwrap_or_default(),
-                recall_pipeline,
-            )
+            .combine_results(query, initial_results, live_results.unwrap_or_default())
             .await;
 
-        let retrieved_webpages = self
-            .retrieve_webpages(&search_query.query, &top_websites)
-            .await;
+        let inbound_scorer = self.inbound_scorer(query).await;
 
-        let mut search_query = SearchQuery {
-            page: 0,
-            ..query.clone()
-        };
-
-        let reranking_pipeline: RankingPipeline<PrecisionRankingWebpage> =
-            RankingPipeline::<PrecisionRankingWebpage>::reranker(
-                &mut search_query,
-                self.cross_encoder.clone(),
+        let pipeline: RankingPipeline<ScoredWebpagePointer> =
+            RankingPipeline::<ScoredWebpagePointer>::recall_stage(
+                query,
+                inbound_scorer,
                 self.lambda_model.clone(),
-                self.collector_config.clone(),
-                query.num_results,
-            )?;
+                self.dual_encoder.clone(),
+            );
 
-        let retrieved_webpages = reranking_pipeline.apply(retrieved_webpages);
+        let top_websites = pipeline.apply(top_websites, query);
+
+        let mut retrieved_webpages = self.retrieve_webpages(&query.query, &top_websites).await;
+
+        if let Some(cross_encoder) = self.cross_encoder.clone() {
+            if query.page < 2 {
+                let query = SearchQuery {
+                    page: 1,
+                    ..query.clone()
+                };
+
+                let reranking_pipeline: RankingPipeline<PrecisionRankingWebpage> =
+                    RankingPipeline::<PrecisionRankingWebpage>::reranker(
+                        &query,
+                        cross_encoder,
+                        self.lambda_model.clone(),
+                    );
+
+                retrieved_webpages = reranking_pipeline.apply(retrieved_webpages, &query);
+            }
+        }
 
         let mut retrieved_webpages: Vec<_> = retrieved_webpages
             .into_iter()
             .map(|webpage| webpage.into_retrieved_webpage())
-            .map(|webpage| DisplayedWebpage::new(webpage, &search_query))
+            .map(|webpage| DisplayedWebpage::new(webpage, query))
             .collect();
 
         if retrieved_webpages.len() != top_websites.len() {
@@ -655,12 +714,8 @@ where
             add_ranking_signals(
                 &mut retrieved_webpages,
                 &top_websites,
-                &search_query.signal_coefficients(),
+                &query.signal_coefficients(),
             );
-        }
-
-        for (website, pointer) in retrieved_webpages.iter_mut().zip(top_websites.iter()) {
-            website.score = Some(pointer.score());
         }
 
         let search_duration_ms = start.elapsed().as_millis();

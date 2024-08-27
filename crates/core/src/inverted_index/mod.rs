@@ -237,7 +237,7 @@ mod tests {
         collector::MainCollector,
         config::CollectorConfig,
         query::Query,
-        ranking::{Ranker, SignalComputer},
+        ranking::{LocalRanker, SignalComputer},
         search_ctx::Ctx,
         searcher::SearchQuery,
         webgraph::{Edge, NodeDatum},
@@ -282,7 +282,7 @@ mod tests {
         )
         .expect("Failed to parse query");
 
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -314,7 +314,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let ctx = index.local_search_ctx();
 
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -363,7 +363,7 @@ mod tests {
         )
         .expect("Failed to parse query");
 
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -410,7 +410,7 @@ mod tests {
             &index,
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -458,7 +458,7 @@ mod tests {
             &index,
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -536,7 +536,7 @@ mod tests {
             &index,
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -594,7 +594,7 @@ mod tests {
             &index,
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -641,7 +641,7 @@ mod tests {
             &index,
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -717,7 +717,7 @@ mod tests {
             &index,
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -744,7 +744,7 @@ mod tests {
             &index,
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -777,7 +777,7 @@ mod tests {
         index.commit().expect("failed to commit index");
 
         let ctx = index.local_search_ctx();
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -824,7 +824,7 @@ mod tests {
             &index,
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -875,7 +875,7 @@ mod tests {
             &index,
         )
         .expect("Failed to parse query");
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -1048,7 +1048,7 @@ mod tests {
         )
         .expect("Failed to parse query");
 
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -1119,7 +1119,7 @@ mod tests {
             ..Default::default()
         };
 
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             collector_config,
@@ -1170,7 +1170,7 @@ mod tests {
         )
         .expect("Failed to parse query");
 
-        let ranker = Ranker::new(
+        let ranker = LocalRanker::new(
             SignalComputer::new(Some(&query)),
             ctx.columnfield_reader.clone(),
             CollectorConfig::default(),
@@ -1228,7 +1228,7 @@ mod tests {
             )
             .expect("Failed to parse query");
 
-            let ranker = Ranker::new(
+            let ranker = LocalRanker::new(
                 SignalComputer::new(Some(&query)),
                 ctx.columnfield_reader.clone(),
                 CollectorConfig::default(),

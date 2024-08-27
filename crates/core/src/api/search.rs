@@ -17,7 +17,7 @@
 use crate::{
     config::defaults,
     enum_map::EnumMap,
-    ranking::{SignalCoefficient, SignalEnum, SignalEnumDiscriminants},
+    ranking::{SignalCoefficients, SignalEnum, SignalEnumDiscriminants},
 };
 use http::StatusCode;
 use optics::{HostRankings, Optic};
@@ -95,7 +95,7 @@ impl TryFrom<ApiSearchQuery> for SearchQuery {
             None
         };
 
-        let signal_coefficients: Option<SignalCoefficient> =
+        let signal_coefficients: Option<SignalCoefficients> =
             api.signal_coefficients.map(|coefficients| {
                 coefficients
                     .into_iter()

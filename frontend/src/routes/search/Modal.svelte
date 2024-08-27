@@ -78,16 +78,22 @@
       .with('fetch_time_ms', () => 'fetchTime' as const)
       .with('update_timestamp', () => 'updateTimestamp' as const)
       .with('tracker_score', () => 'trackerScore' as const)
+      .with('has_ads', () => 'trackerScore' as const)
       .with('region', () => 'region' as const)
       .with('query_centrality', () => 'queryCentrality' as const)
       .with('inbound_similarity', () => 'inboundSimilarity' as const)
       .with('lambda_mart', () => undefined)
+      .with('num_query_terms', () => undefined)
       .with('url_digits', () => 'urlSymbols' as const)
       .with('url_slashes', () => 'urlSymbols' as const)
       .with('link_density', () => 'linkDensity' as const)
       .with('title_embedding_similarity', () => 'title' as const)
       .with('keyword_embedding_similarity', () => 'keywords' as const)
       .with('bm25_f', () => 'combinedText' as const)
+      .with('min_clean_body_slop', () => 'body' as const)
+      .with('min_title_slop', () => 'title' as const)
+      .with('title_coverage', () => 'title' as const)
+      .with('clean_body_coverage', () => 'body' as const)
       .exhaustive();
   };
 

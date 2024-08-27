@@ -10,17 +10,17 @@
   let showMore = false;
 
   $: {
-    let medianScore = 0;
-    if (discussions) {
-      const scores = discussions.map((d) => d.score || 0);
-      scores.sort((a, b) => a - b);
-      const mid = Math.floor(scores.length / 2);
-      medianScore = scores.length % 2 !== 0 ? scores[mid] : (scores[mid - 1] + scores[mid]) / 2;
-    }
+    // let medianScore = 0;
+    // if (discussions) {
+    //   const scores = discussions.map((d) => d.score || 0);
+    //   scores.sort((a, b) => a - b);
+    //   const mid = Math.floor(scores.length / 2);
+    //   medianScore = scores.length % 2 !== 0 ? scores[mid] : (scores[mid - 1] + scores[mid]) / 2;
+    // }
 
-    if (medianScore < 0.1) {
-      discussions = undefined;
-    }
+    // if (medianScore < 0.1) {
+    //   discussions = undefined;
+    // }
 
     let numDiscussions = discussions?.length || 0;
     if (numDiscussions < 5) {

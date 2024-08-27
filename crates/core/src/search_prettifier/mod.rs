@@ -197,7 +197,6 @@ pub struct DisplayedWebpage {
     pub rich_snippet: Option<RichSnippet>,
     pub ranking_signals: Option<HashMap<SignalEnumDiscriminants, SignalScore>>,
     pub structured_data: Option<Vec<StructuredData>>,
-    pub score: Option<f64>,
     pub likely_has_ads: bool,
     pub likely_has_paywall: bool,
 }
@@ -251,7 +250,6 @@ impl DisplayedWebpage {
             #[cfg(feature = "return_body")]
             body,
             ranking_signals: None,
-            score: None,
             likely_has_ads: webpage.likely_has_ads,
             likely_has_paywall: webpage.likely_has_paywall,
             rich_snippet,

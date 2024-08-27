@@ -22,14 +22,14 @@ use crate::{
     models::dual_encoder::DualEncoder,
     ranking::{
         self,
-        pipeline::{stages::StoredEmbeddings, LocalRecallRankingWebpage, RankableWebpage},
+        pipeline::{stages::StoredEmbeddings, RankableWebpage},
         SignalEnum,
     },
-    searcher::{api::ScoredWebpagePointer, SearchQuery},
+    searcher::api::ScoredWebpagePointer,
     Result,
 };
 
-use super::Scorer;
+use super::FullRankingStage;
 
 pub struct Embedding(Tensor);
 
@@ -72,15 +72,15 @@ impl Embedding {
 
 pub struct EmbeddingScorer<W, E: EmbeddingSignal<W>> {
     dual_encoder: Option<Arc<DualEncoder>>,
-    query: Option<String>,
+    query: String,
     _marker: std::marker::PhantomData<(E, W)>,
 }
 
 impl<W, E: EmbeddingSignal<W>> EmbeddingScorer<W, E> {
-    pub fn new(dual_encoder: Option<Arc<DualEncoder>>) -> Self {
+    pub fn new(query: String, dual_encoder: Option<Arc<DualEncoder>>) -> Self {
         Self {
             dual_encoder,
-            query: None,
+            query,
             _marker: std::marker::PhantomData,
         }
     }
@@ -89,28 +89,12 @@ impl<W, E: EmbeddingSignal<W>> EmbeddingScorer<W, E> {
 impl<W, E: EmbeddingSignal<W>> EmbeddingScorer<W, E> {
     pub fn query_emb(&self) -> Option<Embedding> {
         self.dual_encoder.as_ref().and_then(|dual_encoder| {
-            self.query.as_ref().and_then(|query| {
-                dual_encoder
-                    .embed(&[query.to_string()])
-                    .ok()
-                    .and_then(|d| d.squeeze(0).ok())
-                    .map(Embedding)
-            })
+            dual_encoder
+                .embed(&[self.query.clone()])
+                .ok()
+                .and_then(|d| d.squeeze(0).ok())
+                .map(Embedding)
         })
-    }
-}
-
-impl LocalRecallRankingWebpage {
-    fn title_emb(&self, hidden_size: usize) -> Option<Embedding> {
-        self.title_embedding()
-            .as_ref()
-            .and_then(|s| Embedding::new(s, hidden_size).ok())
-    }
-
-    fn keyword_emb(&self, hidden_size: usize) -> Option<Embedding> {
-        self.keyword_embedding()
-            .as_ref()
-            .and_then(|s| Embedding::new(s, hidden_size).ok())
     }
 }
 
@@ -130,8 +114,12 @@ impl ScoredWebpagePointer {
     }
 }
 
-impl<W: RankableWebpage, E: EmbeddingSignal<W>> Scorer<W> for EmbeddingScorer<W, E> {
-    fn score(&self, webpages: &mut [W]) {
+impl<E: EmbeddingSignal<ScoredWebpagePointer>> FullRankingStage
+    for EmbeddingScorer<ScoredWebpagePointer, E>
+{
+    type Webpage = ScoredWebpagePointer;
+
+    fn compute(&self, webpages: &mut [Self::Webpage]) {
         if !webpages.iter().any(E::has_embedding) {
             return;
         }
@@ -145,10 +133,6 @@ impl<W: RankableWebpage, E: EmbeddingSignal<W>> Scorer<W> for EmbeddingScorer<W,
                 }
             }
         }
-    }
-
-    fn set_query_info(&mut self, query: &SearchQuery) {
-        self.query = Some(query.query.clone());
     }
 }
 
@@ -177,27 +161,10 @@ impl EmbeddingSignal<ScoredWebpagePointer> for TitleEmbeddings {
 
     fn insert_signal(webpage: &mut ScoredWebpagePointer, score: f64) {
         let sig = <TitleEmbeddings as EmbeddingSignal<ScoredWebpagePointer>>::signal();
-        webpage.as_ranking_mut().signals_mut().insert(sig, score);
-    }
-}
-
-impl EmbeddingSignal<LocalRecallRankingWebpage> for TitleEmbeddings {
-    fn signal() -> SignalEnum {
-        ranking::core::TitleEmbeddingSimilarity.into()
-    }
-
-    fn has_embedding(webpage: &LocalRecallRankingWebpage) -> bool {
-        webpage.title_embedding().is_some()
-    }
-
-    fn embedding(webpage: &LocalRecallRankingWebpage, hidden_size: usize) -> Option<Embedding> {
-        webpage.title_emb(hidden_size)
-    }
-
-    fn insert_signal(webpage: &mut LocalRecallRankingWebpage, score: f64) {
-        let sig = <TitleEmbeddings as EmbeddingSignal<LocalRecallRankingWebpage>>::signal();
-
-        webpage.signals_mut().insert(sig, score);
+        webpage
+            .as_ranking_mut()
+            .signals_mut()
+            .insert(sig, ranking::SignalCalculation::new_symmetrical(score));
     }
 }
 
@@ -216,26 +183,10 @@ impl EmbeddingSignal<ScoredWebpagePointer> for KeywordEmbeddings {
 
     fn insert_signal(webpage: &mut ScoredWebpagePointer, score: f64) {
         let sig = <KeywordEmbeddings as EmbeddingSignal<ScoredWebpagePointer>>::signal();
-        webpage.as_ranking_mut().signals_mut().insert(sig, score);
-    }
-}
-
-impl EmbeddingSignal<LocalRecallRankingWebpage> for KeywordEmbeddings {
-    fn signal() -> SignalEnum {
-        ranking::core::KeywordEmbeddingSimilarity.into()
-    }
-
-    fn has_embedding(webpage: &LocalRecallRankingWebpage) -> bool {
-        webpage.keyword_embedding().is_some()
-    }
-
-    fn embedding(webpage: &LocalRecallRankingWebpage, hidden_size: usize) -> Option<Embedding> {
-        webpage.keyword_emb(hidden_size)
-    }
-
-    fn insert_signal(webpage: &mut LocalRecallRankingWebpage, score: f64) {
-        let sig = <KeywordEmbeddings as EmbeddingSignal<LocalRecallRankingWebpage>>::signal();
-        webpage.signals_mut().insert(sig, score);
+        webpage
+            .as_ranking_mut()
+            .signals_mut()
+            .insert(sig, ranking::SignalCalculation::new_symmetrical(score));
     }
 }
 

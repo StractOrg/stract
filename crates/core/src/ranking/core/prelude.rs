@@ -26,10 +26,10 @@ use enum_dispatch::enum_dispatch;
 
 use strum::{EnumDiscriminants, VariantArray};
 
-use super::non_text::*;
 use super::query::*;
 use super::text::*;
 use super::SignalComputer;
+use super::{non_text::*, SignalCalculation};
 use tantivy::DocId;
 
 #[enum_dispatch]
@@ -38,9 +38,13 @@ pub trait Signal:
 {
     fn default_coefficient(&self) -> f64;
     fn as_field(&self) -> Option<Field>;
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64>;
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation>;
 
-    fn precompute(self, _webpage: &Webpage, _signal_computer: &SignalComputer) -> Option<f64> {
+    fn precompute(
+        self,
+        _webpage: &Webpage,
+        _signal_computer: &SignalComputer,
+    ) -> Option<SignalCalculation> {
         None
     }
 

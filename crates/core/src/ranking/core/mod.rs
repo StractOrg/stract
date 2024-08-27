@@ -49,23 +49,23 @@ impl FromStr for SignalEnumDiscriminants {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Clone)]
-pub struct SignalCoefficient {
+pub struct SignalCoefficients {
     map: EnumMap<SignalEnum, f64>,
 }
 
-impl Default for SignalCoefficient {
+impl Default for SignalCoefficients {
     fn default() -> Self {
         Self::new(SignalEnum::all().map(|signal| (signal, signal.default_coefficient())))
     }
 }
 
-impl From<EnumMap<SignalEnum, f64>> for SignalCoefficient {
+impl From<EnumMap<SignalEnum, f64>> for SignalCoefficients {
     fn from(map: EnumMap<SignalEnum, f64>) -> Self {
         Self { map }
     }
 }
 
-impl SignalCoefficient {
+impl SignalCoefficients {
     pub fn get(&self, signal: &SignalEnum) -> f64 {
         self.map
             .get(*signal)
@@ -83,7 +83,7 @@ impl SignalCoefficient {
         Self { map }
     }
 
-    pub fn merge_add(&mut self, coeffs: SignalCoefficient) {
+    pub fn merge_add(&mut self, coeffs: SignalCoefficients) {
         for signal in SignalEnum::all() {
             if let Some(coeff) = coeffs.map.get(signal).copied() {
                 match self.map.get_mut(signal) {
@@ -96,7 +96,7 @@ impl SignalCoefficient {
         }
     }
 
-    pub fn merge_overwrite(&mut self, coeffs: SignalCoefficient) {
+    pub fn merge_overwrite(&mut self, coeffs: SignalCoefficients) {
         for signal in SignalEnum::all() {
             if let Some(coeff) = coeffs.map.get(signal).copied() {
                 match self.map.get_mut(signal) {
@@ -110,10 +110,25 @@ impl SignalCoefficient {
     }
 }
 
+#[derive(Debug, Clone, Copy, bincode::Encode, bincode::Decode)]
+pub struct SignalCalculation {
+    pub value: f64,
+    pub score: f64,
+}
+
+impl SignalCalculation {
+    pub fn new_symmetrical(val: f64) -> Self {
+        Self {
+            value: val,
+            score: val,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ComputedSignal {
     pub signal: SignalEnum,
-    pub score: f64,
+    pub calc: SignalCalculation,
 }
 
 #[derive(

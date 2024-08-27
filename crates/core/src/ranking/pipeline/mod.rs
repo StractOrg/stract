@@ -14,43 +14,37 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{ops::Add, sync::Arc};
-
 use crate::{
-    collector::{self, BucketCollector},
-    config::CollectorConfig,
+    collector::{self},
     enum_map::EnumMap,
     searcher::SearchQuery,
 };
 
 use super::{
-    models::lambdamart::{self, LambdaMART},
-    InboundSimilarity, SignalCoefficient, SignalEnum, SignalScore,
+    models::lambdamart::{self},
+    SignalCalculation, SignalEnum, SignalScore,
 };
 
+mod modifiers;
 mod scorers;
 mod stages;
 
-pub use scorers::{ReRanker, Recall, Scorer};
+use modifiers::FullModifier;
+pub use scorers::{FullRankingStage, ReRanker};
 pub use stages::{LocalRecallRankingWebpage, PrecisionRankingWebpage, RecallRankingWebpage};
 
-const INBOUND_SIMILARITY_SMOOTHING: f64 = 8.0;
-
 pub trait RankableWebpage: collector::Doc + Send + Sync {
-    fn set_score(&mut self, score: f64);
-    fn boost(&self) -> Option<f64>;
-    fn signals(&self) -> &EnumMap<SignalEnum, f64>;
-    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, f64>;
+    fn set_raw_score(&mut self, score: f64);
+    fn unboosted_score(&self) -> f64;
+    fn boost(&self) -> f64;
+    fn set_boost(&mut self, boost: f64);
+    fn signals(&self) -> &EnumMap<SignalEnum, SignalCalculation>;
+    fn signals_mut(&mut self) -> &mut EnumMap<SignalEnum, SignalCalculation>;
 
     fn as_local_recall(&self) -> &LocalRecallRankingWebpage;
 
-    fn boost_score(&mut self) {
-        if let Some(boost) = self.boost() {
-            if boost != 0.0 {
-                let score = self.score() * boost;
-                self.set_score(score);
-            }
-        }
+    fn score(&self) -> f64 {
+        self.boost() * self.unboosted_score()
     }
 }
 
@@ -60,136 +54,136 @@ impl lambdamart::AsValue for SignalScore {
     }
 }
 
-struct RankingStage<T> {
-    scorer: Box<dyn Scorer<T>>,
-    stage_top_n: usize,
-    derank_similar: bool,
-    model: Option<Arc<LambdaMART>>,
-    coefficients: SignalCoefficient,
+enum StageOrModifier<T> {
+    Stage(Box<dyn FullRankingStage<Webpage = T>>),
+    Modifier(Box<dyn FullModifier<Webpage = T>>),
 }
 
-impl<T: RankableWebpage> RankingStage<T> {
-    fn apply(
-        &self,
-        websites: Vec<T>,
-        top_n: usize,
-        offset: usize,
-        collector_config: CollectorConfig,
-    ) -> Vec<T> {
-        let mut websites = websites
-            .into_iter()
-            .skip(offset)
-            .take(self.stage_top_n.max(top_n))
-            .collect::<Vec<_>>();
+pub enum Top {
+    Unlimited,
+    Limit(usize),
+}
 
-        self.scorer.score(&mut websites);
-
-        let mut collector =
-            BucketCollector::new(self.stage_top_n.max(top_n) + offset, collector_config);
-
-        for mut website in websites {
-            website.set_score(self.calculate_score(website.signals()));
-            website.boost_score();
-            collector.insert(website);
-        }
-
-        collector
-            .into_sorted_vec(self.derank_similar)
-            .into_iter()
-            .take(top_n)
-            .collect()
-    }
-
-    fn calculate_score(&self, signals: &EnumMap<SignalEnum, f64>) -> f64 {
-        match self.model.as_ref() {
-            Some(model) => {
-                let coeff = self.coefficients.get(&super::core::LambdaMart.into());
-                if coeff == 0.0 {
-                    signals
-                        .iter()
-                        .map(|(signal, score)| self.coefficients.get(&signal) * score)
-                        .sum()
-                } else {
-                    signals
-                        .get(InboundSimilarity.into())
-                        .copied()
-                        .unwrap_or(0.0)
-                        .add(INBOUND_SIMILARITY_SMOOTHING)
-                        * coeff
-                        * model.predict(signals)
-                }
-            }
-            None => signals
-                .iter()
-                .map(|(signal, score)| self.coefficients.get(&signal) * score)
-                .sum(),
+impl<T> StageOrModifier<T>
+where
+    T: RankableWebpage + Send + Sync,
+{
+    fn top_n(&self) -> Top {
+        match self {
+            StageOrModifier::Stage(stage) => stage.top_n(),
+            StageOrModifier::Modifier(modifier) => modifier.top_n(),
         }
     }
 
-    fn set_query_info(&mut self, query: &SearchQuery) {
-        self.scorer.set_query_info(query);
+    fn compute(&self, webpages: &mut [T]) {
+        match self {
+            StageOrModifier::Stage(stage) => stage.compute(webpages),
+            StageOrModifier::Modifier(modifier) => modifier.update_boosts(webpages),
+        }
+    }
 
-        self.coefficients = query.signal_coefficients();
+    fn update_scores(&self, webpages: &mut [T], coefficients: &super::SignalCoefficients) {
+        match self {
+            StageOrModifier::Stage(stage) => stage.update_scores(webpages, coefficients),
+            StageOrModifier::Modifier(_) => {}
+        }
+    }
+
+    fn rank(&self, webpages: &mut [T]) {
+        match self {
+            StageOrModifier::Stage(stage) => stage.rank(webpages),
+            StageOrModifier::Modifier(modifier) => modifier.rank(webpages),
+        }
     }
 }
 
 pub struct RankingPipeline<T> {
-    stage: RankingStage<T>,
-    page: usize,
-    pub top_n: usize,
-    collector_config: CollectorConfig,
+    stages_or_modifiers: Vec<StageOrModifier<T>>,
 }
 
-impl<T: RankableWebpage> RankingPipeline<T> {
-    fn set_query_info(&mut self, query: &mut SearchQuery) {
-        self.stage.set_query_info(query);
-        self.page = query.page;
-        self.top_n = query.num_results;
-
-        query.num_results = self.collector_top_n();
-        query.page = 0;
+impl<T> RankingPipeline<T>
+where
+    T: RankableWebpage,
+{
+    fn new() -> Self {
+        Self {
+            stages_or_modifiers: Vec::new(),
+        }
     }
 
-    pub fn offset(&self) -> usize {
-        self.top_n * self.page
+    pub fn add_stage<R>(mut self, stage: R) -> Self
+    where
+        R: FullRankingStage<Webpage = T> + 'static,
+    {
+        self.stages_or_modifiers.push(StageOrModifier::Stage(
+            Box::new(stage) as Box<dyn FullRankingStage<Webpage = T>>
+        ));
+
+        self
     }
 
-    pub fn apply(self, websites: Vec<T>) -> Vec<T> {
-        if websites.len() <= 1 {
-            return websites;
+    pub fn add_modifier<R>(mut self, modifier: R) -> Self
+    where
+        R: FullModifier<Webpage = T> + 'static,
+    {
+        self.stages_or_modifiers.push(StageOrModifier::Modifier(
+            Box::new(modifier) as Box<dyn FullModifier<Webpage = T>>
+        ));
+
+        self
+    }
+
+    pub fn apply(&self, webpages: Vec<T>, query: &SearchQuery) -> Vec<T> {
+        let mut webpages = webpages;
+        let num_pages = webpages.len();
+        let coefficients = query.signal_coefficients();
+
+        for stage_or_modifier in self.stages_or_modifiers.iter() {
+            let webpages = if let Top::Limit(top_n) = stage_or_modifier.top_n() {
+                if query.offset() > top_n {
+                    continue;
+                }
+
+                &mut webpages[..top_n.min(num_pages)]
+            } else {
+                &mut webpages
+            };
+
+            stage_or_modifier.compute(webpages);
+            stage_or_modifier.update_scores(webpages, &coefficients);
+            stage_or_modifier.rank(webpages);
         }
 
-        self.stage.apply(
-            websites,
-            self.top_n,
-            self.offset(),
-            self.collector_config.clone(),
-        )
-    }
-
-    pub fn collector_top_n(&self) -> usize {
-        (self.initial_top_n().max(self.top_n) + self.top_n * self.page) + 1
-    }
-
-    pub fn initial_top_n(&self) -> usize {
-        self.stage.stage_top_n.max(self.top_n)
+        webpages
+            .into_iter()
+            .skip(query.offset())
+            .take(query.num_results())
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
+    use scorers::term_distance;
 
     use crate::{
+        ampc::dht::ShardId,
         collector::Hashes,
         inverted_index::{DocAddress, WebpagePointer},
         prehashed::Prehashed,
-        ranking::{self, initial::Score},
+        ranking::{self, bitvec_similarity::BitVec, initial::Score},
+        searcher::api,
     };
 
     use super::*;
 
-    fn sample_websites(n: usize) -> Vec<LocalRecallRankingWebpage> {
+    fn pipeline() -> RankingPipeline<api::ScoredWebpagePointer> {
+        RankingPipeline::new()
+            .add_stage(term_distance::TitleDistanceScorer)
+            .add_stage(term_distance::BodyDistanceScorer)
+    }
+
+    fn sample_websites(n: usize) -> Vec<api::ScoredWebpagePointer> {
         (0..n)
             .map(|i| -> LocalRecallRankingWebpage {
                 let pointer = WebpagePointer {
@@ -208,118 +202,49 @@ mod tests {
                 };
 
                 let mut signals = EnumMap::new();
-                signals.insert(ranking::core::HostCentrality.into(), 1.0 / i as f64);
-                LocalRecallRankingWebpage::new_testing(pointer, signals, 1.0 / i as f64)
+                let score = 1.0 / i as f64;
+                let calc = ranking::SignalCalculation {
+                    value: i as f64,
+                    score,
+                };
+                signals.insert(ranking::core::HostCentrality.into(), calc);
+                LocalRecallRankingWebpage::new_testing(pointer, signals, calc.score)
+            })
+            .map(|local| {
+                api::ScoredWebpagePointer::Normal(
+                    crate::searcher::distributed::ScoredWebpagePointer {
+                        website: RecallRankingWebpage::new(local, BitVec::new(vec![])),
+                        shard: ShardId::new(0),
+                    },
+                )
             })
             .collect()
     }
 
     #[test]
     fn simple() {
-        let pipeline = RankingPipeline::<LocalRecallRankingWebpage>::recall_stage(
-            &mut SearchQuery {
-                ..Default::default()
-            },
-            None,
-            None,
-            CollectorConfig::default(),
-            20,
-        );
-        assert_eq!(pipeline.collector_top_n(), 20 + 1);
+        let pipeline = pipeline();
 
-        let sample = sample_websites(pipeline.collector_top_n());
+        let sample = sample_websites(20);
         let res: Vec<_> = pipeline
-            .apply(sample)
+            .apply(
+                sample,
+                &SearchQuery {
+                    page: 0,
+                    num_results: 20,
+                    ..Default::default()
+                },
+            )
             .into_iter()
-            .map(|w| w.pointer().address)
+            .map(|w| w.as_ranking().pointer().address)
             .collect();
 
         let expected: Vec<_> = sample_websites(100)
             .into_iter()
             .take(20)
-            .map(|w| w.pointer().address)
+            .map(|w| w.as_ranking().pointer().address)
             .collect();
 
         assert_eq!(res, expected);
-    }
-
-    #[test]
-    fn top_n() {
-        let num_results = 100;
-        let pipeline = RankingPipeline::<LocalRecallRankingWebpage>::recall_stage(
-            &mut SearchQuery {
-                num_results,
-                ..Default::default()
-            },
-            None,
-            None,
-            CollectorConfig::default(),
-            num_results,
-        );
-
-        let sample: Vec<_> = sample_websites(pipeline.collector_top_n());
-
-        let expected: Vec<_> = sample
-            .clone()
-            .into_iter()
-            .take(num_results)
-            .map(|w| w.pointer().address)
-            .collect();
-
-        let res = pipeline
-            .apply(sample)
-            .into_iter()
-            .map(|w| w.pointer().address)
-            .collect_vec();
-
-        assert_eq!(res.len(), num_results);
-        assert_eq!(res, expected);
-    }
-
-    #[test]
-    fn offsets() {
-        let num_results = 20;
-        let pipeline = RankingPipeline::<LocalRecallRankingWebpage>::recall_stage(
-            &mut SearchQuery {
-                page: 0,
-                num_results,
-                ..Default::default()
-            },
-            None,
-            None,
-            CollectorConfig::default(),
-            num_results,
-        );
-
-        let sample: Vec<_> = sample_websites(pipeline.collector_top_n());
-        let mut prev: Vec<_> = pipeline.apply(sample);
-        for p in 1..1_000 {
-            let pipeline = RankingPipeline::<LocalRecallRankingWebpage>::recall_stage(
-                &mut SearchQuery {
-                    page: p,
-                    ..Default::default()
-                },
-                None,
-                None,
-                CollectorConfig::default(),
-                num_results,
-            );
-
-            let sample: Vec<_> = sample_websites(pipeline.collector_top_n());
-            let res: Vec<_> = pipeline.apply(sample).into_iter().collect();
-
-            assert_eq!(
-                res.len(),
-                num_results,
-                "Every page should have {num_results} results"
-            );
-
-            assert!(!prev
-                .iter()
-                .zip_eq(res.iter())
-                .any(|(p, r)| p.pointer().address.doc_id == r.pointer().address.doc_id));
-
-            prev = res;
-        }
     }
 }

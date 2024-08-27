@@ -25,6 +25,8 @@ pub trait ShortestPaths {
     fn distances(&self, source: Node) -> BTreeMap<Node, u8>;
     fn raw_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8>;
     fn raw_distances_with_max(&self, source: NodeID, max_dist: u8) -> BTreeMap<NodeID, u8>;
+    fn raw_reversed_distances_with_max(&self, source: NodeID, max_dist: u8)
+        -> BTreeMap<NodeID, u8>;
     fn raw_reversed_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8>;
     fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8>;
 }
@@ -110,6 +112,19 @@ impl ShortestPaths for Webgraph {
             |node| self.raw_ingoing_edges(&node, super::EdgeLimit::Unlimited),
             |edge| edge.from.node(),
             None,
+        )
+    }
+
+    fn raw_reversed_distances_with_max(
+        &self,
+        source: NodeID,
+        max_dist: u8,
+    ) -> BTreeMap<NodeID, u8> {
+        dijkstra_multi(
+            &[source],
+            |node| self.raw_ingoing_edges(&node, super::EdgeLimit::Unlimited),
+            |edge| edge.from.node(),
+            Some(max_dist),
         )
     }
 

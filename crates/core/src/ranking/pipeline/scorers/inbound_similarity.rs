@@ -17,11 +17,11 @@
 use std::sync::Mutex;
 
 use crate::{
-    ranking::{core, inbound_similarity},
+    ranking::{self, core, inbound_similarity, pipeline::RankableWebpage},
     searcher::api::ScoredWebpagePointer,
 };
 
-use super::Scorer;
+use super::FullRankingStage;
 
 pub struct InboundScorer {
     scorer: Mutex<inbound_similarity::Scorer>,
@@ -35,8 +35,10 @@ impl InboundScorer {
     }
 }
 
-impl Scorer<ScoredWebpagePointer> for InboundScorer {
-    fn score(&self, webpages: &mut [ScoredWebpagePointer]) {
+impl FullRankingStage for InboundScorer {
+    type Webpage = ScoredWebpagePointer;
+
+    fn compute(&self, webpages: &mut [Self::Webpage]) {
         let mut scorer = self.scorer.lock().unwrap();
 
         for webpage in webpages {
@@ -44,10 +46,10 @@ impl Scorer<ScoredWebpagePointer> for InboundScorer {
                 webpage.as_ranking().host_id(),
                 webpage.as_ranking().inbound_edges(),
             );
-            webpage
-                .as_ranking_mut()
-                .signals_mut()
-                .insert(core::InboundSimilarity.into(), score);
+            webpage.as_ranking_mut().signals_mut().insert(
+                core::InboundSimilarity.into(),
+                ranking::SignalCalculation::new_symmetrical(score),
+            );
         }
     }
 }

@@ -17,7 +17,7 @@
 use crate::{
     inverted_index::InvertedIndex,
     query::parser::TermCompound,
-    ranking::SignalCoefficient,
+    ranking::SignalCoefficients,
     schema::text_field,
     search_ctx::Ctx,
     searcher::SearchQuery,
@@ -53,7 +53,7 @@ pub struct Query {
     optics: Vec<Optic>,
     top_n: usize,
     count_results_exact: bool,
-    signal_coefficients: SignalCoefficient,
+    signal_coefficients: SignalCoefficients,
     lang: Option<whatlang::Lang>,
 }
 
@@ -182,7 +182,7 @@ impl Query {
         &self.host_rankings
     }
 
-    pub fn signal_coefficients(&self) -> SignalCoefficient {
+    pub fn signal_coefficients(&self) -> SignalCoefficients {
         self.signal_coefficients.clone()
     }
 

@@ -16,7 +16,7 @@
 
 use tantivy::DocId;
 
-use super::{Signal, SignalComputer};
+use super::{Signal, SignalCalculation, SignalComputer};
 use crate::{
     schema::{self, Field},
     webpage::Webpage,
@@ -117,11 +117,11 @@ impl Signal for HostCentrality {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
-        Some(webpage.host_centrality)
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<SignalCalculation> {
+        Some(SignalCalculation::new_symmetrical(webpage.host_centrality))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -129,7 +129,7 @@ impl Signal for HostCentrality {
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_f64())
             .unwrap();
-        Some(val)
+        Some(SignalCalculation::new_symmetrical(val))
     }
 }
 
@@ -157,11 +157,14 @@ impl Signal for HostCentralityRank {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
-        Some(score_rank(webpage.host_centrality_rank as f64))
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<SignalCalculation> {
+        Some(SignalCalculation {
+            value: webpage.host_centrality_rank as f64,
+            score: score_rank(webpage.host_centrality_rank as f64),
+        })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -169,7 +172,10 @@ impl Signal for HostCentralityRank {
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
-        Some(score_rank(val as f64))
+        Some(SignalCalculation {
+            value: val as f64,
+            score: score_rank(val as f64),
+        })
     }
 }
 
@@ -197,11 +203,11 @@ impl Signal for PageCentrality {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
-        Some(webpage.page_centrality)
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<SignalCalculation> {
+        Some(SignalCalculation::new_symmetrical(webpage.page_centrality))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -209,7 +215,7 @@ impl Signal for PageCentrality {
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_f64())
             .unwrap();
-        Some(val)
+        Some(SignalCalculation::new_symmetrical(val))
     }
 }
 
@@ -237,11 +243,14 @@ impl Signal for PageCentralityRank {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
-        Some(score_rank(webpage.page_centrality_rank as f64))
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<SignalCalculation> {
+        Some(SignalCalculation {
+            value: webpage.page_centrality_rank as f64,
+            score: score_rank(webpage.page_centrality_rank as f64),
+        })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -249,7 +258,10 @@ impl Signal for PageCentralityRank {
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
-        Some(score_rank(val as f64))
+        Some(SignalCalculation {
+            value: val as f64,
+            score: score_rank(val as f64),
+        })
     }
 }
 
@@ -275,11 +287,13 @@ impl Signal for IsHomepage {
         Some(Field::Numerical(schema::numerical_field::IsHomepage.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
-        Some(webpage.html.is_homepage().into())
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<SignalCalculation> {
+        Some(SignalCalculation::new_symmetrical(
+            webpage.html.is_homepage().into(),
+        ))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -289,9 +303,9 @@ impl Signal for IsHomepage {
             .unwrap();
 
         if val {
-            Some(1.0)
+            Some(SignalCalculation::new_symmetrical(1.0))
         } else {
-            Some(0.0)
+            Some(SignalCalculation::new_symmetrical(0.0))
         }
     }
 }
@@ -320,16 +334,25 @@ impl Signal for FetchTimeMs {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
+    fn precompute(
+        self,
+        webpage: &Webpage,
+        signal_computer: &SignalComputer,
+    ) -> Option<SignalCalculation> {
         let fetch_time_ms = webpage.fetch_time_ms as usize;
-        if fetch_time_ms >= signal_computer.fetch_time_ms_cache().len() {
-            Some(0.0)
+        let score = if fetch_time_ms >= signal_computer.fetch_time_ms_cache().len() {
+            0.0
         } else {
-            Some(signal_computer.fetch_time_ms_cache()[fetch_time_ms])
-        }
+            signal_computer.fetch_time_ms_cache()[fetch_time_ms]
+        };
+
+        Some(SignalCalculation {
+            value: fetch_time_ms as f64,
+            score,
+        })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -338,11 +361,16 @@ impl Signal for FetchTimeMs {
             .and_then(|v| v.as_u64())
             .unwrap() as usize;
 
-        if fetch_time_ms >= signal_computer.fetch_time_ms_cache().len() {
-            Some(0.0)
+        let score = if fetch_time_ms >= signal_computer.fetch_time_ms_cache().len() {
+            0.0
         } else {
-            Some(signal_computer.fetch_time_ms_cache()[fetch_time_ms])
-        }
+            signal_computer.fetch_time_ms_cache()[fetch_time_ms]
+        };
+
+        Some(SignalCalculation {
+            value: fetch_time_ms as f64,
+            score,
+        })
     }
 }
 
@@ -370,17 +398,26 @@ impl Signal for UpdateTimestamp {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
+    fn precompute(
+        self,
+        webpage: &Webpage,
+        signal_computer: &SignalComputer,
+    ) -> Option<SignalCalculation> {
         let update_timestamp = webpage
             .html
             .updated_time()
             .map(|date| date.timestamp().max(0))
             .unwrap_or(0) as usize;
 
-        Some(score_timestamp(update_timestamp, signal_computer))
+        let score = score_timestamp(update_timestamp, signal_computer);
+
+        Some(SignalCalculation {
+            value: update_timestamp as f64,
+            score,
+        })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -389,7 +426,12 @@ impl Signal for UpdateTimestamp {
             .and_then(|v| v.as_u64())
             .unwrap() as usize;
 
-        Some(score_timestamp(val, signal_computer))
+        let score = score_timestamp(val, signal_computer);
+
+        Some(SignalCalculation {
+            value: val as f64,
+            score,
+        })
     }
 }
 
@@ -417,12 +459,17 @@ impl Signal for TrackerScore {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<SignalCalculation> {
         let num_trackers = webpage.html.trackers().len() as f64;
-        Some(score_trackers(num_trackers))
+        let score = score_trackers(num_trackers);
+
+        Some(SignalCalculation {
+            value: num_trackers,
+            score,
+        })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -430,7 +477,12 @@ impl Signal for TrackerScore {
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
-        Some(score_trackers(val as f64))
+        let score = score_trackers(val as f64);
+
+        Some(SignalCalculation {
+            value: val as f64,
+            score,
+        })
     }
 }
 
@@ -456,13 +508,22 @@ impl Signal for Region {
         Some(Field::Numerical(schema::numerical_field::Region.into()))
     }
 
-    fn precompute(self, webpage: &Webpage, signal_computer: &SignalComputer) -> Option<f64> {
+    fn precompute(
+        self,
+        webpage: &Webpage,
+        signal_computer: &SignalComputer,
+    ) -> Option<SignalCalculation> {
         let region =
             crate::webpage::Region::guess_from(webpage).unwrap_or(crate::webpage::Region::All);
-        Some(score_region(region, signal_computer))
+        let score = score_region(region, signal_computer);
+
+        Some(SignalCalculation {
+            value: region.id() as f64,
+            score,
+        })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -471,7 +532,12 @@ impl Signal for Region {
             .and_then(|v| v.as_u64())
             .unwrap();
         let region = crate::webpage::Region::from_id(val);
-        Some(score_region(region, signal_computer))
+        let score = score_region(region, signal_computer);
+
+        Some(SignalCalculation {
+            value: val as f64,
+            score,
+        })
     }
 }
 
@@ -497,7 +563,7 @@ impl Signal for QueryCentrality {
         None
     }
 
-    fn compute(&self, _doc: DocId, _signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, _doc: DocId, _signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         // unimplemented!()
         None
     }
@@ -525,7 +591,7 @@ impl Signal for InboundSimilarity {
         None
     }
 
-    fn compute(&self, _doc: DocId, _signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, _doc: DocId, _signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         None // computed in later ranking stage
     }
 }
@@ -552,7 +618,7 @@ impl Signal for LambdaMart {
         None
     }
 
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
         None // computed in later ranking stage
     }
 }
@@ -581,7 +647,7 @@ impl Signal for UrlDigits {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<SignalCalculation> {
         let num_digits = (webpage
             .html
             .url()
@@ -598,18 +664,25 @@ impl Signal for UrlDigits {
                 .filter(|c| c.is_ascii_digit())
                 .count()) as f64;
 
-        Some(score_digits(num_digits))
+        let score = score_digits(num_digits);
+
+        Some(SignalCalculation {
+            value: num_digits,
+            score,
+        })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
         let val = numericalfield_reader
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
-            .unwrap();
-        Some(score_digits(val as f64))
+            .unwrap() as f64;
+        let score = score_digits(val);
+
+        Some(SignalCalculation { value: val, score })
     }
 }
 
@@ -637,7 +710,7 @@ impl Signal for UrlSlashes {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<SignalCalculation> {
         let num_slashes = webpage
             .html
             .url()
@@ -645,18 +718,25 @@ impl Signal for UrlSlashes {
             .chars()
             .filter(|c| c == &'/')
             .count() as f64;
-        Some(score_slashes(num_slashes))
+        let score = score_slashes(num_slashes);
+
+        Some(SignalCalculation {
+            value: num_slashes,
+            score,
+        })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
         let val = numericalfield_reader
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
-            .unwrap();
-        Some(score_slashes(val as f64))
+            .unwrap() as f64;
+        let score = score_slashes(val);
+
+        Some(SignalCalculation { value: val, score })
     }
 }
 
@@ -684,12 +764,17 @@ impl Signal for LinkDensity {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<SignalCalculation> {
         let link_density = webpage.html.link_density();
-        Some(score_link_density(link_density))
+        let score = score_link_density(link_density);
+
+        Some(SignalCalculation {
+            value: link_density,
+            score,
+        })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -697,7 +782,9 @@ impl Signal for LinkDensity {
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_f64())
             .unwrap();
-        Some(score_link_density(val))
+        let score = score_link_density(val);
+
+        Some(SignalCalculation { value: val, score })
     }
 }
 
@@ -725,15 +812,15 @@ impl Signal for HasAds {
         ))
     }
 
-    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<f64> {
-        if !webpage.html.likely_has_ads() {
-            Some(1.0)
-        } else {
-            Some(0.0)
-        }
+    fn precompute(self, webpage: &Webpage, _: &SignalComputer) -> Option<SignalCalculation> {
+        let has_ads = webpage.html.likely_has_ads();
+        let value: f64 = has_ads.into();
+        let score = if !has_ads { 1.0 } else { 0.0 };
+
+        Some(SignalCalculation { value, score })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -742,10 +829,9 @@ impl Signal for HasAds {
             .and_then(|v| v.as_bool())
             .unwrap();
 
-        if !has_ads {
-            Some(1.0)
-        } else {
-            Some(0.0)
-        }
+        let value: f64 = has_ads.into();
+        let score = if !has_ads { 1.0 } else { 0.0 };
+
+        Some(SignalCalculation { value, score })
     }
 }

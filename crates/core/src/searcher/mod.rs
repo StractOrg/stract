@@ -31,7 +31,7 @@ use crate::{
     bangs::BangHit,
     collector::approx_count::Count,
     config::defaults,
-    ranking::{pipeline::LocalRecallRankingWebpage, SignalCoefficient},
+    ranking::{pipeline::LocalRecallRankingWebpage, SignalCoefficients},
     search_prettifier::DisplayedWebpage,
     webpage::region::Region,
 };
@@ -80,14 +80,13 @@ pub struct SearchQuery {
     pub return_body: Option<ReturnBody>,
     pub return_structured_data: bool,
 
-    pub signal_coefficients: SignalCoefficient,
+    pub signal_coefficients: SignalCoefficients,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct InitialWebsiteResult {
     pub num_websites: Count,
     pub websites: Vec<LocalRecallRankingWebpage>,
-    pub has_more: bool,
 }
 
 impl Default for SearchQuery {
@@ -117,7 +116,7 @@ impl SearchQuery {
         self.query.is_empty()
     }
 
-    pub fn signal_coefficients(&self) -> SignalCoefficient {
+    pub fn signal_coefficients(&self) -> SignalCoefficients {
         self.signal_coefficients.clone()
     }
 
@@ -133,5 +132,17 @@ impl SearchQuery {
         }
 
         rankings
+    }
+
+    pub fn text(&self) -> &str {
+        &self.query
+    }
+
+    pub fn offset(&self) -> usize {
+        self.page * self.num_results
+    }
+
+    pub fn num_results(&self) -> usize {
+        self.num_results
     }
 }

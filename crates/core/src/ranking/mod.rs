@@ -37,7 +37,7 @@ use crate::{
 pub use self::core::*;
 
 #[derive(Clone)]
-pub struct Ranker {
+pub struct LocalRanker {
     max_docs: Option<MaxDocsConsidered>,
     offset: Option<usize>,
     computer: SignalComputer,
@@ -47,13 +47,13 @@ pub struct Ranker {
     collector_config: CollectorConfig,
 }
 
-impl Ranker {
+impl LocalRanker {
     pub fn new(
         computer: SignalComputer,
         columnfield_reader: NumericalFieldReader,
         collector_config: CollectorConfig,
     ) -> Self {
-        Ranker {
+        LocalRanker {
             offset: None,
             computer,
             max_docs: None,

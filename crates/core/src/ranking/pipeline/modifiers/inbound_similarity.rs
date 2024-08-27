@@ -1,7 +1,3 @@
-use tantivy::DocId;
-
-use crate::schema::Field;
-
 // Stract is an open source web search engine.
 // Copyright (C) 2024 Stract ApS
 //
@@ -18,34 +14,27 @@ use crate::schema::Field;
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::{Signal, SignalCalculation, SignalComputer};
+use crate::{
+    ranking::{self, pipeline::RankableWebpage},
+    searcher::api,
+};
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
-pub struct NumQueryTerms;
-impl Signal for NumQueryTerms {
-    fn default_coefficient(&self) -> f64 {
-        0.0
-    }
+use super::Modifier;
 
-    fn as_field(&self) -> Option<Field> {
-        None
-    }
+const INBOUND_SIMILARITY_SMOOTHING: f64 = 8.0;
 
-    fn compute(&self, _: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
-        signal_computer
-            .query_data()
-            .map(|d| d.simple_terms().len() as f64)
-            .map(SignalCalculation::new_symmetrical)
+pub struct InboundSimilarity;
+
+impl Modifier for InboundSimilarity {
+    type Webpage = api::ScoredWebpagePointer;
+
+    fn boost(&self, webpage: &Self::Webpage) -> f64 {
+        webpage
+            .as_ranking()
+            .signals()
+            .get(ranking::InboundSimilarity.into())
+            .map(|calc| calc.value)
+            .unwrap_or(0.0)
+            + INBOUND_SIMILARITY_SMOOTHING
     }
 }

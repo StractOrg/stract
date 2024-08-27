@@ -29,9 +29,9 @@ use crate::query::Query;
 use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{
-    LocalRecallRankingWebpage, PrecisionRankingWebpage, RankingPipeline, RecallRankingWebpage,
+    LocalRecallRankingWebpage, PrecisionRankingWebpage, RankableWebpage, RecallRankingWebpage,
 };
-use crate::ranking::{Ranker, SignalComputer, SignalEnum, SignalScore};
+use crate::ranking::{LocalRanker, SignalComputer, SignalEnum, SignalScore};
 use crate::search_ctx::Ctx;
 use crate::search_prettifier::DisplayedWebpage;
 use crate::{inverted_index, live_index, Result};
@@ -121,7 +121,6 @@ where
 struct InvertedIndexResult {
     webpages: Vec<LocalRecallRankingWebpage>,
     num_hits: approx_count::Count,
-    has_more: bool,
 }
 
 impl<I> LocalSearcher<I>
@@ -173,8 +172,8 @@ where
         guard: &G,
         de_rank_similar: bool,
         computer: SignalComputer,
-    ) -> Result<Ranker> {
-        let mut ranker = Ranker::new(
+    ) -> Result<LocalRanker> {
+        let mut ranker = LocalRanker::new(
             computer,
             guard.inverted_index().columnfield_reader(),
             self.collector_config.clone(),
@@ -198,16 +197,7 @@ where
         query: &SearchQuery,
         de_rank_similar: bool,
     ) -> Result<InvertedIndexResult> {
-        let mut query = query.clone();
-        let pipeline: RankingPipeline<LocalRecallRankingWebpage> =
-            RankingPipeline::<LocalRecallRankingWebpage>::recall_stage(
-                &mut query,
-                self.lambda_model.clone(),
-                self.dual_encoder.clone(),
-                self.collector_config.clone(),
-                100,
-            );
-        let parsed_query = self.parse_query(ctx, guard, &query)?;
+        let parsed_query = self.parse_query(ctx, guard, query)?;
 
         let mut computer = SignalComputer::new(Some(&parsed_query));
 
@@ -241,15 +231,9 @@ where
             &columnfield_reader,
         )?;
 
-        let pipe_top_n = pipeline.top_n;
-        let has_more = ranking_websites.len() > pipe_top_n;
-
-        let ranking_websites = pipeline.apply(ranking_websites);
-
         Ok(InvertedIndexResult {
             webpages: ranking_websites,
             num_hits: res.num_websites,
-            has_more,
         })
     }
 
@@ -270,7 +254,6 @@ where
         Ok(InitialWebsiteResult {
             websites: inverted_index_result.webpages,
             num_websites: inverted_index_result.num_hits,
-            has_more: inverted_index_result.has_more,
         })
     }
 
@@ -295,27 +278,7 @@ where
         use std::time::Instant;
 
         let start = Instant::now();
-        let mut search_query = query.clone();
-
-        let pipeline = {
-            use crate::ranking::models::cross_encoder::CrossEncoderModel;
-            match CrossEncoderModel::open("data/cross_encoder") {
-                Ok(model) => RankingPipeline::reranker::<CrossEncoderModel>(
-                    &mut search_query,
-                    Some(Arc::new(model)),
-                    None,
-                    self.collector_config.clone(),
-                    query.num_results,
-                )?,
-                Err(_) => RankingPipeline::reranker::<CrossEncoderModel>(
-                    &mut search_query,
-                    None,
-                    None,
-                    self.collector_config.clone(),
-                    query.num_results,
-                )?,
-            }
-        };
+        let search_query = query.clone();
 
         let search_result = self.search_initial(&search_query, true)?;
 
@@ -335,13 +298,7 @@ where
             })
             .collect();
 
-        let search_len = websites.len();
-
-        let top_websites = pipeline.apply(websites);
-
-        let has_more_results = search_len != top_websites.len();
-
-        let pointers: Vec<_> = top_websites
+        let pointers: Vec<_> = websites
             .iter()
             .map(|website| website.ranking().pointer().clone())
             .collect();
@@ -355,15 +312,15 @@ where
             .map(|webpage| DisplayedWebpage::new(webpage, query))
             .collect();
 
-        for (webpage, ranking) in webpages.iter_mut().zip(top_websites) {
+        for (webpage, ranking) in webpages.iter_mut().zip(websites) {
             let mut ranking_signals = HashMap::new();
 
             for signal in SignalEnum::all() {
-                if let Some(score) = ranking.ranking().signals().get(signal) {
+                if let Some(calc) = ranking.ranking().signals().get(signal) {
                     ranking_signals.insert(
                         signal.into(),
                         SignalScore {
-                            value: *score,
+                            value: calc.score,
                             coefficient: coefficients.get(&signal),
                         },
                     );
@@ -377,7 +334,8 @@ where
             num_hits: search_result.num_websites,
             webpages,
             search_duration_ms: start.elapsed().as_millis(),
-            has_more_results,
+            has_more_results: (search_result.num_websites.as_u64() as usize)
+                > query.offset() + query.num_results(),
         })
     }
 

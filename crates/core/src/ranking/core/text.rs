@@ -18,7 +18,7 @@ use crate::schema::{self, Field};
 
 use tantivy::DocId;
 
-use super::{Signal, SignalComputer};
+use super::{Signal, SignalCalculation, SignalComputer};
 
 #[derive(
     Debug,
@@ -42,16 +42,16 @@ impl Signal for Bm25F {
         None
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        Some(
+        Some(SignalCalculation::new_symmetrical(
             seg_reader
                 .text_fields_mut()
                 .values_mut()
                 .map(|field| field.bm25f(doc))
                 .sum(),
-        )
+        ))
     }
 }
 
@@ -81,13 +81,14 @@ impl Signal for Bm25Title {
         true
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -113,13 +114,13 @@ impl Signal for TitleCoverage {
         Some(Field::Text(schema::text_field::Title.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| field.coverage(doc))
+            .map(|field| SignalCalculation::new_symmetrical(field.coverage(doc)))
     }
 }
 
@@ -149,13 +150,14 @@ impl Signal for Bm25TitleBigrams {
         Some(Field::Text(schema::text_field::TitleBigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -185,13 +187,14 @@ impl Signal for Bm25TitleTrigrams {
         Some(Field::Text(schema::text_field::TitleTrigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -221,13 +224,14 @@ impl Signal for Bm25CleanBody {
         Some(Field::Text(schema::text_field::CleanBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -253,13 +257,14 @@ impl Signal for CleanBodyCoverage {
         Some(Field::Text(schema::text_field::CleanBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.coverage(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -289,13 +294,14 @@ impl Signal for Bm25CleanBodyBigrams {
         Some(Field::Text(schema::text_field::CleanBodyBigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -325,13 +331,14 @@ impl Signal for Bm25CleanBodyTrigrams {
         Some(Field::Text(schema::text_field::CleanBodyTrigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -357,13 +364,14 @@ impl Signal for Bm25StemmedTitle {
         Some(Field::Text(schema::text_field::StemmedTitle.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -389,13 +397,14 @@ impl Signal for Bm25StemmedCleanBody {
         Some(Field::Text(schema::text_field::StemmedCleanBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -421,13 +430,14 @@ impl Signal for Bm25AllBody {
         Some(Field::Text(schema::text_field::AllBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -453,13 +463,14 @@ impl Signal for Bm25Keywords {
         Some(Field::Text(schema::text_field::Keywords.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -485,13 +496,14 @@ impl Signal for Bm25BacklinkText {
         Some(Field::Text(schema::text_field::BacklinkText.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -517,13 +529,14 @@ impl Signal for IdfSumUrl {
         Some(Field::Text(schema::text_field::Url.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -549,13 +562,14 @@ impl Signal for IdfSumSite {
         Some(Field::Text(schema::text_field::SiteWithout.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -581,13 +595,14 @@ impl Signal for IdfSumDomain {
         Some(Field::Text(schema::text_field::Domain.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -613,13 +628,14 @@ impl Signal for IdfSumSiteNoTokenizer {
         Some(Field::Text(schema::text_field::SiteNoTokenizer.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -645,13 +661,14 @@ impl Signal for IdfSumDomainNoTokenizer {
         Some(Field::Text(schema::text_field::DomainNoTokenizer.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -679,13 +696,14 @@ impl Signal for IdfSumDomainNameNoTokenizer {
         ))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -711,13 +729,14 @@ impl Signal for IdfSumDomainIfHomepage {
         Some(Field::Text(schema::text_field::DomainIfHomepage.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -745,13 +764,14 @@ impl Signal for IdfSumDomainNameIfHomepageNoTokenizer {
         ))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -779,13 +799,14 @@ impl Signal for IdfSumDomainIfHomepageNoTokenizer {
         ))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -811,13 +832,14 @@ impl Signal for IdfSumTitleIfHomepage {
         Some(Field::Text(schema::text_field::TitleIfHomepage.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<f64> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
         seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
+            .map(SignalCalculation::new_symmetrical)
     }
 }
 
@@ -843,7 +865,7 @@ impl Signal for CrossEncoderSnippet {
         None
     }
 
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
         None // computed in later ranking stage
     }
 }
@@ -870,7 +892,7 @@ impl Signal for CrossEncoderTitle {
         None
     }
 
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
         None // computed in later ranking stage
     }
 }
@@ -899,7 +921,7 @@ impl Signal for TitleEmbeddingSimilarity {
         ))
     }
 
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
         None // computed in later ranking stage
     }
 }
@@ -928,7 +950,7 @@ impl Signal for KeywordEmbeddingSimilarity {
         ))
     }
 
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
         None // computed in later ranking stage
     }
 }
@@ -955,7 +977,7 @@ impl Signal for MinTitleSlop {
         Some(Field::Text(schema::text_field::Title.into()))
     }
 
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
         None // computed in later ranking stage
     }
 }
@@ -982,7 +1004,7 @@ impl Signal for MinCleanBodySlop {
         Some(Field::Text(schema::text_field::CleanBody.into()))
     }
 
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<f64> {
+    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
         None // computed in later ranking stage
     }
 }

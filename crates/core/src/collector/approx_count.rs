@@ -66,6 +66,12 @@ impl Count {
             | (Count::Approximate(a), Count::Approximate(b)) => Count::Approximate(a + b),
         }
     }
+
+    pub fn as_u64(&self) -> u64 {
+        match self {
+            Count::Exact(count) | Count::Approximate(count) => *count,
+        }
+    }
 }
 
 impl Add for Count {
