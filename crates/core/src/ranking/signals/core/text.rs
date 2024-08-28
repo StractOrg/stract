@@ -42,16 +42,16 @@ impl CoreSignal for Bm25F {
         None
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        Some(SignalCalculation::new_symmetrical(
+        SignalCalculation::new_symmetrical(
             seg_reader
                 .text_fields_mut()
                 .values_mut()
                 .map(|field| field.bm25f(doc))
                 .sum(),
-        ))
+        )
     }
 }
 
@@ -81,14 +81,16 @@ impl CoreSignal for Bm25Title {
         true
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -114,13 +116,16 @@ impl CoreSignal for TitleCoverage {
         Some(Field::Text(schema::text_field::Title.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
-            .map(|field| SignalCalculation::new_symmetrical(field.coverage(doc)))
+            .map(|field| field.coverage(doc))
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -150,14 +155,16 @@ impl CoreSignal for Bm25TitleBigrams {
         Some(Field::Text(schema::text_field::TitleBigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -187,14 +194,16 @@ impl CoreSignal for Bm25TitleTrigrams {
         Some(Field::Text(schema::text_field::TitleTrigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -224,14 +233,16 @@ impl CoreSignal for Bm25CleanBody {
         Some(Field::Text(schema::text_field::CleanBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -257,14 +268,16 @@ impl CoreSignal for CleanBodyCoverage {
         Some(Field::Text(schema::text_field::CleanBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.coverage(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -294,14 +307,16 @@ impl CoreSignal for Bm25CleanBodyBigrams {
         Some(Field::Text(schema::text_field::CleanBodyBigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -331,14 +346,16 @@ impl CoreSignal for Bm25CleanBodyTrigrams {
         Some(Field::Text(schema::text_field::CleanBodyTrigrams.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -364,14 +381,16 @@ impl CoreSignal for Bm25StemmedTitle {
         Some(Field::Text(schema::text_field::StemmedTitle.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -397,14 +416,16 @@ impl CoreSignal for Bm25StemmedCleanBody {
         Some(Field::Text(schema::text_field::StemmedCleanBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -430,14 +451,16 @@ impl CoreSignal for Bm25AllBody {
         Some(Field::Text(schema::text_field::AllBody.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -463,14 +486,16 @@ impl CoreSignal for Bm25Keywords {
         Some(Field::Text(schema::text_field::Keywords.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -496,14 +521,16 @@ impl CoreSignal for Bm25BacklinkText {
         Some(Field::Text(schema::text_field::BacklinkText.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.bm25(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -529,14 +556,16 @@ impl CoreSignal for IdfSumUrl {
         Some(Field::Text(schema::text_field::Url.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -562,14 +591,16 @@ impl CoreSignal for IdfSumSite {
         Some(Field::Text(schema::text_field::SiteWithout.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -595,14 +626,16 @@ impl CoreSignal for IdfSumDomain {
         Some(Field::Text(schema::text_field::Domain.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -628,14 +661,16 @@ impl CoreSignal for IdfSumSiteNoTokenizer {
         Some(Field::Text(schema::text_field::SiteNoTokenizer.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -661,14 +696,16 @@ impl CoreSignal for IdfSumDomainNoTokenizer {
         Some(Field::Text(schema::text_field::DomainNoTokenizer.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -696,14 +733,16 @@ impl CoreSignal for IdfSumDomainNameNoTokenizer {
         ))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -729,14 +768,16 @@ impl CoreSignal for IdfSumDomainIfHomepage {
         Some(Field::Text(schema::text_field::DomainIfHomepage.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -764,14 +805,16 @@ impl CoreSignal for IdfSumDomainNameIfHomepageNoTokenizer {
         ))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -799,14 +842,16 @@ impl CoreSignal for IdfSumDomainIfHomepageNoTokenizer {
         ))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -832,13 +877,15 @@ impl CoreSignal for IdfSumTitleIfHomepage {
         Some(Field::Text(schema::text_field::TitleIfHomepage.into()))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let mut seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
 
-        seg_reader
+        let val = seg_reader
             .text_fields_mut()
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
-            .map(SignalCalculation::new_symmetrical)
+            .unwrap_or(0.0);
+
+        SignalCalculation::new_symmetrical(val)
     }
 }

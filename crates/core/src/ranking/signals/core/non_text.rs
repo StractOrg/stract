@@ -121,7 +121,7 @@ impl CoreSignal for HostCentrality {
         Some(SignalCalculation::new_symmetrical(webpage.host_centrality))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -129,7 +129,7 @@ impl CoreSignal for HostCentrality {
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_f64())
             .unwrap();
-        Some(SignalCalculation::new_symmetrical(val))
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -164,7 +164,7 @@ impl CoreSignal for HostCentralityRank {
         })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -172,10 +172,10 @@ impl CoreSignal for HostCentralityRank {
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
-        Some(SignalCalculation {
+        SignalCalculation {
             value: val as f64,
             score: score_rank(val as f64),
-        })
+        }
     }
 }
 
@@ -207,7 +207,7 @@ impl CoreSignal for PageCentrality {
         Some(SignalCalculation::new_symmetrical(webpage.page_centrality))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -215,7 +215,7 @@ impl CoreSignal for PageCentrality {
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_f64())
             .unwrap();
-        Some(SignalCalculation::new_symmetrical(val))
+        SignalCalculation::new_symmetrical(val)
     }
 }
 
@@ -250,7 +250,7 @@ impl CoreSignal for PageCentralityRank {
         })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -258,10 +258,10 @@ impl CoreSignal for PageCentralityRank {
             .get(self.as_numericalfield().unwrap())
             .and_then(|v| v.as_u64())
             .unwrap();
-        Some(SignalCalculation {
+        SignalCalculation {
             value: val as f64,
             score: score_rank(val as f64),
-        })
+        }
     }
 }
 
@@ -293,7 +293,7 @@ impl CoreSignal for IsHomepage {
         ))
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -303,9 +303,9 @@ impl CoreSignal for IsHomepage {
             .unwrap();
 
         if val {
-            Some(SignalCalculation::new_symmetrical(1.0))
+            SignalCalculation::new_symmetrical(1.0)
         } else {
-            Some(SignalCalculation::new_symmetrical(0.0))
+            SignalCalculation::new_symmetrical(0.0)
         }
     }
 }
@@ -352,7 +352,7 @@ impl CoreSignal for FetchTimeMs {
         })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -367,10 +367,10 @@ impl CoreSignal for FetchTimeMs {
             signal_computer.fetch_time_ms_cache()[fetch_time_ms]
         };
 
-        Some(SignalCalculation {
+        SignalCalculation {
             value: fetch_time_ms as f64,
             score,
-        })
+        }
     }
 }
 
@@ -417,7 +417,7 @@ impl CoreSignal for UpdateTimestamp {
         })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -428,10 +428,10 @@ impl CoreSignal for UpdateTimestamp {
 
         let score = score_timestamp(val, signal_computer);
 
-        Some(SignalCalculation {
+        SignalCalculation {
             value: val as f64,
             score,
-        })
+        }
     }
 }
 
@@ -469,7 +469,7 @@ impl CoreSignal for TrackerScore {
         })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -479,10 +479,10 @@ impl CoreSignal for TrackerScore {
             .unwrap();
         let score = score_trackers(val as f64);
 
-        Some(SignalCalculation {
+        SignalCalculation {
             value: val as f64,
             score,
-        })
+        }
     }
 }
 
@@ -523,7 +523,7 @@ impl CoreSignal for Region {
         })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -534,10 +534,10 @@ impl CoreSignal for Region {
         let region = crate::webpage::Region::from_id(val);
         let score = score_region(region, signal_computer);
 
-        Some(SignalCalculation {
+        SignalCalculation {
             value: val as f64,
             score,
-        })
+        }
     }
 }
 
@@ -590,7 +590,7 @@ impl CoreSignal for UrlDigits {
         })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -600,7 +600,7 @@ impl CoreSignal for UrlDigits {
             .unwrap() as f64;
         let score = score_digits(val);
 
-        Some(SignalCalculation { value: val, score })
+        SignalCalculation { value: val, score }
     }
 }
 
@@ -644,7 +644,7 @@ impl CoreSignal for UrlSlashes {
         })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -654,7 +654,7 @@ impl CoreSignal for UrlSlashes {
             .unwrap() as f64;
         let score = score_slashes(val);
 
-        Some(SignalCalculation { value: val, score })
+        SignalCalculation { value: val, score }
     }
 }
 
@@ -692,7 +692,7 @@ impl CoreSignal for LinkDensity {
         })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -702,7 +702,7 @@ impl CoreSignal for LinkDensity {
             .unwrap();
         let score = score_link_density(val);
 
-        Some(SignalCalculation { value: val, score })
+        SignalCalculation { value: val, score }
     }
 }
 
@@ -738,7 +738,7 @@ impl CoreSignal for HasAds {
         Some(SignalCalculation { value, score })
     }
 
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation {
         let seg_reader = signal_computer.segment_reader().unwrap().borrow_mut();
         let numericalfield_reader = seg_reader.numericalfield_reader().get_field_reader(doc);
 
@@ -750,6 +750,6 @@ impl CoreSignal for HasAds {
         let value: f64 = has_ads.into();
         let score = if !has_ads { 1.0 } else { 0.0 };
 
-        Some(SignalCalculation { value, score })
+        SignalCalculation { value, score }
     }
 }

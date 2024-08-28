@@ -18,7 +18,7 @@ use tantivy::DocId;
 
 use crate::{
     enum_map::EnumMap,
-    ranking::{ComputedSignal, CoreSignal, CoreSignalEnum, SignalCalculation},
+    ranking::{ComputedSignal, CoreSignal, CoreSignalEnum},
     schema::{text_field::TextField, TextFieldEnum},
 };
 
@@ -69,19 +69,12 @@ impl SignalComputeOrder {
             .values()
             .flat_map(move |ngram| ngram.compute(doc, signal_computer))
             .chain(self.other_signals.iter().map(move |&signal| {
-                signal
-                    .compute(doc, signal_computer)
-                    .map(|calc| ComputedSignal {
-                        signal: signal.into(),
-                        calc,
-                    })
-                    .unwrap_or_else(|| ComputedSignal {
-                        signal: signal.into(),
-                        calc: SignalCalculation {
-                            score: 0.0,
-                            value: 0.0,
-                        },
-                    })
+                let calc = signal.compute(doc, signal_computer);
+
+                ComputedSignal {
+                    signal: signal.into(),
+                    calc,
+                }
             }))
     }
 }
@@ -119,28 +112,20 @@ impl NGramComputeOrder {
         let mut hits = 0;
 
         self.signals.iter().map(|(_, s)| s).map(move |&signal| {
-            signal
-                .compute(doc, signal_computer)
-                .map(|calc| ComputedSignal {
-                    signal: signal.into(),
-                    calc,
-                })
-                .map(|mut c| {
-                    c.calc.score *= NGRAM_DAMPENING.powi(hits);
+            let calc = signal.compute(doc, signal_computer);
 
-                    if c.calc.score > 0.0 {
-                        hits += 1;
-                    }
+            let mut computed = ComputedSignal {
+                signal: signal.into(),
+                calc,
+            };
 
-                    c
-                })
-                .unwrap_or_else(|| ComputedSignal {
-                    signal: signal.into(),
-                    calc: SignalCalculation {
-                        value: 0.0,
-                        score: 0.0,
-                    },
-                })
+            computed.calc.score *= NGRAM_DAMPENING.powi(hits);
+
+            if computed.calc.score > 0.0 {
+                hits += 1;
+            }
+
+            computed
         })
     }
 }

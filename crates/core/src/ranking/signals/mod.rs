@@ -42,7 +42,7 @@ use tantivy::DocId;
 pub trait CoreSignal: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
     fn default_coefficient(&self) -> f64;
     fn as_field(&self) -> Option<Field>;
-    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation>;
+    fn compute(&self, doc: DocId, signal_computer: &SignalComputer) -> SignalCalculation;
 
     fn precompute(
         self,
