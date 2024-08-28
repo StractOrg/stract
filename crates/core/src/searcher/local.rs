@@ -26,7 +26,6 @@ use crate::index::Index;
 use crate::inverted_index::{InvertedIndex, KeyPhrase, RetrievedWebpage};
 use crate::models::dual_encoder::DualEncoder;
 use crate::query::Query;
-use crate::ranking::models::lambdamart::LambdaMART;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{
     LocalRecallRankingWebpage, PrecisionRankingWebpage, RankableWebpage, RecallRankingWebpage,
@@ -104,7 +103,6 @@ impl<'a> SearchGuard<'a> for LiveIndexSearchGuard<'a> {
 pub struct LocalSearcher<I: SearchableIndex> {
     index: I,
     linear_regression: Option<Arc<LinearRegression>>,
-    lambda_model: Option<Arc<LambdaMART>>,
     dual_encoder: Option<Arc<DualEncoder>>,
     collector_config: CollectorConfig,
 }
@@ -131,7 +129,6 @@ where
         LocalSearcher {
             index,
             linear_regression: None,
-            lambda_model: None,
             dual_encoder: None,
             collector_config: CollectorConfig::default(),
         }
@@ -139,10 +136,6 @@ where
 
     pub fn set_linear_model(&mut self, model: LinearRegression) {
         self.linear_regression = Some(Arc::new(model));
-    }
-
-    pub fn set_lambda_model(&mut self, model: LambdaMART) {
-        self.lambda_model = Some(Arc::new(model));
     }
 
     pub fn set_dual_encoder(&mut self, dual_encoder: DualEncoder) {

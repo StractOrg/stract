@@ -306,7 +306,6 @@ pub struct SearchServerConfig {
     pub shard: ShardId,
     pub index_path: String,
     pub linear_model_path: Option<String>,
-    pub lambda_model_path: Option<String>,
     pub dual_encoder_model_path: Option<String>,
     pub host: SocketAddr,
 

@@ -29,7 +29,7 @@ use crate::{
     index::Index,
     inverted_index::{self, KeyPhrase, RetrievedWebpage},
     models::dual_encoder::DualEncoder,
-    ranking::models::{lambdamart::LambdaMART, linear::LinearRegression},
+    ranking::models::linear::LinearRegression,
     searcher::{InitialWebsiteResult, LocalSearcher, SearchGuard, SearchQuery, SearchableIndex},
     Result,
 };
@@ -63,10 +63,6 @@ impl SearchService {
 
         if let Some(model_path) = config.linear_model_path {
             local_searcher.set_linear_model(LinearRegression::open(model_path)?);
-        }
-
-        if let Some(model_path) = config.lambda_model_path {
-            local_searcher.set_lambda_model(LambdaMART::open(model_path)?);
         }
 
         if let Some(model_path) = config.dual_encoder_model_path {
