@@ -352,7 +352,7 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 signal_coefficients: enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::core::Bm25Title) => 1_000_000.0
+                    crate::ranking::SignalEnum::from(crate::ranking::signals::core::Bm25Title) => 1_000_000.0
 
                 }
                 .into(),
@@ -760,7 +760,7 @@ mod tests {
             .search(&SearchQuery {
                 query: "website".to_string(),
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::core::InboundSimilarity) => 100_000.0
+                    crate::ranking::SignalEnum::from(crate::ranking::signals::InboundSimilarity) => 100_000.0
                 }.into(),
 
                 optic: Some(Optic {

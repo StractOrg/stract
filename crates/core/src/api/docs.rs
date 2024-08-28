@@ -77,8 +77,8 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::widgets::thesaurus::PartOfSpeech,
                 crate::widgets::thesaurus::PartOfSpeechMeaning,
 
-                crate::ranking::core::SignalEnumDiscriminants,
-                crate::ranking::core::SignalScore,
+                crate::ranking::SignalEnumDiscriminants,
+                crate::ranking::SignalScore,
                 
                 crate::bangs::BangHit,
                 crate::bangs::Bang,

@@ -414,7 +414,6 @@ export type SignalEnumDiscriminants =
   | 'title_embedding_similarity'
   | 'keyword_embedding_similarity'
   | 'has_ads'
-  | 'num_query_terms'
   | 'min_title_slop'
   | 'min_clean_body_slop';
 export const SIGNAL_ENUM_DISCRIMINANTS = [
@@ -462,7 +461,6 @@ export const SIGNAL_ENUM_DISCRIMINANTS = [
   'title_embedding_similarity',
   'keyword_embedding_similarity',
   'has_ads',
-  'num_query_terms',
   'min_title_slop',
   'min_clean_body_slop',
 ] satisfies SignalEnumDiscriminants[];

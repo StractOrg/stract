@@ -40,7 +40,7 @@ use crate::webpage::region::RegionCount;
 use crate::ranking::bm25::MultiBm25Weight;
 use crate::ranking::models::linear::LinearRegression;
 
-use super::{ComputedSignal, Signal, SignalCoefficients, SignalEnum};
+use super::{ComputedSignal, CoreSignal, CoreSignalEnum, Signal, SignalCoefficients, SignalEnum};
 
 mod order;
 pub use order::SignalComputeOrder;
@@ -288,7 +288,7 @@ impl SignalComputer {
 
         if let Some(query) = &self.query_data {
             if !query.simple_terms.is_empty() {
-                for signal in SignalEnum::all() {
+                for signal in CoreSignalEnum::all() {
                     if let Some((text_field, tv_field)) = signal
                         .as_textfield()
                         .and_then(|f| (f.tantivy_field(schema).map(|tv_field| (f, tv_field))))
@@ -350,7 +350,7 @@ impl SignalComputer {
                                 bm25,
                                 bm25f,
                                 fieldnorm_reader,
-                                signal_coefficient: self.coefficient(&signal),
+                                signal_coefficient: self.coefficient(&signal.into()),
                                 num_query_terms: terms.len(),
                             },
                         );
@@ -470,11 +470,12 @@ impl SignalComputer {
     }
 
     pub fn precompute_score(&self, webpage: &Webpage) -> f64 {
-        SignalEnum::all()
+        CoreSignalEnum::all()
             .filter_map(|signal| {
-                signal
-                    .precompute(webpage, self)
-                    .map(|calc| ComputedSignal { signal, calc })
+                signal.precompute(webpage, self).map(|calc| ComputedSignal {
+                    signal: signal.into(),
+                    calc,
+                })
             })
             .map(|computed| self.coefficient(&computed.signal) * computed.calc.score)
             .sum()

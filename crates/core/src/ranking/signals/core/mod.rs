@@ -13,28 +13,10 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+pub use std::result;
 
-use crate::{
-    ranking::{self, pipeline::RankableWebpage},
-    searcher::api,
-};
+pub mod non_text;
+pub mod text;
 
-use super::Modifier;
-
-const INBOUND_SIMILARITY_SMOOTHING: f64 = 8.0;
-
-pub struct InboundSimilarity;
-
-impl Modifier for InboundSimilarity {
-    type Webpage = api::ScoredWebpagePointer;
-
-    fn boost(&self, webpage: &Self::Webpage) -> f64 {
-        webpage
-            .as_ranking()
-            .signals()
-            .get(ranking::signals::InboundSimilarity.into())
-            .map(|calc| calc.value)
-            .unwrap_or(0.0)
-            + INBOUND_SIMILARITY_SMOOTHING
-    }
-}
+pub use non_text::*;
+pub use text::*;

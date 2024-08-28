@@ -68,7 +68,7 @@ impl super::RankingStage for TitleDistanceScorer {
         let score = score_slop(min_slop);
 
         (
-            ranking::core::MinTitleSlop.into(),
+            ranking::signals::MinTitleSlop.into(),
             ranking::SignalCalculation {
                 value: min_slop,
                 score,
@@ -88,7 +88,7 @@ impl super::RankingStage for BodyDistanceScorer {
         let score = score_slop(min_slop);
 
         (
-            ranking::core::MinCleanBodySlop.into(),
+            ranking::signals::MinCleanBodySlop.into(),
             ranking::SignalCalculation {
                 value: min_slop,
                 score,

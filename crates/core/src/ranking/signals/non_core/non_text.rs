@@ -1,7 +1,3 @@
-use tantivy::DocId;
-
-use crate::schema::Field;
-
 // Stract is an open source web search engine.
 // Copyright (C) 2024 Stract ApS
 //
@@ -16,9 +12,9 @@ use crate::schema::Field;
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use super::{Signal, SignalCalculation, SignalComputer};
+use crate::ranking::Signal;
 
 #[derive(
     Debug,
@@ -32,20 +28,47 @@ use super::{Signal, SignalCalculation, SignalComputer};
     bincode::Encode,
     bincode::Decode,
 )]
-pub struct NumQueryTerms;
-impl Signal for NumQueryTerms {
+pub struct QueryCentrality;
+impl Signal for QueryCentrality {
     fn default_coefficient(&self) -> f64 {
         0.0
     }
+}
 
-    fn as_field(&self) -> Option<Field> {
-        None
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
+pub struct InboundSimilarity;
+impl Signal for InboundSimilarity {
+    fn default_coefficient(&self) -> f64 {
+        0.25
     }
+}
 
-    fn compute(&self, _: DocId, signal_computer: &SignalComputer) -> Option<SignalCalculation> {
-        signal_computer
-            .query_data()
-            .map(|d| d.simple_terms().len() as f64)
-            .map(SignalCalculation::new_symmetrical)
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
+pub struct LambdaMart;
+impl Signal for LambdaMart {
+    fn default_coefficient(&self) -> f64 {
+        10.0
     }
 }

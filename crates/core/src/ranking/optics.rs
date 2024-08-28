@@ -185,7 +185,7 @@ mod tests {
                 }),
 
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::core::InboundSimilarity) => 100_000_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::signals::InboundSimilarity) => 100_000_000.0,
                 }.into(),
 
                 ..Default::default()
@@ -209,7 +209,7 @@ mod tests {
                 }),
 
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::core::InboundSimilarity) => 100_000_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::signals::InboundSimilarity) => 100_000_000.0,
                 }.into(),
 
                 return_ranking_signals: true,
@@ -233,7 +233,7 @@ mod tests {
                 }),
 
                 signal_coefficients: crate::enum_map! {
-                    crate::ranking::SignalEnum::from(crate::ranking::core::InboundSimilarity) => 100_000_000.0,
+                    crate::ranking::SignalEnum::from(crate::ranking::signals::InboundSimilarity) => 100_000_000.0,
                 }.into(),
 
                 return_ranking_signals: true,

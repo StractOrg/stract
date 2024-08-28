@@ -207,7 +207,7 @@ mod tests {
                     value: i as f64,
                     score,
                 };
-                signals.insert(ranking::core::HostCentrality.into(), calc);
+                signals.insert(ranking::signals::HostCentrality.into(), calc);
                 LocalRecallRankingWebpage::new_testing(pointer, signals, calc.score)
             })
             .map(|local| {

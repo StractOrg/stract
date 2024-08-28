@@ -83,7 +83,6 @@
       .with('query_centrality', () => 'queryCentrality' as const)
       .with('inbound_similarity', () => 'inboundSimilarity' as const)
       .with('lambda_mart', () => undefined)
-      .with('num_query_terms', () => undefined)
       .with('url_digits', () => 'urlSymbols' as const)
       .with('url_slashes', () => 'urlSymbols' as const)
       .with('link_density', () => 'linkDensity' as const)

@@ -16,7 +16,7 @@
 
 use tantivy::DocId;
 
-use super::{Signal, SignalCalculation, SignalComputer};
+use crate::ranking::{CoreSignal, SignalCalculation, SignalComputer};
 use crate::{
     schema::{self, Field},
     webpage::Webpage,
@@ -106,7 +106,7 @@ fn score_region(webpage_region: crate::webpage::Region, computer: &SignalCompute
     bincode::Decode,
 )]
 pub struct HostCentrality;
-impl Signal for HostCentrality {
+impl CoreSignal for HostCentrality {
     fn default_coefficient(&self) -> f64 {
         2.0
     }
@@ -146,7 +146,7 @@ impl Signal for HostCentrality {
     bincode::Decode,
 )]
 pub struct HostCentralityRank;
-impl Signal for HostCentralityRank {
+impl CoreSignal for HostCentralityRank {
     fn default_coefficient(&self) -> f64 {
         0.02
     }
@@ -192,7 +192,7 @@ impl Signal for HostCentralityRank {
     bincode::Decode,
 )]
 pub struct PageCentrality;
-impl Signal for PageCentrality {
+impl CoreSignal for PageCentrality {
     fn default_coefficient(&self) -> f64 {
         2.0
     }
@@ -232,7 +232,7 @@ impl Signal for PageCentrality {
     bincode::Decode,
 )]
 pub struct PageCentralityRank;
-impl Signal for PageCentralityRank {
+impl CoreSignal for PageCentralityRank {
     fn default_coefficient(&self) -> f64 {
         0.02
     }
@@ -278,7 +278,7 @@ impl Signal for PageCentralityRank {
     bincode::Decode,
 )]
 pub struct IsHomepage;
-impl Signal for IsHomepage {
+impl CoreSignal for IsHomepage {
     fn default_coefficient(&self) -> f64 {
         0.01
     }
@@ -323,7 +323,7 @@ impl Signal for IsHomepage {
     bincode::Decode,
 )]
 pub struct FetchTimeMs;
-impl Signal for FetchTimeMs {
+impl CoreSignal for FetchTimeMs {
     fn default_coefficient(&self) -> f64 {
         0.001
     }
@@ -387,7 +387,7 @@ impl Signal for FetchTimeMs {
     bincode::Decode,
 )]
 pub struct UpdateTimestamp;
-impl Signal for UpdateTimestamp {
+impl CoreSignal for UpdateTimestamp {
     fn default_coefficient(&self) -> f64 {
         0.001
     }
@@ -448,7 +448,7 @@ impl Signal for UpdateTimestamp {
     bincode::Decode,
 )]
 pub struct TrackerScore;
-impl Signal for TrackerScore {
+impl CoreSignal for TrackerScore {
     fn default_coefficient(&self) -> f64 {
         0.1
     }
@@ -499,7 +499,7 @@ impl Signal for TrackerScore {
     bincode::Decode,
 )]
 pub struct Region;
-impl Signal for Region {
+impl CoreSignal for Region {
     fn default_coefficient(&self) -> f64 {
         0.15
     }
@@ -553,90 +553,8 @@ impl Signal for Region {
     bincode::Encode,
     bincode::Decode,
 )]
-pub struct QueryCentrality;
-impl Signal for QueryCentrality {
-    fn default_coefficient(&self) -> f64 {
-        0.0
-    }
-
-    fn as_field(&self) -> Option<Field> {
-        None
-    }
-
-    fn compute(&self, _doc: DocId, _signal_computer: &SignalComputer) -> Option<SignalCalculation> {
-        // unimplemented!()
-        None
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
-pub struct InboundSimilarity;
-impl Signal for InboundSimilarity {
-    fn default_coefficient(&self) -> f64 {
-        0.25
-    }
-
-    fn as_field(&self) -> Option<Field> {
-        None
-    }
-
-    fn compute(&self, _doc: DocId, _signal_computer: &SignalComputer) -> Option<SignalCalculation> {
-        None // computed in later ranking stage
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
-pub struct LambdaMart;
-impl Signal for LambdaMart {
-    fn default_coefficient(&self) -> f64 {
-        10.0
-    }
-
-    fn as_field(&self) -> Option<Field> {
-        None
-    }
-
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
-        None // computed in later ranking stage
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
 pub struct UrlDigits;
-impl Signal for UrlDigits {
+impl CoreSignal for UrlDigits {
     fn default_coefficient(&self) -> f64 {
         0.01
     }
@@ -699,7 +617,7 @@ impl Signal for UrlDigits {
     bincode::Decode,
 )]
 pub struct UrlSlashes;
-impl Signal for UrlSlashes {
+impl CoreSignal for UrlSlashes {
     fn default_coefficient(&self) -> f64 {
         0.1
     }
@@ -753,7 +671,7 @@ impl Signal for UrlSlashes {
     bincode::Decode,
 )]
 pub struct LinkDensity;
-impl Signal for LinkDensity {
+impl CoreSignal for LinkDensity {
     fn default_coefficient(&self) -> f64 {
         0.0
     }
@@ -801,7 +719,7 @@ impl Signal for LinkDensity {
     bincode::Decode,
 )]
 pub struct HasAds;
-impl Signal for HasAds {
+impl CoreSignal for HasAds {
     fn default_coefficient(&self) -> f64 {
         0.01
     }

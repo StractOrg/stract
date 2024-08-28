@@ -18,7 +18,7 @@ use crate::schema::{self, Field};
 
 use tantivy::DocId;
 
-use super::{Signal, SignalCalculation, SignalComputer};
+use crate::ranking::{CoreSignal, SignalCalculation, SignalComputer};
 
 #[derive(
     Debug,
@@ -33,7 +33,7 @@ use super::{Signal, SignalCalculation, SignalComputer};
     bincode::Decode,
 )]
 pub struct Bm25F;
-impl Signal for Bm25F {
+impl CoreSignal for Bm25F {
     fn default_coefficient(&self) -> f64 {
         0.1
     }
@@ -68,7 +68,7 @@ impl Signal for Bm25F {
     bincode::Decode,
 )]
 pub struct Bm25Title;
-impl Signal for Bm25Title {
+impl CoreSignal for Bm25Title {
     fn default_coefficient(&self) -> f64 {
         0.0063
     }
@@ -105,7 +105,7 @@ impl Signal for Bm25Title {
     bincode::Decode,
 )]
 pub struct TitleCoverage;
-impl Signal for TitleCoverage {
+impl CoreSignal for TitleCoverage {
     fn default_coefficient(&self) -> f64 {
         0.01
     }
@@ -137,7 +137,7 @@ impl Signal for TitleCoverage {
     bincode::Decode,
 )]
 pub struct Bm25TitleBigrams;
-impl Signal for Bm25TitleBigrams {
+impl CoreSignal for Bm25TitleBigrams {
     fn default_coefficient(&self) -> f64 {
         0.005
     }
@@ -174,7 +174,7 @@ impl Signal for Bm25TitleBigrams {
     bincode::Decode,
 )]
 pub struct Bm25TitleTrigrams;
-impl Signal for Bm25TitleTrigrams {
+impl CoreSignal for Bm25TitleTrigrams {
     fn default_coefficient(&self) -> f64 {
         0.005
     }
@@ -211,7 +211,7 @@ impl Signal for Bm25TitleTrigrams {
     bincode::Decode,
 )]
 pub struct Bm25CleanBody;
-impl Signal for Bm25CleanBody {
+impl CoreSignal for Bm25CleanBody {
     fn default_coefficient(&self) -> f64 {
         0.005
     }
@@ -248,7 +248,7 @@ impl Signal for Bm25CleanBody {
     bincode::Decode,
 )]
 pub struct CleanBodyCoverage;
-impl Signal for CleanBodyCoverage {
+impl CoreSignal for CleanBodyCoverage {
     fn default_coefficient(&self) -> f64 {
         0.01
     }
@@ -281,7 +281,7 @@ impl Signal for CleanBodyCoverage {
     bincode::Decode,
 )]
 pub struct Bm25CleanBodyBigrams;
-impl Signal for Bm25CleanBodyBigrams {
+impl CoreSignal for Bm25CleanBodyBigrams {
     fn default_coefficient(&self) -> f64 {
         0.005
     }
@@ -318,7 +318,7 @@ impl Signal for Bm25CleanBodyBigrams {
     bincode::Decode,
 )]
 pub struct Bm25CleanBodyTrigrams;
-impl Signal for Bm25CleanBodyTrigrams {
+impl CoreSignal for Bm25CleanBodyTrigrams {
     fn default_coefficient(&self) -> f64 {
         0.005
     }
@@ -355,7 +355,7 @@ impl Signal for Bm25CleanBodyTrigrams {
     bincode::Decode,
 )]
 pub struct Bm25StemmedTitle;
-impl Signal for Bm25StemmedTitle {
+impl CoreSignal for Bm25StemmedTitle {
     fn default_coefficient(&self) -> f64 {
         0.003
     }
@@ -388,7 +388,7 @@ impl Signal for Bm25StemmedTitle {
     bincode::Decode,
 )]
 pub struct Bm25StemmedCleanBody;
-impl Signal for Bm25StemmedCleanBody {
+impl CoreSignal for Bm25StemmedCleanBody {
     fn default_coefficient(&self) -> f64 {
         0.001
     }
@@ -421,7 +421,7 @@ impl Signal for Bm25StemmedCleanBody {
     bincode::Decode,
 )]
 pub struct Bm25AllBody;
-impl Signal for Bm25AllBody {
+impl CoreSignal for Bm25AllBody {
     fn default_coefficient(&self) -> f64 {
         0.0
     }
@@ -454,7 +454,7 @@ impl Signal for Bm25AllBody {
     bincode::Decode,
 )]
 pub struct Bm25Keywords;
-impl Signal for Bm25Keywords {
+impl CoreSignal for Bm25Keywords {
     fn default_coefficient(&self) -> f64 {
         0.001
     }
@@ -487,7 +487,7 @@ impl Signal for Bm25Keywords {
     bincode::Decode,
 )]
 pub struct Bm25BacklinkText;
-impl Signal for Bm25BacklinkText {
+impl CoreSignal for Bm25BacklinkText {
     fn default_coefficient(&self) -> f64 {
         0.003
     }
@@ -520,7 +520,7 @@ impl Signal for Bm25BacklinkText {
     bincode::Decode,
 )]
 pub struct IdfSumUrl;
-impl Signal for IdfSumUrl {
+impl CoreSignal for IdfSumUrl {
     fn default_coefficient(&self) -> f64 {
         0.0006
     }
@@ -553,7 +553,7 @@ impl Signal for IdfSumUrl {
     bincode::Decode,
 )]
 pub struct IdfSumSite;
-impl Signal for IdfSumSite {
+impl CoreSignal for IdfSumSite {
     fn default_coefficient(&self) -> f64 {
         0.00015
     }
@@ -586,7 +586,7 @@ impl Signal for IdfSumSite {
     bincode::Decode,
 )]
 pub struct IdfSumDomain;
-impl Signal for IdfSumDomain {
+impl CoreSignal for IdfSumDomain {
     fn default_coefficient(&self) -> f64 {
         0.0003
     }
@@ -619,7 +619,7 @@ impl Signal for IdfSumDomain {
     bincode::Decode,
 )]
 pub struct IdfSumSiteNoTokenizer;
-impl Signal for IdfSumSiteNoTokenizer {
+impl CoreSignal for IdfSumSiteNoTokenizer {
     fn default_coefficient(&self) -> f64 {
         0.00015
     }
@@ -652,7 +652,7 @@ impl Signal for IdfSumSiteNoTokenizer {
     bincode::Decode,
 )]
 pub struct IdfSumDomainNoTokenizer;
-impl Signal for IdfSumDomainNoTokenizer {
+impl CoreSignal for IdfSumDomainNoTokenizer {
     fn default_coefficient(&self) -> f64 {
         0.0036
     }
@@ -685,7 +685,7 @@ impl Signal for IdfSumDomainNoTokenizer {
     bincode::Decode,
 )]
 pub struct IdfSumDomainNameNoTokenizer;
-impl Signal for IdfSumDomainNameNoTokenizer {
+impl CoreSignal for IdfSumDomainNameNoTokenizer {
     fn default_coefficient(&self) -> f64 {
         0.0002
     }
@@ -720,7 +720,7 @@ impl Signal for IdfSumDomainNameNoTokenizer {
     bincode::Decode,
 )]
 pub struct IdfSumDomainIfHomepage;
-impl Signal for IdfSumDomainIfHomepage {
+impl CoreSignal for IdfSumDomainIfHomepage {
     fn default_coefficient(&self) -> f64 {
         0.0004
     }
@@ -753,7 +753,7 @@ impl Signal for IdfSumDomainIfHomepage {
     bincode::Decode,
 )]
 pub struct IdfSumDomainNameIfHomepageNoTokenizer;
-impl Signal for IdfSumDomainNameIfHomepageNoTokenizer {
+impl CoreSignal for IdfSumDomainNameIfHomepageNoTokenizer {
     fn default_coefficient(&self) -> f64 {
         0.0036
     }
@@ -788,7 +788,7 @@ impl Signal for IdfSumDomainNameIfHomepageNoTokenizer {
     bincode::Decode,
 )]
 pub struct IdfSumDomainIfHomepageNoTokenizer;
-impl Signal for IdfSumDomainIfHomepageNoTokenizer {
+impl CoreSignal for IdfSumDomainIfHomepageNoTokenizer {
     fn default_coefficient(&self) -> f64 {
         0.0036
     }
@@ -823,7 +823,7 @@ impl Signal for IdfSumDomainIfHomepageNoTokenizer {
     bincode::Decode,
 )]
 pub struct IdfSumTitleIfHomepage;
-impl Signal for IdfSumTitleIfHomepage {
+impl CoreSignal for IdfSumTitleIfHomepage {
     fn default_coefficient(&self) -> f64 {
         0.001
     }
@@ -840,171 +840,5 @@ impl Signal for IdfSumTitleIfHomepage {
             .get_mut(self.as_textfield().unwrap())
             .map(|field| field.idf_sum(doc))
             .map(SignalCalculation::new_symmetrical)
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
-pub struct CrossEncoderSnippet;
-impl Signal for CrossEncoderSnippet {
-    fn default_coefficient(&self) -> f64 {
-        0.17
-    }
-
-    fn as_field(&self) -> Option<Field> {
-        None
-    }
-
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
-        None // computed in later ranking stage
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
-pub struct CrossEncoderTitle;
-impl Signal for CrossEncoderTitle {
-    fn default_coefficient(&self) -> f64 {
-        0.17
-    }
-
-    fn as_field(&self) -> Option<Field> {
-        None
-    }
-
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
-        None // computed in later ranking stage
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
-pub struct TitleEmbeddingSimilarity;
-impl Signal for TitleEmbeddingSimilarity {
-    fn default_coefficient(&self) -> f64 {
-        0.01
-    }
-
-    fn as_field(&self) -> Option<Field> {
-        Some(Field::Numerical(
-            schema::numerical_field::TitleEmbeddings.into(),
-        ))
-    }
-
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
-        None // computed in later ranking stage
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
-pub struct KeywordEmbeddingSimilarity;
-impl Signal for KeywordEmbeddingSimilarity {
-    fn default_coefficient(&self) -> f64 {
-        0.01
-    }
-
-    fn as_field(&self) -> Option<Field> {
-        Some(Field::Numerical(
-            schema::numerical_field::KeywordEmbeddings.into(),
-        ))
-    }
-
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
-        None // computed in later ranking stage
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
-pub struct MinTitleSlop;
-impl Signal for MinTitleSlop {
-    fn default_coefficient(&self) -> f64 {
-        0.1
-    }
-
-    fn as_field(&self) -> Option<Field> {
-        Some(Field::Text(schema::text_field::Title.into()))
-    }
-
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
-        None // computed in later ranking stage
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    bincode::Encode,
-    bincode::Decode,
-)]
-pub struct MinCleanBodySlop;
-impl Signal for MinCleanBodySlop {
-    fn default_coefficient(&self) -> f64 {
-        0.1
-    }
-
-    fn as_field(&self) -> Option<Field> {
-        Some(Field::Text(schema::text_field::CleanBody.into()))
-    }
-
-    fn compute(&self, _: DocId, _: &SignalComputer) -> Option<SignalCalculation> {
-        None // computed in later ranking stage
     }
 }

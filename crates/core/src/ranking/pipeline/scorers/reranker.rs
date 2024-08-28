@@ -49,12 +49,12 @@ impl<M: CrossEncoder> ReRanker<M> {
         for ((webpage, snippet), title) in webpage.iter_mut().zip(snippet_scores).zip(title_scores)
         {
             webpage.ranking_mut().signals_mut().insert(
-                ranking::core::CrossEncoderSnippet.into(),
+                ranking::signals::CrossEncoderSnippet.into(),
                 ranking::SignalCalculation::new_symmetrical(snippet),
             );
 
             webpage.ranking_mut().signals_mut().insert(
-                ranking::core::CrossEncoderTitle.into(),
+                ranking::signals::CrossEncoderTitle.into(),
                 ranking::SignalCalculation::new_symmetrical(title),
             );
         }

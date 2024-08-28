@@ -246,7 +246,7 @@ mod tests {
                 .ranking_signals
                 .as_ref()
                 .unwrap()
-                .get(&crate::ranking::SignalEnum::from(ranking::core::Bm25Title).into())
+                .get(&crate::ranking::SignalEnum::from(ranking::signals::Bm25Title).into())
                 .unwrap())
             .all(|&v| v.value > 0.0));
     }

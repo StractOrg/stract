@@ -18,7 +18,7 @@ use tantivy::DocId;
 
 use crate::{
     enum_map::EnumMap,
-    ranking::{ComputedSignal, Signal, SignalCalculation, SignalEnum},
+    ranking::{ComputedSignal, CoreSignal, CoreSignalEnum, SignalCalculation},
     schema::{text_field::TextField, TextFieldEnum},
 };
 
@@ -27,7 +27,7 @@ use super::SignalComputer;
 #[derive(Clone)]
 pub struct SignalComputeOrder {
     text_signals: EnumMap<TextFieldEnum, NGramComputeOrder>,
-    other_signals: Vec<SignalEnum>,
+    other_signals: Vec<CoreSignalEnum>,
 }
 
 impl SignalComputeOrder {
@@ -35,7 +35,7 @@ impl SignalComputeOrder {
         let mut text_signals = EnumMap::new();
         let mut other_signals = Vec::new();
 
-        for signal in SignalEnum::all() {
+        for signal in CoreSignalEnum::all() {
             if let Some(text_field) = signal.as_textfield() {
                 if signal.has_sibling_ngrams() {
                     let mono = text_field.monogram_field();
@@ -68,21 +68,27 @@ impl SignalComputeOrder {
         self.text_signals
             .values()
             .flat_map(move |ngram| ngram.compute(doc, signal_computer))
-            .chain(self.other_signals.iter().map(move |signal| {
+            .chain(self.other_signals.iter().map(move |&signal| {
                 signal
                     .compute(doc, signal_computer)
                     .map(|calc| ComputedSignal {
-                        signal: *signal,
+                        signal: signal.into(),
                         calc,
                     })
                     .unwrap_or_else(|| ComputedSignal {
-                        signal: *signal,
+                        signal: signal.into(),
                         calc: SignalCalculation {
                             score: 0.0,
                             value: 0.0,
                         },
                     })
             }))
+    }
+}
+
+impl Default for SignalComputeOrder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -96,11 +102,11 @@ const NGRAM_DAMPENING: f64 = 0.4;
 #[derive(Debug, Default, Clone)]
 pub struct NGramComputeOrder {
     /// ordered by descending ngram size. e.g. [title_bm25_trigram, title_bm25_bigram, title_bm25]
-    signals: Vec<(usize, SignalEnum)>,
+    signals: Vec<(usize, CoreSignalEnum)>,
 }
 
 impl NGramComputeOrder {
-    fn push(&mut self, signal: SignalEnum, ngram: usize) {
+    fn push(&mut self, signal: CoreSignalEnum, ngram: usize) {
         self.signals.push((ngram, signal));
         self.signals.sort_unstable_by(|(a, _), (b, _)| b.cmp(a));
     }
@@ -112,11 +118,11 @@ impl NGramComputeOrder {
     ) -> impl Iterator<Item = ComputedSignal> + 'a {
         let mut hits = 0;
 
-        self.signals.iter().map(|(_, s)| s).map(move |signal| {
+        self.signals.iter().map(|(_, s)| s).map(move |&signal| {
             signal
                 .compute(doc, signal_computer)
                 .map(|calc| ComputedSignal {
-                    signal: *signal,
+                    signal: signal.into(),
                     calc,
                 })
                 .map(|mut c| {
@@ -129,7 +135,7 @@ impl NGramComputeOrder {
                     c
                 })
                 .unwrap_or_else(|| ComputedSignal {
-                    signal: *signal,
+                    signal: signal.into(),
                     calc: SignalCalculation {
                         value: 0.0,
                         score: 0.0,

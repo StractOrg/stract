@@ -16,11 +16,9 @@
 
 use std::{path::Path, str::FromStr};
 
-use core::SignalEnumDiscriminants;
-
 use crate::{
     enum_map::EnumMap,
-    ranking::{core, SignalCalculation, SignalEnum},
+    ranking::signals::{SignalCalculation, SignalEnum, SignalEnumDiscriminants},
 };
 
 type Result<T> = std::result::Result<T, Error>;
@@ -35,9 +33,6 @@ pub enum Error {
     #[error("couldn't find end of trees")]
     NoEndOfTrees,
 
-    #[error("Signal error: {0}")]
-    Signal(#[from] core::Error),
-
     #[error("ParseInt error: {0}")]
     ParseInt(#[from] std::num::ParseIntError),
 
@@ -46,6 +41,9 @@ pub enum Error {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Unknown signal: {0}")]
+    UnknownSignal(String),
 }
 
 #[derive(Clone, Debug)]
@@ -225,7 +223,10 @@ impl Header {
             if let Some((key, value)) = lin.split_once('=') {
                 if key == "feature_names" {
                     for name in value.split(' ') {
-                        features.push(SignalEnum::from(SignalEnumDiscriminants::from_str(name)?));
+                        features.push(SignalEnum::from(
+                            SignalEnumDiscriminants::from_str(name)
+                                .map_err(|_| Error::UnknownSignal(name.to_string()))?,
+                        ));
                     }
                 }
             }
@@ -320,41 +321,65 @@ mod tests {
         assert!(!model.trees.is_empty());
 
         let mut features = EnumMap::new();
-        features.insert(ranking::core::Bm25BacklinkText.into(), 85.7750244140625);
-        features.insert(ranking::core::Bm25CleanBody.into(), 67.41311645507812);
-        features.insert(ranking::core::Bm25CleanBodyBigrams.into(), 0.0);
-        features.insert(ranking::core::Bm25CleanBodyTrigrams.into(), 0.0);
-        features.insert(ranking::core::IdfSumDomain.into(), 43.332096099853516);
-        features.insert(ranking::core::IdfSumDomainIfHomepage.into(), 0.0);
-        features.insert(ranking::core::IdfSumDomainIfHomepageNoTokenizer.into(), 0.0);
         features.insert(
-            ranking::core::IdfSumDomainNameIfHomepageNoTokenizer.into(),
+            ranking::signals::core::Bm25BacklinkText.into(),
+            85.7750244140625,
+        );
+        features.insert(
+            ranking::signals::core::Bm25CleanBody.into(),
+            67.41311645507812,
+        );
+        features.insert(ranking::signals::core::Bm25CleanBodyBigrams.into(), 0.0);
+        features.insert(ranking::signals::core::Bm25CleanBodyTrigrams.into(), 0.0);
+        features.insert(
+            ranking::signals::core::IdfSumDomain.into(),
+            43.332096099853516,
+        );
+        features.insert(ranking::signals::core::IdfSumDomainIfHomepage.into(), 0.0);
+        features.insert(
+            ranking::signals::core::IdfSumDomainIfHomepageNoTokenizer.into(),
             0.0,
         );
-        features.insert(ranking::core::IdfSumDomainNameNoTokenizer.into(), 0.0);
-        features.insert(ranking::core::IdfSumDomainNoTokenizer.into(), 0.0);
-        features.insert(ranking::core::IdfSumSite.into(), 61.47410202026367);
-        features.insert(ranking::core::IdfSumSiteNoTokenizer.into(), 0.0);
         features.insert(
-            ranking::core::Bm25StemmedCleanBody.into(),
+            ranking::signals::core::IdfSumDomainNameIfHomepageNoTokenizer.into(),
+            0.0,
+        );
+        features.insert(
+            ranking::signals::core::IdfSumDomainNameNoTokenizer.into(),
+            0.0,
+        );
+        features.insert(ranking::signals::core::IdfSumDomainNoTokenizer.into(), 0.0);
+        features.insert(ranking::signals::core::IdfSumSite.into(), 61.47410202026367);
+        features.insert(ranking::signals::core::IdfSumSiteNoTokenizer.into(), 0.0);
+        features.insert(
+            ranking::signals::core::Bm25StemmedCleanBody.into(),
             65.94627380371094,
         );
-        features.insert(ranking::core::Bm25StemmedTitle.into(), 0.0);
-        features.insert(ranking::core::Bm25Title.into(), 59.817813873291016);
-        features.insert(ranking::core::Bm25TitleBigrams.into(), 0.0);
-        features.insert(ranking::core::IdfSumTitleIfHomepage.into(), 0.0);
-        features.insert(ranking::core::Bm25TitleTrigrams.into(), 0.0);
-        features.insert(ranking::core::IdfSumUrl.into(), 57.07925033569336);
-        features.insert(ranking::core::FetchTimeMs.into(), 0.023255813953488372);
-        features.insert(ranking::core::HostCentrality.into(), 0.017958538);
-        features.insert(ranking::core::InboundSimilarity.into(), 0.0);
-        features.insert(ranking::core::IsHomepage.into(), 0.0);
-        features.insert(ranking::core::PageCentrality.into(), 0.008253236);
-        features.insert(ranking::core::Region.into(), 0.16622349570454012);
-        features.insert(ranking::core::TrackerScore.into(), 0.07692307692307693);
-        features.insert(ranking::core::UpdateTimestamp.into(), 0.0);
-        features.insert(ranking::core::UrlDigits.into(), 0.25);
-        features.insert(ranking::core::UrlSlashes.into(), 0.3333333333333333);
+        features.insert(ranking::signals::core::Bm25StemmedTitle.into(), 0.0);
+        features.insert(ranking::signals::core::Bm25Title.into(), 59.817813873291016);
+        features.insert(ranking::signals::core::Bm25TitleBigrams.into(), 0.0);
+        features.insert(ranking::signals::core::IdfSumTitleIfHomepage.into(), 0.0);
+        features.insert(ranking::signals::core::Bm25TitleTrigrams.into(), 0.0);
+        features.insert(ranking::signals::core::IdfSumUrl.into(), 57.07925033569336);
+        features.insert(
+            ranking::signals::core::FetchTimeMs.into(),
+            0.023255813953488372,
+        );
+        features.insert(ranking::signals::HostCentrality.into(), 0.017958538);
+        features.insert(ranking::signals::InboundSimilarity.into(), 0.0);
+        features.insert(ranking::signals::IsHomepage.into(), 0.0);
+        features.insert(ranking::signals::PageCentrality.into(), 0.008253236);
+        features.insert(ranking::signals::core::Region.into(), 0.16622349570454012);
+        features.insert(
+            ranking::signals::core::TrackerScore.into(),
+            0.07692307692307693,
+        );
+        features.insert(ranking::signals::core::UpdateTimestamp.into(), 0.0);
+        features.insert(ranking::signals::core::UrlDigits.into(), 0.25);
+        features.insert(
+            ranking::signals::core::UrlSlashes.into(),
+            0.3333333333333333,
+        );
 
         assert_eq!((model.predict(&features) * 1000.0) as u64, 1050);
     }

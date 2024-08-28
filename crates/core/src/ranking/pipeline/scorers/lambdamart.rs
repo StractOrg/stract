@@ -36,7 +36,7 @@ impl RankingStage for Arc<models::LambdaMART> {
             .map(|(signal, calc)| (signal, calc.value))
             .collect();
         (
-            ranking::core::LambdaMart.into(),
+            ranking::signals::LambdaMart.into(),
             SignalCalculation::new_symmetrical(self.predict(&signals)),
         )
     }
@@ -59,7 +59,7 @@ impl RankingStage for PrecisionLambda {
 
     fn compute(&self, webpage: &Self::Webpage) -> (SignalEnum, SignalCalculation) {
         (
-            ranking::core::LambdaMart.into(),
+            ranking::signals::LambdaMart.into(),
             SignalCalculation::new_symmetrical(self.0.predict(webpage.ranking().signals())),
         )
     }
