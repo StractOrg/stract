@@ -208,27 +208,15 @@ impl AsTantivyQuery for Matching {
                 )),
                 1.0,
             )),
-            MatchLocation::Description => UnionQuery::from(vec![
-                Box::new(ConstQuery::new(
-                    Box::new(PatternQuery::new(
-                        self.pattern.clone(),
-                        text_field::Description.into(),
-                        schema,
-                        columnfield_reader.clone(),
-                    )),
-                    1.0,
-                )) as Box<dyn tantivy::query::Query>,
-                Box::new(ConstQuery::new(
-                    Box::new(PatternQuery::new(
-                        self.pattern.clone(),
-                        text_field::DmozDescription.into(),
-                        schema,
-                        columnfield_reader.clone(),
-                    )),
-                    1.0,
-                )) as Box<dyn tantivy::query::Query>,
-            ])
-            .box_clone(),
+            MatchLocation::Description => Box::new(ConstQuery::new(
+                Box::new(PatternQuery::new(
+                    self.pattern.clone(),
+                    text_field::Description.into(),
+                    schema,
+                    columnfield_reader.clone(),
+                )),
+                1.0,
+            )) as Box<dyn tantivy::query::Query>,
             MatchLocation::Content => Box::new(ConstQuery::new(
                 Box::new(PatternQuery::new(
                     self.pattern.clone(),
