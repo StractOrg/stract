@@ -91,7 +91,7 @@ def eval_query(query, expected_urls, weights):
 
     if len(weights) != 0:
         coeffs = {id2feature[i]: w for i, w in enumerate(weights)}
-        coeffs["lambda_mart"] = 10.0
+        coeffs["lambda_mart"] = 1000.0
 
     res = stract.search(query, signal_coefficients=coeffs)
     return sum([1 for r in res if r["url"] in expected_urls])
