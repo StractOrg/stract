@@ -29,15 +29,10 @@ use super::RankingStage;
 impl RankingStage for Arc<models::LambdaMART> {
     type Webpage = ScoredWebpagePointer;
 
-    fn compute(&self, webpages: &Self::Webpage) -> (SignalEnum, SignalCalculation) {
-        let signals = webpages
-            .signals()
-            .iter()
-            .map(|(signal, calc)| (signal, calc.value))
-            .collect();
+    fn compute(&self, webpage: &Self::Webpage) -> (SignalEnum, SignalCalculation) {
         (
             ranking::signals::LambdaMart.into(),
-            SignalCalculation::new_symmetrical(self.predict(&signals)),
+            SignalCalculation::new_symmetrical(self.predict(webpage.as_ranking().signals())),
         )
     }
 
