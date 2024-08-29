@@ -21,8 +21,13 @@ use tantivy::{
     query::{BooleanQuery, Occur, QueryClone},
     schema::Schema,
 };
+use url::Url;
 
-use crate::{numericalfield_reader::NumericalFieldReader, schema::text_field, webpage::schema_org};
+use crate::{
+    numericalfield_reader::NumericalFieldReader,
+    schema::text_field,
+    webpage::{schema_org, url_ext::UrlExt},
+};
 
 use super::{const_query::ConstQuery, pattern_query::PatternQuery, union::UnionQuery};
 
@@ -169,72 +174,41 @@ impl AsTantivyQuery for Matching {
         schema: &Schema,
         columnfield_reader: &NumericalFieldReader,
     ) -> Box<dyn tantivy::query::Query> {
-        match &self.location {
-            MatchLocation::Site => ConstQuery::new(
-                PatternQuery::new(
-                    self.pattern.clone(),
-                    text_field::UrlForSiteOperator.into(),
-                    schema,
-                    columnfield_reader.clone(),
-                )
-                .box_clone(),
-                1.0,
-            )
-            .box_clone(),
-            MatchLocation::Url => Box::new(ConstQuery::new(
-                Box::new(PatternQuery::new(
-                    self.pattern.clone(),
-                    text_field::Url.into(),
-                    schema,
-                    columnfield_reader.clone(),
-                )),
-                1.0,
-            )),
-            MatchLocation::Domain => Box::new(ConstQuery::new(
-                Box::new(PatternQuery::new(
-                    self.pattern.clone(),
-                    text_field::Domain.into(),
-                    schema,
-                    columnfield_reader.clone(),
-                )),
-                1.0,
-            )),
-            MatchLocation::Title => Box::new(ConstQuery::new(
-                Box::new(PatternQuery::new(
-                    self.pattern.clone(),
-                    text_field::Title.into(),
-                    schema,
-                    columnfield_reader.clone(),
-                )),
-                1.0,
-            )),
-            MatchLocation::Description => Box::new(ConstQuery::new(
-                Box::new(PatternQuery::new(
-                    self.pattern.clone(),
-                    text_field::Description.into(),
-                    schema,
-                    columnfield_reader.clone(),
-                )),
-                1.0,
-            )) as Box<dyn tantivy::query::Query>,
-            MatchLocation::Content => Box::new(ConstQuery::new(
-                Box::new(PatternQuery::new(
-                    self.pattern.clone(),
-                    text_field::CleanBody.into(),
-                    schema,
-                    columnfield_reader.clone(),
-                )),
-                1.0,
-            )),
-            MatchLocation::MicroformatTag => Box::new(ConstQuery::new(
-                Box::new(PatternQuery::new(
-                    self.pattern.clone(),
-                    text_field::MicroformatTags.into(),
-                    schema,
-                    columnfield_reader.clone(),
-                )),
-                1.0,
-            )),
+        let field = match &self.location {
+            MatchLocation::Site => text_field::UrlForSiteOperator.into(),
+            MatchLocation::Url => text_field::Url.into(),
+            MatchLocation::Domain => {
+                // if pattern is "|raw|" and `raw` is actually a site
+                // instead of a domain, change match location to site
+                if self.pattern.len() == 3
+                    && matches!(self.pattern[0], PatternPart::Anchor)
+                    && matches!(self.pattern[2], PatternPart::Anchor)
+                {
+                    if let PatternPart::Raw(domain) = &self.pattern[1] {
+                        if let Ok(url) = Url::parse(&format!("https://{domain}")) {
+                            if let Some(real_domain) = url.root_domain() {
+                                if domain.as_str() != real_domain {
+                                    return Box::new(ConstQuery::new(
+                                        Box::new(PatternQuery::new(
+                                            self.pattern.clone(),
+                                            text_field::UrlForSiteOperator.into(),
+                                            schema,
+                                            columnfield_reader.clone(),
+                                        )),
+                                        1.0,
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                text_field::Domain.into()
+            }
+            MatchLocation::Title => text_field::Title.into(),
+            MatchLocation::Description => text_field::Description.into(),
+            MatchLocation::Content => text_field::CleanBody.into(),
+            MatchLocation::MicroformatTag => text_field::MicroformatTags.into(),
             MatchLocation::Schema => {
                 let mut pattern = self.pattern.clone();
                 // add TYPE_PREFIX to first term in pattern to ensure
@@ -246,7 +220,7 @@ impl AsTantivyQuery for Matching {
                     *first_term = format!("{}{}", schema_org::TYPE_PREFIX, first_term);
                 }
 
-                Box::new(ConstQuery::new(
+                return Box::new(ConstQuery::new(
                     Box::new(PatternQuery::new(
                         pattern,
                         text_field::FlattenedSchemaOrgJson.into(),
@@ -254,9 +228,21 @@ impl AsTantivyQuery for Matching {
                         columnfield_reader.clone(),
                     )),
                     1.0,
-                ))
+                ));
             }
-        }
+        };
+
+        ConstQuery::new(
+            PatternQuery::new(
+                self.pattern.clone(),
+                field,
+                schema,
+                columnfield_reader.clone(),
+            )
+            .box_clone(),
+            1.0,
+        )
+        .box_clone()
     }
 }
 
@@ -1911,7 +1897,6 @@ mod tests {
         page.html.set_clean_text("".to_string());
 
         index.insert(&page).expect("failed to insert webpage");
-
         index.commit().expect("failed to commit index");
 
         let searcher = LocalSearcher::from(index);
@@ -1929,5 +1914,76 @@ mod tests {
             .webpages;
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].url, "https://a-third-example.com/");
+    }
+
+    #[test]
+    fn test_site_in_domain_rule() {
+        let mut index = Index::temporary().expect("Unable to open index");
+
+        let page = Webpage {
+            html: Html::parse(
+                r#"
+                        <html>
+                            <head>
+                                <title>Example site</title>
+                            </head>
+                            <body>
+                                test example
+                            </body>
+                        </html>
+                    "#,
+                "https://site.example.com/",
+            )
+            .unwrap(),
+            ..Default::default()
+        };
+
+        index.insert(&page).expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let searcher = LocalSearcher::from(index);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse(
+                        "DiscardNonMatching; Rule { Matches { Domain(\"|site.example.com|\") } } ",
+                    )
+                    .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse(
+                        "DiscardNonMatching; Rule { Matches { Domain(\"|example.com|\") } } ",
+                    )
+                    .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 1);
+
+        let res = searcher
+            .search(&SearchQuery {
+                query: "example".to_string(),
+                optic: Some(
+                    Optic::parse("DiscardNonMatching; Rule { Matches { Domain(\"|another.example.com|\") } } ")
+                        .unwrap(),
+                ),
+                ..Default::default()
+            })
+            .unwrap()
+            .webpages;
+        assert_eq!(res.len(), 0);
     }
 }
