@@ -119,7 +119,12 @@ impl Robots {
 
         if !lines.iter().any(|line| {
             if let Line::UserAgent(agents) = line {
-                agents.iter().any(|agent| agent.to_lowercase() == useragent)
+                agents.iter().any(|agent| {
+                    agent
+                        .chars()
+                        .zip(useragent.chars())
+                        .all(|(c1, c2)| c1.to_ascii_lowercase() == c2)
+                })
             } else {
                 false
             }
@@ -138,7 +143,12 @@ impl Robots {
 
             if let Line::UserAgent(agents) = &line {
                 useragent_lines += 1;
-                if agents.iter().any(|agent| agent.to_lowercase() == useragent) {
+                if agents.iter().any(|agent| {
+                    agent
+                        .chars()
+                        .zip(useragent.chars())
+                        .all(|(c1, c2)| c1.to_ascii_lowercase() == c2)
+                }) {
                     let mut has_captured_directive = false;
                     while idx + 1 < lines.len() {
                         idx += 1;
