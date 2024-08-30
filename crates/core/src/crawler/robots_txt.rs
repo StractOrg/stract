@@ -22,6 +22,8 @@ use crate::{config::CrawlerConfig, crawler};
 
 use super::{encoded_body, Result, Site};
 
+const RETRY_ROBOTSTXT_UNREACHABLE: bool = false;
+
 enum Lookup<T> {
     Found(T),
     /// 404
@@ -139,6 +141,10 @@ impl RobotsTxtManager {
     }
 
     async fn fetch_robots_txt(&self, site: &Site) -> Lookup<RobotsTxt> {
+        if !RETRY_ROBOTSTXT_UNREACHABLE {
+            return self.fetch_robots_txt_without_retry(site).await;
+        }
+
         for _ in 0..3 {
             match self.fetch_robots_txt_without_retry(site).await {
                 Lookup::Found(robots_txt) => return Lookup::Found(robots_txt),
@@ -171,8 +177,8 @@ impl RobotsTxtManager {
 
         let cache_should_update = match self.cache.get_mut(&site) {
             Some(Lookup::Found(robots_txt)) => robots_txt.is_expired(&self.cache_expiration),
-            Some(Lookup::Unavailable) => false,
-            _ => true,
+            Some(Lookup::Unavailable) | Some(Lookup::Unreachable) => false,
+            None => true,
         };
 
         if cache_should_update {

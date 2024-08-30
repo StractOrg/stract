@@ -672,8 +672,8 @@ disallow: /x/
 
         let robotstxt = r#"
 user-agent: FooBot
-disallow: 
-allow: 
+disallow:
+allow:
 "#;
 
         assert!(is_user_agent_allowed(robotstxt, "FooBot", url));
