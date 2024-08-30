@@ -85,6 +85,7 @@ impl Default for Params {
     }
 }
 
+#[derive(Debug)]
 pub struct Robots {
     rules: Vec<Rule>,
     crawl_delay: Option<f32>,
@@ -140,6 +141,7 @@ impl Robots {
 
         while idx < lines.len() {
             let line = &lines[idx];
+            idx += 1;
 
             if let Line::UserAgent(agents) = &line {
                 useragent_lines += 1;
@@ -150,9 +152,11 @@ impl Robots {
                         .all(|(c1, c2)| c1.to_ascii_lowercase() == c2)
                 }) {
                     let mut has_captured_directive = false;
-                    while idx + 1 < lines.len() {
+                    while idx < lines.len() {
+                        let line = &lines[idx];
                         idx += 1;
-                        match &lines[idx] {
+
+                        match line {
                             Line::Allow(path) => {
                                 has_captured_directive = true;
 
@@ -173,7 +177,13 @@ impl Robots {
                                     });
                                 }
                             }
-                            Line::UserAgent(_) if has_captured_directive => break,
+                            Line::UserAgent(_) if has_captured_directive => {
+                                idx -= 1;
+                                break;
+                            }
+                            Line::Sitemap(sitemap) => {
+                                sitemaps.push(sitemap.to_string());
+                            }
                             Line::CrawlDelay(Some(delay)) => {
                                 has_captured_directive = true;
                                 crawl_delay = Some(*delay);
@@ -181,7 +191,6 @@ impl Robots {
                             _ => {}
                         }
                     }
-                    continue;
                 }
             } else if useragent_lines == 0 {
                 // add preceding rules as global rules
@@ -208,8 +217,6 @@ impl Robots {
             if let Line::Sitemap(url) = line {
                 sitemaps.push(url.to_string());
             }
-
-            idx += 1;
         }
 
         Ok(Self {

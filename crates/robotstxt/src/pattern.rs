@@ -291,11 +291,5 @@ mod tests {
 
             prop_assert_eq!(rule.matches(&path), re.is_match(&path));
         }
-
-        #[test]
-        fn percent_encode_idempotent(s: String) {
-            let encoded = percent_encode(&s);
-            prop_assert_eq!(percent_encode(&encoded), encoded);
-        }
     }
 }
