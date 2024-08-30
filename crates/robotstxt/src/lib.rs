@@ -17,7 +17,7 @@
 //! A robots.txt parser and matcher compliant with [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309.html)
 //! and [Google's Robots.txt parser](https://github.com/google/robotstxt) (with some extensions).
 
-const MAX_CHAR_LIMIT_DEFAULT: usize = 4_000_000; // 4 MB
+const MAX_CHAR_LIMIT_DEFAULT: usize = 512_000; // 512 KB
 
 mod parser;
 mod pattern;
