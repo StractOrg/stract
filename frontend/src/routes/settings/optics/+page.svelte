@@ -146,12 +146,13 @@
             class="group flex w-6 items-start !bg-transparent"
             on:click={removeOptic(optic)}
             disabled={!removable}
+            title={removable ? 'Remove' : ''}
           >
             <MinusCircle
               class="text-neutral transition group-enabled:text-error group-enabled:group-hover:text-error"
             />
           </button>
-          <label class="flex w-6 items-start hover:cursor-pointer">
+          <label class="flex w-6 items-start hover:cursor-pointer" title="Show/hide in UI">
             <input
               type="checkbox"
               bind:checked={$opticsShowStore[opticKey(optic)]}
