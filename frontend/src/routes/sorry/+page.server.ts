@@ -16,9 +16,10 @@ const patchSelections = (searchParams: URLSearchParams): number[] => {
   return res;
 };
 
-export const load = async ({ url, getClientAddress }: PageServerLoadEvent) => {
+export const load = async ({ url, getClientAddress, request }: PageServerLoadEvent) => {
   const challenge = patchSelections(url.searchParams);
-  await checkCaptcha(url.searchParams, challenge, getClientAddress);
+  const clientAddress = request.headers.get('x-real-ip') || getClientAddress();
+  await checkCaptcha(url.searchParams, challenge, clientAddress);
 
   const captcha = await generateImage();
   const imgBase64 = await captcha.image.getBase64Async('image/png');

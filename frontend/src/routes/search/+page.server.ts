@@ -3,15 +3,17 @@ import { extractSearchParams, type SearchParams } from '$lib/search';
 import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoadEvent } from './$types';
 
-export const load = async ({ locals, getClientAddress, url }: PageServerLoadEvent) => {
+export const load = async ({ locals, getClientAddress, url, request }: PageServerLoadEvent) => {
   const searchParams: SearchParams | undefined =
     (locals['form'] && extractSearchParams(locals['form'])) || undefined;
 
-  if (await shouldShowCaptcha(getClientAddress())) {
+  const clientAddress = request.headers.get('x-real-ip') || getClientAddress();
+
+  if (await shouldShowCaptcha(clientAddress)) {
     return redirect(302, `/sorry?redirectTo=${encodeURIComponent(url.toString())}`);
   }
 
-  return { form: searchParams, clientAddress: getClientAddress() };
+  return { form: searchParams, clientAddress };
 };
 
 export const actions: Actions = {

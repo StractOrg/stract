@@ -13,10 +13,11 @@ const extractChallenge = (searchParams: URLSearchParams): number[] => {
   return challenge;
 };
 
-export const load = async ({ url, getClientAddress }: PageServerLoadEvent) => {
+export const load = async ({ url, getClientAddress, request }: PageServerLoadEvent) => {
   const challenge = extractChallenge(url.searchParams);
 
-  await checkCaptcha(url.searchParams, challenge, getClientAddress);
+  const clientAddress = request.headers.get('x-real-ip') || getClientAddress();
+  await checkCaptcha(url.searchParams, challenge, clientAddress);
 
   const captcha = await generateAudio();
 

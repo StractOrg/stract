@@ -5,13 +5,13 @@ import { verifyDigest } from '$lib/captcha/lib';
 export const checkCaptcha = async (
   searchParams: URLSearchParams,
   challenge: number[],
-  getClientAddress: () => string,
+  clientAddress: string,
 ) => {
   const digest = searchParams.get('digest');
 
   if (digest) {
     if (await verifyDigest(digest, challenge)) {
-      await allow(getClientAddress());
+      await allow(clientAddress);
       let redirectTo = '/';
       try {
         const redirectToUrl = new URL(searchParams.get('redirectTo') || '/');
