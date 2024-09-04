@@ -34,6 +34,7 @@ const config = {
         'connect-src': ['*'],
         'img-src': ['self', 'data:', 'stract.com', '0.0.0.0:3000', 'localhost:3000'],
         'style-src': ['self', 'unsafe-inline'],
+        'media-src': ['data:'],
       },
     },
   },

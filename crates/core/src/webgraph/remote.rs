@@ -98,22 +98,24 @@ impl RemoteWebgraph {
     pub async fn new(cluster: Arc<Cluster>, granularity: WebgraphGranularity) -> Self {
         let manager = WebgraphClientManager { granularity };
 
-        tracing::info!("waiting for {granularity} webgraph to come online...");
-
-        cluster
-            .await_member(|member| {
-                if let Service::Webgraph {
-                    host: _,
-                    shard: _,
-                    granularity: remote_granularity,
-                } = member.service
-                {
-                    granularity == remote_granularity
-                } else {
-                    false
-                }
-            })
-            .await;
+        #[cfg(feature = "dev")]
+        {
+            tracing::info!("waiting for {granularity} webgraph to come online...");
+            cluster
+                .await_member(|member| {
+                    if let Service::Webgraph {
+                        host: _,
+                        shard: _,
+                        granularity: remote_granularity,
+                    } = member.service
+                    {
+                        granularity == remote_granularity
+                    } else {
+                        false
+                    }
+                })
+                .await;
+        }
 
         Self {
             client: Arc::new(Mutex::new(

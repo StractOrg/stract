@@ -59,12 +59,16 @@
   },
   "type": "module",
   "dependencies": {
+    "@types/uuid": "^10.0.0",
+    "async-mutex": "^0.5.0",
+    "client-wasm": "file:../crates/client-wasm/pkg",
     "colord": "^2.9.3",
     "file-saver": "^2.0.5",
     "highlight.js": "^11.9.0",
+    "jimp": "^0.22.12",
     "tailwind-merge": "^2.1.0",
     "ts-pattern": "^5.0.6",
-    "client-wasm": "file:../crates/client-wasm/pkg"
+    "uuid": "^10.0.0"
   },
   "engines": {
     "node": "^20.10.x"

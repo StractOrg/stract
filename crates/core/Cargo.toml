@@ -13,7 +13,6 @@ version = "0.1.0"
 cors = []
 default = ["cors"]
 dev = ["cors"]
-prod = ["cors"]
 return_body = []
 
 [[bin]]
