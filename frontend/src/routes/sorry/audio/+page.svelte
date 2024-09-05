@@ -7,8 +7,6 @@
   import { page } from '$app/stores';
 
   export let data: PageData;
-
-  $: console.log(data.audioBase64);
 </script>
 
 <Captcha resultDigestBase64={data.resultDigestBase64}>
