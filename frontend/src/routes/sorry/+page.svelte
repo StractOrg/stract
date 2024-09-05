@@ -16,7 +16,7 @@
     <a href={`sorry/audio${$page.url.search}`} title="Get an audio challenge"
       ><Speaker class="h-8 w-8" /></a
     >
-    <Button title="Verify challenge" type="submit">VERIFY</Button>
+    <Button title="Verify challenge" type="submit" kind="accent">VERIFY</Button>
   </div>
 </Captcha>
 

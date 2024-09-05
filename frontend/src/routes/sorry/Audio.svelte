@@ -38,7 +38,7 @@
   </audio>
   <button
     type="button"
-    class="h-16 w-full rounded bg-accent text-xl font-semibold"
+    class="h-16 w-full rounded bg-primary text-xl font-semibold text-primary-content"
     on:click={click}
     bind:this={button}>PLAY</button
   >
