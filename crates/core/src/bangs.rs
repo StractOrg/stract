@@ -170,16 +170,15 @@ impl Bangs {
                 .collect::<String>();
 
                 let query = crate::urlencode(query.as_str());
-                let mut url = bang.url.replace("{{{s}}}", query.as_str());
+                let url = bang.url.replace("{{{s}}}", query.as_str());
 
-                if !url.contains("://") {
-                    url = "http://".to_string() + url.as_str();
-                }
-
-                return Some(BangHit {
-                    bang: bang.clone(),
-                    redirect_to: Url::parse(url.as_str()).unwrap().into(),
-                });
+                return Url::parse(url.as_str())
+                    .or_else(|_| Url::parse(&format!("https://{}", url)))
+                    .ok()
+                    .map(|url| BangHit {
+                        bang: bang.clone(),
+                        redirect_to: url.into(),
+                    });
             }
         }
 
