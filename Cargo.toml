@@ -15,6 +15,7 @@ members = [
   "crates/tantivy",
   "crates/leechy",
   "crates/common",
+  "crates/simple-wal",
   "fuzz",
 ]
 resolver = "2"

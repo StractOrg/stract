@@ -5043,6 +5043,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1de1d4f81173b03af4c0cbed3c898f6bff5b870e4a7f5d6f4057d62a7a4b686e"
 
 [[package]]
+name = "simple_wal"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "file_store",
+]
+
+[[package]]
 name = "siphasher"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

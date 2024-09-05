@@ -25,3 +25,30 @@ pub mod random_lookup;
 
 pub use const_serializable::ConstSerializable;
 pub use peekable::Peekable;
+
+// taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
+pub fn gen_temp_path() -> std::path::PathBuf {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::SystemTime;
+
+    static SALT_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    let seed = SALT_COUNTER.fetch_add(1, Ordering::SeqCst) as u128;
+
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos()
+        << 48;
+
+    let pid = u128::from(std::process::id());
+
+    let salt = (pid << 16) + now + seed;
+
+    if cfg!(target_os = "linux") {
+        // use shared memory for temporary linux files
+        format!("/dev/shm/pagecache.tmp.{salt}").into()
+    } else {
+        std::env::temp_dir().join(format!("pagecache.tmp.{salt}"))
+    }
+}

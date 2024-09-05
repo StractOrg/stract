@@ -87,10 +87,8 @@ where
     next_start: u64,
     _marker: std::marker::PhantomData<T>,
 }
-
 impl<T, W> IterableStoreWriter<T, W>
 where
-    T: bincode::Encode,
     W: io::Write,
 {
     pub fn new(writer: W) -> Self {
@@ -100,7 +98,13 @@ where
             next_start: 0,
         }
     }
+}
 
+impl<T, W> IterableStoreWriter<T, W>
+where
+    T: bincode::Encode,
+    W: io::Write,
+{
     pub fn write(&mut self, item: &T) -> Result<WrittenOffset> {
         let serialized = bincode::encode_to_vec(item, common::bincode_config())?;
         let header = IterableHeader {
