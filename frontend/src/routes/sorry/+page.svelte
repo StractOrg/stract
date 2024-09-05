@@ -19,7 +19,3 @@
     <Button title="Verify challenge" type="submit" kind="accent">VERIFY</Button>
   </div>
 </Captcha>
-
-<!-- <audio controls="controls">
-  <source src={audioBase64} />
-</audio> -->
