@@ -101,8 +101,16 @@ impl Crawler {
         60 * 60
     }
 
-    pub fn politeness_factor() -> f32 {
-        1.0
+    pub fn min_politeness_factor() -> u32 {
+        0
+    }
+
+    pub fn start_politeness_factor() -> u32 {
+        2
+    }
+
+    pub fn max_politeness_factor() -> u32 {
+        11
     }
 
     pub fn min_crawl_delay_ms() -> u64 {
@@ -110,11 +118,7 @@ impl Crawler {
     }
 
     pub fn max_crawl_delay_ms() -> u64 {
-        60_000
-    }
-
-    pub fn max_politeness_factor() -> f32 {
-        2048.0
+        180_000
     }
 
     pub fn max_url_slowdown_retry() -> u8 {

@@ -63,10 +63,11 @@ impl From<&LiveIndexConfig> for CrawlerConfig {
             num_worker_threads: 1, // no impact
             user_agent: live.user_agent.clone(),
             robots_txt_cache_sec: live.robots_txt_cache_sec,
-            politeness_factor: live.politeness_factor,
+            start_politeness_factor: live.start_politeness_factor,
+            min_politeness_factor: live.min_politeness_factor,
+            max_politeness_factor: live.max_politeness_factor,
             min_crawl_delay_ms: live.min_crawl_delay_ms,
             max_crawl_delay_ms: live.max_crawl_delay_ms,
-            max_politeness_factor: live.max_politeness_factor,
             max_url_slowdown_retry: live.max_url_slowdown_retry,
             max_redirects: live.max_redirects,
             timeout_seconds: live.timeout_seconds,

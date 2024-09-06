@@ -7,11 +7,32 @@ The crawler uses the user agent `Mozilla/5.0 (compatible; StractBot/0.2; open so
 ## Politeness
 
 StractBot is a polite crawler. It respects the [robots.txt](https://en.wikipedia.org/wiki/Robots.txt) file of the website it is crawling and tries to not overload the server.
-It does this by waiting a certain amount of time between requests to the same domain. The waiting time is calculated by _min(politeness \* max(fetchtime, 5 sec), 60 sec)_ where _fetchtime_ is the time it took to fetch the page. The crawler will wait at least 5 sec between requests and at most 60 seconds.
-This dynamic waiting time tries to prevent us from disrupting servers that cannot handle the load, while not giving unnecessary politeness to servers that can. The politeness factor starts at 1 and is doubled every time the crawler gets a 429 response from the server (to at most 2048).
 
-The crawler looks for the token `StractBot` in the robots.txt file to determine which pages (if any) the crawler is allowed to crawl.
-The robots.txt file is cached for 1 hour, so changes to the file should be respected quite quickly.
+### Waiting Time Calculation
+
+The crawler waits a certain amount of time between requests to the same domain. The waiting time is calculated by:
+_min((2^politeness) \* max(fetchtime, 5 sec), 180 sec)_
+
+Where:
+
+- _politeness_ is the politeness factor (starting at 2)
+- _fetchtime_ is the time it took to fetch the previous page
+
+The crawler will wait at least 5 seconds between requests and at most 180 seconds.
+
+### 429 Response Handling
+
+If the crawler receives a 429 (Too Many Requests) response from the server:
+
+1. The politeness factor is increased, doubling the time between each request.
+2. This increased politeness factor persists for the duration of the crawl for that specific domain.
+3. The crawler will never decrease the politeness factor for a domain that has returned a 429 response.
+
+If the crawler hasn't received any 429 responses from a server, it may gradually decrease the politeness factor over time, but never below 0.
+
+### Robots.txt
+
+The crawler looks for the token StractBot in the robots.txt file to determine which pages (if any) it is allowed to crawl. The robots.txt file is cached for 1 hour, so changes to the file should be respected quite quickly.
 
 ## Contact us
 

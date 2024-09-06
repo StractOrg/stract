@@ -129,7 +129,8 @@ impl WorkerThread {
 pub struct JobExecutor<S: DatumStream> {
     writer: Arc<S>,
     client: reqwest::Client,
-    politeness_factor: f32,
+    has_gotten_429_response: bool,
+    politeness_factor: u32,
     robotstxt: RobotsTxtManager,
     crawled_urls: HashSet<Url>,
     crawled_sitemaps: HashSet<Site>,
@@ -137,7 +138,8 @@ pub struct JobExecutor<S: DatumStream> {
     min_crawl_delay: Duration,
     max_crawl_delay: Duration,
     max_url_slowdown_retry: u8,
-    max_politeness_factor: f32,
+    min_politeness_factor: u32,
+    max_politeness_factor: u32,
     wander_prioritiser: WanderPrioritiser,
     wandered_urls: u64,
     job: WorkerJob,
@@ -152,7 +154,8 @@ impl<S: DatumStream> JobExecutor<S> {
     ) -> Self {
         Self {
             writer,
-            politeness_factor: config.politeness_factor,
+            politeness_factor: config.start_politeness_factor,
+            min_politeness_factor: config.min_politeness_factor,
             robotstxt: RobotsTxtManager::new(&config),
             client,
             crawled_urls: HashSet::new(),
@@ -164,6 +167,7 @@ impl<S: DatumStream> JobExecutor<S> {
             max_url_slowdown_retry: config.max_url_slowdown_retry,
             max_politeness_factor: config.max_politeness_factor,
             wander_prioritiser: WanderPrioritiser::new(),
+            has_gotten_429_response: false,
             job,
         }
     }
@@ -307,6 +311,10 @@ impl<S: DatumStream> JobExecutor<S> {
 
             match res {
                 Ok(res) => {
+                    if !self.has_gotten_429_response {
+                        self.decrease_politeness();
+                    }
+
                     let weight = retryable_url.weighted_url.weight;
 
                     for new_url in res.new_urls {
@@ -325,6 +333,8 @@ impl<S: DatumStream> JobExecutor<S> {
                     status_code,
                     headers,
                 }) if status_code == 429 => {
+                    self.has_gotten_429_response = true;
+
                     if headers.contains_key("retry-after") {
                         let retry_after = headers["retry-after"]
                             .to_str()
@@ -352,13 +362,26 @@ impl<S: DatumStream> JobExecutor<S> {
     }
 
     fn increase_politeness(&mut self) {
-        self.politeness_factor *= 2.0;
+        self.politeness_factor += 1;
 
         if self.politeness_factor > self.max_politeness_factor {
             self.politeness_factor = self.max_politeness_factor;
         }
 
-        tracing::warn!("politeness factor increased to {}", self.politeness_factor);
+        tracing::warn!(
+            "politeness factor increased to {} for {}",
+            self.politeness_factor,
+            self.job.domain.as_str()
+        );
+    }
+
+    fn decrease_politeness(&mut self) {
+        if self.min_politeness_factor >= self.politeness_factor {
+            self.politeness_factor = self.min_politeness_factor;
+            return;
+        }
+
+        self.politeness_factor = self.politeness_factor.saturating_sub(1);
     }
 
     fn new_urls(&self, html: &Html) -> Vec<Url> {
@@ -431,7 +454,7 @@ impl<S: DatumStream> JobExecutor<S> {
 
     fn delay_duration(&self) -> Duration {
         let mut delay = self.min_crawl_delay;
-        delay = delay.mul_f32(self.politeness_factor);
+        delay = delay.mul_f64(2.0_f64.powi(self.politeness_factor as i32));
 
         if delay > self.max_crawl_delay {
             delay = self.max_crawl_delay;
@@ -447,7 +470,7 @@ impl<S: DatumStream> JobExecutor<S> {
             delay = self.min_crawl_delay;
         }
 
-        delay = delay.mul_f32(self.politeness_factor);
+        delay = delay.mul_f64(2.0_f64.powi(self.politeness_factor as i32));
 
         if delay > self.max_crawl_delay {
             delay = self.max_crawl_delay;

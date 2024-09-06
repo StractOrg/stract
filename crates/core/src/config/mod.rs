@@ -345,8 +345,11 @@ pub struct CrawlerConfig {
     #[serde(default = "defaults::Crawler::robots_txt_cache_sec")]
     pub robots_txt_cache_sec: u64,
 
-    #[serde(default = "defaults::Crawler::politeness_factor")]
-    pub politeness_factor: f32,
+    #[serde(default = "defaults::Crawler::min_politeness_factor")]
+    pub min_politeness_factor: u32,
+
+    #[serde(default = "defaults::Crawler::start_politeness_factor")]
+    pub start_politeness_factor: u32,
 
     #[serde(default = "defaults::Crawler::min_crawl_delay_ms")]
     pub min_crawl_delay_ms: u64,
@@ -355,7 +358,7 @@ pub struct CrawlerConfig {
     pub max_crawl_delay_ms: u64,
 
     #[serde(default = "defaults::Crawler::max_politeness_factor")]
-    pub max_politeness_factor: f32,
+    pub max_politeness_factor: u32,
 
     #[serde(default = "defaults::Crawler::max_url_slowdown_retry")]
     pub max_url_slowdown_retry: u8,
@@ -471,14 +474,16 @@ pub struct LiveIndexConfig {
     pub user_agent: UserAgent,
     #[serde(default = "defaults::Crawler::robots_txt_cache_sec")]
     pub robots_txt_cache_sec: u64,
-    #[serde(default = "defaults::Crawler::politeness_factor")]
-    pub politeness_factor: f32,
+    #[serde(default = "defaults::Crawler::min_politeness_factor")]
+    pub min_politeness_factor: u32,
+    #[serde(default = "defaults::Crawler::start_politeness_factor")]
+    pub start_politeness_factor: u32,
     #[serde(default = "defaults::Crawler::min_crawl_delay_ms")]
     pub min_crawl_delay_ms: u64,
     #[serde(default = "defaults::Crawler::max_crawl_delay_ms")]
     pub max_crawl_delay_ms: u64,
     #[serde(default = "defaults::Crawler::max_politeness_factor")]
-    pub max_politeness_factor: f32,
+    pub max_politeness_factor: u32,
     #[serde(default = "defaults::Crawler::max_url_slowdown_retry")]
     pub max_url_slowdown_retry: u8,
     #[serde(default = "defaults::Crawler::max_redirects")]
