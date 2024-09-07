@@ -128,6 +128,7 @@ pub fn run(config: WebSpellConfig) -> Result<()> {
 
     let jobs: Vec<_> = warc_paths
         .into_iter()
+        .skip(config.skip_warc_files.unwrap_or(0))
         .take(config.limit_warc_files.unwrap_or(usize::MAX))
         .map(|warc_path| Job {
             source_config: config.warc_source.clone(),
