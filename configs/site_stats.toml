@@ -1,0 +1,8 @@
+output_path = "data/site_stats.json"
+top_sites = 1_000_000
+host_centrality_path = "data/centrality/harmonic"
+
+[warc_source]
+folder = "data"
+names = ["sample.warc.gz"]
+type = "Local"

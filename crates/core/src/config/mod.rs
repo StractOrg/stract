@@ -539,6 +539,16 @@ pub struct WebSpellConfig {
     pub skip_warc_files: Option<usize>,
 }
 
+#[derive(Debug, serde::Deserialize, Clone)]
+pub struct SiteStatsConfig {
+    pub output_path: String,
+    pub host_centrality_path: String,
+    pub top_sites: usize,
+    pub warc_source: WarcSource,
+    pub limit_warc_files: Option<usize>,
+    pub skip_warc_files: Option<usize>,
+}
+
 #[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
 pub struct CorrectionConfig {
     /// The probability that a word is misspelled

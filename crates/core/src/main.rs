@@ -113,6 +113,11 @@ enum Commands {
         config_path: String,
     },
 
+    // Compute statistics for sites.
+    SiteStats {
+        config_path: String,
+    },
+
     // Commands to compute distributed graph algorithms.
     Ampc {
         #[clap(subcommand)]
@@ -462,6 +467,10 @@ fn main() -> Result<()> {
         Commands::WebSpell { config_path } => {
             let config: config::WebSpellConfig = load_toml_config(config_path);
             entrypoint::web_spell::run(config)?;
+        }
+        Commands::SiteStats { config_path } => {
+            let config: config::SiteStatsConfig = load_toml_config(config_path);
+            entrypoint::site_stats::run(config)?;
         }
         Commands::Ampc { options } => match options {
             AmpcOptions::Dht { config_path } => {

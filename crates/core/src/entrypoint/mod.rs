@@ -28,6 +28,7 @@ pub mod feed_indexer;
 pub mod indexer;
 pub mod safety_classifier;
 pub mod search_server;
+pub mod site_stats;
 pub mod web_spell;
 mod webgraph;
 pub mod webgraph_server;
