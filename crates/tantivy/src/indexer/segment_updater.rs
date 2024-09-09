@@ -31,8 +31,6 @@ const NUM_MERGE_THREADS: usize = 4;
 ///     and the `meta.json` remains untouched,
 /// - it success, and `meta.json` is written
 ///     and flushed.
-///
-/// This method is not part of tantivy's public API
 pub(crate) fn save_metas(metas: &IndexMeta, directory: &dyn Directory) -> crate::Result<()> {
     info!("save metas");
     let mut buffer = serde_json::to_vec_pretty(metas)?;

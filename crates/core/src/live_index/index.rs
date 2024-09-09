@@ -30,7 +30,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     config::{LiveIndexConfig, SnippetConfig},
     entrypoint::indexer::{IndexableWebpage, IndexingWorker},
-    live_index::BATCH_SIZE,
+    live_index::{BATCH_SIZE, TTL},
     searcher::SearchableIndex,
     Result,
 };
@@ -106,7 +106,24 @@ impl InnerIndex {
     }
 
     pub fn prune_segments(&mut self) {
-        todo!("delete index segments older than TTL");
+        let old_segments: Vec<_> = self
+            .meta
+            .segments
+            .iter()
+            .filter_map(|segment| {
+                if segment.created + TTL < Utc::now() {
+                    Some(segment.id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        self.index
+            .inverted_index
+            .delete_segments_by_id(&old_segments)
+            .unwrap();
+
         self.update_meta();
     }
 

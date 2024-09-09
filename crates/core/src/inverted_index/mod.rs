@@ -254,7 +254,7 @@ mod tests {
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
-    fn search(
+    pub fn search(
         index: &InvertedIndex,
         query: &Query,
         ctx: &Ctx,
