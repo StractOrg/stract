@@ -306,7 +306,7 @@ impl SignalComputer {
                         .collect::<String>();
 
                         let mut terms = Vec::new();
-                        let mut tokenizer = text_field.tokenizer(query.lang.as_ref());
+                        let mut tokenizer = text_field.query_tokenizer(query.lang.as_ref());
                         let mut stream = tokenizer.token_stream(&simple_query);
                         let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 

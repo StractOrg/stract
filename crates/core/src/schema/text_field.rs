@@ -793,6 +793,11 @@ impl TextField for DomainNameNoTokenizer {
         FieldTokenizer::Identity(Identity {})
     }
 
+    fn query_tokenizer(&self, lang: Option<&whatlang::Lang>) -> FieldTokenizer {
+        // TODO: change this to word tokenizer
+        FieldTokenizer::default()
+    }
+
     fn is_searchable(&self) -> bool {
         true
     }
@@ -1242,10 +1247,6 @@ impl TextField for CleanBodyBigrams {
         FieldTokenizer::Bigram(BigramTokenizer::default())
     }
 
-    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
-        FieldTokenizer::default()
-    }
-
     fn is_searchable(&self) -> bool {
         true
     }
@@ -1284,10 +1285,6 @@ impl TextField for TitleBigrams {
 
     fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
         FieldTokenizer::Bigram(BigramTokenizer::default())
-    }
-
-    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
-        FieldTokenizer::default()
     }
 
     fn is_searchable(&self) -> bool {
@@ -1336,10 +1333,6 @@ impl TextField for CleanBodyTrigrams {
         FieldTokenizer::Trigram(TrigramTokenizer::default())
     }
 
-    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
-        FieldTokenizer::default()
-    }
-
     fn is_searchable(&self) -> bool {
         true
     }
@@ -1378,10 +1371,6 @@ impl TextField for TitleTrigrams {
 
     fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
         FieldTokenizer::Trigram(TrigramTokenizer::default())
-    }
-
-    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
-        FieldTokenizer::default()
     }
 
     fn is_searchable(&self) -> bool {

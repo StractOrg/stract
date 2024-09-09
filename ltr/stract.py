@@ -12,10 +12,10 @@ def simplify_snippet(snippet):
     return "".join([f["text"] for f in snippet["text"]["fragments"]])
 
 
-def search(query, num_resuts=NUM_RESULTS_PER_QUERY, page=0, signal_coefficients=None):
+def search(query, num_results=NUM_RESULTS_PER_QUERY, page=0, signal_coefficients=None):
     payload = {
         "query": query,
-        "numResults": num_resuts,
+        "numResults": num_results,
         "page": page,
         "returnRankingSignals": True,
         "signalCoefficients": signal_coefficients,
@@ -29,6 +29,6 @@ def search(query, num_resuts=NUM_RESULTS_PER_QUERY, page=0, signal_coefficients=
             "snippet": simplify_snippet(w["snippet"]),
         }
         for w in requests.post(API, json=payload).json()["webpages"][
-            :NUM_RESULTS_PER_QUERY
+            :num_results
         ]
     ]
