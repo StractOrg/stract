@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
+use tantivy::index::SegmentId;
 use tantivy::merge_policy::NoMergePolicy;
 
 use tantivy::{IndexWriter, SegmentMeta};
@@ -148,6 +149,23 @@ impl InvertedIndex {
             base_path,
             max_num_segments,
         )?;
+
+        Ok(())
+    }
+
+    #[allow(clippy::missing_panics_doc)] // cannot panic as writer is prepared
+    pub fn merge_segments_by_id(&mut self, segments: &[SegmentId]) -> Result<()> {
+        self.prepare_writer()?;
+
+        if segments.is_empty() {
+            return Ok(());
+        }
+
+        self.writer
+            .as_mut()
+            .expect("writer has not been prepared")
+            .merge(segments)
+            .wait()?;
 
         Ok(())
     }

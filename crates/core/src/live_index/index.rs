@@ -20,12 +20,12 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard},
 };
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use itertools::Itertools;
 use simple_wal::Wal;
 use tantivy::index::SegmentId;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     config::{LiveIndexConfig, SnippetConfig},
@@ -110,8 +110,27 @@ impl InnerIndex {
         self.update_meta();
     }
 
-    pub fn compact_todays_segments(&mut self) {
-        todo!("compact all segments from today");
+    pub fn compact_segments_by_date(&mut self) {
+        let mut segments_by_date: HashMap<NaiveDate, Vec<SegmentId>> = HashMap::new();
+
+        for segment in self.meta.segments.clone() {
+            segments_by_date
+                .entry(segment.created.date_naive())
+                .or_default()
+                .push(segment.id.clone());
+        }
+
+        for (_, segments) in segments_by_date {
+            if segments.len() <= 1 {
+                continue;
+            }
+
+            self.index
+                .inverted_index
+                .merge_segments_by_id(&segments)
+                .unwrap();
+        }
+
         self.update_meta();
     }
 
@@ -223,11 +242,11 @@ impl LiveIndex {
             .has_inserts()
     }
 
-    pub fn compact_todays_segments(&self) {
+    pub fn compact_segments_by_date(&self) {
         self.inner
             .write()
             .unwrap_or_else(|e| e.into_inner())
-            .compact_todays_segments()
+            .compact_segments_by_date()
     }
 
     pub fn insert(&self, pages: &[IndexableWebpage]) {

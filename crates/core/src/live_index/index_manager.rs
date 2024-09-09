@@ -52,7 +52,7 @@ impl IndexManager {
             }
 
             if last_compact + COMPACT_INTERVAL < Utc::now() {
-                self.index.compact_todays_segments();
+                self.index.compact_segments_by_date();
                 last_compact = Utc::now();
             }
 
