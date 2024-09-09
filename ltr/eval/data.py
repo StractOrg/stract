@@ -25,12 +25,14 @@ coeffs = {
     'title_coverage': 0.2,
     'idf_sum_title_if_homepage': 0.05,
 
+
     'bm25_stemmed_clean_body': 0.002,
     'bm25_keywords': 0.005,
 
     'idf_sum_url': 0.02,
     'idf_sum_domain': 0.001,
     'idf_sum_domain_name_no_tokenizer': 0.01,
+    'idf_sum_domain_if_homepage_no_tokenizer': 0.02,
 
     'bm25_f': 0.05,
 
