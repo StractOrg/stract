@@ -14,50 +14,45 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::tokenizer::BoxTokenStream;
+use tantivy::tokenizer::{BoxTokenStream, TextAnalyzer};
 
-use super::{default::DefaultTokenizer, ngram::NGramTokenStream};
+use super::pred::PredTokenizer;
 
-#[derive(Clone)]
-pub struct BigramTokenizer {
-    inner_tokenizer: DefaultTokenizer,
+#[derive(Clone, Default)]
+pub struct WordTokenizer {
+    analyzer: Option<TextAnalyzer>,
 }
 
-impl Default for BigramTokenizer {
-    fn default() -> Self {
-        Self {
-            inner_tokenizer: DefaultTokenizer::with_stopwords(vec![]),
-        }
-    }
-}
-
-impl BigramTokenizer {
+impl WordTokenizer {
     pub fn as_str() -> &'static str {
-        "bigram_tokenizer"
+        "word"
     }
 }
-impl tantivy::tokenizer::Tokenizer for BigramTokenizer {
+
+impl tantivy::tokenizer::Tokenizer for WordTokenizer {
     type TokenStream<'a> = BoxTokenStream<'a>;
 
     fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
-        let inner_stream = self.inner_tokenizer.token_stream(text);
-        let stream: NGramTokenStream<2> = NGramTokenStream::new(inner_stream);
-        BoxTokenStream::new(stream)
+        let builder = TextAnalyzer::builder(PredTokenizer(|c| c.is_whitespace()));
+
+        self.analyzer = Some(builder.build());
+
+        self.analyzer.as_mut().unwrap().token_stream(text)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use lending_iter::LendingIterator;
-    use tantivy::tokenizer::Tokenizer;
-
     use super::*;
-    fn tokenize_bigram(s: &str) -> Vec<String> {
-        let mut res = Vec::new();
-        let mut tokenizer = BigramTokenizer::default();
-        let mut stream = tokenizer.token_stream(s);
+    use lending_iter::LendingIterator;
+    use tantivy::tokenizer::Tokenizer as _;
 
+    fn tokenize(s: &str) -> Vec<String> {
+        let mut res = Vec::new();
+        let mut tokenizer = WordTokenizer::default();
+        let mut stream = tokenizer.token_stream(s);
         let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
+
         while let Some(token) = it.next() {
             res.push(token.text.clone());
         }
@@ -66,17 +61,11 @@ mod tests {
     }
 
     #[test]
-    fn bigram_tokenizer() {
-        assert!(tokenize_bigram("").is_empty());
-        assert_eq!(tokenize_bigram("test"), vec!["test"]);
-
-        assert_eq!(tokenize_bigram("this is"), vec!["thisis"]);
-        assert_eq!(tokenize_bigram("this is a"), vec!["thisis", "isa",]);
-        assert_eq!(
-            tokenize_bigram("this is a test"),
-            vec!["thisis", "isa", "atest",]
-        );
-
-        assert_eq!(tokenize_bigram("this.is"), vec!["this.", ".is"]);
+    fn test_words_tokenizer() {
+        assert!(tokenize("").is_empty());
+        assert_eq!(tokenize("a b"), vec!["a", "b"]);
+        assert_eq!(tokenize("a b "), vec!["a", "b"]);
+        assert_eq!(tokenize(" a b "), vec!["a", "b"]);
+        assert_eq!(tokenize("a b c"), vec!["a", "b", "c"]);
     }
 }

@@ -19,15 +19,17 @@ use tantivy::tokenizer::BoxTokenStream;
 pub use self::{
     bigram::BigramTokenizer, default::DefaultTokenizer, identity::Identity, json::FlattenedJson,
     json::JsonField, split_newlines::NewlineTokenizer, stemmed::Stemmed, trigram::TrigramTokenizer,
-    url::UrlTokenizer,
+    url::UrlTokenizer, words::WordTokenizer,
 };
 
 mod default;
 mod identity;
 mod json;
+mod pred;
 mod split_newlines;
 mod stemmed;
 mod url;
+mod words;
 
 mod bigram;
 mod ngram;
@@ -43,6 +45,7 @@ pub enum FieldTokenizer {
     Json(JsonField),
     Url(UrlTokenizer),
     Newline(NewlineTokenizer),
+    Words(WordTokenizer),
 }
 
 impl FieldTokenizer {
@@ -56,6 +59,7 @@ impl FieldTokenizer {
             FieldTokenizer::Json(_) => JsonField::as_str(),
             FieldTokenizer::Url(_) => UrlTokenizer::as_str(),
             FieldTokenizer::Newline(_) => NewlineTokenizer::as_str(),
+            FieldTokenizer::Words(_) => WordTokenizer::as_str(),
         }
     }
 }
@@ -84,6 +88,7 @@ impl tantivy::tokenizer::Tokenizer for FieldTokenizer {
             FieldTokenizer::Trigram(tokenizer) => tokenizer.token_stream(text),
             FieldTokenizer::Url(tokenizer) => tokenizer.token_stream(text),
             FieldTokenizer::Newline(tokenizer) => tokenizer.token_stream(text),
+            FieldTokenizer::Words(tokenizer) => tokenizer.token_stream(text),
         }
     }
 }

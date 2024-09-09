@@ -54,7 +54,7 @@ impl<'a, const N: usize> tantivy::tokenizer::TokenStream for NGramTokenStream<'a
 
         while self.token_window[0].text.is_empty() {
             if !self.inner.advance() {
-                return false;
+                break;
             }
 
             self.token_window.rotate_left(1);

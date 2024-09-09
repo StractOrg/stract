@@ -33,7 +33,7 @@ use crate::{
         self,
         fields::{
             BigramTokenizer, FieldTokenizer, Identity, JsonField, NewlineTokenizer,
-            TrigramTokenizer, UrlTokenizer,
+            TrigramTokenizer, UrlTokenizer, WordTokenizer,
         },
     },
     webpage::Html,
@@ -577,6 +577,10 @@ impl TextField for UrlNoTokenizer {
         FieldTokenizer::Identity(Identity {})
     }
 
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Words(WordTokenizer::default())
+    }
+
     fn is_searchable(&self) -> bool {
         true
     }
@@ -707,6 +711,10 @@ impl TextField for SiteNoTokenizer {
         FieldTokenizer::Identity(Identity {})
     }
 
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Words(WordTokenizer::default())
+    }
+
     fn is_searchable(&self) -> bool {
         true
     }
@@ -748,6 +756,10 @@ impl TextField for DomainNoTokenizer {
 
     fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
         FieldTokenizer::Identity(Identity {})
+    }
+
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Words(WordTokenizer::default())
     }
 
     fn is_searchable(&self) -> bool {
@@ -793,9 +805,8 @@ impl TextField for DomainNameNoTokenizer {
         FieldTokenizer::Identity(Identity {})
     }
 
-    fn query_tokenizer(&self, lang: Option<&whatlang::Lang>) -> FieldTokenizer {
-        // TODO: change this to word tokenizer
-        FieldTokenizer::default()
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Words(WordTokenizer::default())
     }
 
     fn is_searchable(&self) -> bool {
@@ -839,6 +850,10 @@ impl TextField for SiteIfHomepageNoTokenizer {
 
     fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
         FieldTokenizer::Identity(Identity {})
+    }
+
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Words(WordTokenizer::default())
     }
 
     fn add_html_tantivy(
@@ -921,6 +936,10 @@ impl TextField for DomainNameIfHomepageNoTokenizer {
         FieldTokenizer::Identity(Identity {})
     }
 
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Words(WordTokenizer::default())
+    }
+
     fn add_html_tantivy(
         &self,
         html: &Html,
@@ -966,6 +985,10 @@ impl TextField for DomainIfHomepageNoTokenizer {
 
     fn tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
         FieldTokenizer::Identity(Identity {})
+    }
+
+    fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
+        FieldTokenizer::Words(WordTokenizer::default())
     }
 
     fn add_html_tantivy(

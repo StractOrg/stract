@@ -69,8 +69,8 @@ mod tests {
     #[test]
     fn trigram_tokenizer() {
         assert!(tokenize_trigram("").is_empty());
-        assert!(tokenize_trigram("test").is_empty());
-        assert!(tokenize_trigram("this is").is_empty());
+        assert_eq!(tokenize_trigram("test"), vec!["test"]);
+        assert_eq!(tokenize_trigram("this is"), vec!["thisis"]);
 
         assert_eq!(tokenize_trigram("this is a"), vec!["thisisa",]);
         assert_eq!(

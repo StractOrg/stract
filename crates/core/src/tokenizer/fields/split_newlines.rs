@@ -16,7 +16,7 @@
 
 use tantivy::tokenizer::{BoxTokenStream, TextAnalyzer};
 
-use crate::tokenizer::{self, normalizer, split_with_range::SplitWithRange, Normalize};
+use super::pred::PredTokenizer;
 
 #[derive(Clone, Default)]
 pub struct NewlineTokenizer {
@@ -33,75 +33,11 @@ impl tantivy::tokenizer::Tokenizer for NewlineTokenizer {
     type TokenStream<'a> = BoxTokenStream<'a>;
 
     fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
-        let builder = TextAnalyzer::builder(Newline);
+        let builder = TextAnalyzer::builder(PredTokenizer(|c| c == '\n' || c == '\r'));
 
         self.analyzer = Some(builder.build());
 
         self.analyzer.as_mut().unwrap().token_stream(text)
-    }
-}
-
-#[derive(Clone)]
-pub struct Newline;
-
-pub struct NewlineTokenStream<'a> {
-    stream: Box<dyn Iterator<Item = tokenizer::Token<'a>> + 'a>,
-    token: Option<tantivy::tokenizer::Token>,
-    next_position: usize,
-}
-
-impl tantivy::tokenizer::Tokenizer for Newline {
-    type TokenStream<'a> = BoxTokenStream<'a>;
-
-    fn token_stream<'a>(&mut self, text: &'a str) -> Self::TokenStream<'a> {
-        let stream = Box::new(
-            text.split_with_range(|c| c == '\n' || c == '\r')
-                .map(|(s, range)| tokenizer::Token::new(s, range))
-                .normalize(&normalizer::Lowercase)
-                .normalize(&normalizer::UnicodeNFKD)
-                .normalize(&normalizer::UnicodeDiacritics),
-        );
-
-        BoxTokenStream::new(NewlineTokenStream::new_boxed(stream))
-    }
-}
-
-impl<'a> tantivy::tokenizer::TokenStream for NewlineTokenStream<'a> {
-    fn advance(&mut self) -> bool {
-        self.token = self.stream.next().map(|token| {
-            let span = token.span();
-            let pos = self.next_position;
-            self.next_position += 1;
-            tantivy::tokenizer::Token {
-                offset_from: span.start,
-                offset_to: span.end,
-                position: pos,
-                text: token.text().to_string(),
-                ..Default::default()
-            }
-        });
-
-        self.token.is_some()
-    }
-
-    fn token(&self) -> &tantivy::tokenizer::Token {
-        self.token.as_ref().unwrap()
-    }
-
-    fn token_mut(&mut self) -> &mut tantivy::tokenizer::Token {
-        self.token.as_mut().unwrap()
-    }
-}
-
-impl<'a> NewlineTokenStream<'a> {
-    fn new_boxed(
-        stream: Box<dyn Iterator<Item = tokenizer::Token<'a>> + 'a>,
-    ) -> BoxTokenStream<'a> {
-        BoxTokenStream::new(Self {
-            stream,
-            token: None,
-            next_position: 0,
-        })
     }
 }
 
