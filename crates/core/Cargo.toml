@@ -29,7 +29,8 @@ base64.workspace = true
 bincode.workspace = true
 bitflags.workspace = true
 bitvec.workspace = true
-bloom = {path = "../bloom"}
+bloom = { path = "../bloom" }
+simple_wal = { path = "../simple-wal" }
 bytecount.workspace = true
 bytemuck.workspace = true
 candle-core.workspace = true
@@ -48,7 +49,7 @@ dirs.workspace = true
 encoding_rs.workspace = true
 enum_dispatch.workspace = true
 fend-core.workspace = true
-file_store = {path = "../file-store"}
+file_store = { path = "../file-store" }
 flate2.workspace = true
 fnv.workspace = true
 fst.workspace = true
@@ -58,7 +59,7 @@ http.workspace = true
 image.workspace = true
 indicatif.workspace = true
 itertools.workspace = true
-kuchiki = {path = "../kuchiki"}
+kuchiki = { path = "../kuchiki" }
 lending-iter.workspace = true
 log.workspace = true
 logos.workspace = true
@@ -71,7 +72,7 @@ nom.workspace = true
 num-bigint.workspace = true
 num-rational.workspace = true
 openraft.workspace = true
-optics = {path = "../optics"}
+optics = { path = "../optics" }
 percent-encoding.workspace = true
 postcard.workspace = true
 publicsuffix.workspace = true
@@ -84,14 +85,14 @@ reqwest.workspace = true
 ring.workspace = true
 rio_api.workspace = true
 rio_turtle.workspace = true
-robotstxt = {path = "../robotstxt"}
+robotstxt = { path = "../robotstxt" }
 rust-s3.workspace = true
 rust-stemmers.workspace = true
 rustc-hash.workspace = true
 scylla.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-speedy_kv = {path = "../speedy-kv"}
+speedy_kv = { path = "../speedy-kv" }
 strum.workspace = true
 tantivy.workspace = true
 thiserror.workspace = true
@@ -110,7 +111,7 @@ utoipa-swagger-ui.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
 whatlang.workspace = true
-zimba = {path = "../zimba"}
+zimba = { path = "../zimba" }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator.workspace = true

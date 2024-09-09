@@ -22,17 +22,16 @@ use crate::{
     feed::scheduler::{DomainFeeds, Split},
 };
 
-pub use self::index::Index;
+pub use self::index::LiveIndex;
 pub use self::index_manager::IndexManager;
 
 mod crawler;
-mod downloaded_db;
-mod index;
+pub mod index;
 mod index_manager;
-mod indexer;
 
 const TTL: Duration = Duration::from_secs(60 * 60 * 24 * 60); // 60 days
 const PRUNE_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
+const COMPACT_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
 const FEED_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 10); // 10 minutes
 const AUTO_COMMIT_INTERVAL: Duration = Duration::from_secs(60 * 5); // 5 minutes
 const EVENT_LOOP_INTERVAL: Duration = Duration::from_secs(5);

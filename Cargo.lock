@@ -5228,6 +5228,7 @@ dependencies = [
  "scylla",
  "serde",
  "serde_json",
+ "simple_wal",
  "speedy_kv",
  "strum 0.26.3",
  "tantivy",

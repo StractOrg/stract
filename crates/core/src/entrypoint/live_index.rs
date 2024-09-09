@@ -25,7 +25,7 @@ use crate::{
     },
     feed::{self, index::FeedIndex},
     inverted_index,
-    live_index::{Index, IndexManager},
+    live_index::{IndexManager, LiveIndex},
     searcher::{InitialWebsiteResult, LocalSearcher},
     webgraph::WebgraphBuilder,
 };
@@ -37,7 +37,7 @@ use super::search_server::{RetrieveWebsites, Search};
 sonic_service!(SearchService, [RetrieveWebsites, Search]);
 
 pub struct SearchService {
-    local_searcher: LocalSearcher<Arc<Index>>,
+    local_searcher: LocalSearcher<Arc<LiveIndex>>,
     // dropping the handle leaves the cluster
     #[allow(unused)]
     cluster_handle: Cluster,

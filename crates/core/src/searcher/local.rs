@@ -76,7 +76,7 @@ impl<'a> SearchGuard<'a> for NormalIndexSearchGuard<'a> {
     }
 }
 
-impl SearchableIndex for Arc<live_index::Index> {
+impl SearchableIndex for Arc<live_index::LiveIndex> {
     type SearchGuard<'a> = LiveIndexSearchGuard<'a>;
 
     fn guard(&self) -> Self::SearchGuard<'_> {
@@ -86,17 +86,17 @@ impl SearchableIndex for Arc<live_index::Index> {
     }
 
     fn set_snippet_config(&mut self, config: SnippetConfig) {
-        self.write().inverted_index.set_snippet_config(config);
+        live_index::LiveIndex::set_snippet_config(&self, config)
     }
 }
 
 pub struct LiveIndexSearchGuard<'a> {
-    lock_guard: RwLockReadGuard<'a, crate::index::Index>,
+    lock_guard: RwLockReadGuard<'a, live_index::index::InnerIndex>,
 }
 
 impl<'a> SearchGuard<'a> for LiveIndexSearchGuard<'a> {
     fn search_index(&self) -> &'_ Index {
-        &self.lock_guard
+        self.lock_guard.index()
     }
 }
 

@@ -48,7 +48,7 @@ impl From<String> for IndexPointer {
     }
 }
 
-pub struct IndexingWorker {}
+pub struct IndexingWorker;
 impl IndexingWorker {
     fn process_job(&self, job: &Job) -> FeedIndex {
         let name = job.warc_path.split('/').last().unwrap().to_string();
@@ -105,7 +105,7 @@ pub fn build(config: FeedIndexingConfig) -> Result<()> {
 
     let job_config: WarcSource = config.warc_source.clone();
 
-    let worker = IndexingWorker {};
+    let worker = IndexingWorker;
 
     let indexes = warc_paths
         .into_par_iter()

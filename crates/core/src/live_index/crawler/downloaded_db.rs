@@ -20,7 +20,7 @@ use url::Url;
 use crate::Result;
 use std::{path::Path, time::Duration};
 
-use super::TTL;
+use crate::live_index::TTL;
 
 #[derive(Debug, Clone)]
 struct InsertionTime {
