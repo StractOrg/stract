@@ -65,6 +65,7 @@ impl Meta {
             .create(true)
             .write(true)
             .read(true)
+            .truncate(true)
             .open(path)
             .unwrap();
         let writer = BufWriter::new(file);
@@ -112,7 +113,7 @@ impl InnerIndex {
             .iter()
             .filter_map(|segment| {
                 if segment.created + TTL < Utc::now() {
-                    Some(segment.id.clone())
+                    Some(segment.id)
                 } else {
                     None
                 }
@@ -134,7 +135,7 @@ impl InnerIndex {
             segments_by_date
                 .entry(segment.created.date_naive())
                 .or_default()
-                .push(segment.id.clone());
+                .push(segment.id);
         }
 
         for (_, segments) in segments_by_date {
@@ -184,7 +185,7 @@ impl InnerIndex {
         // insert all segments from index that is not already in meta
         for id in segments_in_index
             .into_iter()
-            .filter(|segment| !segments_in_meta.contains(&segment))
+            .filter(|segment| !segments_in_meta.contains(segment))
         {
             self.meta.segments.push(Segment {
                 id,

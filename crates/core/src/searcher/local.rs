@@ -86,7 +86,7 @@ impl SearchableIndex for Arc<live_index::LiveIndex> {
     }
 
     fn set_snippet_config(&mut self, config: SnippetConfig) {
-        live_index::LiveIndex::set_snippet_config(&self, config)
+        live_index::LiveIndex::set_snippet_config(self, config)
     }
 }
 

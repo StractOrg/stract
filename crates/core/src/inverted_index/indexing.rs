@@ -252,7 +252,7 @@ impl InvertedIndex {
             return Ok(());
         }
 
-        let segments: HashSet<_> = segment_ids.into_iter().cloned().collect();
+        let segments: HashSet<_> = segment_ids.iter().copied().collect();
         let to_delete: HashSet<_> = self
             .tantivy_index
             .searchable_segments()?
