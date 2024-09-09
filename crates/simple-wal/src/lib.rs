@@ -58,6 +58,16 @@ where
 
         Ok(())
     }
+
+    pub fn batch_write<'a>(&'a mut self, items: impl Iterator<Item = &'a T>) -> Result<()> {
+        for item in items {
+            self.writer.write(item)?;
+        }
+
+        self.writer.flush()?;
+
+        Ok(())
+    }
 }
 
 impl<T> Wal<T>

@@ -37,6 +37,7 @@ pub use retrieved_webpage::RetrievedWebpage;
 
 use tantivy::directory::MmapDirectory;
 
+use tantivy::index::SegmentId;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{IndexReader, IndexWriter};
@@ -200,6 +201,10 @@ impl InvertedIndex {
 
     pub fn schema_ref(&self) -> &Schema {
         &self.schema
+    }
+
+    pub fn segment_ids(&self) -> Vec<SegmentId> {
+        self.tantivy_index.searchable_segment_ids().unwrap()
     }
 
     pub fn num_segments(&self) -> usize {
