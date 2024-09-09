@@ -17,7 +17,7 @@
 use crate::crawler::CrawlDatum;
 use crate::warc::WarcRecord;
 
-#[derive(bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct IndexableWebpage {
     pub url: String,
     pub body: String,

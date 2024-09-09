@@ -29,7 +29,7 @@ use std::collections::HashSet;
 
 use crate::{
     config::{LiveIndexConfig, SnippetConfig},
-    entrypoint::indexer::IndexingWorker,
+    entrypoint::indexer::{IndexableWebpage, IndexingWorker},
     live_index::BATCH_SIZE,
     searcher::SearchableIndex,
     Result,
@@ -163,8 +163,8 @@ impl InnerIndex {
         &self.index
     }
 
-    pub fn insert(&mut self, webpages: &[crate::entrypoint::indexer::IndexableWebpage]) {
-        self.write_ahead_log.batch_write(webpages.iter()).unwrap();
+    pub fn insert(&mut self, pages: &[IndexableWebpage]) {
+        self.write_ahead_log.batch_write(pages.iter()).unwrap();
         self.has_inserts = true;
     }
 
@@ -228,6 +228,13 @@ impl LiveIndex {
             .write()
             .unwrap_or_else(|e| e.into_inner())
             .compact_todays_segments()
+    }
+
+    pub fn insert(&self, pages: &[IndexableWebpage]) {
+        self.inner
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(pages)
     }
 
     pub fn read(&self) -> RwLockReadGuard<'_, InnerIndex> {

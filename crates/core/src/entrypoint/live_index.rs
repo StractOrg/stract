@@ -14,39 +14,43 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
-    config::{LiveIndexConfig, LiveIndexSchedulerConfig},
+    config::LiveIndexConfig,
     distributed::{
         cluster::Cluster,
         member::{Member, Service},
         sonic::{self, service::sonic_service},
     },
-    feed::{self, index::FeedIndex},
     inverted_index,
     live_index::{IndexManager, LiveIndex},
     searcher::{InitialWebsiteResult, LocalSearcher},
-    webgraph::WebgraphBuilder,
 };
 use anyhow::Result;
 use tracing::info;
 
-use super::search_server::{RetrieveWebsites, Search};
+use super::{
+    indexer::IndexableWebpage,
+    search_server::{RetrieveWebsites, Search},
+};
 
-sonic_service!(SearchService, [RetrieveWebsites, Search]);
+sonic_service!(LiveIndexService, [RetrieveWebsites, Search, IndexWebpages]);
 
-pub struct SearchService {
+pub struct LiveIndexService {
     local_searcher: LocalSearcher<Arc<LiveIndex>>,
+    index: Arc<LiveIndex>,
     // dropping the handle leaves the cluster
     #[allow(unused)]
     cluster_handle: Cluster,
 }
 
-impl SearchService {
+impl LiveIndexService {
     async fn new(config: LiveIndexConfig) -> Result<Self> {
         let manager = IndexManager::new(config.clone())?;
         let local_searcher = LocalSearcher::new(manager.index());
+
+        let index = manager.index();
 
         tokio::task::spawn(manager.run());
 
@@ -66,13 +70,14 @@ impl SearchService {
         Ok(Self {
             local_searcher,
             cluster_handle,
+            index,
         })
     }
 }
 
-impl sonic::service::Message<SearchService> for RetrieveWebsites {
+impl sonic::service::Message<LiveIndexService> for RetrieveWebsites {
     type Response = Option<Vec<inverted_index::RetrievedWebpage>>;
-    async fn handle(self, server: &SearchService) -> Self::Response {
+    async fn handle(self, server: &LiveIndexService) -> Self::Response {
         server
             .local_searcher
             .retrieve_websites(&self.websites, &self.query)
@@ -80,17 +85,34 @@ impl sonic::service::Message<SearchService> for RetrieveWebsites {
     }
 }
 
-impl sonic::service::Message<SearchService> for Search {
+impl sonic::service::Message<LiveIndexService> for Search {
     type Response = Option<InitialWebsiteResult>;
-    async fn handle(self, server: &SearchService) -> Self::Response {
+    async fn handle(self, server: &LiveIndexService) -> Self::Response {
         server.local_searcher.search_initial(&self.query, true).ok()
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct IndexWebpages {
+    pages: Vec<IndexableWebpage>,
+}
+
+impl sonic::service::Message<LiveIndexService> for IndexWebpages {
+    type Response = ();
+
+    async fn handle(self, server: &LiveIndexService) -> Self::Response {
+        server.index.insert(&self.pages)
     }
 }
 
 pub async fn serve(config: LiveIndexConfig) -> Result<()> {
     let addr = config.host;
 
-    let server = SearchService::new(config).await?.bind(&addr).await.unwrap();
+    let server = LiveIndexService::new(config)
+        .await?
+        .bind(&addr)
+        .await
+        .unwrap();
 
     info!("live index is ready to accept requests on {}", addr);
 
@@ -99,19 +121,4 @@ pub async fn serve(config: LiveIndexConfig) -> Result<()> {
             tracing::error!("{:?}", e);
         }
     }
-}
-
-pub fn schedule(config: LiveIndexSchedulerConfig) -> Result<()> {
-    let feed_index = FeedIndex::open(config.feed_index_path)?;
-    let host_harmonic = speedy_kv::Db::open_or_create(
-        Path::new(&config.host_centrality_store_path).join("harmonic"),
-    )
-    .unwrap();
-    let host_graph = WebgraphBuilder::new(config.host_graph_path).open();
-
-    let schedule =
-        feed::scheduler::schedule(&feed_index, &host_harmonic, &host_graph, config.num_splits);
-    schedule.save(config.schedule_path)?;
-
-    Ok(())
 }
