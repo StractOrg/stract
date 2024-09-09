@@ -15,46 +15,43 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
-
 use crate::{
     config::{CrawlerConfig, LiveIndexConfig},
-    feed::scheduler::{DomainFeeds, Split},
 };
 
 pub use self::index::LiveIndex;
 pub use self::index_manager::IndexManager;
 
-mod crawler;
+// mod crawler;
 pub mod index;
 mod index_manager;
 
 const TTL: Duration = Duration::from_secs(60 * 60 * 24 * 60); // 60 days
 const PRUNE_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
 const COMPACT_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
-const FEED_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 10); // 10 minutes
+// const FEED_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 10); // 10 minutes
 const AUTO_COMMIT_INTERVAL: Duration = Duration::from_secs(60 * 5); // 5 minutes
 const EVENT_LOOP_INTERVAL: Duration = Duration::from_secs(5);
 const BATCH_SIZE: usize = 512;
 
-#[derive(Debug, Clone)]
-struct Feeds {
-    last_checked: DateTime<Utc>,
-    feed: DomainFeeds,
-}
-
-impl From<Split> for Vec<Feeds> {
-    fn from(split: Split) -> Self {
-        split
-            .feeds
-            .into_iter()
-            .map(|feed| Feeds {
-                last_checked: Utc::now(),
-                feed,
-            })
-            .collect()
-    }
-}
+// #[derive(Debug, Clone)]
+// struct Feeds {
+//     last_checked: DateTime<Utc>,
+//     feed: DomainFeeds,
+// }
+//
+// impl From<Split> for Vec<Feeds> {
+//     fn from(split: Split) -> Self {
+//         split
+//             .feeds
+//             .into_iter()
+//             .map(|feed| Feeds {
+//                 last_checked: Utc::now(),
+//                 feed,
+//             })
+//             .collect()
+//     }
+// }
 
 impl From<&LiveIndexConfig> for CrawlerConfig {
     fn from(live: &LiveIndexConfig) -> Self {
