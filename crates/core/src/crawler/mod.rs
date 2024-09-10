@@ -314,7 +314,7 @@ pub fn reqwest_client(config: &CrawlerConfig) -> Result<reqwest::Client> {
         .connect_timeout(timeout)
         .http2_keep_alive_interval(None)
         .default_headers(headers)
-        .redirect(reqwest::redirect::Policy::limited(config.max_redirects))
+        .redirect(reqwest::redirect::Policy::limited(0))
         .user_agent(&config.user_agent.full)
         .build()
         .map_err(|e| Error::from(anyhow!(e)))

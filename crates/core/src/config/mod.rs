@@ -363,9 +363,6 @@ pub struct CrawlerConfig {
     #[serde(default = "defaults::Crawler::max_url_slowdown_retry")]
     pub max_url_slowdown_retry: u8,
 
-    #[serde(default = "defaults::Crawler::max_redirects")]
-    pub max_redirects: usize,
-
     pub timeout_seconds: u64,
     pub s3: S3Config,
     pub router_hosts: Vec<String>,
@@ -486,8 +483,6 @@ pub struct LiveIndexConfig {
     pub max_politeness_factor: u32,
     #[serde(default = "defaults::Crawler::max_url_slowdown_retry")]
     pub max_url_slowdown_retry: u8,
-    #[serde(default = "defaults::Crawler::max_redirects")]
-    pub max_redirects: usize,
     #[serde(default = "defaults::Crawler::timeout_seconds")]
     pub timeout_seconds: u64,
 

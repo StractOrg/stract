@@ -125,10 +125,6 @@ impl Crawler {
         3
     }
 
-    pub fn max_redirects() -> usize {
-        5
-    }
-
     pub fn timeout_seconds() -> u64 {
         60
     }

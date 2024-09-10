@@ -356,6 +356,23 @@ impl<S: DatumStream> JobExecutor<S> {
                     retryable_url.retries += 1;
                     urls.push_back(retryable_url);
                 }
+                Err(Error::FetchFailed {
+                    status_code,
+                    headers,
+                }) if status_code == 301 || status_code == 302 => {
+                    if let Some(new_url) = headers
+                        .get("location")
+                        .and_then(|location| std::str::from_utf8(location.as_bytes()).ok())
+                        .and_then(|location| {
+                            Url::parse_with_base_url(&retryable_url.weighted_url.url, location).ok()
+                        })
+                    {
+                        let mut retryable_url = retryable_url;
+                        retryable_url.weighted_url.url = new_url;
+                        retryable_url.retries += 1;
+                        urls.push_back(retryable_url);
+                    }
+                }
                 Err(_) => {}
             }
         }
