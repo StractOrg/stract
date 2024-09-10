@@ -19,7 +19,6 @@ pub mod defaults;
 use super::Result;
 use crate::ampc::dht;
 use crate::distributed::member::ShardId;
-use crate::feed::scheduler::SplitId;
 
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -507,7 +506,7 @@ pub struct LiveIndexConfig {
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
-    pub split_id: SplitId,
+    pub shard_id: ShardId,
     pub index_path: String,
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,

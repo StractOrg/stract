@@ -59,13 +59,16 @@ impl LiveIndexService {
                 id: config.cluster_id,
                 service: Service::LiveIndex {
                     host: config.host,
-                    split_id: config.split_id,
+                    shard: config.shard_id,
+                    state: crate::distributed::member::LiveIndexState::InSetup,
                 },
             },
             config.gossip_addr,
             config.gossip_seed_nodes.unwrap_or_default(),
         )
         .await?;
+
+        todo!("check if there are other nodes in cluster with same shard and download index from them if this is the case");
 
         Ok(Self {
             local_searcher,
@@ -101,7 +104,9 @@ impl sonic::service::Message<LiveIndexService> for IndexWebpages {
     type Response = ();
 
     async fn handle(self, server: &LiveIndexService) -> Self::Response {
-        server.index.insert(&self.pages)
+        server.index.insert(&self.pages);
+
+        todo!("send write to all other replicas and make sure we get response from `config.consistency_fraction` before succeeding");
     }
 }
 

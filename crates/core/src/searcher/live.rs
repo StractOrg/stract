@@ -15,16 +15,16 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    ampc::dht::ShardId,
     distributed::{
         cluster::Cluster,
-        member::Service,
+        member::{LiveIndexState, Service},
         sonic::replication::{
             AllShardsSelector, RandomReplicaSelector, RemoteClient, ReplicatedClient, Shard,
-            ShardIdentifier, ShardedClient, SpecificShardSelector,
+            ShardedClient, SpecificShardSelector,
         },
     },
     entrypoint::search_server::{self, SearchService},
-    feed::scheduler::SplitId,
     inverted_index::{RetrievedWebpage, WebpagePointer},
     ranking::pipeline::{PrecisionRankingWebpage, RecallRankingWebpage},
 };
@@ -41,15 +41,13 @@ use super::{InitialWebsiteResult, SearchQuery};
 #[derive(Clone, Debug)]
 pub struct ScoredWebpagePointer {
     pub website: RecallRankingWebpage,
-    pub split_id: SplitId,
+    pub shard_id: ShardId,
 }
 
-impl ShardIdentifier for SplitId {}
-
 #[derive(Debug)]
-pub struct InitialSearchResultSplit {
+pub struct InitialSearchResultShard {
     pub local_result: InitialWebsiteResult,
-    pub split_id: SplitId,
+    pub shard_id: ShardId,
 }
 
 pub struct LiveSearcher {
@@ -61,11 +59,13 @@ impl LiveSearcher {
         Self { cluster }
     }
 
-    async fn client(&self) -> ShardedClient<SearchService, SplitId> {
+    async fn client(&self) -> ShardedClient<SearchService, ShardId> {
         let mut shards = HashMap::new();
         for member in self.cluster.members().await {
-            if let Service::LiveIndex { host, split_id } = member.service {
-                shards.entry(split_id).or_insert_with(Vec::new).push(host);
+            if let Service::LiveIndex { host, shard, state } = member.service {
+                if matches!(state, LiveIndexState::Ready) {
+                    shards.entry(shard).or_insert_with(Vec::new).push(host);
+                }
             }
         }
 
@@ -83,8 +83,8 @@ impl LiveSearcher {
 
     async fn retrieve_webpages_from_shard(
         &self,
-        split: SplitId,
-        client: &ShardedClient<SearchService, SplitId>,
+        shard: ShardId,
+        client: &ShardedClient<SearchService, ShardId>,
         query: &str,
         pointers: Vec<(usize, WebpagePointer)>,
     ) -> Vec<(usize, RetrievedWebpage)> {
@@ -96,7 +96,7 @@ impl LiveSearcher {
                     websites: pointers,
                     query: query.to_string(),
                 },
-                &SpecificShardSelector(split),
+                &SpecificShardSelector(shard),
                 &RandomReplicaSelector,
             )
             .await
@@ -115,7 +115,7 @@ impl LiveSearcher {
 }
 
 impl SearchClient for LiveSearcher {
-    async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultSplit> {
+    async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultShard> {
         let client = self.client().await;
         let mut results = Vec::new();
 
@@ -131,9 +131,9 @@ impl SearchClient for LiveSearcher {
         {
             for (shard_id, mut res) in res {
                 if let Some((_, Some(res))) = res.pop() {
-                    results.push(InitialSearchResultSplit {
+                    results.push(InitialSearchResultShard {
                         local_result: res,
-                        split_id: shard_id,
+                        shard_id,
                     });
                 }
             }
@@ -152,7 +152,7 @@ impl SearchClient for LiveSearcher {
 
         for (i, pointer) in top_websites {
             pointers
-                .entry(pointer.split_id.clone())
+                .entry(pointer.shard_id)
                 .or_default()
                 .push((*i, pointer.website.pointer().clone()));
 
@@ -185,7 +185,7 @@ pub trait SearchClient {
     fn search_initial(
         &self,
         query: &SearchQuery,
-    ) -> impl Future<Output = Vec<InitialSearchResultSplit>> + Send;
+    ) -> impl Future<Output = Vec<InitialSearchResultShard>> + Send;
     fn retrieve_webpages(
         &self,
         top_websites: &[(usize, ScoredWebpagePointer)],

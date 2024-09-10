@@ -82,6 +82,7 @@ fn alive_nodes_updater(chitchat: Arc<Mutex<Chitchat>>) -> Arc<RwLock<HashSet<Mem
 pub struct Cluster {
     alive_nodes: Arc<RwLock<HashSet<Member>>>,
     self_node: Option<Member>,
+    chitchat: Arc<Mutex<Chitchat>>,
     // dropping the handle leaves the cluster
     _chitchat_handle: ChitchatHandle,
 }
@@ -169,11 +170,12 @@ impl Cluster {
         let chitchat_handle = spawn_chitchat(config, key_values, &transport).await?;
         let chitchat = chitchat_handle.chitchat();
 
-        let alive_nodes = alive_nodes_updater(chitchat);
+        let alive_nodes = alive_nodes_updater(chitchat.clone());
 
         Ok(Self {
             alive_nodes,
             self_node,
+            chitchat,
             _chitchat_handle: chitchat_handle,
         })
     }
@@ -207,5 +209,15 @@ impl Cluster {
 
     pub fn self_node(&self) -> Option<&Member> {
         self.self_node.as_ref()
+    }
+
+    pub async fn set_service(&mut self, service: Service) -> Result<()> {
+        self.chitchat
+            .lock()
+            .await
+            .self_node_state()
+            .set(SERVICE_KEY, serde_json::to_string(&service)?);
+
+        Ok(())
     }
 }
