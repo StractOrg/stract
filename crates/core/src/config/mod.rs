@@ -446,6 +446,12 @@ pub struct TopHostsBudgetBoostConfig {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct CrawlPlannerDomainBoost {
+    pub domain: String,
+    pub boost: f64,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct CrawlPlannerConfig {
     pub host_harmonic_path: String,
     pub page_harmonic_path: String,
@@ -456,6 +462,9 @@ pub struct CrawlPlannerConfig {
     pub crawl_budget: usize,
     pub wander_fraction: f64,
     pub top_host_fraction: f64,
+
+    pub excluded_domains: Option<Vec<String>>,
+    pub domain_boosts: Option<Vec<CrawlPlannerDomainBoost>>,
 
     pub top_hosts_budget_boost: Option<TopHostsBudgetBoostConfig>,
 

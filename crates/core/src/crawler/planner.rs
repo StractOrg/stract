@@ -20,7 +20,7 @@ use indicatif::ProgressIterator;
 use itertools::Itertools;
 use rayon::{prelude::*, ThreadPoolBuilder};
 use std::cmp::Reverse;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::{
@@ -151,6 +151,10 @@ pub struct CrawlPlanner {
     page_graph: RemoteWebgraph,
     host_graph: RemoteWebgraph,
     config: CrawlPlannerConfig,
+
+    excluded_domains: HashSet<Domain>,
+
+    domain_boosts: HashMap<Domain, f64>,
 }
 
 impl CrawlPlanner {
@@ -165,11 +169,27 @@ impl CrawlPlanner {
         let page_graph = RemoteWebgraph::new(cluster.clone(), WebgraphGranularity::Page).await;
         let host_graph = RemoteWebgraph::new(cluster, WebgraphGranularity::Host).await;
 
+        let domain_boosts = config
+            .domain_boosts
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|domain_boost| (Domain(domain_boost.domain), domain_boost.boost))
+            .collect();
+
         Ok(Self {
             host_centrality,
             page_centrality,
             page_graph,
             host_graph,
+            domain_boosts,
+            excluded_domains: config
+                .excluded_domains
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .map(Domain)
+                .collect(),
             config,
         })
     }
@@ -203,9 +223,11 @@ impl CrawlPlanner {
             .map(|id| self.host_centrality.get(&id).unwrap().unwrap_or_default())
             .sum();
 
-        let wander_budget = ((wander_budget * host_centrality) / total_host_centralities)
-            .max(1.0)
-            .round() as u64;
+        let wander_budget = ((wander_budget * host_centrality) / total_host_centralities).max(1.0);
+
+        let boost = *self.domain_boosts.get(&domain).unwrap_or(&1.0);
+        let wander_budget = boost * wander_budget;
+        let wander_budget = wander_budget.round() as u64;
 
         let mut urls: Vec<_> = pages
             .into_iter()
@@ -464,7 +486,7 @@ impl CrawlPlanner {
                 let next_queue = AtomicUsize::new(0);
 
                 grouped_pages.into_par_iter().for_each(|(domain, pages)| {
-                    if domain.as_str().is_empty() {
+                    if domain.as_str().is_empty() || self.excluded_domains.contains(&domain) {
                         return;
                     }
 
