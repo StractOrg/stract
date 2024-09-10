@@ -217,10 +217,6 @@ fn process_tantivy_term<T: TextField>(
         });
     }
 
-    if terms.is_empty() {
-        dbg!(field.name());
-    }
-
     terms
 }
 

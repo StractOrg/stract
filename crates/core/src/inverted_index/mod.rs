@@ -37,6 +37,7 @@ pub use retrieved_webpage::RetrievedWebpage;
 
 use tantivy::directory::MmapDirectory;
 
+use tantivy::index::SegmentId;
 use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{IndexReader, IndexWriter};
@@ -202,6 +203,10 @@ impl InvertedIndex {
         &self.schema
     }
 
+    pub fn segment_ids(&self) -> Vec<SegmentId> {
+        self.tantivy_index.searchable_segment_ids().unwrap()
+    }
+
     pub fn num_segments(&self) -> usize {
         self.tantivy_index.searchable_segments().unwrap().len()
     }
@@ -249,7 +254,7 @@ mod tests {
 
     const CONTENT: &str = "this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever this is the best example website ever";
 
-    fn search(
+    pub fn search(
         index: &InvertedIndex,
         query: &Query,
         ctx: &Ctx,

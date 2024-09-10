@@ -545,6 +545,11 @@ impl Index {
         load_metas(self.directory(), &self.inventory)
     }
 
+    /// Saves the index meta file to the directory (Advanced user only)
+    pub fn save_metas(&self, metas: &IndexMeta) -> crate::Result<()> {
+        save_metas(metas, self.directory())
+    }
+
     /// Open a new index writer. Attempts to acquire a lockfile.
     ///
     /// The lockfile should be deleted on drop, but it is possible

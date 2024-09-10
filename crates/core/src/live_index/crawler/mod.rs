@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
+mod downloaded_db;
+
 use crate::Result;
 use std::sync::Arc;
 
@@ -22,14 +24,16 @@ use url::Url;
 
 use crate::{
     config::CrawlerConfig,
-    crawler::{reqwest_client, JobExecutor, RetrieableUrl, WeightedUrl, WorkerJob},
+    crawler::reqwest_client,
     feed::{
         self,
         scheduler::{Domain, DomainFeeds, Split},
     },
 };
 
-use super::{downloaded_db::DownloadedDb, indexer::Indexer, Feeds, FEED_CHECK_INTERVAL};
+use downloaded_db::DownloadedDb;
+
+use super::{Feeds, FEED_CHECK_INTERVAL};
 
 pub enum CrawlResults {
     None,
@@ -38,16 +42,14 @@ pub enum CrawlResults {
 
 pub struct Crawler {
     feeds: Vec<Feeds>,
-    indexer: Arc<Indexer>,
     downloaded_db: DownloadedDb,
-    config: Arc<CrawlerConfig>,
+    _config: Arc<CrawlerConfig>,
     client: reqwest::Client,
 }
 
 impl Crawler {
     pub fn new(
         split: Split,
-        indexer: Arc<Indexer>,
         downloaded_db: DownloadedDb,
         config: Arc<CrawlerConfig>,
     ) -> Result<Self> {
@@ -55,42 +57,43 @@ impl Crawler {
 
         Ok(Self {
             feeds: split.into(),
-            indexer,
             downloaded_db,
-            config,
+            _config: config,
             client,
         })
     }
 
-    async fn process_urls(&self, urls: Vec<Url>) -> Result<bool> {
-        if urls.is_empty() {
-            return Ok(false);
-        }
+    async fn process_urls(&self, _urls: Vec<Url>) -> Result<bool> {
+        todo!()
 
-        let domain = urls.first().unwrap().into();
-        let job = WorkerJob {
-            domain,
-            urls: urls
-                .clone()
-                .into_iter()
-                .map(|url| RetrieableUrl::from(WeightedUrl { url, weight: 1.0 }))
-                .collect(),
-            wandering_urls: 0,
-        };
+        // if urls.is_empty() {
+        //     return Ok(false);
+        // }
 
-        let executor = JobExecutor::new(
-            job,
-            self.client.clone(),
-            self.config.clone(),
-            self.indexer.clone(),
-        );
-        executor.run().await;
+        // let domain = urls.first().unwrap().into();
+        // let job = WorkerJob {
+        //     domain,
+        //     urls: urls
+        //         .clone()
+        //         .into_iter()
+        //         .map(|url| RetrieableUrl::from(WeightedUrl { url, weight: 1.0 }))
+        //         .collect(),
+        //     wandering_urls: 0,
+        // };
 
-        for url in &urls {
-            self.downloaded_db.insert(url)?;
-        }
+        // let executor = JobExecutor::new(
+        //     job,
+        //     self.client.clone(),
+        //     self.config.clone(),
+        //     self.indexer.clone(),
+        // );
+        // executor.run().await;
 
-        Ok(true)
+        // for url in &urls {
+        //     self.downloaded_db.insert(url)?;
+        // }
+
+        // Ok(true)
     }
 
     async fn process_feed(&self, domain_feeds: &DomainFeeds) -> Result<bool> {

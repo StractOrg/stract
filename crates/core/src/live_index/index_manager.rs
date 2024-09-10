@@ -18,72 +18,49 @@ use std::sync::Arc;
 
 use chrono::Utc;
 
-use crate::{
-    config::{CrawlerConfig, LiveIndexConfig},
-    feed::scheduler::Split,
-};
+use crate::config::LiveIndexConfig;
 
 use super::{
-    crawler::{CrawlResults, Crawler},
-    downloaded_db::DownloadedDb,
-    indexer::Indexer,
-    Index, AUTO_COMMIT_INTERVAL, EVENT_LOOP_INTERVAL, PRUNE_INTERVAL,
+    LiveIndex, AUTO_COMMIT_INTERVAL, COMPACT_INTERVAL, EVENT_LOOP_INTERVAL, PRUNE_INTERVAL,
 };
 use crate::Result;
 
 pub struct IndexManager {
-    index: Arc<Index>,
-    crawler: Crawler,
+    index: Arc<LiveIndex>,
 }
 
 impl IndexManager {
     pub fn new(config: LiveIndexConfig) -> Result<Self> {
-        let index = Index::new(&config.index_path)?;
-        let indexer = Arc::new(Indexer::new(index.clone_inner_index(), config.clone()));
-
-        let crawler_config = CrawlerConfig::from(&config);
-
-        let crawler = Crawler::new(
-            Split::open(&config.split_path)?,
-            indexer,
-            DownloadedDb::open(&config.downloaded_db_path)?,
-            Arc::new(crawler_config),
-        )?;
-
-        Ok(Self {
-            index: Arc::new(index),
-            crawler,
-        })
+        let index = Arc::new(LiveIndex::new(config.clone())?);
+        Ok(Self { index })
     }
 
-    pub async fn run(mut self) {
-        let mut has_inserts = false;
+    pub async fn run(self) {
         let mut last_commit = Utc::now();
         let mut last_prune = Utc::now();
+        let mut last_compact = Utc::now();
 
         loop {
-            if let CrawlResults::HasInserts = self.crawler.check_feeds().await {
-                has_inserts = true;
-            }
-
             if last_prune + PRUNE_INTERVAL < Utc::now() {
-                self.index.prune();
-
+                self.index.prune_segments();
                 last_prune = Utc::now();
             }
 
-            if last_commit + AUTO_COMMIT_INTERVAL < Utc::now() && has_inserts {
+            if last_commit + AUTO_COMMIT_INTERVAL < Utc::now() && self.index.has_inserts() {
                 self.index.commit();
-
                 last_commit = Utc::now();
-                has_inserts = false;
+            }
+
+            if last_compact + COMPACT_INTERVAL < Utc::now() {
+                self.index.compact_segments_by_date();
+                last_compact = Utc::now();
             }
 
             tokio::time::sleep(EVENT_LOOP_INTERVAL).await;
         }
     }
 
-    pub fn index(&self) -> Arc<Index> {
+    pub fn index(&self) -> Arc<LiveIndex> {
         self.index.clone()
     }
 }

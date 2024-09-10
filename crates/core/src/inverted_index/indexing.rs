@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
+use tantivy::index::SegmentId;
 use tantivy::merge_policy::NoMergePolicy;
 
 use tantivy::{IndexWriter, SegmentMeta};
@@ -152,6 +153,23 @@ impl InvertedIndex {
         Ok(())
     }
 
+    #[allow(clippy::missing_panics_doc)] // cannot panic as writer is prepared
+    pub fn merge_segments_by_id(&mut self, segments: &[SegmentId]) -> Result<()> {
+        self.prepare_writer()?;
+
+        if segments.is_empty() {
+            return Ok(());
+        }
+
+        self.writer
+            .as_mut()
+            .expect("writer has not been prepared")
+            .merge(segments)
+            .wait()?;
+
+        Ok(())
+    }
+
     #[must_use]
     pub fn merge(mut self, mut other: InvertedIndex) -> Self {
         self.prepare_writer().expect("failed to prepare writer");
@@ -228,11 +246,145 @@ impl InvertedIndex {
         res
     }
 
+    #[allow(clippy::missing_panics_doc)] // cannot panic as writer is prepared
+    pub fn delete_segments_by_id(&mut self, segment_ids: &[SegmentId]) -> Result<()> {
+        if segment_ids.is_empty() {
+            return Ok(());
+        }
+
+        let segments: HashSet<_> = segment_ids.iter().copied().collect();
+        let to_delete: HashSet<_> = self
+            .tantivy_index
+            .searchable_segments()?
+            .into_iter()
+            .filter(|seg| segments.contains(&seg.id()))
+            .flat_map(|seg| seg.meta().list_files().into_iter())
+            .collect();
+
+        let mut index_meta = self.tantivy_index.load_metas()?;
+
+        index_meta.segments = index_meta
+            .segments
+            .clone()
+            .into_iter()
+            .filter(|seg| !segments.contains(&seg.id()))
+            .collect();
+
+        let living_files: HashSet<_> = self
+            .tantivy_index
+            .directory()
+            .list_managed_files()
+            .difference(&to_delete)
+            .cloned()
+            .collect();
+
+        self.tantivy_index
+            .directory_mut()
+            .garbage_collect(|| living_files)?;
+
+        self.tantivy_index.save_metas(&index_meta)?;
+
+        self.reader.reload()?;
+
+        Ok(())
+    }
+
     pub fn stop(mut self) {
         self.writer
             .take()
             .expect("writer has not been prepared")
             .wait_merging_threads()
             .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        config::CollectorConfig,
+        inverted_index::tests::search,
+        query::Query,
+        ranking::{LocalRanker, SignalComputer},
+        searcher::SearchQuery,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_delete_segments() {
+        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                TEST
+                            </body>
+                        </html>
+                    "#
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                TEST
+                            </body>
+                        </html>
+                    "#
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let segments = index.segment_ids();
+
+        assert_eq!(segments.len(), 2);
+        index.delete_segments_by_id(&segments).unwrap();
+
+        let segments = index.segment_ids();
+        assert!(segments.is_empty());
+
+        let ctx = index.local_search_ctx();
+        let query = Query::parse(
+            &ctx,
+            &SearchQuery {
+                query: "test".to_string(),
+                ..Default::default()
+            },
+            &index,
+        )
+        .expect("Failed to parse query");
+
+        let ranker = LocalRanker::new(
+            SignalComputer::new(Some(&query)),
+            ctx.columnfield_reader.clone(),
+            CollectorConfig::default(),
+        );
+
+        let result =
+            search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
+        assert_eq!(result.documents.len(), 0);
     }
 }

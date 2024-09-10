@@ -175,9 +175,6 @@ enum AdminIndexOptions {
 
 #[derive(Subcommand)]
 enum LiveIndex {
-    /// Create a schedule of which feeds should go to which index.
-    Schedule { config_path: String },
-
     /// Serve the live index.
     Serve { config_path: String },
 }
@@ -451,10 +448,6 @@ fn main() -> Result<()> {
             }
         },
         Commands::LiveIndex { options } => match options {
-            LiveIndex::Schedule { config_path } => {
-                let config = load_toml_config(config_path);
-                entrypoint::live_index::schedule(config)?;
-            }
             LiveIndex::Serve { config_path } => {
                 let config = load_toml_config(config_path);
 
