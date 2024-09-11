@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use crate::{
     config::LiveIndexConfig,
     distributed::{
         cluster::Cluster,
-        member::{Member, Service},
+        member::{LiveIndexState, Member, Service},
         sonic::{self, service::sonic_service},
     },
     inverted_index,
@@ -28,12 +28,17 @@ use crate::{
     searcher::{InitialWebsiteResult, LocalSearcher},
 };
 use anyhow::Result;
+use futures::stream::FuturesUnordered;
+use tokio_stream::StreamExt;
 use tracing::info;
 
 use super::{
     indexer::IndexableWebpage,
     search_server::{RetrieveWebsites, Search},
 };
+
+const INDEXING_TIMEOUT: Duration = Duration::from_secs(60);
+const INDEXING_RETRIES: usize = 3;
 
 sonic_service!(LiveIndexService, [RetrieveWebsites, Search, IndexWebpages]);
 
@@ -76,6 +81,79 @@ impl LiveIndexService {
             index,
         })
     }
+
+    async fn index_webpages_in_replicas(
+        &self,
+        webpages: &[IndexableWebpage],
+        consistency_fraction: f64,
+    ) -> Result<(), IndexingError> {
+        let self_member = self
+            .cluster_handle
+            .self_node()
+            .expect("node should be participating part of cluster");
+
+        let self_id = self_member.id.clone();
+        let Service::LiveIndex {
+            host: _,
+            shard: self_shard,
+            state: _,
+        } = self_member.service
+        else {
+            panic!("self_member should always be a live index")
+        };
+
+        let live_indexes: Vec<_> = self
+            .cluster_handle
+            .members()
+            .await
+            .into_iter()
+            .filter_map(|member| {
+                if let Service::LiveIndex { host, shard, state } = member.service {
+                    if member.id != self_id && shard == self_shard {
+                        Some(RemoteIndex { host, state })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let ready = live_indexes
+            .iter()
+            .filter(|index| matches!(index.state, LiveIndexState::Ready))
+            .count();
+
+        let mut futures = FuturesUnordered::new();
+
+        for index in live_indexes {
+            let pages = webpages.to_vec();
+
+            futures.push(tokio::spawn(async move {
+                index.index_webpages_without_consistency(&pages).await;
+                index
+            }));
+        }
+
+        let mut missing_responses = ((ready as f64) * consistency_fraction).ceil() as u64;
+
+        while let Some(Ok(index)) = futures.next().await {
+            if matches!(index.state, LiveIndexState::Ready) {
+                missing_responses = missing_responses.saturating_sub(1);
+            }
+
+            if missing_responses == 0 {
+                break;
+            }
+        }
+
+        if missing_responses > 0 {
+            return Err(IndexingError::InsufficientReplication);
+        }
+
+        Ok(())
+    }
 }
 
 impl sonic::service::Message<LiveIndexService> for RetrieveWebsites {
@@ -95,18 +173,61 @@ impl sonic::service::Message<LiveIndexService> for Search {
     }
 }
 
+#[derive(Clone, Debug)]
+struct RemoteIndex {
+    host: SocketAddr,
+    state: LiveIndexState,
+}
+
+impl RemoteIndex {
+    async fn index_webpages_without_consistency(&self, webpages: &[IndexableWebpage]) {
+        let req = IndexWebpages {
+            pages: webpages.to_vec(),
+            consistency_fraction: None,
+        };
+
+        for _ in 0..INDEXING_RETRIES {
+            let mut conn: sonic::service::Connection<LiveIndexService> =
+                sonic::service::Connection::create(self.host)
+                    .await
+                    .expect(&format!("failed to connect to {}", self.host));
+
+            if conn
+                .send_with_timeout(req.clone(), INDEXING_TIMEOUT)
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug, bincode::Encode, bincode::Decode)]
+pub enum IndexingError {
+    #[error("failed to replicate to the necessary quorom")]
+    InsufficientReplication,
+}
+
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct IndexWebpages {
     pages: Vec<IndexableWebpage>,
+    consistency_fraction: Option<f64>,
 }
 
 impl sonic::service::Message<LiveIndexService> for IndexWebpages {
-    type Response = ();
+    type Response = Result<(), IndexingError>;
 
     async fn handle(self, server: &LiveIndexService) -> Self::Response {
         server.index.insert(&self.pages);
 
-        todo!("send write to all other replicas and make sure we get response from `config.consistency_fraction` before succeeding");
+        if let Some(consistency_fraction) = self.consistency_fraction {
+            server
+                .index_webpages_in_replicas(&self.pages, consistency_fraction)
+                .await?;
+        }
+
+        Ok(())
     }
 }
 
