@@ -32,7 +32,24 @@ If the crawler hasn't received any 429 responses from a server, it may gradually
 
 ### Robots.txt
 
-The crawler looks for the token StractBot in the robots.txt file to determine which pages (if any) it is allowed to crawl. The robots.txt file is cached for 1 hour, so changes to the file should be respected quite quickly.
+The crawler looks for the token StractBot in the [robots.txt](https://www.robotstxt.org/about.html) file to determine which pages (if any) it is allowed to crawl.
+
+If you want to restrict access to part of your site, add the following to your robots.txt file
+
+```
+User-agent: StractBot
+Disallow: /private
+```
+
+This will ensure that StractBot doesn't access any page with the '/private' prefix.
+You can also restrict StractBot from accessing any page on your site
+
+```
+User-agent: StractBot
+Disallow: /
+```
+
+The robots.txt file is cached for 1 hour, so changes to the file should be respected fairly quickly.
 
 ## Contact us
 
