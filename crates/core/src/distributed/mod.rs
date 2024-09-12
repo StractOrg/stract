@@ -17,3 +17,4 @@ pub mod cluster;
 pub mod member;
 pub mod retry_strategy;
 pub mod sonic;
+pub mod remote_cp;
