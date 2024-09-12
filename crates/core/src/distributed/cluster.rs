@@ -211,7 +211,7 @@ impl Cluster {
         self.self_node.as_ref()
     }
 
-    pub async fn set_service(&mut self, service: Service) -> Result<()> {
+    pub async fn set_service(&self, service: Service) -> Result<()> {
         self.chitchat
             .lock()
             .await

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, path::Path, sync::Arc, time::Duration};
 
 use crate::{
     config::LiveIndexConfig,
@@ -29,6 +29,9 @@ use crate::{
 };
 use anyhow::Result;
 use futures::stream::FuturesUnordered;
+use itertools::Itertools;
+use simple_wal::Wal;
+use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tracing::info;
 
@@ -42,44 +45,75 @@ const INDEXING_RETRIES: usize = 3;
 
 sonic_service!(LiveIndexService, [RetrieveWebsites, Search, IndexWebpages]);
 
+fn start_manager(index: Arc<LiveIndex>) {
+    let manager = IndexManager::new(index);
+    tokio::task::spawn_blocking(|| manager.run());
+}
+
+async fn setup(index: Arc<LiveIndex>, temp_wal: TempWal) {
+    todo!("check if there are other nodes in cluster with same shard and download index from them if this is the case");
+
+    let mut wal = temp_wal
+        .lock()
+        .await
+        .take()
+        .expect("temp_wal should always exist before setup has been run");
+
+    for pages in wal.iter().unwrap().chunks(512).into_iter() {
+        let pages: Vec<_> = pages.into_iter().collect();
+        index.insert(&pages);
+    }
+
+    wal.clear().unwrap();
+
+    start_manager(index);
+}
+
+type TempWal = Arc<Mutex<Option<Wal<IndexableWebpage>>>>;
+
 pub struct LiveIndexService {
     local_searcher: LocalSearcher<Arc<LiveIndex>>,
+    temp_wal: TempWal,
     index: Arc<LiveIndex>,
-    // dropping the handle leaves the cluster
-    #[allow(unused)]
     cluster_handle: Cluster,
 }
 
 impl LiveIndexService {
     async fn new(config: LiveIndexConfig) -> Result<Self> {
-        let manager = IndexManager::new(config.clone())?;
-        let local_searcher = LocalSearcher::new(manager.index());
-
-        let index = manager.index();
-
-        tokio::task::spawn(manager.run());
-
         let cluster_handle = Cluster::join(
             Member {
-                id: config.cluster_id,
+                id: config.cluster_id.clone(),
                 service: Service::LiveIndex {
                     host: config.host,
                     shard: config.shard_id,
                     state: crate::distributed::member::LiveIndexState::InSetup,
                 },
             },
-            config.gossip_addr,
-            config.gossip_seed_nodes.unwrap_or_default(),
+            config.gossip_addr.clone(),
+            config.gossip_seed_nodes.clone().unwrap_or_default(),
         )
         .await?;
 
-        todo!("check if there are other nodes in cluster with same shard and download index from them if this is the case");
+        let index = Arc::new(LiveIndex::new(config.clone())?);
+        let local_searcher = LocalSearcher::new(index.clone());
+
+        let temp_wal = Arc::new(Mutex::new(Some(Wal::open(
+            Path::new(&config.index_path).join("temp.wal"),
+        )?)));
 
         Ok(Self {
             local_searcher,
             cluster_handle,
             index,
+            temp_wal,
         })
+    }
+
+    fn background_setup(&self) {
+        let index = self.index.clone();
+        let temp_wal = self.temp_wal.clone();
+
+        tokio::task::spawn_blocking(|| setup(index, temp_wal));
     }
 
     async fn index_webpages_in_replicas(
@@ -219,12 +253,16 @@ impl sonic::service::Message<LiveIndexService> for IndexWebpages {
     type Response = Result<(), IndexingError>;
 
     async fn handle(self, server: &LiveIndexService) -> Self::Response {
-        server.index.insert(&self.pages);
+        if let Some(wal) = server.temp_wal.lock().await.as_mut() {
+            wal.batch_write(self.pages.iter()).unwrap();
+        } else {
+            server.index.insert(&self.pages);
 
-        if let Some(consistency_fraction) = self.consistency_fraction {
-            server
-                .index_webpages_in_replicas(&self.pages, consistency_fraction)
-                .await?;
+            if let Some(consistency_fraction) = self.consistency_fraction {
+                server
+                    .index_webpages_in_replicas(&self.pages, consistency_fraction)
+                    .await?;
+            }
         }
 
         Ok(())
@@ -234,11 +272,11 @@ impl sonic::service::Message<LiveIndexService> for IndexWebpages {
 pub async fn serve(config: LiveIndexConfig) -> Result<()> {
     let addr = config.host;
 
-    let server = LiveIndexService::new(config)
-        .await?
-        .bind(&addr)
-        .await
-        .unwrap();
+    let service = LiveIndexService::new(config).await?;
+
+    service.background_setup();
+
+    let server = service.bind(&addr).await.unwrap();
 
     info!("live index is ready to accept requests on {}", addr);
 

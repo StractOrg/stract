@@ -30,12 +30,11 @@ pub struct IndexManager {
 }
 
 impl IndexManager {
-    pub fn new(config: LiveIndexConfig) -> Result<Self> {
-        let index = Arc::new(LiveIndex::new(config.clone())?);
-        Ok(Self { index })
+    pub fn new(index: Arc<LiveIndex>) -> Self {
+        Self { index }
     }
 
-    pub async fn run(self) {
+    pub fn run(self) {
         let mut last_commit = Utc::now();
         let mut last_prune = Utc::now();
         let mut last_compact = Utc::now();
@@ -56,7 +55,7 @@ impl IndexManager {
                 last_compact = Utc::now();
             }
 
-            tokio::time::sleep(EVENT_LOOP_INTERVAL).await;
+            std::thread::sleep(EVENT_LOOP_INTERVAL);
         }
     }
 
