@@ -22,7 +22,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const CHUNK_SIZE_BYTES: usize = 1024 * 1024 * 1024; // 1 MB
+const CHUNK_SIZE_BYTES: usize = 1024 * 1024; // 1 MB
 
 pub trait Stepper {
     fn step(&self, req: Request) -> impl Future<Output = Response>;
@@ -282,5 +282,8 @@ mod tests {
 
         let res = std::fs::read_to_string(b.join("plus_1.txt")).unwrap();
         assert_eq!(format!("{}aa", &content), res);
+
+        std::fs::remove_dir_all(&a).unwrap();
+        std::fs::remove_dir_all(&b).unwrap();
     }
 }
