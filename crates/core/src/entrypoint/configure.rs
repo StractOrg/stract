@@ -185,26 +185,29 @@ fn create_inverted_index() -> Result<()> {
         Some(dual_encoder_path)
     };
 
-    let worker = indexer::IndexingWorker::new(IndexerConfig {
-        host_centrality_store_path: centrality_path.to_str().unwrap().to_string(),
-        page_centrality_store_path: Some(page_centrality_path.to_str().unwrap().to_string()),
-        page_webgraph: Some(IndexerGraphConfig::Local {
-            path: webgraph_path.to_str().unwrap().to_string(),
-        }),
-        output_path: out_path.to_str().unwrap().to_string(),
-        limit_warc_files: None,
-        skip_warc_files: None,
-        warc_source: job.source_config.clone(),
-        host_centrality_threshold: None,
-        safety_classifier_path: None,
-        minimum_clean_words: None,
-        batch_size: defaults::Indexing::batch_size(),
-        autocommit_after_num_inserts: defaults::Indexing::autocommit_after_num_inserts(),
-        dual_encoder: dual_encoder_path.map(|p| IndexerDualEncoderConfig {
-            model_path: p.to_str().unwrap().to_string(),
-            page_centrality_rank_threshold: Some(100_000),
-        }),
-    });
+    let worker = indexer::IndexingWorker::new(
+        IndexerConfig {
+            host_centrality_store_path: centrality_path.to_str().unwrap().to_string(),
+            page_centrality_store_path: Some(page_centrality_path.to_str().unwrap().to_string()),
+            page_webgraph: Some(IndexerGraphConfig::Local {
+                path: webgraph_path.to_str().unwrap().to_string(),
+            }),
+            output_path: out_path.to_str().unwrap().to_string(),
+            limit_warc_files: None,
+            skip_warc_files: None,
+            warc_source: job.source_config.clone(),
+            host_centrality_threshold: None,
+            safety_classifier_path: None,
+            minimum_clean_words: None,
+            batch_size: defaults::Indexing::batch_size(),
+            autocommit_after_num_inserts: defaults::Indexing::autocommit_after_num_inserts(),
+            dual_encoder: dual_encoder_path.map(|p| IndexerDualEncoderConfig {
+                model_path: p.to_str().unwrap().to_string(),
+                page_centrality_rank_threshold: Some(100_000),
+            }),
+        }
+        .into(),
+    );
 
     let index = job.process(&worker);
     crate::mv(index.path(), &out_path)?;

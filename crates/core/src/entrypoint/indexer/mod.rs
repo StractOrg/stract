@@ -45,7 +45,7 @@ pub fn run(config: &config::IndexerConfig) -> Result<()> {
 
     let job_config: WarcSource = config.warc_source.clone();
 
-    let worker = IndexingWorker::new(config.clone());
+    let worker = IndexingWorker::new(config.clone().into());
 
     let indexes = warc_paths
         .into_par_iter()

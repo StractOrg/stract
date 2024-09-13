@@ -172,12 +172,7 @@ pub struct IndexingWorker {
 }
 
 impl IndexingWorker {
-    pub fn new<C>(config: C) -> Self
-    where
-        Config: From<C>,
-    {
-        let config = Config::from(config);
-
+    pub fn new(config: Config) -> Self {
         let host_centrality_rank_store = speedy_kv::Db::open_or_create(
             Path::new(&config.host_centrality_store_path).join("harmonic_rank"),
         )
@@ -486,28 +481,31 @@ mod tests {
     use super::*;
 
     fn setup_worker(data_path: &Path, threshold: Option<u64>) -> IndexingWorker {
-        IndexingWorker::new(IndexerConfig {
-            host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
-            page_centrality_store_path: None,
-            page_webgraph: None,
-            safety_classifier_path: None,
-            dual_encoder: Some(IndexerDualEncoderConfig {
-                model_path: data_path.to_str().unwrap().to_string(),
-                page_centrality_rank_threshold: threshold,
-            }),
-            output_path: crate::gen_temp_path().to_str().unwrap().to_string(),
-            limit_warc_files: None,
-            skip_warc_files: None,
-            warc_source: WarcSource::Local(crate::config::LocalConfig {
-                folder: crate::gen_temp_path().to_str().unwrap().to_string(),
-                names: vec!["".to_string()],
-            }),
-            host_centrality_threshold: None,
-            minimum_clean_words: None,
-            batch_size: 10,
-            autocommit_after_num_inserts:
-                crate::config::defaults::Indexing::autocommit_after_num_inserts(),
-        })
+        IndexingWorker::new(
+            IndexerConfig {
+                host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
+                page_centrality_store_path: None,
+                page_webgraph: None,
+                safety_classifier_path: None,
+                dual_encoder: Some(IndexerDualEncoderConfig {
+                    model_path: data_path.to_str().unwrap().to_string(),
+                    page_centrality_rank_threshold: threshold,
+                }),
+                output_path: crate::gen_temp_path().to_str().unwrap().to_string(),
+                limit_warc_files: None,
+                skip_warc_files: None,
+                warc_source: WarcSource::Local(crate::config::LocalConfig {
+                    folder: crate::gen_temp_path().to_str().unwrap().to_string(),
+                    names: vec!["".to_string()],
+                }),
+                host_centrality_threshold: None,
+                minimum_clean_words: None,
+                batch_size: 10,
+                autocommit_after_num_inserts:
+                    crate::config::defaults::Indexing::autocommit_after_num_inserts(),
+            }
+            .into(),
+        )
     }
 
     #[test]

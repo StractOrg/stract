@@ -18,12 +18,9 @@ use std::sync::Arc;
 
 use chrono::Utc;
 
-use crate::config::LiveIndexConfig;
-
 use super::{
     LiveIndex, AUTO_COMMIT_INTERVAL, COMPACT_INTERVAL, EVENT_LOOP_INTERVAL, PRUNE_INTERVAL,
 };
-use crate::Result;
 
 pub struct IndexManager {
     index: Arc<LiveIndex>,

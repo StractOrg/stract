@@ -17,27 +17,45 @@
 use crate::Result;
 use std::{
     fs,
-    io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write},
+    future::Future,
+    io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
 
 const CHUNK_SIZE_BYTES: usize = 1024 * 1024 * 1024; // 1 MB
 
-enum Request {
+pub trait Stepper {
+    fn step(&self, req: Request) -> impl Future<Output = Response>;
+}
+
+impl<F> Stepper for F
+where
+    F: Fn(Request) -> Response,
+{
+    async fn step(&self, req: Request) -> Response {
+        self(req)
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub enum Request {
     Overview { root: PathBuf },
     Chunk { path: PathBuf, offset: u64 },
 }
 
 impl Request {
-    pub fn download<P1, P2, F>(remote_path: P1, to: P2, step: F)
+    pub async fn download<P1, P2, S>(remote_path: P1, to: P2, stepper: &S)
     where
         P1: AsRef<Path>,
         P2: AsRef<Path>,
-        F: Fn(Self) -> Response,
+        S: Stepper,
     {
-        let Response::Overview { paths } = step(Self::Overview {
-            root: remote_path.as_ref().to_path_buf(),
-        }) else {
+        let Response::Overview { paths } = stepper
+            .step(Self::Overview {
+                root: remote_path.as_ref().to_path_buf(),
+            })
+            .await
+        else {
             panic!("unexpected response to request")
         };
 
@@ -49,32 +67,33 @@ impl Request {
                 }
             }
 
-            Self::download_file(remote_path.as_ref().join(path.clone()), local, &step);
+            Self::download_file(remote_path.as_ref().join(path.clone()), local, stepper).await;
         }
     }
 
-    pub fn download_file<P1, P2, F>(remote: P1, local: P2, step: F)
+    pub async fn download_file<P1, P2, S>(remote: P1, local: P2, stepper: &S)
     where
         P1: AsRef<Path>,
         P2: AsRef<Path>,
-        F: Fn(Self) -> Response,
+        S: Stepper,
     {
         let mut offset = 0;
         let file = std::fs::OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(true)
             .open(local.as_ref())
-            .expect(&format!(
-                "failed to create file {:?}",
-                local.as_ref().as_os_str()
-            ));
+            .unwrap_or_else(|_| panic!("failed to create file {:?}", local.as_ref().as_os_str()));
         let mut writer = BufWriter::new(file);
 
         loop {
-            let Response::Chunk { bytes } = step(Self::Chunk {
-                path: remote.as_ref().to_path_buf(),
-                offset,
-            }) else {
+            let Response::Chunk { bytes } = stepper
+                .step(Self::Chunk {
+                    path: remote.as_ref().to_path_buf(),
+                    offset,
+                })
+                .await
+            else {
                 panic!("unexpected response to request");
             };
 
@@ -89,7 +108,8 @@ impl Request {
     }
 }
 
-enum Response {
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub enum Response {
     Overview { paths: Vec<PathBuf> },
     Chunk { bytes: Vec<u8> },
 }
@@ -135,13 +155,9 @@ fn files(root: PathBuf) -> Vec<PathBuf> {
     while let Some(path) = stack.pop() {
         if path.is_file() {
             res.push(path);
-        } else {
-            if let Ok(dir) = fs::read_dir(path) {
-                for entry in dir {
-                    if let Ok(entry) = entry {
-                        stack.push(entry.path());
-                    }
-                }
+        } else if let Ok(dir) = fs::read_dir(path) {
+            for entry in dir.flatten() {
+                stack.push(entry.path());
             }
         }
     }
@@ -161,19 +177,19 @@ mod tests {
         Response::handle(req).unwrap()
     }
 
-    fn download<P1: AsRef<Path>, P2: AsRef<Path>>(remote: P1, local: P2) {
-        Request::download(remote, local, local_step)
+    async fn download<P1: AsRef<Path>, P2: AsRef<Path>>(remote: P1, local: P2) {
+        Request::download(remote, local, &local_step).await
     }
 
-    #[test]
-    fn test_directory() {
+    #[tokio::test]
+    async fn test_directory() {
         let a = gen_temp_path();
         std::fs::create_dir_all(a.join("test")).unwrap();
         let contents = "this is a test";
         std::fs::write(a.join("test").join("file.txt"), contents).unwrap();
 
         let b = gen_temp_path();
-        download(&a, &b);
+        download(&a, &b).await;
 
         assert!(b.join("test").exists());
         assert!(b.join("test").join("file.txt").exists());
@@ -183,20 +199,88 @@ mod tests {
         assert_eq!(contents, res);
     }
 
-    #[test]
-    fn test_single_file() {
+    #[tokio::test]
+    async fn test_single_file() {
         let a = gen_temp_path();
         std::fs::create_dir_all(&a).unwrap();
         let contents = "this is a test";
         std::fs::write(a.join("file.txt"), contents).unwrap();
 
         let b = gen_temp_path();
-        download(&a, &b);
+        download(&a, &b).await;
 
         assert!(b.join("file.txt").exists());
 
         let res = std::fs::read_to_string(b.join("file.txt")).unwrap();
 
         assert_eq!(contents, res);
+    }
+
+    #[tokio::test]
+    async fn test_overwrite() {
+        let a = gen_temp_path();
+        std::fs::create_dir_all(&a).unwrap();
+        let contents = "this is a test";
+        std::fs::write(a.join("file.txt"), contents).unwrap();
+
+        let b = gen_temp_path();
+        std::fs::create_dir_all(&b).unwrap();
+        std::fs::write(b.join("file.txt"), "this is another test").unwrap();
+        download(&a, &b).await;
+
+        assert!(b.join("file.txt").exists());
+
+        let res = std::fs::read_to_string(b.join("file.txt")).unwrap();
+
+        assert_eq!(contents, res);
+    }
+
+    #[tokio::test]
+    async fn test_keep_non_copied() {
+        let a = gen_temp_path();
+        std::fs::create_dir_all(a.join("test")).unwrap();
+        let contents = "this is a test";
+        std::fs::write(a.join("test").join("a.txt"), contents).unwrap();
+
+        let b = gen_temp_path();
+        std::fs::create_dir_all(b.join("test")).unwrap();
+        std::fs::write(b.join("test").join("b.txt"), contents).unwrap();
+
+        download(&a, &b).await;
+
+        assert!(b.join("test").exists());
+        assert!(b.join("test").join("a.txt").exists());
+        assert!(b.join("test").join("b.txt").exists());
+
+        let res = std::fs::read_to_string(b.join("test").join("a.txt")).unwrap();
+        assert_eq!(contents, res);
+
+        let res = std::fs::read_to_string(b.join("test").join("b.txt")).unwrap();
+        assert_eq!(contents, res);
+    }
+
+    #[tokio::test]
+    async fn test_file_size_edge_case() {
+        let content = "a".repeat(CHUNK_SIZE_BYTES - 1);
+        let a = gen_temp_path();
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::write(a.join("minus_1.txt"), &content).unwrap();
+        std::fs::write(a.join("edge.txt"), format!("{}a", &content)).unwrap();
+        std::fs::write(a.join("plus_1.txt"), format!("{}aa", &content)).unwrap();
+
+        let b = gen_temp_path();
+        download(&a, &b).await;
+        assert!(b.join("minus_1.txt").exists());
+        assert!(b.join("edge.txt").exists());
+        assert!(b.join("plus_1.txt").exists());
+
+        let res = std::fs::read_to_string(b.join("minus_1.txt")).unwrap();
+        assert_eq!(content, res);
+
+        let res = std::fs::read_to_string(b.join("edge.txt")).unwrap();
+        assert_eq!(format!("{}a", &content), res);
+
+        let res = std::fs::read_to_string(b.join("plus_1.txt")).unwrap();
+        assert_eq!(format!("{}aa", &content), res);
     }
 }

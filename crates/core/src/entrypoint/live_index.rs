@@ -14,13 +14,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, path::Path, sync::Arc, time::Duration};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use crate::{
+    ampc::dht::ShardId,
     config::LiveIndexConfig,
     distributed::{
         cluster::Cluster,
         member::{LiveIndexState, Member, Service},
+        remote_cp,
         sonic::{self, service::sonic_service},
     },
     inverted_index,
@@ -43,15 +50,93 @@ use super::{
 const INDEXING_TIMEOUT: Duration = Duration::from_secs(60);
 const INDEXING_RETRIES: usize = 3;
 
-sonic_service!(LiveIndexService, [RetrieveWebsites, Search, IndexWebpages]);
+sonic_service!(
+    LiveIndexService,
+    [
+        RetrieveWebsites,
+        Search,
+        IndexWebpages,
+        GetIndexPath,
+        RemoteDownload
+    ]
+);
 
 fn start_manager(index: Arc<LiveIndex>) {
     let manager = IndexManager::new(index);
     tokio::task::spawn_blocking(|| manager.run());
 }
 
-async fn setup(index: Arc<LiveIndex>, temp_wal: TempWal) {
-    todo!("check if there are other nodes in cluster with same shard and download index from them if this is the case");
+struct FileDownloadStepper {
+    conn: Mutex<sonic::service::Connection<LiveIndexService>>,
+}
+
+impl remote_cp::Stepper for FileDownloadStepper {
+    async fn step(&self, req: remote_cp::Request) -> remote_cp::Response {
+        self.conn
+            .lock()
+            .await
+            .send(RemoteDownload { req })
+            .await
+            .unwrap()
+    }
+}
+
+async fn other_replicas(cluster: &Cluster, shard: &ShardId, id: &str) -> Vec<SocketAddr> {
+    cluster
+        .members()
+        .await
+        .into_iter()
+        .filter_map(|member| {
+            if member.id != id {
+                if let Service::LiveIndex {
+                    host,
+                    shard: member_shard,
+                    state,
+                } = member.service
+                {
+                    if &member_shard == shard && matches!(state, LiveIndexState::Ready) {
+                        return Some(host);
+                    }
+                }
+            }
+
+            None
+        })
+        .collect()
+}
+
+async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) -> Result<()> {
+    let self_node = cluster
+        .self_node()
+        .expect("cluster should not be joined as spectator");
+
+    let Service::LiveIndex {
+        host: _,
+        shard,
+        state: _,
+    } = self_node.service.clone()
+    else {
+        panic!("self node should be a live index")
+    };
+
+    let mut others = other_replicas(&cluster, &shard, &self_node.id).await;
+
+    if let Some(other) = others.pop() {
+        let mut conn: sonic::service::Connection<LiveIndexService> =
+            sonic::service::Connection::create(other).await?;
+        index.delete_all_pages();
+        let local_path = index.path();
+        let remote_path = conn.send(GetIndexPath).await?;
+
+        remote_cp::Request::download(
+            remote_path,
+            local_path,
+            &FileDownloadStepper {
+                conn: Mutex::new(conn),
+            },
+        )
+        .await;
+    }
 
     let mut wal = temp_wal
         .lock()
@@ -67,6 +152,8 @@ async fn setup(index: Arc<LiveIndex>, temp_wal: TempWal) {
     wal.clear().unwrap();
 
     start_manager(index);
+
+    Ok(())
 }
 
 type TempWal = Arc<Mutex<Option<Wal<IndexableWebpage>>>>;
@@ -75,31 +162,35 @@ pub struct LiveIndexService {
     local_searcher: LocalSearcher<Arc<LiveIndex>>,
     temp_wal: TempWal,
     index: Arc<LiveIndex>,
-    cluster_handle: Cluster,
+    cluster_handle: Arc<Cluster>,
 }
 
 impl LiveIndexService {
     async fn new(config: LiveIndexConfig) -> Result<Self> {
-        let cluster_handle = Cluster::join(
-            Member {
-                id: config.cluster_id.clone(),
-                service: Service::LiveIndex {
-                    host: config.host,
-                    shard: config.shard_id,
-                    state: crate::distributed::member::LiveIndexState::InSetup,
+        let cluster_handle = Arc::new(
+            Cluster::join(
+                Member {
+                    id: config.cluster_id.clone(),
+                    service: Service::LiveIndex {
+                        host: config.host,
+                        shard: config.shard_id,
+                        state: crate::distributed::member::LiveIndexState::InSetup,
+                    },
                 },
-            },
-            config.gossip_addr.clone(),
-            config.gossip_seed_nodes.clone().unwrap_or_default(),
-        )
-        .await?;
+                config.gossip_addr,
+                config.gossip_seed_nodes.clone().unwrap_or_default(),
+            )
+            .await?,
+        );
+        let index_path = Path::new(&config.index_path);
 
-        let index = Arc::new(LiveIndex::new(config.clone())?);
+        let index = Arc::new(LiveIndex::new(
+            index_path.join("index"),
+            config.clone().into(),
+        )?);
         let local_searcher = LocalSearcher::new(index.clone());
 
-        let temp_wal = Arc::new(Mutex::new(Some(Wal::open(
-            Path::new(&config.index_path).join("temp.wal"),
-        )?)));
+        let temp_wal = Arc::new(Mutex::new(Some(Wal::open(index_path.join("wal.temp"))?)));
 
         Ok(Self {
             local_searcher,
@@ -112,8 +203,11 @@ impl LiveIndexService {
     fn background_setup(&self) {
         let index = self.index.clone();
         let temp_wal = self.temp_wal.clone();
+        let cluster = self.cluster_handle.clone();
 
-        tokio::task::spawn_blocking(|| setup(index, temp_wal));
+        tokio::task::spawn_blocking(
+            || async move { setup(index, cluster, temp_wal).await.unwrap() },
+        );
     }
 
     async fn index_webpages_in_replicas(
@@ -224,7 +318,7 @@ impl RemoteIndex {
             let mut conn: sonic::service::Connection<LiveIndexService> =
                 sonic::service::Connection::create(self.host)
                     .await
-                    .expect(&format!("failed to connect to {}", self.host));
+                    .unwrap_or_else(|_| panic!("failed to connect to {}", self.host));
 
             if conn
                 .send_with_timeout(req.clone(), INDEXING_TIMEOUT)
@@ -266,6 +360,29 @@ impl sonic::service::Message<LiveIndexService> for IndexWebpages {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct GetIndexPath;
+
+impl sonic::service::Message<LiveIndexService> for GetIndexPath {
+    type Response = PathBuf;
+
+    async fn handle(self, server: &LiveIndexService) -> Self::Response {
+        server.index.path()
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct RemoteDownload {
+    req: remote_cp::Request,
+}
+impl sonic::service::Message<LiveIndexService> for RemoteDownload {
+    type Response = remote_cp::Response;
+
+    async fn handle(self, _: &LiveIndexService) -> Self::Response {
+        remote_cp::Response::handle(self.req).unwrap()
     }
 }
 
