@@ -55,8 +55,4 @@ impl IndexManager {
             std::thread::sleep(EVENT_LOOP_INTERVAL);
         }
     }
-
-    pub fn index(&self) -> Arc<LiveIndex> {
-        self.index.clone()
-    }
 }
