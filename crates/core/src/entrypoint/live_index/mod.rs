@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#[cfg(test)]
+mod tests;
+
 use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -339,8 +342,8 @@ pub enum IndexingError {
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct IndexWebpages {
-    pages: Vec<IndexableWebpage>,
-    consistency_fraction: Option<f64>,
+    pub pages: Vec<IndexableWebpage>,
+    pub consistency_fraction: Option<f64>,
 }
 
 impl sonic::service::Message<LiveIndexService> for IndexWebpages {
