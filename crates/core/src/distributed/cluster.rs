@@ -15,12 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use chitchat::{
     spawn_chitchat, transport::UdpTransport, Chitchat, ChitchatConfig, ChitchatHandle,
-    FailureDetectorConfig, NodeId,
+    ClusterStateSnapshot, FailureDetectorConfig, NodeId,
 };
-use std::{collections::HashSet, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::sync::{Mutex, RwLock};
-use tokio_stream::StreamExt;
-use tracing::error;
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+use tokio::sync::Mutex;
 
 use crate::distributed::member::{Member, Service};
 
@@ -30,57 +28,20 @@ const SERVICE_KEY: &str = "service";
 
 type Result<T> = std::result::Result<T, anyhow::Error>;
 
-fn alive_nodes_updater(chitchat: Arc<Mutex<Chitchat>>) -> Arc<RwLock<HashSet<Member>>> {
-    let alive_nodes = Arc::new(RwLock::new(HashSet::new()));
-    let alive_nodes_ref = alive_nodes.clone();
-
-    tokio::spawn(async move {
-        let mut node_change_receiver = chitchat.lock().await.ready_nodes_watcher();
-
-        while let Some(members_set) = node_change_receiver.next().await {
-            let alive_node_ids: HashSet<_> = alive_nodes_ref
-                .read()
-                .await
-                .iter()
-                .map(|member: &Member| member.id.clone())
-                .collect();
-
-            let member_ids: HashSet<_> =
-                members_set.iter().map(|member| member.id.clone()).collect();
-
-            if alive_node_ids != member_ids {
-                let snapshot = chitchat.lock().await.state_snapshot();
-                let mut new_members = Vec::new();
-                for member in members_set {
-                    if let Some(state) = snapshot.node_states.get(&member.id) {
-                        if let Some(service) = state.get(SERVICE_KEY) {
-                            let service: Service = serde_json::from_str(service).unwrap();
-                            new_members.push(Member {
-                                service,
-                                id: member.id,
-                            });
-                        }
-                    } else {
-                        error!("no state found for node")
-                    }
-                }
-
-                tracing::info!("new members: {:#?}", new_members);
-                let mut write = alive_nodes_ref.write().await;
-                write.clear();
-
-                for member in new_members {
-                    write.insert(member);
-                }
+fn snapshot_members(snapshot: ClusterStateSnapshot) -> Vec<Member> {
+    let mut res = Vec::new();
+    for (id, state) in snapshot.node_states {
+        if let Some(service) = state.get(SERVICE_KEY) {
+            if let Ok(service) = serde_json::from_str(service) {
+                res.push(Member { service, id });
             }
         }
-    });
+    }
 
-    alive_nodes
+    res
 }
 
 pub struct Cluster {
-    alive_nodes: Arc<RwLock<HashSet<Member>>>,
     self_node: Option<Member>,
     chitchat: Arc<Mutex<Chitchat>>,
     // dropping the handle leaves the cluster
@@ -89,7 +50,7 @@ pub struct Cluster {
 
 impl Cluster {
     pub async fn join(
-        self_node: Member,
+        mut self_node: Member,
         gossip_addr: SocketAddr,
         seed_addrs: Vec<SocketAddr>,
     ) -> Result<Self> {
@@ -104,6 +65,8 @@ impl Cluster {
             id: format!("{}_{}", self_node.id, uuid),
             gossip_public_address: gossip_addr,
         };
+        self_node.id = node_id.id.clone();
+
         let config = ChitchatConfig {
             node_id,
             cluster_id: CLUSTER_ID.to_string(),
@@ -170,10 +133,7 @@ impl Cluster {
         let chitchat_handle = spawn_chitchat(config, key_values, &transport).await?;
         let chitchat = chitchat_handle.chitchat();
 
-        let alive_nodes = alive_nodes_updater(chitchat.clone());
-
         Ok(Self {
-            alive_nodes,
             self_node,
             chitchat,
             _chitchat_handle: chitchat_handle,
@@ -181,14 +141,7 @@ impl Cluster {
     }
 
     pub async fn members(&self) -> Vec<Member> {
-        let lock = self.alive_nodes.read().await;
-        let mut res = Vec::with_capacity(lock.len());
-
-        for member in lock.iter() {
-            res.push(member.clone());
-        }
-
-        res
+        snapshot_members(self.chitchat.lock().await.state_snapshot())
     }
 
     pub async fn await_member<P>(&self, pred: P) -> Member
@@ -217,6 +170,17 @@ impl Cluster {
             .await
             .self_node_state()
             .set(SERVICE_KEY, serde_json::to_string(&service)?);
+
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub async fn remove_service(&self) -> Result<()> {
+        self.chitchat
+            .lock()
+            .await
+            .self_node_state()
+            .set(SERVICE_KEY, String::new());
 
         Ok(())
     }

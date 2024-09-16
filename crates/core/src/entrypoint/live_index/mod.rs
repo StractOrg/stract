@@ -37,7 +37,7 @@ use crate::{
     live_index::{IndexManager, LiveIndex},
     searcher::{InitialWebsiteResult, LocalSearcher},
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
 use simple_wal::Wal;
@@ -46,7 +46,7 @@ use tokio_stream::StreamExt;
 use tracing::info;
 
 use super::{
-    indexer::IndexableWebpage,
+    indexer::{self, IndexableWebpage},
     search_server::{RetrieveWebsites, Search},
 };
 
@@ -66,7 +66,7 @@ sonic_service!(
 
 fn start_manager(index: Arc<LiveIndex>) {
     let manager = IndexManager::new(index);
-    tokio::task::spawn_blocking(|| manager.run());
+    std::thread::spawn(|| manager.run());
 }
 
 struct FileDownloadStepper {
@@ -85,6 +85,7 @@ impl remote_cp::Stepper for FileDownloadStepper {
 }
 
 async fn other_replicas(cluster: &Cluster, shard: &ShardId, id: &str) -> Vec<SocketAddr> {
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     cluster
         .members()
         .await
@@ -114,7 +115,7 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
         .expect("cluster should not be joined as spectator");
 
     let Service::LiveIndex {
-        host: _,
+        host,
         shard,
         state: _,
     } = self_node.service.clone()
@@ -156,6 +157,14 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
 
     start_manager(index);
 
+    cluster
+        .set_service(Service::LiveIndex {
+            host,
+            shard,
+            state: LiveIndexState::Ready,
+        })
+        .await?;
+
     Ok(())
 }
 
@@ -187,10 +196,21 @@ impl LiveIndexService {
         );
         let index_path = Path::new(&config.index_path);
 
-        let index = Arc::new(LiveIndex::new(
-            index_path.join("index"),
-            config.clone().into(),
-        )?);
+        let index = Arc::new(
+            LiveIndex::new(
+                index_path.join("index"),
+                indexer::worker::Config {
+                    host_centrality_store_path: config.host_centrality_store_path.clone(),
+                    page_centrality_store_path: config.page_centrality_store_path.clone(),
+                    page_webgraph: Some(indexer::worker::IndexerGraphConfig::Existing {
+                        cluster: cluster_handle.clone(),
+                    }),
+                    safety_classifier_path: config.safety_classifier_path.clone(),
+                    dual_encoder: None,
+                },
+            )
+            .await?,
+        );
         let local_searcher = LocalSearcher::new(index.clone());
 
         let temp_wal = Arc::new(Mutex::new(Some(Wal::open(index_path.join("wal.temp"))?)));
@@ -208,9 +228,7 @@ impl LiveIndexService {
         let temp_wal = self.temp_wal.clone();
         let cluster = self.cluster_handle.clone();
 
-        tokio::task::spawn_blocking(
-            || async move { setup(index, cluster, temp_wal).await.unwrap() },
-        );
+        tokio::task::spawn(async move { setup(index, cluster, temp_wal).await.unwrap() });
     }
 
     async fn index_webpages_in_replicas(
@@ -262,20 +280,25 @@ impl LiveIndexService {
             let pages = webpages.to_vec();
 
             futures.push(tokio::spawn(async move {
-                index.index_webpages_without_consistency(&pages).await;
-                index
+                match index.index_webpages_without_consistency(&pages).await {
+                    Ok(_) => Ok(index),
+                    Err(e) => Err(e),
+                }
             }));
         }
 
-        let mut missing_responses = ((ready as f64) * consistency_fraction).ceil() as u64;
+        let mut missing_responses =
+            (((ready as f64) * consistency_fraction).ceil() as u64).min(ready as u64);
 
         while let Some(Ok(index)) = futures.next().await {
-            if matches!(index.state, LiveIndexState::Ready) {
-                missing_responses = missing_responses.saturating_sub(1);
-            }
+            if let Ok(index) = index {
+                if matches!(index.state, LiveIndexState::Ready) {
+                    missing_responses = missing_responses.saturating_sub(1);
+                }
 
-            if missing_responses == 0 {
-                break;
+                if missing_responses == 0 {
+                    break;
+                }
             }
         }
 
@@ -311,7 +334,10 @@ struct RemoteIndex {
 }
 
 impl RemoteIndex {
-    async fn index_webpages_without_consistency(&self, webpages: &[IndexableWebpage]) {
+    async fn index_webpages_without_consistency(
+        &self,
+        webpages: &[IndexableWebpage],
+    ) -> Result<()> {
         let req = IndexWebpages {
             pages: webpages.to_vec(),
             consistency_fraction: None,
@@ -321,16 +347,18 @@ impl RemoteIndex {
             let mut conn: sonic::service::Connection<LiveIndexService> =
                 sonic::service::Connection::create(self.host)
                     .await
-                    .unwrap_or_else(|_| panic!("failed to connect to {}", self.host));
+                    .with_context(|| format!("failed to connect to {}", self.host))?;
 
             if conn
                 .send_with_timeout(req.clone(), INDEXING_TIMEOUT)
                 .await
                 .is_ok()
             {
-                return;
+                return Ok(());
             }
         }
+
+        Err(anyhow::anyhow!("failed to replicate webpages"))
     }
 }
 

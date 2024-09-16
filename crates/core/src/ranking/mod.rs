@@ -756,7 +756,7 @@ mod tests {
     }
 
     fn setup_worker(data_path: &Path) -> IndexingWorker {
-        IndexingWorker::new(
+        crate::block_on(IndexingWorker::new(
             IndexerConfig {
                 host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
                 page_centrality_store_path: None,
@@ -780,7 +780,7 @@ mod tests {
                     crate::config::defaults::Indexing::autocommit_after_num_inserts(),
             }
             .into(),
-        )
+        ))
     }
 
     #[test]

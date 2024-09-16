@@ -185,7 +185,7 @@ fn create_inverted_index() -> Result<()> {
         Some(dual_encoder_path)
     };
 
-    let worker = indexer::IndexingWorker::new(
+    let worker = crate::block_on(indexer::IndexingWorker::new(
         IndexerConfig {
             host_centrality_store_path: centrality_path.to_str().unwrap().to_string(),
             page_centrality_store_path: Some(page_centrality_path.to_str().unwrap().to_string()),
@@ -207,7 +207,7 @@ fn create_inverted_index() -> Result<()> {
             }),
         }
         .into(),
-    );
+    ));
 
     let index = job.process(&worker);
     crate::mv(index.path(), &out_path)?;

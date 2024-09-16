@@ -17,17 +17,15 @@
 use chrono::Utc;
 use itertools::Itertools;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use tracing::debug;
 
 pub use super::indexable_webpage::IndexableWebpage;
 pub use super::job::{Job, JobSettings};
 use crate::backlink_grouper::BacklinkGrouper;
-use crate::config::{
-    IndexerConfig, IndexerDualEncoderConfig, IndexerGraphConfig, LiveIndexConfig,
-    WebgraphGranularity,
-};
+use crate::config::{GossipConfig, IndexerConfig, IndexerDualEncoderConfig, WebgraphGranularity};
+use crate::distributed::cluster::Cluster;
 use crate::models::dual_encoder::DualEncoder as DualEncoderModel;
 use crate::webgraph::remote::RemoteWebgraph;
 use crate::Result;
@@ -39,6 +37,23 @@ use crate::webgraph::{self, Edge, EdgeLimit, Node, NodeID};
 use crate::webpage::{safety_classifier, Html, Webpage};
 
 const MAX_BACKLINKS: EdgeLimit = EdgeLimit::Limit(1024);
+
+pub enum IndexerGraphConfig {
+    Local { path: String },
+    Remote { gossip: GossipConfig },
+    Existing { cluster: Arc<Cluster> },
+}
+
+impl From<crate::config::IndexerGraphConfig> for IndexerGraphConfig {
+    fn from(conf: crate::config::IndexerGraphConfig) -> Self {
+        match conf {
+            crate::config::IndexerGraphConfig::Local { path } => IndexerGraphConfig::Local { path },
+            crate::config::IndexerGraphConfig::Remote { gossip } => {
+                IndexerGraphConfig::Remote { gossip }
+            }
+        }
+    }
+}
 
 pub struct Config {
     pub host_centrality_store_path: String,
@@ -53,21 +68,9 @@ impl From<IndexerConfig> for Config {
         Self {
             host_centrality_store_path: config.host_centrality_store_path,
             page_centrality_store_path: config.page_centrality_store_path,
-            page_webgraph: config.page_webgraph,
+            page_webgraph: config.page_webgraph.map(IndexerGraphConfig::from),
             safety_classifier_path: config.safety_classifier_path,
             dual_encoder: config.dual_encoder,
-        }
-    }
-}
-
-impl From<LiveIndexConfig> for Config {
-    fn from(config: LiveIndexConfig) -> Self {
-        Self {
-            host_centrality_store_path: config.host_centrality_store_path,
-            page_centrality_store_path: config.page_centrality_store_path,
-            page_webgraph: config.page_webgraph,
-            safety_classifier_path: config.safety_classifier_path,
-            dual_encoder: None,
         }
     }
 }
@@ -83,16 +86,16 @@ pub(super) enum Webgraph {
 }
 
 impl Webgraph {
-    fn batch_raw_ingoing_edges_with_labels(
+    async fn batch_raw_ingoing_edges_with_labels(
         &self,
         ids: Vec<NodeID>,
         limit: EdgeLimit,
     ) -> Vec<Vec<Edge<String>>> {
         let edges = match self {
-            Self::Remote(webgraph) => {
-                crate::block_on(webgraph.batch_raw_ingoing_edges_with_labels(&ids, limit))
-                    .unwrap_or_default()
-            }
+            Self::Remote(webgraph) => webgraph
+                .batch_raw_ingoing_edges_with_labels(&ids, limit)
+                .await
+                .unwrap_or_default(),
             Self::Local(webgraph) => {
                 let mut res = Vec::new();
 
@@ -140,7 +143,7 @@ impl Webgraph {
 }
 
 impl Webgraph {
-    fn new(config: &IndexerGraphConfig) -> Self {
+    async fn new(config: &IndexerGraphConfig) -> Self {
         match config {
             IndexerGraphConfig::Local { path } => Self::Local(
                 webgraph::WebgraphBuilder::new(path)
@@ -149,10 +152,10 @@ impl Webgraph {
             ),
             IndexerGraphConfig::Remote { gossip } => {
                 let cluster = crate::start_gossip_cluster_thread(gossip.clone(), None);
-                Self::Remote(crate::block_on(RemoteWebgraph::new(
-                    cluster,
-                    WebgraphGranularity::Page,
-                )))
+                Self::Remote(RemoteWebgraph::new(cluster, WebgraphGranularity::Page).await)
+            }
+            IndexerGraphConfig::Existing { cluster } => {
+                Self::Remote(RemoteWebgraph::new(cluster.clone(), WebgraphGranularity::Page).await)
             }
         }
     }
@@ -172,7 +175,7 @@ pub struct IndexingWorker {
 }
 
 impl IndexingWorker {
-    pub fn new(config: Config) -> Self {
+    pub async fn new(config: Config) -> Self {
         let host_centrality_rank_store = speedy_kv::Db::open_or_create(
             Path::new(&config.host_centrality_store_path).join("harmonic_rank"),
         )
@@ -191,7 +194,10 @@ impl IndexingWorker {
             page_centrality_rank_store: config.page_centrality_store_path.as_ref().map(|p| {
                 speedy_kv::Db::open_or_create(Path::new(&p).join("harmonic_rank")).unwrap()
             }),
-            page_webgraph: config.page_webgraph.as_ref().map(Webgraph::new),
+            page_webgraph: match config.page_webgraph.as_ref() {
+                Some(graph) => Some(Webgraph::new(graph).await),
+                None => None,
+            },
             safety_classifier: config
                 .safety_classifier_path
                 .as_ref()
@@ -385,14 +391,16 @@ impl IndexingWorker {
         }
     }
 
-    pub fn set_backlinks(&self, pages: &mut [Webpage]) {
+    pub async fn set_backlinks(&self, pages: &mut [Webpage]) {
         if let Some(graph) = self.page_webgraph() {
             let ids = pages
                 .iter()
                 .map(|w| Node::from(w.html.url()).id())
                 .collect::<Vec<_>>();
 
-            let backlinks = graph.batch_raw_ingoing_edges_with_labels(ids, MAX_BACKLINKS);
+            let backlinks = graph
+                .batch_raw_ingoing_edges_with_labels(ids, MAX_BACKLINKS)
+                .await;
 
             for (page, backlinks) in pages.iter_mut().zip_eq(backlinks) {
                 page.set_backlinks(backlinks.clone());
@@ -439,7 +447,7 @@ impl IndexingWorker {
         }
     }
 
-    pub fn prepare_webpages(&self, batch: &[IndexableWebpage]) -> Vec<Webpage> {
+    pub async fn prepare_webpages(&self, batch: &[IndexableWebpage]) -> Vec<Webpage> {
         let mut res = Vec::with_capacity(batch.len());
         let mut signal_computer = SignalComputer::new(None);
 
@@ -468,7 +476,7 @@ impl IndexingWorker {
 
         self.set_title_embeddings(&mut res);
         self.set_keyword_embeddings(&mut res);
-        self.set_backlinks(&mut res);
+        self.set_backlinks(&mut res).await;
 
         res
     }
@@ -481,7 +489,7 @@ mod tests {
     use super::*;
 
     fn setup_worker(data_path: &Path, threshold: Option<u64>) -> IndexingWorker {
-        IndexingWorker::new(
+        crate::block_on(IndexingWorker::new(
             IndexerConfig {
                 host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
                 page_centrality_store_path: None,
@@ -505,7 +513,7 @@ mod tests {
                     crate::config::defaults::Indexing::autocommit_after_num_inserts(),
             }
             .into(),
-        )
+        ))
     }
 
     #[test]
@@ -532,7 +540,7 @@ mod tests {
             },
         ];
 
-        let webpages = worker.prepare_webpages(&webpages);
+        let webpages = crate::block_on(worker.prepare_webpages(&webpages));
 
         assert_eq!(webpages.len(), 2);
 

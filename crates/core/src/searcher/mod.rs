@@ -83,6 +83,16 @@ pub struct SearchQuery {
     pub signal_coefficients: SignalCoefficients,
 }
 
+#[cfg(test)]
+impl From<String> for SearchQuery {
+    fn from(query: String) -> Self {
+        Self {
+            query,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct InitialWebsiteResult {
     pub num_websites: Count,

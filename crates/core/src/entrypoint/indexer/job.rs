@@ -85,7 +85,7 @@ impl Job {
                     batch.push(IndexableWebpage::from(record));
                 }
 
-                let prepared = worker.prepare_webpages(&batch);
+                let prepared = crate::block_on(worker.prepare_webpages(&batch));
 
                 for webpage in &prepared {
                     if webpage.host_centrality > 0.0 {

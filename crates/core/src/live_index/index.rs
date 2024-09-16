@@ -84,7 +84,7 @@ pub struct InnerIndex {
 }
 
 impl InnerIndex {
-    pub fn new<P: AsRef<Path>>(
+    pub async fn new<P: AsRef<Path>>(
         path: P,
         indexer_worker_config: indexer::worker::Config,
     ) -> Result<Self> {
@@ -94,7 +94,7 @@ impl InnerIndex {
         let write_ahead_log = Wal::open(path.as_ref().join("wal"))?;
         let wal_count = write_ahead_log.iter()?.count();
 
-        let worker = IndexingWorker::new(indexer_worker_config);
+        let worker = IndexingWorker::new(indexer_worker_config).await;
 
         let meta = Meta::open_or_create(path.as_ref().join("meta.json"));
 
@@ -220,7 +220,7 @@ impl InnerIndex {
         self.has_inserts = true;
     }
 
-    pub fn commit(&mut self) {
+    pub async fn commit(&mut self) {
         for batch in self
             .write_ahead_log
             .iter()
@@ -229,7 +229,7 @@ impl InnerIndex {
             .into_iter()
         {
             let batch: Vec<_> = batch.collect();
-            for webpage in self.indexing_worker.prepare_webpages(&batch) {
+            for webpage in self.indexing_worker.prepare_webpages(&batch).await {
                 self.index.insert(&webpage).unwrap();
             }
         }
@@ -252,20 +252,24 @@ pub struct LiveIndex {
 }
 
 impl LiveIndex {
-    pub fn new<P: AsRef<Path>>(
+    pub async fn new<P: AsRef<Path>>(
         path: P,
         indexer_worker_config: indexer::worker::Config,
     ) -> Result<Self> {
         Ok(Self {
-            inner: Arc::new(RwLock::new(InnerIndex::new(path, indexer_worker_config)?)),
+            inner: Arc::new(RwLock::new(
+                InnerIndex::new(path, indexer_worker_config).await?,
+            )),
         })
     }
 
     pub fn commit(&self) {
-        self.inner
-            .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .commit();
+        futures::executor::block_on(
+            self.inner
+                .write()
+                .unwrap_or_else(|e| e.into_inner())
+                .commit(),
+        );
     }
 
     pub fn prune_segments(&self) {
