@@ -8,27 +8,24 @@
 
 <div class="flex w-full justify-center">
   <div class="flex w-full flex-col items-center">
-    {#if entity.imageId}
-      <div class="w-lg mb-5">
-        <ResultLink href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}">
-          <div class="h-40">
-            <img
-              alt="Image of {entity.title}"
-              class="h-full w-full rounded-full object-contain"
-              src="{getApiBase()}/beta/api/entity_image?imageId={entity.imageId}"
-            />
+    <ResultLink href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}">
+      <div class="flex flex-col items-center hover:underline">
+        {#if entity.imageId}
+          <div class="w-lg mb-5">
+            <div class="h-40">
+              <img
+                alt={entity.title}
+                class="h-full w-full rounded-full object-contain"
+                src="{getApiBase()}/beta/api/entity_image?imageId={entity.imageId}"
+              />
+            </div>
           </div>
-        </ResultLink>
+        {/if}
+        <h2 class="mb-5 text-xl">
+          {entity.title}
+        </h2>
       </div>
-    {/if}
-    <div class="mb-5 text-xl">
-      <ResultLink
-        _class="hover:underline"
-        href="https://en.wikipedia.org/wiki/{encodeURI(entity.title)}"
-      >
-        {entity.title}
-      </ResultLink>
-    </div>
+    </ResultLink>
     <div class="text-sm">
       <span><EntitySnippet snippet={entity.smallAbstract} /></span>{' '}
       <span class="italic">
@@ -56,11 +53,14 @@
     {#if entity.relatedEntities.length > 0}
       <div class="mt-5 flex w-full flex-col text-neutral">
         <div class="font-light">Related Searches</div>
-        <div class="flex overflow-auto">
+        <ul class="flex overflow-auto">
           {#each entity.relatedEntities as related, index (`${index}-${related.title}`)}
-            <div class="flex flex-col items-center p-4">
-              {#if related.imageId != null}
-                <ResultLink href="/search?q={encodeURIComponent(related.title)}">
+            <li class="flex flex-col items-center p-4 hover:underline">
+              <ResultLink
+                href="/search?q={encodeURIComponent(related.title)}"
+                _class="flex flex-col items-center"
+              >
+                {#if related.imageId != null}
                   <div class="h-20 w-20">
                     <img
                       alt="Image of {related.title}"
@@ -68,17 +68,14 @@
                       src="{getApiBase()}/beta/api/entity_image?imageId={related.imageId}&maxWidth=200&maxHeight=200"
                     />
                   </div>
-                </ResultLink>
-              {/if}
-
-              <div class="line-clamp-3 text-center">
-                <ResultLink href="/search?q={encodeURI(related.title)}">
+                {/if}
+                <h3 class="line-clamp-3 text-center">
                   {related.title}
-                </ResultLink>
-              </div>
-            </div>
+                </h3>
+              </ResultLink>
+            </li>
           {/each}
-        </div>
+        </ul>
       </div>
     {/if}
   </div>
