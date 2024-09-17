@@ -169,35 +169,45 @@
           <div />
           <Button _class="noscript:hidden" on:click={exportAsOptic}>Export as optic</Button>
         </div>
-        <div class="grid items-center gap-y-2">
-          {#each similarHosts as host (`${host.host}`)}
-            <div
-              class="col-span-full grid grid-cols-[auto_auto_minmax(auto,66%)] items-center gap-x-3"
-              transition:fade={{ duration: 200 }}
-              animate:flip={{ duration: 200 }}
-            >
-              <div>
-                <button
-                  class={twJoin('noscript:hidden group')}
-                  on:click={() =>
-                    chosenHosts.includes(host.host)
-                      ? removeWebsite(host.host)
-                      : addWebsite(host.host)}
-                >
-                  <PlusCircleOutline
-                    class={twJoin(
-                      'text-xl text-success group-hover:scale-105 group-active:scale-95',
-                    )}
-                  />
-                </button>
-              </div>
-              <span>{host.score.toFixed(2)}</span>
-              <div class="flex">
-                <a href="http://{host.host}" target="_blank" class="underline">{host.host}</a>
-              </div>
-            </div>
-          {/each}
-        </div>
+        <table class="w-full border-separate border-spacing-y-1">
+          <thead>
+            <tr class="text-left">
+              <th class="pb-2"></th>
+              <th class="pb-2">Similarity</th>
+              <th class="pb-2">Site</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each similarHosts as host (`${host.host}`)}
+              <tr
+                class="items-center"
+                transition:fade={{ duration: 200 }}
+                animate:flip={{ duration: 200 }}
+              >
+                <td class="pr-2">
+                  <button
+                    class={twJoin('noscript:hidden group')}
+                    on:click={() =>
+                      chosenHosts.includes(host.host)
+                        ? removeWebsite(host.host)
+                        : addWebsite(host.host)}
+                    title={chosenHosts.includes(host.host) ? 'Remove from search' : 'Add to search'}
+                  >
+                    <PlusCircleOutline
+                      class={twJoin(
+                        'text-xl text-success group-hover:scale-105 group-active:scale-95',
+                      )}
+                    />
+                  </button>
+                </td>
+                <td class="px-2">{host.score.toFixed(2)}</td>
+                <td>
+                  <a href="http://{host.host}" target="_blank" class="underline">{host.host}</a>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
         <div class="noscript:hidden flex w-full justify-center">
           <button
             class="h-6 w-6 cursor-pointer rounded-full text-accent"
