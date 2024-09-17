@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -13,8 +13,18 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-pub mod cluster;
-pub mod member;
-pub mod retry_strategy;
-pub mod sonic;
-pub mod remote_cp;
+
+static TOKIO_RUNTIME: std::sync::LazyLock<tokio::runtime::Runtime> =
+    std::sync::LazyLock::new(|| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    });
+
+pub fn block_on<F>(f: F) -> F::Output
+where
+    F: std::future::Future,
+{
+    TOKIO_RUNTIME.block_on(f)
+}

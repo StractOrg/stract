@@ -73,6 +73,31 @@ impl From<ShardId> for u64 {
     Clone,
     Debug,
 )]
+pub enum LiveIndexState {
+    InSetup,
+    Ready,
+}
+
+impl std::fmt::Display for LiveIndexState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LiveIndexState::InSetup => write!(f, "setup"),
+            LiveIndexState::Ready => write!(f, "ready"),
+        }
+    }
+}
+
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Hash,
+    Clone,
+    Debug,
+)]
 pub enum Service {
     Searcher {
         host: SocketAddr,
@@ -83,7 +108,8 @@ pub enum Service {
     },
     LiveIndex {
         host: SocketAddr,
-        split_id: crate::feed::scheduler::SplitId,
+        shard: ShardId,
+        state: LiveIndexState,
     },
     Api {
         host: SocketAddr,
@@ -118,7 +144,9 @@ impl std::fmt::Display for Service {
         match self {
             Self::Searcher { host, shard } => write!(f, "Searcher {} {}", host, shard),
             Self::EntitySearcher { host } => write!(f, "EntitySearcher {}", host),
-            Self::LiveIndex { host, split_id } => write!(f, "LiveIndex {} {}", host, split_id),
+            Self::LiveIndex { host, shard, state } => {
+                write!(f, "LiveIndex {} {} {}", host, shard, state)
+            }
             Self::Api { host } => write!(f, "Api {}", host),
             Self::Webgraph {
                 host,

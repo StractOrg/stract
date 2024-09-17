@@ -28,8 +28,8 @@ use tantivy::index::SegmentId;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    config::{LiveIndexConfig, SnippetConfig},
-    entrypoint::indexer::{IndexableWebpage, IndexingWorker},
+    config::SnippetConfig,
+    entrypoint::indexer::{self, IndexableWebpage, IndexingWorker},
     live_index::{BATCH_SIZE, TTL},
     searcher::SearchableIndex,
     Result,
@@ -84,17 +84,19 @@ pub struct InnerIndex {
 }
 
 impl InnerIndex {
-    pub fn new(config: LiveIndexConfig) -> Result<Self> {
-        let path = Path::new(&config.index_path);
-        let mut index = crate::index::Index::open(path.join("index"))?;
+    pub async fn new<P: AsRef<Path>>(
+        path: P,
+        indexer_worker_config: indexer::worker::Config,
+    ) -> Result<Self> {
+        let mut index = crate::index::Index::open(path.as_ref().join("index"))?;
         index.prepare_writer()?;
 
-        let write_ahead_log = Wal::open(path.join("wal"))?;
+        let write_ahead_log = Wal::open(path.as_ref().join("wal"))?;
         let wal_count = write_ahead_log.iter()?.count();
 
-        let worker = IndexingWorker::new(config.clone());
+        let worker = IndexingWorker::new(indexer_worker_config).await;
 
-        let meta = Meta::open_or_create(path.join("meta.json"));
+        let meta = Meta::open_or_create(path.as_ref().join("meta.json"));
 
         Ok(Self {
             index,
@@ -102,7 +104,7 @@ impl InnerIndex {
             indexing_worker: worker,
             has_inserts: wal_count > 0,
             meta,
-            path: path.to_path_buf(),
+            path: path.as_ref().to_path_buf(),
         })
     }
 
@@ -192,7 +194,9 @@ impl InnerIndex {
                 created: Utc::now(),
             })
         }
+    }
 
+    fn save_meta(&self) {
         self.meta.save(self.path.join("meta.json"));
     }
 
@@ -200,12 +204,23 @@ impl InnerIndex {
         &self.index
     }
 
+    pub fn delete_all_pages(&mut self) {
+        let segments = self.index.inverted_index.segment_ids();
+        self.index
+            .inverted_index
+            .delete_segments_by_id(&segments)
+            .unwrap();
+
+        self.meta = Meta::default();
+        self.save_meta()
+    }
+
     pub fn insert(&mut self, pages: &[IndexableWebpage]) {
         self.write_ahead_log.batch_write(pages.iter()).unwrap();
         self.has_inserts = true;
     }
 
-    pub fn commit(&mut self) {
+    pub async fn commit(&mut self) {
         for batch in self
             .write_ahead_log
             .iter()
@@ -214,7 +229,7 @@ impl InnerIndex {
             .into_iter()
         {
             let batch: Vec<_> = batch.collect();
-            for webpage in self.indexing_worker.prepare_webpages(&batch) {
+            for webpage in self.indexing_worker.prepare_webpages(&batch).await {
                 self.index.insert(&webpage).unwrap();
             }
         }
@@ -226,6 +241,10 @@ impl InnerIndex {
     pub fn has_inserts(&self) -> bool {
         self.has_inserts
     }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
 }
 
 pub struct LiveIndex {
@@ -233,17 +252,24 @@ pub struct LiveIndex {
 }
 
 impl LiveIndex {
-    pub fn new(config: LiveIndexConfig) -> Result<Self> {
+    pub async fn new<P: AsRef<Path>>(
+        path: P,
+        indexer_worker_config: indexer::worker::Config,
+    ) -> Result<Self> {
         Ok(Self {
-            inner: Arc::new(RwLock::new(InnerIndex::new(config)?)),
+            inner: Arc::new(RwLock::new(
+                InnerIndex::new(path, indexer_worker_config).await?,
+            )),
         })
     }
 
     pub fn commit(&self) {
-        self.inner
-            .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .commit();
+        futures::executor::block_on(
+            self.inner
+                .write()
+                .unwrap_or_else(|e| e.into_inner())
+                .commit(),
+        );
     }
 
     pub fn prune_segments(&self) {
@@ -284,5 +310,20 @@ impl LiveIndex {
             .unwrap_or_else(|e| e.into_inner())
             .index
             .set_snippet_config(config)
+    }
+
+    pub fn path(&self) -> PathBuf {
+        self.inner
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .path
+            .to_path_buf()
+    }
+
+    pub fn delete_all_pages(&self) {
+        self.inner
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .delete_all_pages();
     }
 }

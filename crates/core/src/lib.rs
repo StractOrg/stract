@@ -47,6 +47,7 @@ pub mod autosuggest;
 mod backlink_grouper;
 pub mod bangs;
 mod bincode_utils;
+mod block_on;
 pub mod canon_index;
 mod collector;
 pub mod config;
@@ -93,17 +94,7 @@ pub mod webgraph;
 pub mod webpage;
 mod widgets;
 
-static TOKIO_RUNTIME: std::sync::LazyLock<tokio::runtime::Runtime> =
-    std::sync::LazyLock::new(|| {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-    });
-
-pub fn block_on<F: std::future::Future>(f: F) -> F::Output {
-    TOKIO_RUNTIME.block_on(f)
-}
+pub use block_on::block_on;
 
 #[derive(Error, Debug)]
 pub enum Error {

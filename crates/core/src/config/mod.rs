@@ -19,7 +19,6 @@ pub mod defaults;
 use super::Result;
 use crate::ampc::dht;
 use crate::distributed::member::ShardId;
-use crate::feed::scheduler::SplitId;
 
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -473,9 +472,6 @@ pub struct CrawlPlannerConfig {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct LiveIndexConfig {
-    pub split_path: String,
-    pub downloaded_db_path: String,
-
     // crawler
     pub user_agent: UserAgent,
     #[serde(default = "defaults::Crawler::robots_txt_cache_sec")]
@@ -497,7 +493,6 @@ pub struct LiveIndexConfig {
 
     // indexer
     pub host_centrality_store_path: String,
-    pub page_webgraph: Option<IndexerGraphConfig>,
     pub page_centrality_store_path: Option<String>,
     pub safety_classifier_path: Option<String>,
     pub host_centrality_threshold: Option<f64>,
@@ -507,7 +502,7 @@ pub struct LiveIndexConfig {
     pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
-    pub split_id: SplitId,
+    pub shard_id: ShardId,
     pub index_path: String,
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,

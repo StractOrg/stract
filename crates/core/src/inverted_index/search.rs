@@ -63,6 +63,13 @@ impl InvertedIndex {
         let mut query: Box<dyn tantivy::query::Query> = Box::new(query.clone());
 
         if let Some(limit) = collector.top_docs().max_docs().cloned() {
+            if limit.segments == 0 {
+                return Ok(InitialSearchResult {
+                    num_websites: approx_count::Count::Exact(0),
+                    top_websites: vec![],
+                });
+            }
+
             let docs_per_segment = (limit.total_docs / limit.segments) as u64;
             query = Box::new(ShortCircuitQuery::new(query, docs_per_segment));
 

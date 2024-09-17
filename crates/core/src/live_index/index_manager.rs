@@ -18,24 +18,20 @@ use std::sync::Arc;
 
 use chrono::Utc;
 
-use crate::config::LiveIndexConfig;
-
 use super::{
     LiveIndex, AUTO_COMMIT_INTERVAL, COMPACT_INTERVAL, EVENT_LOOP_INTERVAL, PRUNE_INTERVAL,
 };
-use crate::Result;
 
 pub struct IndexManager {
     index: Arc<LiveIndex>,
 }
 
 impl IndexManager {
-    pub fn new(config: LiveIndexConfig) -> Result<Self> {
-        let index = Arc::new(LiveIndex::new(config.clone())?);
-        Ok(Self { index })
+    pub fn new(index: Arc<LiveIndex>) -> Self {
+        Self { index }
     }
 
-    pub async fn run(self) {
+    pub fn run(self) {
         let mut last_commit = Utc::now();
         let mut last_prune = Utc::now();
         let mut last_compact = Utc::now();
@@ -56,11 +52,7 @@ impl IndexManager {
                 last_compact = Utc::now();
             }
 
-            tokio::time::sleep(EVENT_LOOP_INTERVAL).await;
+            std::thread::sleep(EVENT_LOOP_INTERVAL);
         }
-    }
-
-    pub fn index(&self) -> Arc<LiveIndex> {
-        self.index.clone()
     }
 }

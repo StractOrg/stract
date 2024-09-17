@@ -453,7 +453,7 @@ where
     async fn search_initial_from_live(
         &self,
         query: &SearchQuery,
-    ) -> Option<Vec<live::InitialSearchResultSplit>> {
+    ) -> Option<Vec<live::InitialSearchResultShard>> {
         match &self.live_searcher {
             Some(searcher) => Some(searcher.search_initial(query).await),
             None => None,
@@ -482,7 +482,7 @@ where
         &self,
         query: &SearchQuery,
         initial_results: Vec<distributed::InitialSearchResultShard>,
-        live_results: Vec<live::InitialSearchResultSplit>,
+        live_results: Vec<live::InitialSearchResultShard>,
     ) -> (Vec<ScoredWebpagePointer>, bool) {
         let mut collector =
             BucketCollector::new(NUM_PIPELINE_RANKING_RESULTS, self.collector_config.clone());
@@ -542,7 +542,7 @@ where
                     .unwrap_or_default();
                 let pointer = live::ScoredWebpagePointer {
                     website: RecallRankingWebpage::new(website, inbound),
-                    split_id: result.split_id.clone(),
+                    shard_id: result.shard_id,
                 };
 
                 let pointer = ScoredWebpagePointer::Live(pointer);

@@ -756,28 +756,31 @@ mod tests {
     }
 
     fn setup_worker(data_path: &Path) -> IndexingWorker {
-        IndexingWorker::new(IndexerConfig {
-            host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
-            page_centrality_store_path: None,
-            page_webgraph: None,
-            safety_classifier_path: None,
-            dual_encoder: Some(IndexerDualEncoderConfig {
-                model_path: data_path.to_str().unwrap().to_string(),
-                page_centrality_rank_threshold: None,
-            }),
-            output_path: crate::gen_temp_path().to_str().unwrap().to_string(),
-            limit_warc_files: None,
-            skip_warc_files: None,
-            warc_source: WarcSource::Local(crate::config::LocalConfig {
-                folder: crate::gen_temp_path().to_str().unwrap().to_string(),
-                names: vec!["".to_string()],
-            }),
-            host_centrality_threshold: None,
-            minimum_clean_words: None,
-            batch_size: 10,
-            autocommit_after_num_inserts:
-                crate::config::defaults::Indexing::autocommit_after_num_inserts(),
-        })
+        crate::block_on(IndexingWorker::new(
+            IndexerConfig {
+                host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
+                page_centrality_store_path: None,
+                page_webgraph: None,
+                safety_classifier_path: None,
+                dual_encoder: Some(IndexerDualEncoderConfig {
+                    model_path: data_path.to_str().unwrap().to_string(),
+                    page_centrality_rank_threshold: None,
+                }),
+                output_path: crate::gen_temp_path().to_str().unwrap().to_string(),
+                limit_warc_files: None,
+                skip_warc_files: None,
+                warc_source: WarcSource::Local(crate::config::LocalConfig {
+                    folder: crate::gen_temp_path().to_str().unwrap().to_string(),
+                    names: vec!["".to_string()],
+                }),
+                host_centrality_threshold: None,
+                minimum_clean_words: None,
+                batch_size: 10,
+                autocommit_after_num_inserts:
+                    crate::config::defaults::Indexing::autocommit_after_num_inserts(),
+            }
+            .into(),
+        ))
     }
 
     #[test]
