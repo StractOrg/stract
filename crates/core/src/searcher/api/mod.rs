@@ -570,13 +570,23 @@ where
                 let liked: Vec<_> = host_rankings
                     .liked
                     .iter()
-                    .map(|n| webgraph::Node::from(n.clone()).into_host().id())
+                    .filter_map(|n| {
+                        Url::parse(n)
+                            .or_else(|_| Url::parse(&format!("http://{}", n)))
+                            .ok()
+                    })
+                    .map(|n| webgraph::Node::from(n).into_host().id())
                     .collect();
 
                 let disliked: Vec<_> = host_rankings
                     .disliked
                     .iter()
-                    .map(|n| webgraph::Node::from(n.clone()).into_host().id())
+                    .filter_map(|n| {
+                        Url::parse(n)
+                            .or_else(|_| Url::parse(&format!("http://{}", n)))
+                            .ok()
+                    })
+                    .map(|n| webgraph::Node::from(n).into_host().id())
                     .collect();
                 inbound_similarity::Scorer::new(webgraph, &liked, &disliked, false).await
             }

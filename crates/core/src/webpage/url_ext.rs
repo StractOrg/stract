@@ -33,6 +33,9 @@ pub trait UrlExt {
     fn parse_with_base_url(base_url: &url::Url, url: &str) -> Result<url::Url> {
         url::Url::parse(url).or_else(|_| base_url.join(url).map_err(|e| e.into()))
     }
+    fn robust_parse(url: &str) -> Result<url::Url, url::ParseError> {
+        url::Url::parse(url).or_else(|_| url::Url::parse(&format!("https://{}", url)))
+    }
     fn icann_domain(&self) -> Option<&str>;
     fn root_domain(&self) -> Option<&str>;
     fn normalized_host(&self) -> Option<&str>;

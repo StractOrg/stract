@@ -153,6 +153,7 @@ impl Node {
     }
 }
 
+#[cfg(test)]
 impl From<String> for Node {
     fn from(name: String) -> Self {
         let url = if name.contains("://") {
@@ -172,6 +173,7 @@ impl From<&Url> for Node {
     }
 }
 
+#[cfg(test)]
 impl From<&str> for Node {
     fn from(name: &str) -> Self {
         name.to_string().into()

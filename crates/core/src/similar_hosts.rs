@@ -57,7 +57,8 @@ impl SimilarHostsFinder {
 
         let nodes: Vec<_> = nodes
             .iter()
-            .map(|url| Node::from(url.to_string()).into_host())
+            .filter_map(|url| Url::robust_parse(url).ok())
+            .map(|url| Node::from(url).into_host())
             .collect();
 
         let domains = nodes

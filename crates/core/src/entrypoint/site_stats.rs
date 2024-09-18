@@ -21,6 +21,7 @@ use std::{
 };
 
 use bloom::BytesBloomFilter;
+use url::Url;
 
 use crate::{
     config::{self, SiteStatsConfig},
@@ -56,9 +57,10 @@ struct Site(String);
 struct SiteId([u8; 8]);
 
 impl SiteId {
-    fn from_url(url: String) -> Self {
-        let node_id = Node::from(url).into_host().id();
-        Self(node_id.as_u64().to_be_bytes())
+    fn from_url(url: &str) -> Result<Self> {
+        let url = Url::robust_parse(url)?;
+        let node_id = Node::from(&url).into_host().id();
+        Ok(Self(node_id.as_u64().to_be_bytes()))
     }
 }
 
@@ -126,10 +128,16 @@ impl StatsWorker {
 
         for file in warc_files.by_ref() {
             for record in file.records().flatten() {
-                if !self
-                    .site_filter
-                    .should_process(&SiteId::from_url(record.request.url.clone()))
-                {
+                let site_id = SiteId::from_url(&record.request.url);
+
+                if site_id.is_err() {
+                    tracing::error!("error parsing url: {}", site_id.err().unwrap());
+                    continue;
+                }
+
+                let site_id = site_id.unwrap();
+
+                if !self.site_filter.should_process(&site_id) {
                     continue;
                 }
 
@@ -220,7 +228,7 @@ pub fn run(config: SiteStatsConfig) -> Result<()> {
     }
 
     for handler in handlers {
-        handler.join().unwrap();
+        handler.join().ok();
     }
 
     let mut final_stats: Vec<_> = worker

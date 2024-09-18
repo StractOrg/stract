@@ -156,6 +156,10 @@ pub mod host {
 }
 
 pub mod page {
+    use url::Url;
+
+    use crate::webpage::url_ext::UrlExt;
+
     use super::*;
 
     #[derive(serde::Deserialize, IntoParams)]
@@ -175,7 +179,8 @@ pub mod page {
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<PageLinksParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        let node = Node::from(params.page);
+        let page = Url::robust_parse(&params.page).map_err(|_| StatusCode::BAD_REQUEST)?;
+        let node = Node::from(page);
         let links = ingoing_links(state, node, WebgraphGranularity::Page)
             .await
             .map_err(|_| {
@@ -197,7 +202,8 @@ pub mod page {
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<PageLinksParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        let node = Node::from(params.page);
+        let url = Url::robust_parse(&params.page).map_err(|_| StatusCode::BAD_REQUEST)?;
+        let node = Node::from(url);
         let links = outgoing_links(state, node, WebgraphGranularity::Page)
             .await
             .map_err(|_| {
