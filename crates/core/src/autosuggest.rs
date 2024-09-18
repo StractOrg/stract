@@ -16,6 +16,7 @@
 
 //! Autosuggest provides the functionality for the little dropdown that appears
 //! when you type something into the search bar and queries are suggested.
+//!
 //! It uses a finite state transducer (fst) to store popular queries
 //! and performs a prefix search on the fst to find suggestions.
 

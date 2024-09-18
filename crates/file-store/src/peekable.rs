@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
 /// An iterator that allows peeking at the next element.
+///
 /// Unlike the standard library's `Peekable`, this implementation
 /// *is not* lazy and will always consume the next element when peeking.
 /// This is useful when you want to peek at the next element without

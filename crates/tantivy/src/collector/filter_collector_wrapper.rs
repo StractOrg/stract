@@ -142,8 +142,9 @@ where
     }
 }
 
-/// A variant of the [`FilterCollector`] specialized for bytes columnar fields, i.e.
-/// it transparently wraps an inner [`Collector`] but filters documents
+/// A variant of the [`FilterCollector`] specialized for bytes columnar fields.
+///
+/// It transparently wraps an inner [`Collector`] but filters documents
 /// based on the result of applying the predicate to the bytes columnar field.
 ///
 /// A document is accepted if and only if the predicate returns `true` for at least one value.

@@ -113,7 +113,6 @@ where
     move |input: I| match f.parse(input) {
         Ok((input, (output, _err))) => Ok((input, output)),
         Err(Err::Incomplete(needed)) => Err(Err::Incomplete(needed)),
-        Err(Err::Error(val)) | Err(Err::Failure(val)) => match val {},
     }
 }
 

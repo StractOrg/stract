@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! The inverted index is the main data structure of the search engine.
+//!
 //! It is a mapping from terms to a list of documents. Imagine a hash map
 //! { term -> \[doc1, doc2, doc3\] } etc. During search, we look up the terms
 //! from the query in the index and perform an intersection of the lists of

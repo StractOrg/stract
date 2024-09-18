@@ -12,7 +12,7 @@ enum PhraseKind<TPostings: Postings> {
         postings: TPostings,
         positions: Vec<u32>,
     },
-    MultiPrefix(PhraseScorer<TPostings>),
+    MultiPrefix(Box<PhraseScorer<TPostings>>),
 }
 
 impl<TPostings: Postings> PhraseKind<TPostings> {
@@ -117,13 +117,13 @@ impl<TPostings: Postings> PhrasePrefixScorer<TPostings> {
             .unwrap();
 
         let phrase_scorer = if term_postings.len() > 1 {
-            PhraseKind::MultiPrefix(PhraseScorer::new_with_offset(
+            PhraseKind::MultiPrefix(Box::new(PhraseScorer::new_with_offset(
                 term_postings,
                 similarity_weight_opt,
                 fieldnorm_reader,
                 0,
                 1,
-            ))
+            )))
         } else {
             let (pos, postings) = term_postings
                 .pop()
