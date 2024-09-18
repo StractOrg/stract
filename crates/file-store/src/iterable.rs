@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
 //! This module contains the implementation of the `IterableStoreWriter` and `IterableStoreReader`.
+//!
 //! The iterable store is a simple format for storing a sequence of items in a file such that they
 //! can be read back in order. The format is as follows:
 //!

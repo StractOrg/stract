@@ -110,10 +110,11 @@ where
     F: nom::Parser<I, (O, ErrorList), Infallible>,
 {
     use nom::Err;
+    #[allow(unreachable_patterns)]
     move |input: I| match f.parse(input) {
         Ok((input, (output, _err))) => Ok((input, output)),
         Err(Err::Incomplete(needed)) => Err(Err::Incomplete(needed)),
-        Err(Err::Error(val)) | Err(Err::Failure(val)) => match val {},
+        Err(Err::Error(_)) | Err(Err::Failure(_)) => unreachable!(),
     }
 }
 

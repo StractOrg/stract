@@ -302,6 +302,7 @@ where
 }
 
 /// ValueBytes represents a serialized value.
+///
 /// The value can be of any type of [`Type`] (e.g. string, u64, f64, bool, date, JSON).
 /// The serialized representation matches the lexographical order of the type.
 ///
