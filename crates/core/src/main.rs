@@ -262,11 +262,6 @@ enum IndexingOptions {
         output_path: String,
     },
 
-    /// Create the feed index. Used to find feeds to put into the live index.
-    Feed {
-        config_path: String,
-    },
-
     // Create an index of canonical urls.
     Canonical {
         config_path: String,
@@ -308,10 +303,6 @@ fn main() -> Result<()> {
                 wikipedia_dump_path,
                 output_path,
             } => entrypoint::EntityIndexer::run(wikipedia_dump_path, output_path)?,
-            IndexingOptions::Feed { config_path } => {
-                let config = load_toml_config(config_path);
-                entrypoint::feed_indexer::build(config)?;
-            }
             IndexingOptions::MergeSearch { paths } => {
                 let pointers = paths
                     .into_iter()

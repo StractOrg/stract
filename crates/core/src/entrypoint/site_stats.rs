@@ -25,6 +25,7 @@ use bloom::BytesBloomFilter;
 use crate::{
     config::{self, SiteStatsConfig},
     entrypoint::download_all_warc_files,
+    feed::Feed,
     webgraph::Node,
     webpage::{url_ext::UrlExt, Html},
     Result,
@@ -35,13 +36,15 @@ pub struct SiteStats {
     pages: u64,
     blogposts: u64,
     news_articles: u64,
+    feeds: HashSet<Feed>,
 }
 
 impl AddAssign<SiteStats> for SiteStats {
     fn add_assign(&mut self, rhs: SiteStats) {
         self.pages += rhs.pages;
         self.blogposts += rhs.blogposts;
-        self.news_articles += rhs.news_articles
+        self.news_articles += rhs.news_articles;
+        self.feeds.extend(rhs.feeds);
     }
 }
 
@@ -139,10 +142,15 @@ impl StatsWorker {
                 };
 
                 let mut stats = SiteStats {
+                    feeds: HashSet::new(),
                     pages: 1,
                     blogposts: 0,
                     news_articles: 0,
                 };
+
+                if let Ok(feeds) = webpage.feeds() {
+                    stats.feeds.extend(feeds);
+                }
 
                 for schema in webpage.schema_org() {
                     if schema.types_contains("NewsArticle") {

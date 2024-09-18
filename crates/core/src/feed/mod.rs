@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use url::Url;
 
-pub mod index;
 mod parser;
-pub mod scheduler;
 
 pub use parser::parse;
 
@@ -37,6 +37,20 @@ pub use parser::parse;
 pub enum FeedKind {
     Atom,
     Rss,
+}
+
+impl FromStr for FeedKind {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "application/atom" => Ok(Self::Atom),
+            "application/atom+xml" => Ok(Self::Atom),
+            "application/rss" => Ok(Self::Rss),
+            "application/rss+xml" => Ok(Self::Rss),
+            s => anyhow::bail!("Unknown feed kind: {s}"),
+        }
+    }
 }
 
 #[derive(

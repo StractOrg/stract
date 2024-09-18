@@ -16,7 +16,7 @@
 
 mod downloaded_db;
 
-use crate::Result;
+use crate::{entrypoint::indexer::IndexableWebpage, Result};
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -61,6 +61,10 @@ impl Crawler {
             _config: config,
             client,
         })
+    }
+
+    async fn send_to_indexer(&self, pages: Vec<IndexableWebpage>) {
+        todo!()
     }
 
     async fn process_urls(&self, _urls: Vec<Url>) -> Result<bool> {

@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -31,6 +31,7 @@ use super::url_ext::UrlExt;
 
 pub use fn_cache::FnCache;
 
+mod feeds;
 mod fn_cache;
 mod into_tantivy;
 pub mod links;

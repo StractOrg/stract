@@ -513,22 +513,6 @@ pub struct LiveIndexConfig {
     pub snippet: SnippetConfig,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
-pub struct LiveIndexSchedulerConfig {
-    pub schedule_path: String,
-    pub feed_index_path: String,
-    pub host_centrality_store_path: String,
-    pub host_graph_path: String,
-    pub num_splits: u64,
-}
-#[derive(Debug, serde::Deserialize, Clone)]
-pub struct FeedIndexingConfig {
-    pub output_path: String,
-    pub warc_source: WarcSource,
-    pub limit_warc_files: Option<usize>,
-    pub skip_warc_files: Option<usize>,
-}
-
 #[derive(Debug, serde::Deserialize, Clone)]
 pub struct WebSpellConfig {
     pub output_path: String,
