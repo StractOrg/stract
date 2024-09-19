@@ -14,11 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
+use dashmap::DashMap;
 use redb::ReadableTable;
 use url::Url;
 
-use crate::Result;
-use std::{path::Path, time::Duration};
+use crate::{webpage::url_ext::UrlExt, Result};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use crate::live_index::TTL;
 
@@ -232,7 +237,7 @@ impl InnerDb {
         self.truncate(TTL)
     }
 
-    pub fn insert(&mut self, url: &Url) -> Result<()> {
+    fn insert(&mut self, url: &Url) -> Result<()> {
         {
             let key = TruncatedUrl::new(url);
             let txn = self.db.begin_write()?;
@@ -280,6 +285,71 @@ impl DownloadedDb {
     }
 }
 
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+struct ShardedHost(String);
+
+impl ShardedHost {
+    fn from_url(url: &Url) -> Option<Self> {
+        let host = url.normalized_host()?;
+        let hash = md5::compute(host);
+        let hash = format!("{:x}", hash).chars().take(2).collect();
+
+        Some(Self(hash))
+    }
+}
+
+pub struct ShardedDownloadedDb {
+    inner: Arc<DashMap<ShardedHost, DownloadedDb>>,
+    folder: PathBuf,
+}
+
+impl ShardedDownloadedDb {
+    pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
+        if !folder.as_ref().exists() {
+            std::fs::create_dir_all(folder.as_ref())?;
+        }
+
+        let inner = Arc::new(
+            std::fs::read_dir(&folder)?
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
+                .filter_map(|entry| {
+                    let path = entry.path();
+                    let shard = ShardedHost(path.file_name()?.to_str()?.to_string());
+                    let db = DownloadedDb::open(path).ok()?;
+                    Some((shard, db))
+                })
+                .collect::<DashMap<ShardedHost, DownloadedDb>>(),
+        );
+
+        Ok(Self {
+            folder: folder.as_ref().to_path_buf(),
+            inner,
+        })
+    }
+
+    pub fn has_downloaded(&self, url: &Url) -> Result<bool> {
+        let shard =
+            ShardedHost::from_url(url).ok_or(anyhow::anyhow!("Failed to get shard from url"))?;
+        match self.inner.get(&shard) {
+            Some(db) => db.has_downloaded(url),
+            None => Ok(false),
+        }
+    }
+
+    pub fn insert(&self, url: &Url) -> Result<()> {
+        let shard =
+            ShardedHost::from_url(url).ok_or(anyhow::anyhow!("Failed to get shard from url"))?;
+
+        let db = self.inner.entry(shard.clone()).or_insert_with(|| {
+            let path = self.folder.join(shard.0);
+            DownloadedDb::open(path).unwrap()
+        });
+
+        db.insert(url)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -309,6 +379,26 @@ mod tests {
 
         db.inner.lock().unwrap().truncate(ttl).unwrap();
 
+        assert!(!db.has_downloaded(&url).unwrap());
+    }
+
+    #[test]
+    fn test_sharded_downloaded_db() {
+        let db = ShardedDownloadedDb::open(crate::gen_temp_path()).unwrap();
+
+        let url = Url::parse("https://example.com").unwrap();
+        assert!(!db.has_downloaded(&url).unwrap());
+
+        db.insert(&url).unwrap();
+        assert!(db.has_downloaded(&url).unwrap());
+
+        let url = Url::parse("https://example.com/foo").unwrap();
+        assert!(!db.has_downloaded(&url).unwrap());
+
+        db.insert(&url).unwrap();
+        assert!(db.has_downloaded(&url).unwrap());
+
+        let url = Url::parse("https://another_example.com/bar").unwrap();
         assert!(!db.has_downloaded(&url).unwrap());
     }
 }
