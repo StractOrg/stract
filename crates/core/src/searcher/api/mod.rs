@@ -41,7 +41,7 @@ use crate::ranking::{
 };
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::web_spell::SpellChecker;
-use crate::webgraph::remote::RemoteWebgraph;
+use crate::webgraph::remote::{RemoteWebgraph, WebgraphGranularity};
 use crate::webgraph::EdgeLimit;
 use crate::widgets::{Widget, Widgets};
 use crate::{
@@ -177,7 +177,7 @@ pub trait Graph {
     ) -> impl Future<Output = Vec<Vec<webgraph::Edge<()>>>>;
 }
 
-impl Graph for RemoteWebgraph {
+impl<G: WebgraphGranularity> Graph for RemoteWebgraph<G> {
     async fn batch_raw_ingoing(
         &self,
         nodes: &[webgraph::NodeID],

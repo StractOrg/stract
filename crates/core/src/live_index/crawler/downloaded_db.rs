@@ -263,7 +263,7 @@ impl InnerDb {
     }
 }
 
-pub struct DownloadedDb {
+struct DownloadedDb {
     inner: std::sync::Mutex<InnerDb>,
 }
 

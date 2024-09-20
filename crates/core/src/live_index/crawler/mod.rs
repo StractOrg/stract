@@ -15,3 +15,103 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
 mod downloaded_db;
+
+use std::sync::Arc;
+use std::time::Duration;
+
+use crate::ampc::dht::ShardId;
+use crate::distributed::sonic::replication::{
+    AllShardsSelector, RandomReplicaSelector, RandomShardSelector, ShardedClient,
+};
+use crate::entrypoint::search_server;
+use crate::Result;
+use crate::{
+    distributed::sonic::replication::ReusableShardedClient,
+    entrypoint::{indexer::IndexableWebpage, live_index},
+};
+use downloaded_db::ShardedDownloadedDb;
+use tokio::sync::Mutex;
+use url::Url;
+
+const SITE_URL_BATCH_SIZE: usize = 100;
+const DEFAULT_CONSISTENCY_FRACTION: f64 = 0.5;
+
+struct Client {
+    live_index: Mutex<ReusableShardedClient<live_index::LiveIndexService>>,
+    search: Mutex<ReusableShardedClient<search_server::SearchService>>,
+}
+
+impl Client {
+    pub async fn new() -> Result<Self> {
+        todo!()
+    }
+
+    async fn live_conn(&self) -> Arc<ShardedClient<live_index::LiveIndexService, ShardId>> {
+        self.live_index.lock().await.conn().await
+    }
+
+    async fn search_conn(&self) -> Arc<ShardedClient<search_server::SearchService, ShardId>> {
+        self.search.lock().await.conn().await
+    }
+
+    pub async fn index(&self, pages: Vec<IndexableWebpage>) -> Result<()> {
+        let conn = self.live_conn().await;
+        let req = live_index::IndexWebpages {
+            pages,
+            consistency_fraction: Some(DEFAULT_CONSISTENCY_FRACTION),
+        };
+
+        while let Err(e) = conn
+            .send(req.clone(), &RandomShardSelector, &RandomReplicaSelector)
+            .await
+        {
+            tracing::error!("Failed to index webpages: {e}");
+            tokio::time::sleep(Duration::from_millis(1_000)).await;
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_site_urls(&self, site: &str) -> Result<Vec<Url>> {
+        let mut res = Vec::new();
+        let conn = self.search_conn().await;
+        let mut offset = 0;
+
+        while let Ok(resp) = conn
+            .send(
+                search_server::GetSiteUrls {
+                    site: site.to_string(),
+                    offset,
+                    limit: SITE_URL_BATCH_SIZE,
+                },
+                &AllShardsSelector,
+                &RandomReplicaSelector,
+            )
+            .await
+        {
+            let urls: Vec<_> = resp
+                .into_iter()
+                .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v.urls))
+                .collect();
+
+            if urls.is_empty() {
+                break;
+            }
+
+            res.extend(urls);
+            offset += SITE_URL_BATCH_SIZE;
+        }
+
+        Ok(res)
+    }
+}
+
+pub struct Crawler {
+    db: ShardedDownloadedDb,
+}
+
+impl Crawler {
+    pub async fn new() -> Result<Self> {
+        todo!()
+    }
+}

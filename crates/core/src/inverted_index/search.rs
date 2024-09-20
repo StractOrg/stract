@@ -39,6 +39,7 @@ use crate::snippet;
 use crate::snippet::TextSnippet;
 use crate::webgraph::NodeID;
 
+use crate::schema::text_field::TextField;
 use crate::webpage::url_ext::UrlExt;
 use crate::Result;
 
@@ -186,8 +187,7 @@ impl InvertedIndex {
         let tv_searcher = self.reader.searcher();
         let mut webpages: Vec<RetrievedWebpage> = websites
             .iter()
-            .map(|website| self.retrieve_doc(website.address, &tv_searcher))
-            .filter_map(|res| res.ok())
+            .filter_map(|website| self.retrieve_doc(website.address, &tv_searcher).ok())
             .collect();
 
         for (url, page) in webpages.iter_mut().filter_map(|page| {
@@ -309,5 +309,31 @@ impl InvertedIndex {
 
     pub(crate) fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
         KeyPhrase::compute_top(&self.reader, top_n)
+    }
+
+    pub(crate) fn get_site_urls(&self, site: &str, offset: usize, limit: usize) -> Vec<Url> {
+        let ctx = self.local_search_ctx();
+        let tv_searcher = ctx.tv_searcher;
+
+        let field = tv_searcher
+            .schema()
+            .get_field(text_field::SiteNoTokenizer.name())
+            .unwrap();
+
+        let term = tantivy::Term::from_field_text(field, site);
+
+        let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
+
+        match tv_searcher.search(
+            &query,
+            &tantivy::collector::TopDocs::with_limit(limit).and_offset(offset),
+        ) {
+            Ok(res) => res
+                .into_iter()
+                .filter_map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).ok())
+                .filter_map(|page| Url::parse(&page.url).ok())
+                .collect(),
+            Err(_) => vec![],
+        }
     }
 }

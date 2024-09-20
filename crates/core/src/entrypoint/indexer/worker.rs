@@ -24,10 +24,10 @@ use tracing::debug;
 pub use super::indexable_webpage::IndexableWebpage;
 pub use super::job::{Job, JobSettings};
 use crate::backlink_grouper::BacklinkGrouper;
-use crate::config::{GossipConfig, IndexerConfig, IndexerDualEncoderConfig, WebgraphGranularity};
+use crate::config::{GossipConfig, IndexerConfig, IndexerDualEncoderConfig};
 use crate::distributed::cluster::Cluster;
 use crate::models::dual_encoder::DualEncoder as DualEncoderModel;
-use crate::webgraph::remote::RemoteWebgraph;
+use crate::webgraph::remote::{Page, RemoteWebgraph};
 use crate::Result;
 
 use crate::index::Index;
@@ -81,7 +81,7 @@ struct DualEncoder {
 }
 
 pub(super) enum Webgraph {
-    Remote(RemoteWebgraph),
+    Remote(RemoteWebgraph<Page>),
     Local(webgraph::Webgraph),
 }
 
@@ -152,10 +152,10 @@ impl Webgraph {
             ),
             IndexerGraphConfig::Remote { gossip } => {
                 let cluster = crate::start_gossip_cluster_thread(gossip.clone(), None);
-                Self::Remote(RemoteWebgraph::new(cluster, WebgraphGranularity::Page).await)
+                Self::Remote(RemoteWebgraph::new(cluster).await)
             }
             IndexerGraphConfig::Existing { cluster } => {
-                Self::Remote(RemoteWebgraph::new(cluster.clone(), WebgraphGranularity::Page).await)
+                Self::Remote(RemoteWebgraph::new(cluster.clone()).await)
             }
         }
     }

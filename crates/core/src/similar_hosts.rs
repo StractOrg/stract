@@ -22,7 +22,10 @@ use url::Url;
 
 use crate::{
     ranking::{bitvec_similarity, inbound_similarity},
-    webgraph::{remote::RemoteWebgraph, EdgeLimit, Node, NodeID},
+    webgraph::{
+        remote::{RemoteWebgraph, WebgraphGranularity},
+        EdgeLimit, Node, NodeID,
+    },
     webpage::url_ext::UrlExt,
     SortableFloat,
 };
@@ -33,13 +36,13 @@ pub struct ScoredNode {
     pub score: f64,
 }
 
-pub struct SimilarHostsFinder {
-    webgraph: Arc<RemoteWebgraph>,
+pub struct SimilarHostsFinder<G: WebgraphGranularity> {
+    webgraph: Arc<RemoteWebgraph<G>>,
     max_similar_hosts: usize,
 }
 
-impl SimilarHostsFinder {
-    pub fn new(webgraph: Arc<RemoteWebgraph>, max_similar_hosts: usize) -> Self {
+impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
+    pub fn new(webgraph: Arc<RemoteWebgraph<G>>, max_similar_hosts: usize) -> Self {
         Self {
             webgraph,
             max_similar_hosts,

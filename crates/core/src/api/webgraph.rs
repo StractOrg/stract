@@ -220,12 +220,20 @@ async fn ingoing_links(
     node: Node,
     level: WebgraphGranularity,
 ) -> anyhow::Result<Vec<FullEdge>> {
-    let graph = match level {
-        WebgraphGranularity::Host => &state.host_webgraph,
-        WebgraphGranularity::Page => &state.page_webgraph,
-    };
-
-    graph.ingoing_edges(node, EdgeLimit::Limit(1024)).await
+    match level {
+        WebgraphGranularity::Host => {
+            state
+                .host_webgraph
+                .ingoing_edges(node, EdgeLimit::Limit(1024))
+                .await
+        }
+        WebgraphGranularity::Page => {
+            state
+                .page_webgraph
+                .ingoing_edges(node, EdgeLimit::Limit(1024))
+                .await
+        }
+    }
 }
 
 async fn outgoing_links(
@@ -233,12 +241,20 @@ async fn outgoing_links(
     node: Node,
     level: WebgraphGranularity,
 ) -> anyhow::Result<Vec<FullEdge>> {
-    let graph = match level {
-        WebgraphGranularity::Host => &state.host_webgraph,
-        WebgraphGranularity::Page => &state.page_webgraph,
-    };
-
-    graph.outgoing_edges(node, EdgeLimit::Limit(1024)).await
+    match level {
+        WebgraphGranularity::Host => {
+            state
+                .host_webgraph
+                .outgoing_edges(node, EdgeLimit::Limit(1024))
+                .await
+        }
+        WebgraphGranularity::Page => {
+            state
+                .page_webgraph
+                .outgoing_edges(node, EdgeLimit::Limit(1024))
+                .await
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema)]
