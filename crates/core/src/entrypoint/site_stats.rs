@@ -52,6 +52,48 @@ impl AddAssign<SiteStats> for SiteStats {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct FinalStats {
+    pages: u64,
+    blogposts: u64,
+    news_articles: u64,
+    feeds: Vec<FeedCount>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+struct FeedCount {
+    feed: Feed,
+    count: u64,
+}
+
+impl From<(Feed, u64)> for FeedCount {
+    fn from((feed, count): (Feed, u64)) -> Self {
+        Self { feed, count }
+    }
+}
+
+impl From<SiteStats> for FinalStats {
+    fn from(stats: SiteStats) -> Self {
+        Self {
+            pages: stats.pages,
+            blogposts: stats.blogposts,
+            news_articles: stats.news_articles,
+            feeds: stats
+                .feeds
+                .into_iter()
+                .map(|(feed, count)| FeedCount::from((feed, count)))
+                .collect(),
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+struct FinalSiteStats {
+    site: Site,
+    #[serde(flatten)]
+    stats: FinalStats,
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 #[serde(transparent)]
 struct Site(String);
@@ -81,13 +123,6 @@ impl AsRef<[u8]> for SiteId {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
     }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-struct FinalSiteStats {
-    site: Site,
-    #[serde(flatten)]
-    stats: SiteStats,
 }
 
 struct SiteFilter {
@@ -248,8 +283,18 @@ pub fn run(config: SiteStatsConfig) -> Result<()> {
         .unwrap()
         .clone()
         .into_iter()
-        .map(|(site, stats)| FinalSiteStats { site, stats })
+        .map(|(site, stats)| FinalSiteStats {
+            site,
+            stats: stats.into(),
+        })
         .collect();
+
+    final_stats.iter_mut().for_each(|site_stats| {
+        site_stats
+            .stats
+            .feeds
+            .retain(|feed_count| feed_count.count > 1);
+    });
 
     final_stats.sort_by(|a, b| b.stats.pages.cmp(&a.stats.pages));
 
