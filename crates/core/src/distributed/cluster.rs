@@ -92,7 +92,6 @@ impl Cluster {
     }
 
     pub async fn join_as_spectator(
-        cluster_id: String,
         gossip_addr: SocketAddr,
         seed_addrs: Vec<SocketAddr>,
     ) -> Result<Self> {
@@ -104,7 +103,7 @@ impl Cluster {
         let uuid = uuid::Uuid::new_v4().to_string();
 
         let node_id = NodeId {
-            id: format!("{}_{}", cluster_id, uuid),
+            id: format!("{}_{}", CLUSTER_ID, uuid),
             gossip_public_address: gossip_addr,
         };
         let config = ChitchatConfig {

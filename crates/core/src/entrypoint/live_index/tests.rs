@@ -79,7 +79,6 @@ impl RemoteIndex {
             safety_classifier_path: None,
             host_centrality_threshold: None,
             minimum_clean_words: None,
-            cluster_id: "test-cluster".to_string(),
             gossip_seed_nodes: gossip_seed,
             gossip_addr,
             shard_id: shard,
@@ -186,19 +185,12 @@ impl RemoteIndex {
     }
 }
 
-const CLUSTER_ID: &str = "test-cluster";
-
 #[tokio::test]
 async fn test_shard_without_replica() -> Result<()> {
     let shard1 = RemoteIndex::start(ShardId::new(1), vec![]).await?;
     let shard2 = RemoteIndex::start(ShardId::new(2), vec![shard1.gossip_addr]).await?;
 
-    let cluster = Cluster::join_as_spectator(
-        CLUSTER_ID.to_string(),
-        free_socket_addr(),
-        vec![shard1.gossip_addr],
-    )
-    .await?;
+    let cluster = Cluster::join_as_spectator(free_socket_addr(), vec![shard1.gossip_addr]).await?;
 
     shard1.await_ready(&cluster).await;
     shard2.await_ready(&cluster).await;
@@ -252,12 +244,7 @@ async fn test_replica_no_fails() -> Result<()> {
     let rep1 = RemoteIndex::start(ShardId::new(1), vec![]).await?;
     let rep2 = RemoteIndex::start(ShardId::new(1), vec![rep1.gossip_addr]).await?;
 
-    let cluster = Cluster::join_as_spectator(
-        CLUSTER_ID.to_string(),
-        free_socket_addr(),
-        vec![rep1.gossip_addr],
-    )
-    .await?;
+    let cluster = Cluster::join_as_spectator(free_socket_addr(), vec![rep1.gossip_addr]).await?;
 
     rep1.await_ready(&cluster).await;
     rep2.await_ready(&cluster).await;
@@ -306,12 +293,7 @@ async fn test_replica_no_fails() -> Result<()> {
 async fn test_replica_setup_after_inserts() -> Result<()> {
     let rep1 = RemoteIndex::start(ShardId::new(1), vec![]).await?;
 
-    let cluster = Cluster::join_as_spectator(
-        CLUSTER_ID.to_string(),
-        free_socket_addr(),
-        vec![rep1.gossip_addr],
-    )
-    .await?;
+    let cluster = Cluster::join_as_spectator(free_socket_addr(), vec![rep1.gossip_addr]).await?;
 
     rep1.await_ready(&cluster).await;
 
@@ -364,12 +346,7 @@ async fn test_replica_recovery() -> Result<()> {
     let rep1 = RemoteIndex::start(ShardId::new(1), vec![]).await?;
     let rep2 = RemoteIndex::start(ShardId::new(1), vec![rep1.gossip_addr]).await?;
 
-    let cluster = Cluster::join_as_spectator(
-        CLUSTER_ID.to_string(),
-        free_socket_addr(),
-        vec![rep1.gossip_addr],
-    )
-    .await?;
+    let cluster = Cluster::join_as_spectator(free_socket_addr(), vec![rep1.gossip_addr]).await?;
 
     rep1.await_ready(&cluster).await;
     rep2.await_ready(&cluster).await;

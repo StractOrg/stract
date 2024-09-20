@@ -144,10 +144,7 @@ struct ClusterInfo {
 
 async fn setup_gossip(config: HarmonicCoordinatorConfig) -> Result<ClusterInfo> {
     let handle = Cluster::join(
-        Member {
-            id: config.gossip.cluster_id,
-            service: Service::HarmonicCoordinator { host: config.host },
-        },
+        Member::new(Service::HarmonicCoordinator { host: config.host }),
         config.gossip.addr,
         config.gossip.seed_nodes.unwrap_or_default(),
     )

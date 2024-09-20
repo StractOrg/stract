@@ -162,10 +162,7 @@ struct ClusterInfo {
 
 async fn setup_gossip(config: ApproxHarmonicCoordinatorConfig) -> Result<ClusterInfo> {
     let handle = Cluster::join(
-        Member {
-            id: config.gossip.cluster_id,
-            service: Service::ApproxHarmonicCoordinator { host: config.host },
-        },
+        Member::new(Service::ApproxHarmonicCoordinator { host: config.host }),
         config.gossip.addr,
         config.gossip.seed_nodes.unwrap_or_default(),
     )

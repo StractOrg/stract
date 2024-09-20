@@ -230,7 +230,6 @@ pub struct ApiConfig {
     pub dual_encoder_model_path: Option<String>,
     pub bangs_path: Option<String>,
     pub query_store_db_host: Option<String>,
-    pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
 
@@ -299,7 +298,6 @@ impl Default for SnippetConfig {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct SearchServerConfig {
-    pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
     pub shard: ShardId,
@@ -317,7 +315,6 @@ pub struct SearchServerConfig {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct EntitySearchServerConfig {
-    pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
     pub index_path: String,
@@ -415,7 +412,6 @@ pub struct WebgraphServerConfig {
     pub graph_path: String,
     pub granularity: WebgraphGranularity,
 
-    pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
 }
@@ -499,7 +495,6 @@ pub struct LiveIndexConfig {
     pub minimum_clean_words: Option<usize>,
 
     // search
-    pub cluster_id: String,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
     pub shard_id: ShardId,
@@ -561,7 +556,6 @@ impl Default for CorrectionConfig {
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct GossipConfig {
-    pub cluster_id: String,
     pub seed_nodes: Option<Vec<SocketAddr>>,
     pub addr: SocketAddr,
 }

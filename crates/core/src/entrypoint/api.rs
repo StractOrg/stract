@@ -90,10 +90,7 @@ fn counters(registry: &mut crate::metrics::PrometheusRegistry) -> Result<Counter
 
 async fn cluster(config: &config::ApiConfig) -> Result<Cluster> {
     Cluster::join(
-        Member {
-            id: config.cluster_id.clone(),
-            service: Service::Api { host: config.host },
-        },
+        Member::new(Service::Api { host: config.host }),
         config.gossip_addr,
         config.gossip_seed_nodes.clone().unwrap_or_default(),
     )

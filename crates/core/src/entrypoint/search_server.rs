@@ -74,13 +74,10 @@ impl SearchService {
         local_searcher.set_snippet_config(config.snippet);
 
         let cluster_handle = Cluster::join(
-            Member {
-                id: config.cluster_id,
-                service: Service::Searcher {
-                    host: config.host,
-                    shard: config.shard,
-                },
-            },
+            Member::new(Service::Searcher {
+                host: config.host,
+                shard: config.shard,
+            }),
             config.gossip_addr,
             config.gossip_seed_nodes.unwrap_or_default(),
         )

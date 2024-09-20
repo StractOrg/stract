@@ -179,3 +179,10 @@ pub struct Member {
     pub id: String,
     pub service: Service,
 }
+
+impl Member {
+    pub fn new(service: Service) -> Self {
+        let id = uuid::Uuid::new_v4().to_string();
+        Self { id, service }
+    }
+}

@@ -181,14 +181,11 @@ impl LiveIndexService {
     async fn new(config: LiveIndexConfig) -> Result<Self> {
         let cluster_handle = Arc::new(
             Cluster::join(
-                Member {
-                    id: config.cluster_id.clone(),
-                    service: Service::LiveIndex {
-                        host: config.host,
-                        shard: config.shard_id,
-                        state: crate::distributed::member::LiveIndexState::InSetup,
-                    },
-                },
+                Member::new(Service::LiveIndex {
+                    host: config.host,
+                    shard: config.shard_id,
+                    state: crate::distributed::member::LiveIndexState::InSetup,
+                }),
                 config.gossip_addr,
                 config.gossip_seed_nodes.clone().unwrap_or_default(),
             )

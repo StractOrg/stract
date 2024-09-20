@@ -145,22 +145,17 @@ pub fn start_gossip_cluster_thread(config: GossipConfig, service: Option<Service
         rt.block_on(async {
             let cluster = match service {
                 Some(service) => Cluster::join(
-                    Member {
-                        id: config.cluster_id,
-                        service,
-                    },
+                    Member::new(service),
                     config.addr,
                     config.seed_nodes.unwrap_or_default(),
                 )
                 .await
                 .unwrap(),
-                None => Cluster::join_as_spectator(
-                    config.cluster_id,
-                    config.addr,
-                    config.seed_nodes.unwrap_or_default(),
-                )
-                .await
-                .unwrap(),
+                None => {
+                    Cluster::join_as_spectator(config.addr, config.seed_nodes.unwrap_or_default())
+                        .await
+                        .unwrap()
+                }
             };
 
             let cluster = Arc::new(cluster);

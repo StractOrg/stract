@@ -113,13 +113,10 @@ pub async fn run<C: Into<Config>>(config: C) -> Result<()> {
     let _cluster_handle = match config.gossip {
         Some(gossip) => Some(
             Cluster::join(
-                Member {
-                    id: gossip.cluster_id,
-                    service: Service::Dht {
-                        host: config.host,
-                        shard: config.shard,
-                    },
-                },
+                Member::new(Service::Dht {
+                    host: config.host,
+                    shard: config.shard,
+                }),
                 gossip.addr,
                 gossip.seed_nodes.unwrap_or_default(),
             )

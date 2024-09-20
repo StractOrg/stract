@@ -20,6 +20,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::ampc::dht::ShardId;
+use crate::config::GossipConfig;
+use crate::distributed::cluster::Cluster;
 use crate::distributed::sonic::replication::{
     AllShardsSelector, RandomReplicaSelector, RandomShardSelector, ShardedClient,
 };
@@ -106,12 +108,24 @@ impl Client {
     }
 }
 
+struct LiveCrawlerConfig {
+    gossip: GossipConfig,
+}
+
 pub struct Crawler {
     db: ShardedDownloadedDb,
 }
 
 impl Crawler {
-    pub async fn new() -> Result<Self> {
+    pub async fn new(config: LiveCrawlerConfig) -> Result<Self> {
+        let cluster = Arc::new(
+            Cluster::join_as_spectator(
+                config.gossip.addr,
+                config.gossip.seed_nodes.unwrap_or_default(),
+            )
+            .await?,
+        );
+
         todo!()
     }
 }
