@@ -37,7 +37,7 @@ pub struct SiteStats {
     pages: u64,
     blogposts: u64,
     news_articles: u64,
-    feeds: HashSet<Feed>,
+    feeds: HashMap<Feed, u64>,
 }
 
 impl AddAssign<SiteStats> for SiteStats {
@@ -45,13 +45,26 @@ impl AddAssign<SiteStats> for SiteStats {
         self.pages += rhs.pages;
         self.blogposts += rhs.blogposts;
         self.news_articles += rhs.news_articles;
-        self.feeds.extend(rhs.feeds);
+
+        for (feed, count) in rhs.feeds {
+            *self.feeds.entry(feed).or_default() += count;
+        }
     }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 #[serde(transparent)]
 struct Site(String);
+
+impl Site {
+    fn from_url(url: &str) -> Result<Self> {
+        let url = Url::robust_parse(url)?;
+        let root_domain = url
+            .root_domain()
+            .ok_or(anyhow::anyhow!("Failed to get root domain from url"))?;
+        Ok(Self(root_domain.to_string()))
+    }
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct SiteId([u8; 8]);
@@ -150,14 +163,16 @@ impl StatsWorker {
                 };
 
                 let mut stats = SiteStats {
-                    feeds: HashSet::new(),
+                    feeds: HashMap::new(),
                     pages: 1,
                     blogposts: 0,
                     news_articles: 0,
                 };
 
                 if let Ok(feeds) = webpage.feeds() {
-                    stats.feeds.extend(feeds);
+                    for feed in feeds {
+                        *stats.feeds.entry(feed).or_default() += 1;
+                    }
                 }
 
                 for schema in webpage.schema_org() {
@@ -169,11 +184,7 @@ impl StatsWorker {
                         stats.blogposts = 1;
                     }
                 }
-                if let Some(site) = webpage
-                    .url()
-                    .root_domain()
-                    .map(|site| Site(site.to_string()))
-                {
+                if let Ok(site) = Site::from_url(&record.request.url) {
                     *self.stats.lock().unwrap().entry(site).or_default() += stats;
                 }
             }
