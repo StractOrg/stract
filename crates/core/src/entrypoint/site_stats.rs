@@ -32,6 +32,9 @@ use crate::{
     Result,
 };
 
+const TOP_FEEDS_PER_SITE: Option<usize> = Some(10);
+const MIN_FEED_COUNT: u64 = 1;
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Default)]
 pub struct SiteStats {
     pages: u64,
@@ -54,16 +57,22 @@ impl AddAssign<SiteStats> for SiteStats {
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct FinalStats {
-    pages: u64,
-    blogposts: u64,
-    news_articles: u64,
-    feeds: Vec<FeedCount>,
+    pub pages: u64,
+    pub blogposts: u64,
+    pub news_articles: u64,
+    pub feeds: Vec<FeedCount>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-struct FeedCount {
+pub struct FeedCount {
     feed: Feed,
     count: u64,
+}
+
+impl From<FeedCount> for Feed {
+    fn from(feed_count: FeedCount) -> Self {
+        feed_count.feed
+    }
 }
 
 impl From<(Feed, u64)> for FeedCount {
@@ -88,15 +97,25 @@ impl From<SiteStats> for FinalStats {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-struct FinalSiteStats {
+pub struct FinalSiteStats {
     site: Site,
     #[serde(flatten)]
     stats: FinalStats,
 }
 
+impl FinalSiteStats {
+    pub fn site(&self) -> &Site {
+        &self.site
+    }
+
+    pub fn stats(&self) -> &FinalStats {
+        &self.stats
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 #[serde(transparent)]
-struct Site(String);
+pub struct Site(String);
 
 impl Site {
     fn from_url(url: &str) -> Result<Self> {
@@ -105,6 +124,10 @@ impl Site {
             .root_domain()
             .ok_or(anyhow::anyhow!("Failed to get root domain from url"))?;
         Ok(Self(root_domain.to_string()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -205,8 +228,12 @@ impl StatsWorker {
                 };
 
                 if let Ok(feeds) = webpage.feeds() {
+                    let root_domain = webpage.url().root_domain();
+
                     for feed in feeds {
-                        *stats.feeds.entry(feed).or_default() += 1;
+                        if feed.url.root_domain() == root_domain {
+                            *stats.feeds.entry(feed).or_default() += 1;
+                        }
                     }
                 }
 
@@ -293,7 +320,13 @@ pub fn run(config: SiteStatsConfig) -> Result<()> {
         site_stats
             .stats
             .feeds
-            .retain(|feed_count| feed_count.count > 1);
+            .retain(|feed_count| feed_count.count > MIN_FEED_COUNT);
+
+        site_stats.stats.feeds.sort_by(|a, b| b.count.cmp(&a.count));
+
+        if let Some(top_feeds) = TOP_FEEDS_PER_SITE {
+            site_stats.stats.feeds.truncate(top_feeds);
+        }
     });
 
     final_stats.sort_by(|a, b| b.stats.pages.cmp(&a.stats.pages));

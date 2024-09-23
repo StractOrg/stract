@@ -15,8 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
-
 use crate::config::{CrawlerConfig, LiveIndexConfig};
 
 pub use self::index::LiveIndex;
@@ -33,12 +31,6 @@ const COMPACT_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
 const AUTO_COMMIT_INTERVAL: Duration = Duration::from_secs(60 * 5); // 5 minutes
 const EVENT_LOOP_INTERVAL: Duration = Duration::from_secs(5);
 const BATCH_SIZE: usize = 512;
-
-#[derive(Debug, Clone)]
-struct Feeds {
-    last_checked: DateTime<Utc>,
-    feeds: Vec<Feeds>,
-}
 
 impl From<&LiveIndexConfig> for CrawlerConfig {
     fn from(live: &LiveIndexConfig) -> Self {
