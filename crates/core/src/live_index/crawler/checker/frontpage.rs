@@ -17,6 +17,7 @@
 use url::Url;
 
 use crate::config::CheckIntervals;
+use crate::webpage::Html;
 use crate::Result;
 use crate::{entrypoint::site_stats, webpage::url_ext::UrlExt};
 
@@ -42,7 +43,20 @@ impl Frontpage {
 
 impl Checker for Frontpage {
     async fn get_urls(&mut self) -> Result<Vec<CrawlableUrl>> {
-        todo!()
+        let res = self.client.get(self.url.clone()).send().await?;
+        let body = res.text().await?;
+
+        let page = Html::parse(&body, &self.url.to_string())?;
+
+        let urls = page
+            .anchor_links()
+            .into_iter()
+            .map(|link| CrawlableUrl::from(link.destination))
+            .collect::<Vec<_>>();
+
+        self.last_check = std::time::Instant::now();
+
+        Ok(urls)
     }
 
     fn should_check(&self, interval: &CheckIntervals) -> bool {

@@ -121,6 +121,8 @@ impl Checker for Sitemap {
             );
         }
 
+        self.last_check = std::time::Instant::now();
+
         Ok(urls)
     }
 

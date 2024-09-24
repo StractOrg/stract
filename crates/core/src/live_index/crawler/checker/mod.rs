@@ -44,6 +44,15 @@ impl From<DatedUrl> for CrawlableUrl {
     }
 }
 
+impl From<Url> for CrawlableUrl {
+    fn from(url: Url) -> Self {
+        Self {
+            url,
+            last_modified: None,
+        }
+    }
+}
+
 pub trait Checker {
     async fn get_urls(&mut self) -> Result<Vec<CrawlableUrl>>;
     fn should_check(&self, interval: &CheckIntervals) -> bool;
