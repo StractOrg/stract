@@ -29,7 +29,7 @@ use std::time::Duration;
 pub fn parse_duration<'de, D: serde::de::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Duration, D::Error> {
-    let err = |msg| <D::Error as serde::de::Error>::custom(msg);
+    let err = <D::Error as serde::de::Error>::custom;
     let s: String = serde::de::Deserialize::deserialize(deserializer)?;
     let num_part = s.trim_end_matches(|c: char| !c.is_numeric());
     let suffix = &s[num_part.len()..];
