@@ -14,16 +14,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
-use std::time::{Duration, Instant};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
+};
+
+use tokio::sync::Mutex;
+use url::Url;
 
 use crate::{
-    entrypoint::site_stats::{self, FinalSiteStats},
+    config::{CheckIntervals, CrawlerConfig},
+    crawler,
+    entrypoint::{
+        indexer::IndexableWebpage,
+        site_stats::{self, FinalSiteStats},
+    },
     live_index::crawler::checker::{Feeds, Frontpage, Sitemap},
     Result,
 };
 
 use super::{
-    checker::{CheckIntervals, Checker},
+    checker::{Checker, CrawlableUrl},
+    downloaded_db::ShardedDownloadedDb,
     Client,
 };
 
@@ -37,6 +52,7 @@ pub struct CrawlableSite {
     last_drip: Instant,
     drip_rate: Duration,
     budget: u64,
+    currently_crawling: AtomicBool,
 }
 
 impl CrawlableSite {
@@ -56,9 +72,15 @@ impl CrawlableSite {
             last_drip: Instant::now(),
             drip_rate,
             budget: 0,
+            currently_crawling: AtomicBool::new(false),
         })
     }
+
     pub fn drip(&mut self) {
+        if self.currently_crawling.load(Ordering::Relaxed) {
+            return;
+        }
+
         let pages_to_drip =
             (self.last_drip.elapsed().as_secs_f32() / self.drip_rate.as_secs_f32()) as u64;
 
@@ -71,15 +93,191 @@ impl CrawlableSite {
             }
         }
     }
-
-    pub fn should_check(&self, interval: &CheckIntervals) -> bool {
+    pub fn should_crawl(&self, interval: &CheckIntervals) -> bool {
         (self.frontpage.should_check(interval)
             || self.sitemap.should_check(interval)
             || self.feeds.should_check(interval))
             && self.budget > 0
+            && !self.currently_crawling.load(Ordering::Relaxed)
     }
 
-    pub async fn crawl(&mut self, client: &Client) {
-        todo!()
+    pub fn currently_crawling(&self) -> bool {
+        self.currently_crawling.load(Ordering::Relaxed)
+    }
+}
+
+impl crawler::DatumStream for tokio::sync::Mutex<Vec<crawler::CrawlDatum>> {
+    async fn write(&self, crawl_datum: crawler::CrawlDatum) -> Result<(), crawler::Error> {
+        self.lock().await.push(crawl_datum);
+        Ok(())
+    }
+
+    async fn finish(&self) -> Result<(), crawler::Error> {
+        Ok(())
+    }
+}
+
+pub struct CrawlableSiteGuard {
+    site: Arc<Mutex<CrawlableSite>>,
+    downloaded_db: Arc<ShardedDownloadedDb>,
+    config: Arc<CrawlerConfig>,
+}
+
+impl CrawlableSiteGuard {
+    pub fn new(
+        site: Arc<Mutex<CrawlableSite>>,
+        downloaded_db: Arc<ShardedDownloadedDb>,
+        config: Arc<CrawlerConfig>,
+    ) -> Self {
+        {
+            let lock = site.blocking_lock();
+
+            if lock.currently_crawling() {
+                panic!("site is already being crawled");
+            }
+
+            lock.currently_crawling.store(true, Ordering::Relaxed);
+        }
+
+        Self {
+            site,
+            downloaded_db,
+            config,
+        }
+    }
+
+    pub async fn url(&self) -> Result<Url> {
+        self.site.lock().await.site.url()
+    }
+}
+
+impl Drop for CrawlableSiteGuard {
+    fn drop(&mut self) {
+        self.site
+            .blocking_lock()
+            .currently_crawling
+            .store(false, Ordering::Relaxed);
+    }
+}
+
+impl CrawlableSiteGuard {
+    pub async fn crawl(self, client: &Client, interval: &CheckIntervals) -> Result<()> {
+        let mut site = self.site.lock().await;
+        let mut urls = Vec::new();
+
+        if site.feeds.should_check(interval) {
+            urls.extend(site.feeds.get_urls().await);
+        }
+
+        if site.sitemap.should_check(interval) {
+            urls.extend(site.sitemap.get_urls().await);
+        }
+
+        if site.frontpage.should_check(interval) {
+            urls.extend(site.frontpage.get_urls().await);
+        }
+
+        urls.retain(|url| !self.downloaded_db.has_downloaded(&url.url).unwrap_or(false));
+
+        for url in &urls {
+            self.downloaded_db.insert(&url.url)?;
+        }
+
+        order_urls(&mut urls);
+
+        let budget = site.budget.min(urls.len() as u64);
+        site.budget = site.budget.saturating_sub(budget);
+
+        let crawl_data = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+
+        let executor = crawler::JobExecutor::new(
+            crawler::WorkerJob {
+                domain: crawler::Domain::from(site.site.url()?),
+                urls: urls
+                    .into_iter()
+                    .take(budget as usize)
+                    .map(|url| {
+                        let weighted_url = crawler::WeightedUrl {
+                            url: url.url,
+                            weight: 1.0,
+                        };
+
+                        crawler::RetrieableUrl::from(weighted_url)
+                    })
+                    .collect(),
+                wandering_urls: 0,
+            },
+            client.reqwest().clone(),
+            self.config.clone(),
+            Arc::clone(&crawl_data),
+        );
+
+        executor.run().await;
+
+        let crawl_data = crawl_data.lock().await.clone();
+
+        client
+            .index(crawl_data.into_iter().map(IndexableWebpage::from).collect())
+            .await?;
+
+        Ok(())
+    }
+}
+
+fn order_urls(urls: &mut Vec<CrawlableUrl>) {
+    urls.sort_by(|a, b| match (a.last_modified, b.last_modified) {
+        (Some(a), Some(b)) => a.cmp(&b).reverse(),
+        (Some(_), None) => std::cmp::Ordering::Greater,
+        (None, Some(_)) => std::cmp::Ordering::Less,
+        (None, None) => std::cmp::Ordering::Equal,
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::DateTime;
+    use url::Url;
+
+    use super::*;
+
+    #[test]
+    fn test_latest_urls_crawled_first() {
+        let mut urls = vec![
+            CrawlableUrl {
+                url: Url::parse("https://example.com/page1").unwrap(),
+                last_modified: Some(
+                    DateTime::parse_from_rfc2822("Mon, 01 Jan 2024 00:00:00 GMT")
+                        .unwrap()
+                        .into(),
+                ),
+            },
+            CrawlableUrl {
+                url: Url::parse("https://example.com/page2").unwrap(),
+                last_modified: Some(
+                    DateTime::parse_from_rfc2822("Tue, 02 Jan 2024 00:00:01 GMT")
+                        .unwrap()
+                        .into(),
+                ),
+            },
+            CrawlableUrl {
+                url: Url::parse("https://example.com/page3").unwrap(),
+                last_modified: None,
+            },
+        ];
+
+        order_urls(&mut urls);
+
+        assert_eq!(
+            urls[0].url,
+            Url::parse("https://example.com/page3").unwrap()
+        );
+        assert_eq!(
+            urls[1].url,
+            Url::parse("https://example.com/page2").unwrap()
+        );
+        assert_eq!(
+            urls[2].url,
+            Url::parse("https://example.com/page1").unwrap()
+        );
     }
 }

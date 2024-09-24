@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 pub struct Collector;
 
 impl Collector {
@@ -209,5 +211,33 @@ pub struct Webgraph;
 impl Webgraph {
     pub fn merge_all_segments() -> bool {
         true
+    }
+}
+
+pub struct LiveIndex;
+
+impl LiveIndex {
+    pub fn rss_crawl_interval() -> Duration {
+        Duration::from_secs(30 * 60) // 30 minutes
+    }
+
+    pub fn sitemap_crawl_interval() -> Duration {
+        Duration::from_secs(24 * 60 * 60) // daily
+    }
+
+    pub fn frontpage_crawl_interval() -> Duration {
+        Duration::from_secs(12 * 60 * 60) // 12 hours
+    }
+
+    pub fn blogs_budget() -> u64 {
+        300_000
+    }
+
+    pub fn news_budget() -> u64 {
+        500_000
+    }
+
+    pub fn remaining_budget() -> u64 {
+        200_000
     }
 }

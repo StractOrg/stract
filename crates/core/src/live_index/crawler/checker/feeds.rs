@@ -35,7 +35,7 @@ impl Feeds {
 }
 
 impl Checker for Feeds {
-    async fn check(&mut self) -> Vec<CrawlableUrl> {
+    async fn get_urls(&mut self) -> Vec<CrawlableUrl> {
         todo!()
     }
 

@@ -23,6 +23,38 @@ use crate::distributed::member::ShardId;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::time::Duration;
+
+pub fn parse_duration<'de, D: serde::de::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Duration, D::Error> {
+    let err = |msg| <D::Error as serde::de::Error>::custom(msg);
+    let s: String = serde::de::Deserialize::deserialize(deserializer)?;
+    let num_part = s.trim_end_matches(|c: char| !c.is_numeric());
+    let suffix = &s[num_part.len()..];
+    let num: u64 = num_part
+        .parse()
+        .map_err(|_| err("invalid number".to_string()))?;
+
+    let ret = match suffix {
+        "s" => Duration::from_secs(num),
+        "sec" => Duration::from_secs(num),
+        "secs" => Duration::from_secs(num),
+        "ms" => Duration::from_millis(num),
+        "millis" => Duration::from_millis(num),
+        "milliseconds" => Duration::from_millis(num),
+        "m" => Duration::from_secs(num * 60),
+        "mins" => Duration::from_secs(num * 60),
+        "minutes" => Duration::from_secs(num * 60),
+        "h" => Duration::from_secs(num * 60 * 60),
+        "hours" => Duration::from_secs(num * 60 * 60),
+        "d" => Duration::from_secs(num * 24 * 60 * 60),
+        "days" => Duration::from_secs(num * 24 * 60 * 60),
+        other => return Err(err(format!("invalid suffix {other}"))),
+    };
+    Ok(ret)
+}
 
 #[derive(Debug, serde::Deserialize, Clone)]
 pub struct IndexerConfig {
@@ -364,6 +396,47 @@ pub struct CrawlerConfig {
     pub router_hosts: Vec<String>,
 }
 
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct DailyLiveIndexCrawlerBudget {
+    #[serde(default = "defaults::LiveIndex::blogs_budget")]
+    pub blogs: u64,
+    #[serde(default = "defaults::LiveIndex::news_budget")]
+    pub news: u64,
+    #[serde(default = "defaults::LiveIndex::remaining_budget")]
+    pub remaining: u64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct CheckIntervals {
+    #[serde(
+        deserialize_with = "parse_duration",
+        default = "defaults::LiveIndex::rss_crawl_interval"
+    )]
+    pub rss: Duration,
+    #[serde(
+        deserialize_with = "parse_duration",
+        default = "defaults::LiveIndex::sitemap_crawl_interval"
+    )]
+    pub sitemap: Duration,
+    #[serde(
+        deserialize_with = "parse_duration",
+        default = "defaults::LiveIndex::frontpage_crawl_interval"
+    )]
+    pub frontpage: Duration,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct LiveCrawlerConfig {
+    pub downloaded_db_path: PathBuf,
+    pub gossip: GossipConfig,
+    pub site_stats_path: PathBuf,
+    pub host_centrality_path: PathBuf,
+    pub user_agent: UserAgent,
+    pub num_worker_threads: usize,
+    pub check_intervals: CheckIntervals,
+    pub daily_budget: DailyLiveIndexCrawlerBudget,
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct CrawlRouterConfig {
     pub host: SocketAddr,
@@ -468,33 +541,11 @@ pub struct CrawlPlannerConfig {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct LiveIndexConfig {
-    // crawler
-    pub user_agent: UserAgent,
-    #[serde(default = "defaults::Crawler::robots_txt_cache_sec")]
-    pub robots_txt_cache_sec: u64,
-    #[serde(default = "defaults::Crawler::min_politeness_factor")]
-    pub min_politeness_factor: u32,
-    #[serde(default = "defaults::Crawler::start_politeness_factor")]
-    pub start_politeness_factor: u32,
-    #[serde(default = "defaults::Crawler::min_crawl_delay_ms")]
-    pub min_crawl_delay_ms: u64,
-    #[serde(default = "defaults::Crawler::max_crawl_delay_ms")]
-    pub max_crawl_delay_ms: u64,
-    #[serde(default = "defaults::Crawler::max_politeness_factor")]
-    pub max_politeness_factor: u32,
-    #[serde(default = "defaults::Crawler::max_url_slowdown_retry")]
-    pub max_url_slowdown_retry: u8,
-    #[serde(default = "defaults::Crawler::timeout_seconds")]
-    pub timeout_seconds: u64,
-
-    // indexer
     pub host_centrality_store_path: String,
     pub page_centrality_store_path: Option<String>,
     pub safety_classifier_path: Option<String>,
     pub host_centrality_threshold: Option<f64>,
     pub minimum_clean_words: Option<usize>,
-
-    // search
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
     pub shard_id: ShardId,

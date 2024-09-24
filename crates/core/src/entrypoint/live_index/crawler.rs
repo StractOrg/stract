@@ -12,29 +12,16 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use crate::config;
+use crate::live_index;
+use crate::Result;
 
-use chrono::{DateTime, Utc};
-use url::Url;
+pub async fn run(config: config::LiveCrawlerConfig) -> Result<()> {
+    let crawler = live_index::Crawler::new(config).await?;
 
-mod feeds;
-mod frontpage;
-mod sitemap;
+    crawler.run().await?;
 
-pub use feeds::Feeds;
-pub use frontpage::Frontpage;
-pub use sitemap::Sitemap;
-
-use crate::config::CheckIntervals;
-
-pub struct CrawlableUrl {
-    pub url: Url,
-    pub last_modified: Option<DateTime<Utc>>,
-}
-
-pub trait Checker {
-    async fn get_urls(&mut self) -> Vec<CrawlableUrl>;
-    fn should_check(&self, interval: &CheckIntervals) -> bool;
+    Ok(())
 }

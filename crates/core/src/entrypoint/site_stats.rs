@@ -129,6 +129,10 @@ impl Site {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    pub fn url(&self) -> Result<Url> {
+        Url::robust_parse(&self.0).map_err(|_| anyhow::anyhow!("Failed to parse url"))
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

@@ -38,7 +38,7 @@ impl Sitemap {
 }
 
 impl Checker for Sitemap {
-    async fn check(&mut self) -> Vec<CrawlableUrl> {
+    async fn get_urls(&mut self) -> Vec<CrawlableUrl> {
         todo!()
     }
 

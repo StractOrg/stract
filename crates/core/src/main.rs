@@ -177,6 +177,9 @@ enum AdminIndexOptions {
 enum LiveIndex {
     /// Serve the live index.
     Serve { config_path: String },
+
+    /// Start the live index crawler.
+    Crawl { config_path: String },
 }
 
 #[derive(Subcommand)]
@@ -445,7 +448,15 @@ fn main() -> Result<()> {
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?
-                    .block_on(entrypoint::live_index::serve(config))?;
+                    .block_on(entrypoint::live_index::search_server::serve(config))?;
+            }
+            LiveIndex::Crawl { config_path } => {
+                let config = load_toml_config(config_path);
+
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::live_index::crawler::run(config))?;
             }
         },
         Commands::WebSpell { config_path } => {

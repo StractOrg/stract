@@ -16,10 +16,11 @@
 
 use url::Url;
 
+use crate::config::CheckIntervals;
 use crate::Result;
 use crate::{entrypoint::site_stats, webpage::url_ext::UrlExt};
 
-use super::{CheckIntervals, Checker, CrawlableUrl};
+use super::{Checker, CrawlableUrl};
 
 pub struct Frontpage {
     url: Url,
@@ -38,7 +39,7 @@ impl Frontpage {
 }
 
 impl Checker for Frontpage {
-    async fn check(&mut self) -> Vec<CrawlableUrl> {
+    async fn get_urls(&mut self) -> Vec<CrawlableUrl> {
         todo!()
     }
 

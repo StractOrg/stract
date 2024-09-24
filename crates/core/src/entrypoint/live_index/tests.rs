@@ -57,18 +57,6 @@ impl RemoteIndex {
         };
 
         let config = LiveIndexConfig {
-            user_agent: crate::config::UserAgent {
-                full: "TestBot".to_string(),
-                token: "TestBot".to_string(),
-            },
-            robots_txt_cache_sec: 60 * 60,
-            min_politeness_factor: 1,
-            start_politeness_factor: 3,
-            min_crawl_delay_ms: 5_000,
-            max_crawl_delay_ms: 60_000,
-            max_politeness_factor: 2048,
-            max_url_slowdown_retry: 5,
-            timeout_seconds: 30,
             host_centrality_store_path: path
                 .as_path()
                 .join("host_centrality")
@@ -91,8 +79,8 @@ impl RemoteIndex {
         };
 
         let service = LiveIndexService::new(config).await?;
-        let cluster = service.cluster_handle.clone();
-        let index = service.index.clone();
+        let cluster = service.cluster_handle();
+        let index = service.index();
 
         service.background_setup();
 

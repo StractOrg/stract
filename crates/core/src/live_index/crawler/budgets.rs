@@ -16,6 +16,7 @@
 
 use url::Url;
 
+use crate::config::DailyLiveIndexCrawlerBudget;
 use crate::entrypoint::site_stats::{FinalSiteStats, Site};
 use crate::webgraph;
 use crate::webpage::url_ext::UrlExt;
@@ -28,16 +29,9 @@ use super::SiteStats;
 
 const MILLIS_PER_DAY: u64 = 24 * 60 * 60 * 1000;
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct DailyBudget {
-    pub blogs: f64,
-    pub news: f64,
-    pub remaining: f64,
-}
-
 fn assign_budgets(
     sites: &mut HashMap<Site, f64>,
-    daily_budget: f64,
+    daily_budget: u64,
     total_centrality: f64,
     host_centrality: &speedy_kv::Db<webgraph::NodeID, f64>,
 ) {
@@ -48,7 +42,7 @@ fn assign_budgets(
             .map(|node| node.id())
             .and_then(|id| host_centrality.get(&id).ok().flatten())
         {
-            *budget = (centrality * daily_budget) / total_centrality;
+            *budget = (centrality * daily_budget as f64) / total_centrality;
         }
     }
 }
@@ -74,7 +68,7 @@ impl SiteBudgets {
     pub fn new<P: AsRef<Path>>(
         host_centrality: P,
         stats: &SiteStats,
-        daily_budget: DailyBudget,
+        daily_budget: DailyLiveIndexCrawlerBudget,
     ) -> Result<Self> {
         let host_centrality: speedy_kv::Db<webgraph::NodeID, f64> =
             speedy_kv::Db::open_or_create(host_centrality)?;

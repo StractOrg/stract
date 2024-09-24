@@ -195,7 +195,10 @@ impl<S: DatumStream> JobExecutor<S> {
         }
 
         self.scheduled_urls().await;
-        self.crawl_sitemaps().await;
+
+        if self.wandered_urls < self.job.wandering_urls {
+            self.crawl_sitemaps().await;
+        }
 
         while self.wandered_urls < self.job.wandering_urls
             && self.wander_prioritiser.known_urls() > 0
@@ -295,7 +298,7 @@ impl<S: DatumStream> JobExecutor<S> {
         }
     }
 
-    async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>) {
+    pub async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>) {
         while let Some(retryable_url) = urls.pop_front() {
             if let UrlVisit::Skip = self.verify_url(&retryable_url).await {
                 continue;

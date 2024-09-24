@@ -15,45 +15,18 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::time::Duration;
 
-use crate::config::{CrawlerConfig, LiveIndexConfig};
-
 pub use self::index::LiveIndex;
 pub use self::index_manager::IndexManager;
 
-mod crawler;
+pub mod crawler;
 pub mod index;
 mod index_manager;
+
+pub use self::crawler::Crawler;
 
 const TTL: Duration = Duration::from_secs(60 * 60 * 24 * 60); // 60 days
 const PRUNE_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
 const COMPACT_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
-                                                                 // const FEED_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 10); // 10 minutes
 const AUTO_COMMIT_INTERVAL: Duration = Duration::from_secs(60 * 5); // 5 minutes
 const EVENT_LOOP_INTERVAL: Duration = Duration::from_secs(5);
 const BATCH_SIZE: usize = 512;
-
-impl From<&LiveIndexConfig> for CrawlerConfig {
-    fn from(live: &LiveIndexConfig) -> Self {
-        Self {
-            num_worker_threads: 1, // no impact
-            user_agent: live.user_agent.clone(),
-            robots_txt_cache_sec: live.robots_txt_cache_sec,
-            start_politeness_factor: live.start_politeness_factor,
-            min_politeness_factor: live.min_politeness_factor,
-            max_politeness_factor: live.max_politeness_factor,
-            min_crawl_delay_ms: live.min_crawl_delay_ms,
-            max_crawl_delay_ms: live.max_crawl_delay_ms,
-            max_url_slowdown_retry: live.max_url_slowdown_retry,
-            timeout_seconds: live.timeout_seconds,
-            // no impact
-            s3: crate::config::S3Config {
-                bucket: String::new(),
-                folder: String::new(),
-                access_key: String::new(),
-                secret_key: String::new(),
-                endpoint: String::new(),
-            },
-            router_hosts: Vec::new(),
-        }
-    }
-}
