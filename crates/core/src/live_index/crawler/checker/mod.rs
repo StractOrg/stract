@@ -25,8 +25,8 @@ pub use self::feeds::Feeds;
 pub use frontpage::Frontpage;
 pub use sitemap::Sitemap;
 
+use crate::config::CheckIntervals;
 use crate::dated_url::DatedUrl;
-use crate::{config::CheckIntervals, feed};
 
 use crate::Result;
 

@@ -46,7 +46,7 @@ impl Checker for Frontpage {
         let res = self.client.get(self.url.clone()).send().await?;
         let body = res.text().await?;
 
-        let page = Html::parse(&body, &self.url.to_string())?;
+        let page = Html::parse(&body, self.url.as_str())?;
 
         let urls = page
             .anchor_links()

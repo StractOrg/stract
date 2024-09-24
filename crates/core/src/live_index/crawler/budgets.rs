@@ -130,6 +130,6 @@ impl SiteBudgets {
             .or_else(|| self.news.get(site))
             .or_else(|| self.remaining.get(site))?;
 
-        Some(Duration::from_millis(MILLIS_PER_DAY as u64 / budget as u64))
+        Some(Duration::from_millis(MILLIS_PER_DAY / budget as u64))
     }
 }

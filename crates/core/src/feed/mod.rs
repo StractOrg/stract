@@ -16,7 +16,6 @@
 
 use std::str::FromStr;
 
-use chrono::{DateTime, Utc};
 use url::Url;
 
 mod parser;

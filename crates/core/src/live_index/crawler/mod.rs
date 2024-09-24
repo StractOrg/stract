@@ -24,14 +24,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::ampc::dht::ShardId;
-use crate::config::{CheckIntervals, CrawlerConfig, GossipConfig, LiveCrawlerConfig};
+use crate::config::{CheckIntervals, CrawlerConfig, LiveCrawlerConfig};
 use crate::distributed::cluster::Cluster;
 use crate::distributed::sonic::replication::{
     AllShardsSelector, RandomReplicaSelector, RandomShardSelector, ShardedClient,
 };
 use crate::entrypoint::search_server;
 use crate::entrypoint::site_stats::FinalSiteStats;
-use crate::{crawler, webgraph, Result};
+use crate::{crawler, Result};
 use crate::{
     distributed::sonic::replication::ReusableShardedClient,
     entrypoint::{indexer::IndexableWebpage, live_index},
@@ -224,13 +224,13 @@ impl Crawler {
 
         let mut crawlable_sites = Vec::new();
         for site in sites {
-            for url in client.get_site_urls(&site.site().as_str()).await? {
+            for url in client.get_site_urls(site.site().as_str()).await? {
                 if !db.has_downloaded(&url)? {
                     db.insert(&url)?;
                 }
             }
 
-            if let Some(drip_rate) = budgets.drip_rate(&site.site()) {
+            if let Some(drip_rate) = budgets.drip_rate(site.site()) {
                 crawlable_sites.push(Arc::new(Mutex::new(CrawlableSite::new(
                     site, &client, drip_rate,
                 )?)));

@@ -228,7 +228,7 @@ impl CrawlableSiteGuard {
     }
 }
 
-fn order_urls(urls: &mut Vec<CrawlableUrl>) {
+fn order_urls(urls: &mut [CrawlableUrl]) {
     urls.sort_by(|a, b| match (a.last_modified, b.last_modified) {
         (Some(a), Some(b)) => a.cmp(&b).reverse(),
         (Some(_), None) => std::cmp::Ordering::Greater,
