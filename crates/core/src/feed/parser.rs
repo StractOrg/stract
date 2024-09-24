@@ -19,7 +19,9 @@ use chrono::{DateTime, Utc};
 use quick_xml::events::Event;
 use url::Url;
 
-use super::{DatedUrl, FeedKind, ParsedFeed};
+use crate::dated_url::DatedUrl;
+
+use super::{FeedKind, ParsedFeed};
 
 fn parse_rss(feed: &str) -> Result<ParsedFeed> {
     let mut reader = quick_xml::Reader::from_str(feed);

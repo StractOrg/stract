@@ -14,12 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use url::Url;
 
+use crate::dated_url::DatedUrl;
+use crate::sitemap::{parse_sitemap, SitemapEntry};
 use crate::Result;
 use crate::{entrypoint::site_stats, webpage::url_ext::UrlExt};
 
 use super::{CheckIntervals, Checker, CrawlableUrl};
+
+const MAX_SITEMAP_DEPTH: usize = 10;
+const SITEMAP_DELAY: Duration = Duration::from_secs(10);
 
 pub struct Sitemap {
     robots_txt: Url,
@@ -37,11 +44,84 @@ impl Sitemap {
             client,
         })
     }
+
+    async fn sitemap_urls(&self) -> Result<Vec<Url>> {
+        let res = self.client.get(self.robots_txt.clone()).send().await?;
+        let body = res.text().await?;
+
+        // wildcard useragent is okay as we only use it to check for sitemap directive
+        let robots = robotstxt::Robots::parse("*", &body)?;
+
+        Ok(robots
+            .sitemaps()
+            .iter()
+            .filter_map(|s| Url::parse(s).ok())
+            .collect())
+    }
+
+    async fn urls_from_sitemap(&self, sitemap: Url) -> Vec<DatedUrl> {
+        let mut stack = vec![(sitemap, 0)];
+        let mut urls = vec![];
+
+        while let Some((url, depth)) = stack.pop() {
+            if depth >= MAX_SITEMAP_DEPTH {
+                continue;
+            }
+
+            let res = self.client.get(url).send().await;
+            tokio::time::sleep(SITEMAP_DELAY).await;
+
+            if res.is_err() {
+                continue;
+            }
+
+            let res = res.unwrap();
+
+            if res.status() != reqwest::StatusCode::OK {
+                continue;
+            }
+
+            let body = res.text().await;
+
+            if body.is_err() {
+                continue;
+            }
+
+            let body = body.unwrap();
+
+            let entries = parse_sitemap(&body);
+
+            for entry in entries {
+                match entry {
+                    SitemapEntry::Url(url) => {
+                        urls.push(url);
+                    }
+                    SitemapEntry::Sitemap(url) => {
+                        stack.push((url, depth + 1));
+                    }
+                }
+            }
+        }
+
+        urls
+    }
 }
 
 impl Checker for Sitemap {
     async fn get_urls(&mut self) -> Result<Vec<CrawlableUrl>> {
-        todo!()
+        let sitemap_urls = self.sitemap_urls().await?;
+        let mut urls = vec![];
+
+        for sitemap_url in sitemap_urls {
+            urls.extend(
+                self.urls_from_sitemap(sitemap_url)
+                    .await
+                    .into_iter()
+                    .map(CrawlableUrl::from),
+            );
+        }
+
+        Ok(urls)
     }
 
     fn should_check(&self, interval: &CheckIntervals) -> bool {

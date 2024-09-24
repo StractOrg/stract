@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::anyhow;
 use hashbrown::HashSet;
-use quick_xml::events::Event;
 use rand::seq::SliceRandom;
 
 use std::{
@@ -30,8 +29,10 @@ use url::Url;
 use crate::{
     config::CrawlerConfig,
     crawler::MAX_URL_LEN_BYTES,
+    dated_url::DatedUrl,
     distributed::{retry_strategy::ExponentialBackoff, sonic},
     entrypoint::crawler::router::{NewJob, RouterService},
+    sitemap::{parse_sitemap, SitemapEntry},
     warc,
     webpage::{url_ext::UrlExt, Html},
 };
@@ -291,8 +292,12 @@ impl<S: DatumStream> JobExecutor<S> {
                 let sitemaps = self.robotstxt.sitemaps(url).await;
 
                 for sitemap in sitemaps {
-                    self.sitemap_urls
-                        .extend(self.urls_from_sitemap(sitemap, 5).await);
+                    self.sitemap_urls.extend(
+                        self.urls_from_sitemap(sitemap, 5)
+                            .await
+                            .into_iter()
+                            .map(|dated_url| dated_url.url),
+                    );
                 }
             }
         }
@@ -604,7 +609,7 @@ impl<S: DatumStream> JobExecutor<S> {
         })
     }
 
-    async fn urls_from_sitemap(&self, sitemap: Url, max_depth: usize) -> Vec<Url> {
+    async fn urls_from_sitemap(&self, sitemap: Url, max_depth: usize) -> Vec<DatedUrl> {
         let mut stack = vec![(sitemap, 0)];
         let mut urls = vec![];
 
@@ -649,157 +654,5 @@ impl<S: DatumStream> JobExecutor<S> {
         }
 
         urls
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum SitemapEntry {
-    Url(Url),
-    Sitemap(Url),
-}
-
-fn parse_sitemap(s: &str) -> Vec<SitemapEntry> {
-    let mut reader = quick_xml::Reader::from_str(s);
-
-    let mut res = vec![];
-
-    let mut in_sitemap = false;
-    let mut in_url = false;
-    let mut in_loc = false;
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(ref e)) => {
-                if e.name().as_ref() == b"sitemap" {
-                    in_sitemap = true;
-                } else if e.name().as_ref() == b"url" {
-                    in_url = true;
-                } else if e.name().as_ref() == b"loc" {
-                    in_loc = true;
-                }
-            }
-            Ok(Event::End(ref e)) => {
-                if e.name().as_ref() == b"sitemap" {
-                    in_sitemap = false;
-                } else if e.name().as_ref() == b"url" {
-                    in_url = false;
-                } else if e.name().as_ref() == b"loc" {
-                    in_loc = false;
-                }
-            }
-            Ok(Event::Text(e)) => {
-                if in_sitemap && in_loc {
-                    if let Ok(url) = Url::parse(&e.unescape().unwrap()) {
-                        res.push(SitemapEntry::Sitemap(url));
-                    }
-                } else if in_url && in_loc {
-                    if let Ok(url) = Url::parse(&e.unescape().unwrap()) {
-                        res.push(SitemapEntry::Url(url));
-                    }
-                }
-            }
-            Ok(Event::Eof) => break,
-            Err(e) => {
-                tracing::debug!("failed to parse sitemap: {}", e);
-                break;
-            }
-            _ => (),
-        }
-    }
-
-    res
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn parse_sitemap() {
-        let dr = r#"<sitemapindex>
-        <sitemap>
-        <loc>https://www.dr.dk/drtv/sitemap.xml</loc>
-        </sitemap>
-        <sitemap>
-        <loc>https://www.dr.dk/sitemap.tvguide.xml</loc>
-        </sitemap>
-        <sitemap>
-        <loc>
-        https://www.dr.dk/sitemap.kommunalvalg.resultater.xml
-        </loc>
-        </sitemap>
-        <sitemap>
-        <loc>https://www.dr.dk/sitemap.folketingsvalg2022.xml</loc>
-        </sitemap>
-        </sitemapindex>"#;
-
-        let entries = super::parse_sitemap(dr);
-        assert_eq!(
-            entries,
-            vec![
-                super::SitemapEntry::Sitemap("https://www.dr.dk/drtv/sitemap.xml".parse().unwrap()),
-                super::SitemapEntry::Sitemap(
-                    "https://www.dr.dk/sitemap.tvguide.xml".parse().unwrap()
-                ),
-                super::SitemapEntry::Sitemap(
-                    "https://www.dr.dk/sitemap.kommunalvalg.resultater.xml"
-                        .parse()
-                        .unwrap()
-                ),
-                super::SitemapEntry::Sitemap(
-                    "https://www.dr.dk/sitemap.folketingsvalg2022.xml"
-                        .parse()
-                        .unwrap()
-                ),
-            ]
-        );
-
-        let dr = r#"<urlset>
-        <url>
-        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
-        <loc>https://www.dr.dk/drtv/serie/sleepover_6382</loc>
-        </url>
-        <url>
-        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
-        <loc>https://www.dr.dk/drtv/saeson/sleepover_9673</loc>
-        </url>
-        <url>
-        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
-        <loc>
-        https://www.dr.dk/drtv/episode/sleepover_-zoologisk-museum_52239
-        </loc>
-        </url>
-        <url>
-        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
-        <loc>
-        https://www.dr.dk/drtv/episode/sleepover_-koebenhavns-raadhus_52252
-        </loc>
-        </url>
-        </urlset>"#;
-
-        let entries = super::parse_sitemap(dr);
-        assert_eq!(
-            entries,
-            vec![
-                super::SitemapEntry::Url(
-                    "https://www.dr.dk/drtv/serie/sleepover_6382"
-                        .parse()
-                        .unwrap()
-                ),
-                super::SitemapEntry::Url(
-                    "https://www.dr.dk/drtv/saeson/sleepover_9673"
-                        .parse()
-                        .unwrap()
-                ),
-                super::SitemapEntry::Url(
-                    "https://www.dr.dk/drtv/episode/sleepover_-zoologisk-museum_52239"
-                        .parse()
-                        .unwrap()
-                ),
-                super::SitemapEntry::Url(
-                    "https://www.dr.dk/drtv/episode/sleepover_-koebenhavns-raadhus_52252"
-                        .parse()
-                        .unwrap()
-                ),
-            ]
-        );
     }
 }

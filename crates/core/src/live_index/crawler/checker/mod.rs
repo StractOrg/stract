@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/
 
-use std::time::Duration;
-
 use chrono::{DateTime, Utc};
 use url::Url;
 
@@ -23,10 +21,11 @@ mod feeds;
 mod frontpage;
 mod sitemap;
 
-pub use feeds::Feeds;
+pub use self::feeds::Feeds;
 pub use frontpage::Frontpage;
 pub use sitemap::Sitemap;
 
+use crate::dated_url::DatedUrl;
 use crate::{config::CheckIntervals, feed};
 
 use crate::Result;
@@ -36,8 +35,8 @@ pub struct CrawlableUrl {
     pub last_modified: Option<DateTime<Utc>>,
 }
 
-impl From<feed::DatedUrl> for CrawlableUrl {
-    fn from(url: feed::DatedUrl) -> Self {
+impl From<DatedUrl> for CrawlableUrl {
+    fn from(url: DatedUrl) -> Self {
         Self {
             url: url.url,
             last_modified: url.last_modified,
