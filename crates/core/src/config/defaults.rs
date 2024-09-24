@@ -217,7 +217,7 @@ impl Webgraph {
 pub struct LiveIndex;
 
 impl LiveIndex {
-    pub fn rss_crawl_interval() -> Duration {
+    pub fn feeds_crawl_interval() -> Duration {
         Duration::from_secs(30 * 60) // 30 minutes
     }
 

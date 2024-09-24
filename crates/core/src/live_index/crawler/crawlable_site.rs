@@ -22,6 +22,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use itertools::Itertools;
 use tokio::sync::Mutex;
 use url::Url;
 
@@ -56,7 +57,7 @@ pub struct CrawlableSite {
 }
 
 impl CrawlableSite {
-    pub fn new(site: FinalSiteStats, drip_rate: Duration) -> Result<Self> {
+    pub fn new(site: FinalSiteStats, client: &Client, drip_rate: Duration) -> Result<Self> {
         Ok(Self {
             site: site.site().clone(),
             feeds: Feeds::new(
@@ -66,9 +67,10 @@ impl CrawlableSite {
                     .into_iter()
                     .map(|feed| feed.into())
                     .collect(),
+                client.reqwest().clone(),
             ),
-            sitemap: Sitemap::new(site.site())?,
-            frontpage: Frontpage::new(site.site())?,
+            sitemap: Sitemap::new(site.site(), client.reqwest().clone())?,
+            frontpage: Frontpage::new(site.site(), client.reqwest().clone())?,
             last_drip: Instant::now(),
             drip_rate,
             budget: 0,
@@ -166,16 +168,18 @@ impl CrawlableSiteGuard {
         let mut urls = Vec::new();
 
         if site.feeds.should_check(interval) {
-            urls.extend(site.feeds.get_urls().await);
+            urls.extend(site.feeds.get_urls().await.unwrap_or_default());
         }
 
         if site.sitemap.should_check(interval) {
-            urls.extend(site.sitemap.get_urls().await);
+            urls.extend(site.sitemap.get_urls().await.unwrap_or_default());
         }
 
         if site.frontpage.should_check(interval) {
-            urls.extend(site.frontpage.get_urls().await);
+            urls.extend(site.frontpage.get_urls().await.unwrap_or_default());
         }
+
+        urls = urls.into_iter().unique_by(|u| u.url.clone()).collect();
 
         urls.retain(|url| !self.downloaded_db.has_downloaded(&url.url).unwrap_or(false));
 

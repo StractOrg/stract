@@ -25,25 +25,27 @@ use super::{Checker, CrawlableUrl};
 pub struct Frontpage {
     url: Url,
     last_check: std::time::Instant,
+    client: reqwest::Client,
 }
 
 impl Frontpage {
-    pub fn new(site: &site_stats::Site) -> Result<Self> {
+    pub fn new(site: &site_stats::Site, client: reqwest::Client) -> Result<Self> {
         let url = Url::robust_parse(&format!("https://{}/", site.as_str()))?;
 
         Ok(Self {
             url,
             last_check: std::time::Instant::now(),
+            client,
         })
     }
 }
 
 impl Checker for Frontpage {
-    async fn get_urls(&mut self) -> Vec<CrawlableUrl> {
+    async fn get_urls(&mut self) -> Result<Vec<CrawlableUrl>> {
         todo!()
     }
 
     fn should_check(&self, interval: &CheckIntervals) -> bool {
-        todo!()
+        self.last_check.elapsed() > interval.frontpage
     }
 }

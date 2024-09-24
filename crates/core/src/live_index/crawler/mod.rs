@@ -231,7 +231,9 @@ impl Crawler {
             }
 
             if let Some(drip_rate) = budgets.drip_rate(&site.site()) {
-                crawlable_sites.push(Arc::new(Mutex::new(CrawlableSite::new(site, drip_rate)?)));
+                crawlable_sites.push(Arc::new(Mutex::new(CrawlableSite::new(
+                    site, &client, drip_rate,
+                )?)));
             }
         }
 

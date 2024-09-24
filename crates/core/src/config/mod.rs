@@ -410,9 +410,9 @@ pub struct DailyLiveIndexCrawlerBudget {
 pub struct CheckIntervals {
     #[serde(
         deserialize_with = "parse_duration",
-        default = "defaults::LiveIndex::rss_crawl_interval"
+        default = "defaults::LiveIndex::feeds_crawl_interval"
     )]
-    pub rss: Duration,
+    pub feeds: Duration,
     #[serde(
         deserialize_with = "parse_duration",
         default = "defaults::LiveIndex::sitemap_crawl_interval"

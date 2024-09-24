@@ -16,6 +16,7 @@
 
 use std::str::FromStr;
 
+use chrono::{DateTime, Utc};
 use url::Url;
 
 mod parser;
@@ -70,6 +71,24 @@ pub struct Feed {
     pub kind: FeedKind,
 }
 
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+    Eq,
+    Hash,
+)]
+pub struct DatedUrl {
+    #[bincode(with_serde)]
+    pub url: Url,
+    #[bincode(with_serde)]
+    pub last_modified: Option<DateTime<Utc>>,
+}
+
 pub struct ParsedFeed {
-    pub links: Vec<Url>,
+    pub links: Vec<DatedUrl>,
 }

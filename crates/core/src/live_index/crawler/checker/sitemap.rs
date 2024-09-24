@@ -24,25 +24,27 @@ use super::{CheckIntervals, Checker, CrawlableUrl};
 pub struct Sitemap {
     robots_txt: Url,
     last_check: std::time::Instant,
+    client: reqwest::Client,
 }
 
 impl Sitemap {
-    pub fn new(site: &site_stats::Site) -> Result<Self> {
+    pub fn new(site: &site_stats::Site, client: reqwest::Client) -> Result<Self> {
         let robots_txt = Url::robust_parse(&format!("{}/robots.txt", site.as_str()))?;
 
         Ok(Self {
             robots_txt,
             last_check: std::time::Instant::now(),
+            client,
         })
     }
 }
 
 impl Checker for Sitemap {
-    async fn get_urls(&mut self) -> Vec<CrawlableUrl> {
+    async fn get_urls(&mut self) -> Result<Vec<CrawlableUrl>> {
         todo!()
     }
 
     fn should_check(&self, interval: &CheckIntervals) -> bool {
-        todo!()
+        self.last_check.elapsed() > interval.sitemap
     }
 }
