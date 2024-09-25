@@ -40,10 +40,7 @@ impl SearchService {
         let index = EntityIndex::open(config.index_path)?;
 
         let cluster_handle = Cluster::join(
-            Member {
-                id: config.cluster_id,
-                service: Service::EntitySearcher { host: config.host },
-            },
+            Member::new(Service::EntitySearcher { host: config.host }),
             config.gossip_addr,
             config.gossip_seed_nodes.unwrap_or_default(),
         )

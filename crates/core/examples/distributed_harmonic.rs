@@ -19,7 +19,6 @@ fn start_dht_thread(id: u64, host: SocketAddr, gossip: SocketAddr) {
             shard: ShardId::new(id),
             seed_node: None,
             gossip: Some(stract::config::GossipConfig {
-                cluster_id: "test".to_string(),
                 seed_nodes: Some(vec!["0.0.0.0:3001".parse().unwrap()]),
                 addr: gossip,
             }),
@@ -38,7 +37,6 @@ fn start_worker_thread(graph_path: String, shard: ShardId, host: SocketAddr, gos
     std::thread::spawn(move || {
         let config = stract::config::HarmonicWorkerConfig {
             gossip: stract::config::GossipConfig {
-                cluster_id: "test".to_string(),
                 seed_nodes: Some(vec!["0.0.0.0:3001".parse().unwrap()]),
                 addr: gossip,
             },
@@ -158,7 +156,6 @@ fn main() -> anyhow::Result<()> {
 
     let config = stract::config::HarmonicCoordinatorConfig {
         gossip: stract::config::GossipConfig {
-            cluster_id: "test".to_string(),
             seed_nodes: Some(vec!["0.0.0.0:3001".parse().unwrap()]),
             addr: "0.0.0.0:3007".parse().unwrap(),
         },

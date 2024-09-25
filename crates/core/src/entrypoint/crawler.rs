@@ -68,7 +68,6 @@ pub async fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
     let gossip = config.gossip.clone();
     let cluster = Arc::new(
         crate::distributed::cluster::Cluster::join_as_spectator(
-            gossip.cluster_id,
             gossip.addr,
             gossip.seed_nodes.unwrap_or_default(),
         )

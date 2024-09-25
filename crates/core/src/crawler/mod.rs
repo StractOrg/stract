@@ -58,6 +58,9 @@ pub enum Error {
     #[error("content too large")]
     ContentTooLarge,
 
+    #[error("couldn't read response body")]
+    ResponseBodyReadFailed,
+
     #[error("invalid politeness factor")]
     InvalidPolitenessFactor,
 
@@ -338,7 +341,7 @@ pub async fn encoded_body(res: reqwest::Response) -> Result<String> {
     let mut stream = res.bytes_stream();
     while let Some(b) = stream.next().await {
         if b.is_err() {
-            return Err(Error::ContentTooLarge);
+            return Err(Error::ResponseBodyReadFailed);
         }
 
         let b = b.unwrap();

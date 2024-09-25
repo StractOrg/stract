@@ -17,7 +17,7 @@
 use crate::{
     distributed::{
         cluster::Cluster,
-        member::{Service, ShardId},
+        member::{LiveIndexState, Service, ShardId},
         sonic::replication::{
             AllShardsSelector, RandomReplicaSelector, RemoteClient, ReplicatedClient,
             ReusableClientManager, ReusableShardedClient, Shard, ShardIdentifier, ShardedClient,
@@ -27,6 +27,7 @@ use crate::{
     entity_index::EntityMatch,
     entrypoint::{
         entity_search_server,
+        live_index::LiveIndexService,
         search_server::{self, SearchService},
     },
     image_store::Image,
@@ -110,16 +111,14 @@ pub struct InitialSearchResultShard {
     pub shard: ShardId,
 }
 
-struct SearchClientManager;
-
-impl ReusableClientManager for SearchClientManager {
+impl ReusableClientManager for SearchService {
     const CLIENT_REFRESH_INTERVAL: std::time::Duration = CLIENT_REFRESH_INTERVAL;
 
     type Service = SearchService;
 
     type ShardId = ShardId;
 
-    async fn new_client(&self, cluster: &Cluster) -> ShardedClient<Self::Service, Self::ShardId> {
+    async fn new_client(cluster: &Cluster) -> ShardedClient<Self::Service, Self::ShardId> {
         let mut shards = HashMap::new();
         for member in cluster.members().await {
             if let Service::Searcher { host, shard } = member.service {
@@ -140,15 +139,13 @@ impl ReusableClientManager for SearchClientManager {
     }
 }
 
-struct EntitySearchClientManager;
-
-impl ReusableClientManager for EntitySearchClientManager {
+impl ReusableClientManager for entity_search_server::SearchService {
     const CLIENT_REFRESH_INTERVAL: std::time::Duration = CLIENT_REFRESH_INTERVAL;
 
     type Service = entity_search_server::SearchService;
     type ShardId = ();
 
-    async fn new_client(&self, cluster: &Cluster) -> ShardedClient<Self::Service, Self::ShardId> {
+    async fn new_client(cluster: &Cluster) -> ShardedClient<Self::Service, Self::ShardId> {
         let mut replicas = Vec::new();
         for member in cluster.members().await {
             if let Service::EntitySearcher { host } = member.service {
@@ -166,20 +163,46 @@ impl ReusableClientManager for EntitySearchClientManager {
     }
 }
 
+impl ReusableClientManager for LiveIndexService {
+    const CLIENT_REFRESH_INTERVAL: std::time::Duration = CLIENT_REFRESH_INTERVAL;
+
+    type Service = LiveIndexService;
+
+    type ShardId = ShardId;
+
+    async fn new_client(cluster: &Cluster) -> ShardedClient<Self::Service, Self::ShardId> {
+        let mut shards = HashMap::new();
+        for member in cluster.members().await {
+            if let Service::LiveIndex { host, shard, state } = member.service {
+                if state == LiveIndexState::Ready {
+                    shards.entry(shard).or_insert_with(Vec::new).push(host);
+                }
+            }
+        }
+
+        let mut shard_clients = Vec::new();
+
+        for (id, replicas) in shards {
+            let replicated =
+                ReplicatedClient::new(replicas.into_iter().map(RemoteClient::new).collect());
+            let shard = Shard::new(id, replicated);
+            shard_clients.push(shard);
+        }
+
+        ShardedClient::new(shard_clients)
+    }
+}
+
 pub struct DistributedSearcher {
-    client: Mutex<ReusableShardedClient<SearchClientManager>>,
-    entiy_client: Mutex<ReusableShardedClient<EntitySearchClientManager>>,
+    client: Mutex<ReusableShardedClient<SearchService>>,
+    entiy_client: Mutex<ReusableShardedClient<entity_search_server::SearchService>>,
 }
 
 impl DistributedSearcher {
     pub async fn new(cluster: Arc<Cluster>) -> Self {
         Self {
-            client: Mutex::new(
-                ReusableShardedClient::new(cluster.clone(), SearchClientManager).await,
-            ),
-            entiy_client: Mutex::new(
-                ReusableShardedClient::new(cluster, EntitySearchClientManager).await,
-            ),
+            client: Mutex::new(ReusableShardedClient::new(cluster.clone()).await),
+            entiy_client: Mutex::new(ReusableShardedClient::new(cluster).await),
         }
     }
 

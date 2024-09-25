@@ -29,11 +29,10 @@ use std::{
 };
 use url::Url;
 
-use crate::config::WebgraphGranularity;
 use crate::crawler::WeightedUrl;
 use crate::distributed::cluster::Cluster;
 use crate::external_sort::ExternalSorter;
-use crate::webgraph::remote::RemoteWebgraph;
+use crate::webgraph::remote::{Host, Page, RemoteWebgraph};
 use crate::webgraph::Node;
 use crate::webpage::url_ext::UrlExt;
 use crate::SortableFloat;
@@ -148,8 +147,8 @@ struct Budget {
 pub struct CrawlPlanner {
     host_centrality: speedy_kv::Db<NodeID, f64>,
     page_centrality: speedy_kv::Db<NodeID, f64>,
-    page_graph: RemoteWebgraph,
-    host_graph: RemoteWebgraph,
+    page_graph: RemoteWebgraph<Page>,
+    host_graph: RemoteWebgraph<Host>,
     config: CrawlPlannerConfig,
 
     excluded_domains: HashSet<Domain>,
@@ -166,8 +165,8 @@ impl CrawlPlanner {
     ) -> Result<Self> {
         Self::check_config(&config)?;
 
-        let page_graph = RemoteWebgraph::new(cluster.clone(), WebgraphGranularity::Page).await;
-        let host_graph = RemoteWebgraph::new(cluster, WebgraphGranularity::Host).await;
+        let page_graph = RemoteWebgraph::new(cluster.clone()).await;
+        let host_graph = RemoteWebgraph::new(cluster.clone()).await;
 
         let domain_boosts = config
             .domain_boosts

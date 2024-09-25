@@ -322,12 +322,6 @@ impl Html {
         }
 
         while let Some((text, attributes)) = open_links.pop() {
-            if let Some(rel) = attributes.borrow().get("rel") {
-                if rel.contains("nofollow") || rel.contains("sponsored") || rel.contains("ugc") {
-                    continue;
-                }
-            }
-
             if let Some(dest) = attributes.borrow().get("href") {
                 if dest.starts_with("mailto:") || dest.starts_with("tel:") {
                     continue;

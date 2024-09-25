@@ -190,14 +190,11 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     // dropping the handle leaves the cluster
     let _cluster = Arc::new(
         Cluster::join(
-            Member {
-                id: config.cluster_id,
-                service: Service::Webgraph {
-                    host: addr,
-                    granularity: config.granularity,
-                    shard: config.shard,
-                },
-            },
+            Member::new(Service::Webgraph {
+                host: addr,
+                granularity: config.granularity,
+                shard: config.shard,
+            }),
             config.gossip_addr,
             config.gossip_seed_nodes.unwrap_or_default(),
         )

@@ -24,6 +24,7 @@ use super::{encoded_body, Result, Site};
 
 const RETRY_ROBOTSTXT_UNREACHABLE: bool = false;
 
+#[derive(Debug)]
 enum Lookup<T> {
     Found(T),
     /// 404
@@ -113,12 +114,12 @@ impl RobotsTxtManager {
 
     async fn fetch_robots_txt_without_retry(&self, site: &Site) -> Lookup<RobotsTxt> {
         match self
-            .fetch_robots_txt_from_url(&format!("http://{}/robots.txt", site.0))
+            .fetch_robots_txt_from_url(&format!("https://{}/robots.txt", site.0))
             .await
         {
-            Lookup::Unavailable => {
+            Lookup::Unavailable | Lookup::Unreachable => {
                 match self
-                    .fetch_robots_txt_from_url(&format!("https://{}/robots.txt", site.0))
+                    .fetch_robots_txt_from_url(&format!("http://{}/robots.txt", site.0))
                     .await
                 {
                     Lookup::Found(robots_txt) => Lookup::Found(robots_txt),
@@ -136,7 +137,7 @@ impl RobotsTxtManager {
                     Lookup::Unavailable => Lookup::Unavailable,
                 }
             }
-            res => res,
+            Lookup::Found(robots_txt) => Lookup::Found(robots_txt),
         }
     }
 
@@ -202,6 +203,7 @@ impl RobotsTxtManager {
     }
 }
 
+#[derive(Debug)]
 struct RobotsTxt {
     download_time: std::time::Instant,
     robots: robotstxt::Robots,

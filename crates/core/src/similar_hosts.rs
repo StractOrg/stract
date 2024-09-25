@@ -22,7 +22,10 @@ use url::Url;
 
 use crate::{
     ranking::{bitvec_similarity, inbound_similarity},
-    webgraph::{remote::RemoteWebgraph, EdgeLimit, Node, NodeID},
+    webgraph::{
+        remote::{RemoteWebgraph, WebgraphGranularity},
+        EdgeLimit, Node, NodeID,
+    },
     webpage::url_ext::UrlExt,
     SortableFloat,
 };
@@ -33,13 +36,13 @@ pub struct ScoredNode {
     pub score: f64,
 }
 
-pub struct SimilarHostsFinder {
-    webgraph: Arc<RemoteWebgraph>,
+pub struct SimilarHostsFinder<G: WebgraphGranularity> {
+    webgraph: Arc<RemoteWebgraph<G>>,
     max_similar_hosts: usize,
 }
 
-impl SimilarHostsFinder {
-    pub fn new(webgraph: Arc<RemoteWebgraph>, max_similar_hosts: usize) -> Self {
+impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
+    pub fn new(webgraph: Arc<RemoteWebgraph<G>>, max_similar_hosts: usize) -> Self {
         Self {
             webgraph,
             max_similar_hosts,
@@ -57,7 +60,8 @@ impl SimilarHostsFinder {
 
         let nodes: Vec<_> = nodes
             .iter()
-            .map(|url| Node::from(url.to_string()).into_host())
+            .filter_map(|url| Url::robust_parse(url).ok())
+            .map(|url| Node::from(url).into_host())
             .collect();
 
         let domains = nodes

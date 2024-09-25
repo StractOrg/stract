@@ -341,6 +341,10 @@ where
     pub fn new(id: Id, replicas: ReplicatedClient<S>) -> Self {
         Self { replicas, id }
     }
+
+    pub fn id(&self) -> &Id {
+        &self.id
+    }
 }
 
 pub struct ShardedClient<S: sonic::service::Service, Id: ShardIdentifier> {
@@ -358,6 +362,10 @@ where
 
     pub fn is_empty(&self) -> bool {
         self.shards.is_empty()
+    }
+
+    pub fn shards(&self) -> &[Shard<S, Id>] {
+        &self.shards
     }
 
     async fn send_single<Req, Sel>(
@@ -395,6 +403,10 @@ where
         let mut futures = Vec::new();
         for shard in shard_selector.select(&self.shards) {
             futures.push(self.send_single(req.clone(), shard, replica_selector, timeout));
+        }
+
+        if futures.is_empty() {
+            return Err(anyhow::anyhow!("no shards available").into());
         }
 
         let mut results = Vec::new();
@@ -478,7 +490,6 @@ pub trait ReusableClientManager {
     type ShardId: ShardIdentifier;
 
     fn new_client(
-        &self,
         cluster: &Cluster,
     ) -> impl std::future::Future<Output = ShardedClient<Self::Service, Self::ShardId>>;
 }
@@ -490,29 +501,27 @@ where
     cluster: Arc<Cluster>,
     client: Arc<sonic::replication::ShardedClient<M::Service, M::ShardId>>,
     last_client_update: std::time::Instant,
-    manager: M,
 }
 
 impl<M> ReusableShardedClient<M>
 where
     M: ReusableClientManager,
 {
-    pub async fn new(cluster: Arc<Cluster>, manager: M) -> Self {
-        let client = Arc::new(manager.new_client(&cluster).await);
+    pub async fn new(cluster: Arc<Cluster>) -> Self {
+        let client = Arc::new(M::new_client(&cluster).await);
         let last_client_update = std::time::Instant::now();
 
         Self {
             cluster,
             client,
             last_client_update,
-            manager,
         }
     }
 
     pub async fn conn(&mut self) -> Arc<sonic::replication::ShardedClient<M::Service, M::ShardId>> {
         if self.client.is_empty() || self.last_client_update.elapsed() > M::CLIENT_REFRESH_INTERVAL
         {
-            self.client = Arc::new(self.manager.new_client(&self.cluster).await);
+            self.client = Arc::new(M::new_client(&self.cluster).await);
             self.last_client_update = std::time::Instant::now();
         }
 

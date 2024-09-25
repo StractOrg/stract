@@ -12,135 +12,326 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/
+// along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-mod downloaded_db;
-
-use crate::Result;
+mod budgets;
+mod checker;
+mod crawlable_site;
+mod crawled_db;
+use std::fs::File;
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
-use chrono::Utc;
+use crate::ampc::dht::ShardId;
+use crate::config::{CheckIntervals, CrawlerConfig, LiveCrawlerConfig};
+use crate::distributed::cluster::Cluster;
+use crate::distributed::sonic::replication::{
+    AllShardsSelector, RandomReplicaSelector, RandomShardSelector, ShardedClient,
+};
+use crate::entrypoint::search_server;
+use crate::entrypoint::site_stats::FinalSiteStats;
+use crate::{crawler, Result};
+use crate::{
+    distributed::sonic::replication::ReusableShardedClient,
+    entrypoint::{indexer::IndexableWebpage, live_index},
+};
+use crawlable_site::{CrawlableSite, CrawlableSiteGuard};
+use crawled_db::ShardedCrawledDb;
+use tokio::sync::Mutex;
+use tokio::sync::Semaphore;
 use url::Url;
 
-use crate::{
-    config::CrawlerConfig,
-    crawler::reqwest_client,
-    feed::{
-        self,
-        scheduler::{Domain, DomainFeeds, Split},
-    },
-};
+const SITE_URL_BATCH_SIZE: usize = 100;
+const DEFAULT_CONSISTENCY_FRACTION: f64 = 0.5;
+const BLOG_FRACTION_THRESHOLD: f64 = 0.5;
+const NEWS_FRACTION_THRESHOLD: f64 = 0.5;
+const MIN_CRAWL_DELAY: Duration = Duration::from_secs(30);
+const MAX_CRAWL_DELAY: Duration = Duration::from_secs(300);
+const TICK_INTERVAL: Duration = Duration::from_secs(5);
 
-use downloaded_db::DownloadedDb;
-
-use super::{Feeds, FEED_CHECK_INTERVAL};
-
-pub enum CrawlResults {
-    None,
-    HasInserts,
+struct Client {
+    live_index: Mutex<ReusableShardedClient<live_index::LiveIndexService>>,
+    search: Mutex<ReusableShardedClient<search_server::SearchService>>,
+    reqwest: reqwest::Client,
 }
 
-pub struct Crawler {
-    feeds: Vec<Feeds>,
-    downloaded_db: DownloadedDb,
-    _config: Arc<CrawlerConfig>,
-    client: reqwest::Client,
-}
-
-impl Crawler {
-    pub fn new(
-        split: Split,
-        downloaded_db: DownloadedDb,
-        config: Arc<CrawlerConfig>,
-    ) -> Result<Self> {
-        let client = reqwest_client(&config)?;
+impl Client {
+    pub async fn new(cluster: Arc<Cluster>, crawler_config: &CrawlerConfig) -> Result<Self> {
+        let live_index = Mutex::new(ReusableShardedClient::new(cluster.clone()).await);
+        let search = Mutex::new(ReusableShardedClient::new(cluster.clone()).await);
 
         Ok(Self {
-            feeds: split.into(),
-            downloaded_db,
-            _config: config,
-            client,
+            live_index,
+            search,
+            reqwest: crawler::reqwest_client(crawler_config)?,
         })
     }
 
-    async fn process_urls(&self, _urls: Vec<Url>) -> Result<bool> {
-        todo!()
-
-        // if urls.is_empty() {
-        //     return Ok(false);
-        // }
-
-        // let domain = urls.first().unwrap().into();
-        // let job = WorkerJob {
-        //     domain,
-        //     urls: urls
-        //         .clone()
-        //         .into_iter()
-        //         .map(|url| RetrieableUrl::from(WeightedUrl { url, weight: 1.0 }))
-        //         .collect(),
-        //     wandering_urls: 0,
-        // };
-
-        // let executor = JobExecutor::new(
-        //     job,
-        //     self.client.clone(),
-        //     self.config.clone(),
-        //     self.indexer.clone(),
-        // );
-        // executor.run().await;
-
-        // for url in &urls {
-        //     self.downloaded_db.insert(url)?;
-        // }
-
-        // Ok(true)
+    pub fn reqwest(&self) -> &reqwest::Client {
+        &self.reqwest
     }
 
-    async fn process_feed(&self, domain_feeds: &DomainFeeds) -> Result<bool> {
-        let mut urls = Vec::new();
+    async fn live_conn(&self) -> Arc<ShardedClient<live_index::LiveIndexService, ShardId>> {
+        self.live_index.lock().await.conn().await
+    }
 
-        for feed in domain_feeds.feeds.iter() {
-            let content = self
-                .client
-                .get(feed.url.as_str())
-                .send()
-                .await?
-                .text()
-                .await?;
+    async fn search_conn(&self) -> Arc<ShardedClient<search_server::SearchService, ShardId>> {
+        self.search.lock().await.conn().await
+    }
 
-            let feed = feed::parse(&content, feed.kind)?;
+    pub async fn index(&self, pages: Vec<IndexableWebpage>) -> Result<()> {
+        let conn = self.live_conn().await;
 
-            for url in feed.links {
-                if !self.downloaded_db.has_downloaded(&url)?
-                    && Domain::from(&url) == domain_feeds.domain
-                {
-                    urls.push(url);
+        let req = live_index::IndexWebpages {
+            pages,
+            consistency_fraction: Some(DEFAULT_CONSISTENCY_FRACTION),
+        };
+
+        while let Err(e) = conn
+            .send(req.clone(), &RandomShardSelector, &RandomReplicaSelector)
+            .await
+        {
+            tracing::error!("Failed to index pages: {e}");
+            tokio::time::sleep(Duration::from_millis(1_000)).await;
+        }
+
+        Ok(())
+    }
+
+    async fn get_site_urls_from_backbone(&self, site: &str) -> Result<Vec<Url>> {
+        let mut res = Vec::new();
+        let conn = self.search_conn().await;
+        let mut offset = 0;
+
+        while let Ok(resp) = conn
+            .send(
+                search_server::GetSiteUrls {
+                    site: site.to_string(),
+                    offset,
+                    limit: SITE_URL_BATCH_SIZE,
+                },
+                &AllShardsSelector,
+                &RandomReplicaSelector,
+            )
+            .await
+        {
+            let urls: Vec<_> = resp
+                .into_iter()
+                .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v.urls))
+                .collect();
+
+            if urls.is_empty() {
+                break;
+            }
+
+            res.extend(urls);
+            offset += SITE_URL_BATCH_SIZE;
+        }
+
+        Ok(res)
+    }
+
+    async fn get_site_urls_from_live(&self, site: &str) -> Result<Vec<Url>> {
+        let mut res = Vec::new();
+        let conn = self.live_conn().await;
+        let mut offset = 0;
+
+        while let Ok(resp) = conn
+            .send(
+                search_server::GetSiteUrls {
+                    site: site.to_string(),
+                    offset,
+                    limit: SITE_URL_BATCH_SIZE,
+                },
+                &AllShardsSelector,
+                &RandomReplicaSelector,
+            )
+            .await
+        {
+            let urls: Vec<_> = resp
+                .into_iter()
+                .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v.urls))
+                .collect();
+
+            if urls.is_empty() {
+                break;
+            }
+
+            res.extend(urls);
+            offset += SITE_URL_BATCH_SIZE;
+        }
+
+        Ok(res)
+    }
+
+    pub async fn get_site_urls(&self, site: &str) -> Vec<Url> {
+        let mut res = Vec::new();
+
+        if let Ok(urls) = self.get_site_urls_from_backbone(site).await {
+            res.extend(urls);
+        }
+
+        if let Ok(urls) = self.get_site_urls_from_live(site).await {
+            res.extend(urls);
+        }
+
+        res
+    }
+}
+
+impl From<LiveCrawlerConfig> for CrawlerConfig {
+    fn from(config: LiveCrawlerConfig) -> Self {
+        Self {
+            num_worker_threads: 1,
+            user_agent: config.user_agent,
+            robots_txt_cache_sec: crate::config::defaults::Crawler::robots_txt_cache_sec(),
+            min_politeness_factor: 0,
+            start_politeness_factor: 1,
+            min_crawl_delay_ms: MIN_CRAWL_DELAY.as_millis() as u64,
+            max_crawl_delay_ms: MAX_CRAWL_DELAY.as_millis() as u64,
+            max_politeness_factor: crate::config::defaults::Crawler::max_politeness_factor(),
+            max_url_slowdown_retry: crate::config::defaults::Crawler::max_url_slowdown_retry(),
+            timeout_seconds: 60,
+            s3: crate::config::S3Config {
+                bucket: String::new(),
+                folder: String::new(),
+                access_key: String::new(),
+                secret_key: String::new(),
+                endpoint: String::new(),
+            },
+            router_hosts: vec![],
+        }
+    }
+}
+
+struct SiteStats {
+    sites: Vec<FinalSiteStats>,
+}
+
+impl SiteStats {
+    pub fn open(path: PathBuf) -> Result<Self> {
+        let file = File::open(path)?;
+        let sites = serde_json::from_reader(file)?;
+        Ok(Self { sites })
+    }
+
+    pub fn blogs(&self) -> impl Iterator<Item = &FinalSiteStats> {
+        self.sites.iter().filter(|site| {
+            site.stats().blogposts as f64 / site.stats().pages as f64 > BLOG_FRACTION_THRESHOLD
+        })
+    }
+
+    pub fn news(&self) -> impl Iterator<Item = &FinalSiteStats> {
+        self.sites.iter().filter(|site| {
+            site.stats().news_articles as f64 / site.stats().pages as f64 > NEWS_FRACTION_THRESHOLD
+        })
+    }
+
+    pub fn all(&self) -> impl Iterator<Item = &FinalSiteStats> {
+        self.sites.iter()
+    }
+}
+
+pub struct Crawler {
+    client: Arc<Client>,
+    db: Arc<ShardedCrawledDb>,
+    sites: Vec<Arc<CrawlableSite>>,
+    num_worker_threads: usize,
+    check_intervals: CheckIntervals,
+    crawler_config: Arc<CrawlerConfig>,
+}
+
+impl Crawler {
+    pub async fn new(config: LiveCrawlerConfig) -> Result<Self> {
+        let crawler_config = Arc::new(CrawlerConfig::from(config.clone()));
+
+        let cluster = Arc::new(
+            Cluster::join_as_spectator(
+                config.gossip.addr,
+                config.gossip.seed_nodes.unwrap_or_default(),
+            )
+            .await?,
+        );
+
+        let client = Arc::new(Client::new(cluster, &crawler_config).await?);
+        let db = Arc::new(ShardedCrawledDb::open(config.crawled_db_path)?);
+
+        let site_stats = SiteStats::open(config.site_stats_path)?;
+        let sites: Vec<_> = site_stats.all().cloned().collect();
+
+        let budgets = budgets::SiteBudgets::new(
+            &config.host_centrality_path,
+            &site_stats,
+            config.daily_budget.clone(),
+        )?;
+
+        let mut crawlable_sites = Vec::new();
+        tracing::debug!("Initializing crawler db with previously crawled urls");
+        for site in sites {
+            for url in client.get_site_urls(site.site().as_str()).await {
+                if !db.has_crawled(&url)? {
+                    db.insert(&url)?;
                 }
             }
-        }
 
-        self.process_urls(urls).await
-    }
-
-    pub async fn check_feeds(&mut self) -> CrawlResults {
-        let mut feeds = self.feeds.clone();
-
-        let mut futures = Vec::new();
-        for feeds in feeds.iter_mut() {
-            if feeds.last_checked + FEED_CHECK_INTERVAL < Utc::now() {
-                futures.push(self.process_feed(&feeds.feed));
-                feeds.last_checked = Utc::now();
+            if let Some(drip_rate) = budgets.drip_rate(site.site()) {
+                crawlable_sites.push(Arc::new(CrawlableSite::new(site, &client, drip_rate)?));
             }
         }
 
-        let res = futures::future::join_all(futures).await;
+        Ok(Self {
+            client,
+            db,
+            sites: crawlable_sites,
+            num_worker_threads: config.num_worker_threads,
+            check_intervals: config.check_intervals,
+            crawler_config,
+        })
+    }
 
-        self.feeds = feeds;
+    pub async fn run(mut self) -> Result<()> {
+        let mut interval = tokio::time::interval(TICK_INTERVAL);
+        let semaphore = Arc::new(Semaphore::new(self.num_worker_threads));
 
-        if res.iter().filter_map(|r| r.as_ref().ok()).any(|r| *r) {
-            CrawlResults::HasInserts
-        } else {
-            CrawlResults::None
+        loop {
+            interval.tick().await;
+            tracing::debug!("Tick");
+
+            for site in &mut self.sites {
+                if site.currently_crawling() {
+                    tracing::debug!("Site {} is currently crawling", site.site().as_str());
+                    continue;
+                }
+
+                site.drip().await;
+
+                if site.should_crawl(&self.check_intervals).await {
+                    tracing::debug!("Site {} should crawl", site.site().as_str());
+                    let client = self.client.clone();
+                    let intervals = self.check_intervals.clone();
+                    let guard = CrawlableSiteGuard::new(
+                        site.clone(),
+                        self.db.clone(),
+                        self.crawler_config.clone(),
+                    )
+                    .await;
+                    let semaphore = semaphore.clone();
+
+                    tokio::task::spawn(async move {
+                        let _permit = semaphore.acquire().await.unwrap();
+                        let url = guard.url();
+
+                        if let Err(e) = guard.crawl(&client, &intervals).await {
+                            if let Ok(url) = url {
+                                tracing::error!("Failed to crawl site {}: {:?}", url, e);
+                            } else {
+                                tracing::error!("Failed to crawl site: {:?}", e);
+                            }
+                        }
+                    });
+                }
+            }
         }
     }
 }

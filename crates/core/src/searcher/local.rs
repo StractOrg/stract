@@ -343,6 +343,13 @@ where
     pub fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
         self.index.guard().inverted_index().top_key_phrases(top_n)
     }
+
+    pub fn get_site_urls(&self, site: &str, offset: usize, limit: usize) -> Vec<Url> {
+        self.index
+            .guard()
+            .inverted_index()
+            .get_site_urls(site, offset, limit)
+    }
 }
 
 #[cfg(test)]

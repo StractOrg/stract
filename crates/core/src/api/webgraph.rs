@@ -156,6 +156,10 @@ pub mod host {
 }
 
 pub mod page {
+    use url::Url;
+
+    use crate::webpage::url_ext::UrlExt;
+
     use super::*;
 
     #[derive(serde::Deserialize, IntoParams)]
@@ -175,7 +179,8 @@ pub mod page {
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<PageLinksParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        let node = Node::from(params.page);
+        let page = Url::robust_parse(&params.page).map_err(|_| StatusCode::BAD_REQUEST)?;
+        let node = Node::from(page);
         let links = ingoing_links(state, node, WebgraphGranularity::Page)
             .await
             .map_err(|_| {
@@ -197,7 +202,8 @@ pub mod page {
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<PageLinksParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
-        let node = Node::from(params.page);
+        let url = Url::robust_parse(&params.page).map_err(|_| StatusCode::BAD_REQUEST)?;
+        let node = Node::from(url);
         let links = outgoing_links(state, node, WebgraphGranularity::Page)
             .await
             .map_err(|_| {
@@ -214,12 +220,20 @@ async fn ingoing_links(
     node: Node,
     level: WebgraphGranularity,
 ) -> anyhow::Result<Vec<FullEdge>> {
-    let graph = match level {
-        WebgraphGranularity::Host => &state.host_webgraph,
-        WebgraphGranularity::Page => &state.page_webgraph,
-    };
-
-    graph.ingoing_edges(node, EdgeLimit::Limit(1024)).await
+    match level {
+        WebgraphGranularity::Host => {
+            state
+                .host_webgraph
+                .ingoing_edges(node, EdgeLimit::Limit(1024))
+                .await
+        }
+        WebgraphGranularity::Page => {
+            state
+                .page_webgraph
+                .ingoing_edges(node, EdgeLimit::Limit(1024))
+                .await
+        }
+    }
 }
 
 async fn outgoing_links(
@@ -227,12 +241,20 @@ async fn outgoing_links(
     node: Node,
     level: WebgraphGranularity,
 ) -> anyhow::Result<Vec<FullEdge>> {
-    let graph = match level {
-        WebgraphGranularity::Host => &state.host_webgraph,
-        WebgraphGranularity::Page => &state.page_webgraph,
-    };
-
-    graph.outgoing_edges(node, EdgeLimit::Limit(1024)).await
+    match level {
+        WebgraphGranularity::Host => {
+            state
+                .host_webgraph
+                .outgoing_edges(node, EdgeLimit::Limit(1024))
+                .await
+        }
+        WebgraphGranularity::Page => {
+            state
+                .page_webgraph
+                .outgoing_edges(node, EdgeLimit::Limit(1024))
+                .await
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema)]

@@ -24,7 +24,6 @@ pub mod configure;
 pub mod crawler;
 mod entity;
 pub mod entity_search_server;
-pub mod feed_indexer;
 pub mod indexer;
 pub mod safety_classifier;
 pub mod search_server;

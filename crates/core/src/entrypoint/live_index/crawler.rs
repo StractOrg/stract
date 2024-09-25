@@ -13,20 +13,15 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::time::Duration;
 
-pub use self::index::LiveIndex;
-pub use self::index_manager::IndexManager;
+use crate::config;
+use crate::live_index;
+use crate::Result;
 
-pub mod crawler;
-pub mod index;
-mod index_manager;
+pub async fn run(config: config::LiveCrawlerConfig) -> Result<()> {
+    let crawler = live_index::Crawler::new(config).await?;
 
-pub use self::crawler::Crawler;
+    crawler.run().await?;
 
-const TTL: Duration = Duration::from_secs(60 * 60 * 24 * 60); // 60 days
-const PRUNE_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
-const COMPACT_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
-const AUTO_COMMIT_INTERVAL: Duration = Duration::from_secs(60 * 5); // 5 minutes
-const EVENT_LOOP_INTERVAL: Duration = Duration::from_secs(5);
-const BATCH_SIZE: usize = 512;
+    Ok(())
+}

@@ -41,7 +41,7 @@ use crate::ranking::{
 };
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::web_spell::SpellChecker;
-use crate::webgraph::remote::RemoteWebgraph;
+use crate::webgraph::remote::{RemoteWebgraph, WebgraphGranularity};
 use crate::webgraph::EdgeLimit;
 use crate::widgets::{Widget, Widgets};
 use crate::{
@@ -177,7 +177,7 @@ pub trait Graph {
     ) -> impl Future<Output = Vec<Vec<webgraph::Edge<()>>>>;
 }
 
-impl Graph for RemoteWebgraph {
+impl<G: WebgraphGranularity> Graph for RemoteWebgraph<G> {
     async fn batch_raw_ingoing(
         &self,
         nodes: &[webgraph::NodeID],
@@ -570,13 +570,23 @@ where
                 let liked: Vec<_> = host_rankings
                     .liked
                     .iter()
-                    .map(|n| webgraph::Node::from(n.clone()).into_host().id())
+                    .filter_map(|n| {
+                        Url::parse(n)
+                            .or_else(|_| Url::parse(&format!("http://{}", n)))
+                            .ok()
+                    })
+                    .map(|n| webgraph::Node::from(n).into_host().id())
                     .collect();
 
                 let disliked: Vec<_> = host_rankings
                     .disliked
                     .iter()
-                    .map(|n| webgraph::Node::from(n.clone()).into_host().id())
+                    .filter_map(|n| {
+                        Url::parse(n)
+                            .or_else(|_| Url::parse(&format!("http://{}", n)))
+                            .ok()
+                    })
+                    .map(|n| webgraph::Node::from(n).into_host().id())
                     .collect();
                 inbound_similarity::Scorer::new(webgraph, &liked, &disliked, false).await
             }

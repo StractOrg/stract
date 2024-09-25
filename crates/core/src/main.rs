@@ -177,6 +177,9 @@ enum AdminIndexOptions {
 enum LiveIndex {
     /// Serve the live index.
     Serve { config_path: String },
+
+    /// Start the live index crawler.
+    Crawler { config_path: String },
 }
 
 #[derive(Subcommand)]
@@ -262,11 +265,6 @@ enum IndexingOptions {
         output_path: String,
     },
 
-    /// Create the feed index. Used to find feeds to put into the live index.
-    Feed {
-        config_path: String,
-    },
-
     // Create an index of canonical urls.
     Canonical {
         config_path: String,
@@ -308,10 +306,6 @@ fn main() -> Result<()> {
                 wikipedia_dump_path,
                 output_path,
             } => entrypoint::EntityIndexer::run(wikipedia_dump_path, output_path)?,
-            IndexingOptions::Feed { config_path } => {
-                let config = load_toml_config(config_path);
-                entrypoint::feed_indexer::build(config)?;
-            }
             IndexingOptions::MergeSearch { paths } => {
                 let pointers = paths
                     .into_iter()
@@ -454,7 +448,15 @@ fn main() -> Result<()> {
                 tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?
-                    .block_on(entrypoint::live_index::serve(config))?;
+                    .block_on(entrypoint::live_index::search_server::serve(config))?;
+            }
+            LiveIndex::Crawler { config_path } => {
+                let config = load_toml_config(config_path);
+
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::live_index::crawler::run(config))?;
             }
         },
         Commands::WebSpell { config_path } => {

@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::anyhow;
 use hashbrown::HashSet;
-use quick_xml::events::Event;
 use rand::seq::SliceRandom;
 
 use std::{
@@ -30,8 +29,10 @@ use url::Url;
 use crate::{
     config::CrawlerConfig,
     crawler::MAX_URL_LEN_BYTES,
+    dated_url::DatedUrl,
     distributed::{retry_strategy::ExponentialBackoff, sonic},
     entrypoint::crawler::router::{NewJob, RouterService},
+    sitemap::{parse_sitemap, SitemapEntry},
     warc,
     webpage::{url_ext::UrlExt, Html},
 };
@@ -195,7 +196,10 @@ impl<S: DatumStream> JobExecutor<S> {
         }
 
         self.scheduled_urls().await;
-        self.crawl_sitemaps().await;
+
+        if self.wandered_urls < self.job.wandering_urls {
+            self.crawl_sitemaps().await;
+        }
 
         while self.wandered_urls < self.job.wandering_urls
             && self.wander_prioritiser.known_urls() > 0
@@ -288,16 +292,22 @@ impl<S: DatumStream> JobExecutor<S> {
                 let sitemaps = self.robotstxt.sitemaps(url).await;
 
                 for sitemap in sitemaps {
-                    self.sitemap_urls
-                        .extend(self.urls_from_sitemap(sitemap, 5).await);
+                    self.sitemap_urls.extend(
+                        self.urls_from_sitemap(sitemap, 5)
+                            .await
+                            .into_iter()
+                            .map(|dated_url| dated_url.url),
+                    );
                 }
             }
         }
     }
 
-    async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>) {
+    pub async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>) {
+        tracing::debug!("processing {} urls", urls.len());
         while let Some(retryable_url) = urls.pop_front() {
             if let UrlVisit::Skip = self.verify_url(&retryable_url).await {
+                tracing::debug!("skipping url: {}", retryable_url.url());
                 continue;
             }
 
@@ -420,7 +430,7 @@ impl<S: DatumStream> JobExecutor<S> {
     }
 
     async fn process_url(&mut self, url: Url) -> Result<ProcessedUrl> {
-        let datum = self.crawl_url(url.clone()).await?;
+        let datum = self.polite_crawl_url(url.clone()).await?;
         self.save_datum(datum.clone()).await;
 
         match Html::parse(&datum.body, datum.url.as_str()) {
@@ -527,7 +537,6 @@ impl<S: DatumStream> JobExecutor<S> {
         res: &reqwest::Response,
         url: &Url,
         payload_type: warc::PayloadType,
-        fetch_time: Duration,
     ) -> Result<Option<CrawlDatum>> {
         let status_code = res.status().as_u16();
 
@@ -547,14 +556,51 @@ impl<S: DatumStream> JobExecutor<S> {
                 url,
                 payload_type,
                 body: String::new(),
-                fetch_time_ms: fetch_time.as_millis() as u64,
+                fetch_time_ms: 0,
             }))
         } else {
             Ok(None)
         }
     }
 
-    async fn crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
+    async fn unpolite_crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
+        tracing::debug!("crawling url: {}", url);
+
+        let res = self.fetch_with_https_priority(url.clone()).await?;
+
+        let payload_type = self.check_headers(&res);
+        let status_code = res.status();
+        let mut res_url = res.url().clone();
+
+        if let Ok(payload_type) = payload_type {
+            if let Ok(Some(datum)) = self.redirect_datum(&res, &url, payload_type) {
+                return Ok(datum);
+            }
+        }
+        if status_code != reqwest::StatusCode::OK {
+            return Err(Error::FetchFailed {
+                status_code,
+                headers: res.headers().clone(),
+            });
+        }
+
+        let body = encoded_body(res).await;
+
+        self.crawled_urls.insert(url.clone());
+
+        res_url.normalize_in_place();
+
+        self.crawled_urls.insert(res_url.clone());
+
+        Ok(CrawlDatum {
+            url: res_url,
+            body: body?,
+            payload_type: payload_type?,
+            fetch_time_ms: 0,
+        })
+    }
+
+    async fn polite_crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
         let mut url = url;
         url.normalize_in_place();
 
@@ -563,45 +609,15 @@ impl<S: DatumStream> JobExecutor<S> {
         }
 
         let start = Instant::now();
-        let res = self.fetch_with_https_priority(url.clone()).await;
+        let res = self.unpolite_crawl_url(url).await;
         let fetch_time = start.elapsed();
         self.politeness_delay(fetch_time).await;
-
-        // we want to delay before returning the error
-        let res = res?;
-
-        self.crawled_urls.insert(url.clone());
-        let payload_type = self.check_headers(&res)?;
-
-        if let Some(datum) = self.redirect_datum(&res, &url, payload_type, fetch_time)? {
-            return Ok(datum);
-        }
-
-        let status_code = res.status();
-
-        if status_code != reqwest::StatusCode::OK {
-            return Err(Error::FetchFailed {
-                status_code,
-                headers: res.headers().clone(),
-            });
-        }
-
-        let mut res_url = res.url().clone();
-        res_url.normalize_in_place();
-
-        self.crawled_urls.insert(res_url.clone());
-
-        let body = encoded_body(res).await?;
-
-        Ok(CrawlDatum {
-            url: res_url,
-            body,
-            payload_type,
-            fetch_time_ms: fetch_time.as_millis() as u64,
-        })
+        let mut datum = res?;
+        datum.fetch_time_ms = fetch_time.as_millis() as u64;
+        Ok(datum)
     }
 
-    async fn urls_from_sitemap(&self, sitemap: Url, max_depth: usize) -> Vec<Url> {
+    async fn urls_from_sitemap(&self, sitemap: Url, max_depth: usize) -> Vec<DatedUrl> {
         let mut stack = vec![(sitemap, 0)];
         let mut urls = vec![];
 
@@ -646,157 +662,5 @@ impl<S: DatumStream> JobExecutor<S> {
         }
 
         urls
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum SitemapEntry {
-    Url(Url),
-    Sitemap(Url),
-}
-
-fn parse_sitemap(s: &str) -> Vec<SitemapEntry> {
-    let mut reader = quick_xml::Reader::from_str(s);
-
-    let mut res = vec![];
-
-    let mut in_sitemap = false;
-    let mut in_url = false;
-    let mut in_loc = false;
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(ref e)) => {
-                if e.name().as_ref() == b"sitemap" {
-                    in_sitemap = true;
-                } else if e.name().as_ref() == b"url" {
-                    in_url = true;
-                } else if e.name().as_ref() == b"loc" {
-                    in_loc = true;
-                }
-            }
-            Ok(Event::End(ref e)) => {
-                if e.name().as_ref() == b"sitemap" {
-                    in_sitemap = false;
-                } else if e.name().as_ref() == b"url" {
-                    in_url = false;
-                } else if e.name().as_ref() == b"loc" {
-                    in_loc = false;
-                }
-            }
-            Ok(Event::Text(e)) => {
-                if in_sitemap && in_loc {
-                    if let Ok(url) = Url::parse(&e.unescape().unwrap()) {
-                        res.push(SitemapEntry::Sitemap(url));
-                    }
-                } else if in_url && in_loc {
-                    if let Ok(url) = Url::parse(&e.unescape().unwrap()) {
-                        res.push(SitemapEntry::Url(url));
-                    }
-                }
-            }
-            Ok(Event::Eof) => break,
-            Err(e) => {
-                tracing::debug!("failed to parse sitemap: {}", e);
-                break;
-            }
-            _ => (),
-        }
-    }
-
-    res
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn parse_sitemap() {
-        let dr = r#"<sitemapindex>
-        <sitemap>
-        <loc>https://www.dr.dk/drtv/sitemap.xml</loc>
-        </sitemap>
-        <sitemap>
-        <loc>https://www.dr.dk/sitemap.tvguide.xml</loc>
-        </sitemap>
-        <sitemap>
-        <loc>
-        https://www.dr.dk/sitemap.kommunalvalg.resultater.xml
-        </loc>
-        </sitemap>
-        <sitemap>
-        <loc>https://www.dr.dk/sitemap.folketingsvalg2022.xml</loc>
-        </sitemap>
-        </sitemapindex>"#;
-
-        let entries = super::parse_sitemap(dr);
-        assert_eq!(
-            entries,
-            vec![
-                super::SitemapEntry::Sitemap("https://www.dr.dk/drtv/sitemap.xml".parse().unwrap()),
-                super::SitemapEntry::Sitemap(
-                    "https://www.dr.dk/sitemap.tvguide.xml".parse().unwrap()
-                ),
-                super::SitemapEntry::Sitemap(
-                    "https://www.dr.dk/sitemap.kommunalvalg.resultater.xml"
-                        .parse()
-                        .unwrap()
-                ),
-                super::SitemapEntry::Sitemap(
-                    "https://www.dr.dk/sitemap.folketingsvalg2022.xml"
-                        .parse()
-                        .unwrap()
-                ),
-            ]
-        );
-
-        let dr = r#"<urlset>
-        <url>
-        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
-        <loc>https://www.dr.dk/drtv/serie/sleepover_6382</loc>
-        </url>
-        <url>
-        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
-        <loc>https://www.dr.dk/drtv/saeson/sleepover_9673</loc>
-        </url>
-        <url>
-        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
-        <loc>
-        https://www.dr.dk/drtv/episode/sleepover_-zoologisk-museum_52239
-        </loc>
-        </url>
-        <url>
-        <lastmod>2023-10-18T05:40:04.7435930+00:00</lastmod>
-        <loc>
-        https://www.dr.dk/drtv/episode/sleepover_-koebenhavns-raadhus_52252
-        </loc>
-        </url>
-        </urlset>"#;
-
-        let entries = super::parse_sitemap(dr);
-        assert_eq!(
-            entries,
-            vec![
-                super::SitemapEntry::Url(
-                    "https://www.dr.dk/drtv/serie/sleepover_6382"
-                        .parse()
-                        .unwrap()
-                ),
-                super::SitemapEntry::Url(
-                    "https://www.dr.dk/drtv/saeson/sleepover_9673"
-                        .parse()
-                        .unwrap()
-                ),
-                super::SitemapEntry::Url(
-                    "https://www.dr.dk/drtv/episode/sleepover_-zoologisk-museum_52239"
-                        .parse()
-                        .unwrap()
-                ),
-                super::SitemapEntry::Url(
-                    "https://www.dr.dk/drtv/episode/sleepover_-koebenhavns-raadhus_52252"
-                        .parse()
-                        .unwrap()
-                ),
-            ]
-        );
     }
 }

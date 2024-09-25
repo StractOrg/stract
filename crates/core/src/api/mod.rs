@@ -33,7 +33,7 @@ use crate::{
     ranking::models::lambdamart::LambdaMART,
     searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher, SearchClient},
     similar_hosts::SimilarHostsFinder,
-    webgraph::remote::RemoteWebgraph,
+    webgraph::remote::{Host, Page, RemoteWebgraph},
 };
 
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
@@ -72,14 +72,14 @@ pub struct Counters {
 
 pub struct State {
     pub config: ApiConfig,
-    pub searcher: Arc<ApiSearcher<DistributedSearcher, LiveSearcher, Arc<RemoteWebgraph>>>,
-    pub page_webgraph: Arc<RemoteWebgraph>,
-    pub host_webgraph: Arc<RemoteWebgraph>,
+    pub searcher: Arc<ApiSearcher<DistributedSearcher, LiveSearcher, Arc<RemoteWebgraph<Host>>>>,
+    pub page_webgraph: Arc<RemoteWebgraph<Page>>,
+    pub host_webgraph: Arc<RemoteWebgraph<Host>>,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
     pub _cluster: Arc<Cluster>,
-    pub similar_hosts: SimilarHostsFinder,
+    pub similar_hosts: SimilarHostsFinder<Host>,
 }
 
 pub async fn favicon() -> impl IntoResponse {
@@ -172,10 +172,8 @@ pub async fn router(
         None => Bangs::empty(),
     };
 
-    let host_webgraph =
-        RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Host).await;
-    let page_webgraph =
-        RemoteWebgraph::new(cluster.clone(), crate::config::WebgraphGranularity::Page).await;
+    let host_webgraph = RemoteWebgraph::<Host>::new(cluster.clone()).await;
+    let page_webgraph = RemoteWebgraph::<Page>::new(cluster.clone()).await;
 
     let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster)).await;
     let live_searcher = LiveSearcher::new(Arc::clone(&cluster));

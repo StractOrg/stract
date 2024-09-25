@@ -45,6 +45,7 @@ sonic_service!(
         GetHomepageDescriptions,
         TopKeyPhrases,
         Size,
+        GetSiteUrls,
     ]
 );
 
@@ -73,13 +74,10 @@ impl SearchService {
         local_searcher.set_snippet_config(config.snippet);
 
         let cluster_handle = Cluster::join(
-            Member {
-                id: config.cluster_id,
-                service: Service::Searcher {
-                    host: config.host,
-                    shard: config.shard,
-                },
-            },
+            Member::new(Service::Searcher {
+                host: config.host,
+                shard: config.shard,
+            }),
             config.gossip_addr,
             config.gossip_seed_nodes.unwrap_or_default(),
         )
@@ -186,5 +184,29 @@ impl sonic::service::Message<SearchService> for Size {
                 .inverted_index()
                 .num_documents(),
         }
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct GetSiteUrls {
+    pub site: String,
+    pub offset: usize,
+    pub limit: usize,
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct SiteUrls {
+    #[bincode(with_serde)]
+    pub urls: Vec<Url>,
+}
+
+impl sonic::service::Message<SearchService> for GetSiteUrls {
+    type Response = SiteUrls;
+    async fn handle(self, server: &SearchService) -> Self::Response {
+        let urls = server
+            .local_searcher
+            .get_site_urls(&self.site, self.offset, self.limit);
+
+        SiteUrls { urls }
     }
 }

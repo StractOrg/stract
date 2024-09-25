@@ -21,41 +21,128 @@ use std::{
 };
 
 use bloom::BytesBloomFilter;
+use url::Url;
 
 use crate::{
     config::{self, SiteStatsConfig},
     entrypoint::download_all_warc_files,
+    feed::Feed,
     webgraph::Node,
     webpage::{url_ext::UrlExt, Html},
     Result,
 };
+
+const TOP_FEEDS_PER_SITE: Option<usize> = Some(10);
+const MIN_FEED_COUNT: u64 = 1;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Default)]
 pub struct SiteStats {
     pages: u64,
     blogposts: u64,
     news_articles: u64,
+    feeds: HashMap<Feed, u64>,
 }
 
 impl AddAssign<SiteStats> for SiteStats {
     fn add_assign(&mut self, rhs: SiteStats) {
         self.pages += rhs.pages;
         self.blogposts += rhs.blogposts;
-        self.news_articles += rhs.news_articles
+        self.news_articles += rhs.news_articles;
+
+        for (feed, count) in rhs.feeds {
+            *self.feeds.entry(feed).or_default() += count;
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct FinalStats {
+    pub pages: u64,
+    pub blogposts: u64,
+    pub news_articles: u64,
+    pub feeds: Vec<FeedCount>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct FeedCount {
+    feed: Feed,
+    count: u64,
+}
+
+impl From<FeedCount> for Feed {
+    fn from(feed_count: FeedCount) -> Self {
+        feed_count.feed
+    }
+}
+
+impl From<(Feed, u64)> for FeedCount {
+    fn from((feed, count): (Feed, u64)) -> Self {
+        Self { feed, count }
+    }
+}
+
+impl From<SiteStats> for FinalStats {
+    fn from(stats: SiteStats) -> Self {
+        Self {
+            pages: stats.pages,
+            blogposts: stats.blogposts,
+            news_articles: stats.news_articles,
+            feeds: stats
+                .feeds
+                .into_iter()
+                .map(|(feed, count)| FeedCount::from((feed, count)))
+                .collect(),
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct FinalSiteStats {
+    site: Site,
+    #[serde(flatten)]
+    stats: FinalStats,
+}
+
+impl FinalSiteStats {
+    pub fn site(&self) -> &Site {
+        &self.site
+    }
+
+    pub fn stats(&self) -> &FinalStats {
+        &self.stats
     }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 #[serde(transparent)]
-struct Site(String);
+pub struct Site(String);
+
+impl Site {
+    fn from_url(url: &str) -> Result<Self> {
+        let url = Url::robust_parse(url)?;
+        let root_domain = url
+            .root_domain()
+            .ok_or(anyhow::anyhow!("Failed to get root domain from url"))?;
+        Ok(Self(root_domain.to_string()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn url(&self) -> Result<Url> {
+        Url::robust_parse(&self.0).map_err(|_| anyhow::anyhow!("Failed to parse url"))
+    }
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct SiteId([u8; 8]);
 
 impl SiteId {
-    fn from_url(url: String) -> Self {
-        let node_id = Node::from(url).into_host().id();
-        Self(node_id.as_u64().to_be_bytes())
+    fn from_url(url: &str) -> Result<Self> {
+        let url = Url::robust_parse(url)?;
+        let node_id = Node::from(&url).into_host().id();
+        Ok(Self(node_id.as_u64().to_be_bytes()))
     }
 }
 
@@ -63,13 +150,6 @@ impl AsRef<[u8]> for SiteId {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
     }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-struct FinalSiteStats {
-    site: Site,
-    #[serde(flatten)]
-    stats: SiteStats,
 }
 
 struct SiteFilter {
@@ -123,10 +203,16 @@ impl StatsWorker {
 
         for file in warc_files.by_ref() {
             for record in file.records().flatten() {
-                if !self
-                    .site_filter
-                    .should_process(&SiteId::from_url(record.request.url.clone()))
-                {
+                let site_id = SiteId::from_url(&record.request.url);
+
+                if site_id.is_err() {
+                    tracing::error!("error parsing url: {}", site_id.err().unwrap());
+                    continue;
+                }
+
+                let site_id = site_id.unwrap();
+
+                if !self.site_filter.should_process(&site_id) {
                     continue;
                 }
 
@@ -139,10 +225,21 @@ impl StatsWorker {
                 };
 
                 let mut stats = SiteStats {
+                    feeds: HashMap::new(),
                     pages: 1,
                     blogposts: 0,
                     news_articles: 0,
                 };
+
+                if let Ok(feeds) = webpage.feeds() {
+                    let root_domain = webpage.url().root_domain();
+
+                    for feed in feeds {
+                        if feed.url.root_domain() == root_domain {
+                            *stats.feeds.entry(feed).or_default() += 1;
+                        }
+                    }
+                }
 
                 for schema in webpage.schema_org() {
                     if schema.types_contains("NewsArticle") {
@@ -153,11 +250,7 @@ impl StatsWorker {
                         stats.blogposts = 1;
                     }
                 }
-                if let Some(site) = webpage
-                    .url()
-                    .root_domain()
-                    .map(|site| Site(site.to_string()))
-                {
+                if let Ok(site) = Site::from_url(&record.request.url) {
                     *self.stats.lock().unwrap().entry(site).or_default() += stats;
                 }
             }
@@ -212,7 +305,7 @@ pub fn run(config: SiteStatsConfig) -> Result<()> {
     }
 
     for handler in handlers {
-        handler.join().unwrap();
+        handler.join().ok();
     }
 
     let mut final_stats: Vec<_> = worker
@@ -221,8 +314,24 @@ pub fn run(config: SiteStatsConfig) -> Result<()> {
         .unwrap()
         .clone()
         .into_iter()
-        .map(|(site, stats)| FinalSiteStats { site, stats })
+        .map(|(site, stats)| FinalSiteStats {
+            site,
+            stats: stats.into(),
+        })
         .collect();
+
+    final_stats.iter_mut().for_each(|site_stats| {
+        site_stats
+            .stats
+            .feeds
+            .retain(|feed_count| feed_count.count > MIN_FEED_COUNT);
+
+        site_stats.stats.feeds.sort_by(|a, b| b.count.cmp(&a.count));
+
+        if let Some(top_feeds) = TOP_FEEDS_PER_SITE {
+            site_stats.stats.feeds.truncate(top_feeds);
+        }
+    });
 
     final_stats.sort_by(|a, b| b.stats.pages.cmp(&a.stats.pages));
 

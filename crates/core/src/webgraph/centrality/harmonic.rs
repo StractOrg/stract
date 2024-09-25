@@ -36,6 +36,7 @@ const HYPERLOGLOG_COUNTERS: usize = 64;
 pub static SKIPPED_REL: std::sync::LazyLock<RelFlags> = std::sync::LazyLock::new(|| {
     RelFlags::TAG
         | RelFlags::NOFOLLOW
+        | RelFlags::SPONSORED
         | RelFlags::IS_IN_FOOTER
         | RelFlags::IS_IN_NAVIGATION
         | RelFlags::PRIVACY_POLICY
