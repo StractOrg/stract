@@ -48,7 +48,7 @@ Stract is offered under the terms defined under the [LICENSE.md](LICENSE.md) fil
 
 # 📬 Contact
 
-You can contact us at [hello@stract.com](mailto:hello@stract.com) or come hang out in our [Discord](https://discord.gg/BmzKHffWJM) or [Matrix](https://matrix.to/#/#stract:matrix.org) server.
+You can contact us at [hello@stract.com](mailto:hello@stract.com) or open an [issue](https://github.com/StractOrg/stract/issues)/[discussion](https://github.com/StractOrg/stract/discussions) here on GitHub.
 
 # 🏆 Thank you!
 
