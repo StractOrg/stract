@@ -40,7 +40,7 @@ use crate::{
 
 use super::{
     checker::{Checker, CrawlableUrl},
-    downloaded_db::ShardedDownloadedDb,
+    crawled_db::ShardedCrawledDb,
     Client,
 };
 
@@ -149,14 +149,14 @@ impl crawler::DatumStream for tokio::sync::Mutex<Vec<crawler::CrawlDatum>> {
 
 pub struct CrawlableSiteGuard {
     site: Arc<CrawlableSite>,
-    downloaded_db: Arc<ShardedDownloadedDb>,
+    crawled_db: Arc<ShardedCrawledDb>,
     config: Arc<CrawlerConfig>,
 }
 
 impl CrawlableSiteGuard {
     pub async fn new(
         site: Arc<CrawlableSite>,
-        downloaded_db: Arc<ShardedDownloadedDb>,
+        crawled_db: Arc<ShardedCrawledDb>,
         config: Arc<CrawlerConfig>,
     ) -> Self {
         {
@@ -168,7 +168,7 @@ impl CrawlableSiteGuard {
 
         Self {
             site,
-            downloaded_db,
+            crawled_db,
             config,
         }
     }
@@ -214,7 +214,7 @@ impl CrawlableSiteGuard {
             .unique_by(|u| u.url.clone())
             .collect();
 
-        urls.retain(|url| !self.downloaded_db.has_downloaded(&url.url).unwrap_or(false));
+        urls.retain(|url| !self.crawled_db.has_crawled(&url.url).unwrap_or(false));
 
         order_urls(&mut urls);
 
@@ -235,7 +235,7 @@ impl CrawlableSiteGuard {
         );
 
         for crawlable_url in &urls {
-            self.downloaded_db.insert(&crawlable_url.url)?;
+            self.crawled_db.insert(&crawlable_url.url)?;
         }
 
         let crawl_data = Arc::new(tokio::sync::Mutex::new(Vec::new()));

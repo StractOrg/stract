@@ -177,7 +177,7 @@ impl InnerDb {
         redb::TableDefinition::new("times")
     }
 
-    fn has_downloaded(&self, url: &Url) -> Result<bool> {
+    fn has_crawled(&self, url: &Url) -> Result<bool> {
         let url = TruncatedUrl::new(url);
 
         Ok(self
@@ -263,11 +263,11 @@ impl InnerDb {
     }
 }
 
-struct DownloadedDb {
+struct CrawledDb {
     inner: std::sync::Mutex<InnerDb>,
 }
 
-impl DownloadedDb {
+impl CrawledDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let db = InnerDb::open(path)?;
 
@@ -276,8 +276,8 @@ impl DownloadedDb {
         })
     }
 
-    pub fn has_downloaded(&self, url: &Url) -> Result<bool> {
-        self.inner.lock().unwrap().has_downloaded(url)
+    pub fn has_crawled(&self, url: &Url) -> Result<bool> {
+        self.inner.lock().unwrap().has_crawled(url)
     }
 
     pub fn insert(&self, url: &Url) -> Result<()> {
@@ -298,12 +298,12 @@ impl ShardedHost {
     }
 }
 
-pub struct ShardedDownloadedDb {
-    inner: Arc<DashMap<ShardedHost, DownloadedDb>>,
+pub struct ShardedCrawledDb {
+    inner: Arc<DashMap<ShardedHost, CrawledDb>>,
     folder: PathBuf,
 }
 
-impl ShardedDownloadedDb {
+impl ShardedCrawledDb {
     pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
         if !folder.as_ref().exists() {
             std::fs::create_dir_all(folder.as_ref())?;
@@ -316,10 +316,10 @@ impl ShardedDownloadedDb {
                 .filter_map(|entry| {
                     let path = entry.path();
                     let shard = ShardedHost(path.file_name()?.to_str()?.to_string());
-                    let db = DownloadedDb::open(path).ok()?;
+                    let db = CrawledDb::open(path).ok()?;
                     Some((shard, db))
                 })
-                .collect::<DashMap<ShardedHost, DownloadedDb>>(),
+                .collect::<DashMap<ShardedHost, CrawledDb>>(),
         );
 
         Ok(Self {
@@ -328,11 +328,11 @@ impl ShardedDownloadedDb {
         })
     }
 
-    pub fn has_downloaded(&self, url: &Url) -> Result<bool> {
+    pub fn has_crawled(&self, url: &Url) -> Result<bool> {
         let shard =
             ShardedHost::from_url(url).ok_or(anyhow::anyhow!("Failed to get shard from url"))?;
         match self.inner.get(&shard) {
-            Some(db) => db.has_downloaded(url),
+            Some(db) => db.has_crawled(url),
             None => Ok(false),
         }
     }
@@ -343,7 +343,7 @@ impl ShardedDownloadedDb {
 
         let db = self.inner.entry(shard.clone()).or_insert_with(|| {
             let path = self.folder.join(shard.0);
-            DownloadedDb::open(path).unwrap()
+            CrawledDb::open(path).unwrap()
         });
 
         db.insert(url)
@@ -356,49 +356,49 @@ mod tests {
 
     #[test]
     fn test_downloaded_db() {
-        let db = DownloadedDb::open(crate::gen_temp_path()).unwrap();
+        let db = CrawledDb::open(crate::gen_temp_path()).unwrap();
 
         let url = Url::parse("https://example.com").unwrap();
-        assert!(!db.has_downloaded(&url).unwrap());
+        assert!(!db.has_crawled(&url).unwrap());
 
         db.insert(&url).unwrap();
-        assert!(db.has_downloaded(&url).unwrap());
+        assert!(db.has_crawled(&url).unwrap());
     }
 
     #[test]
     fn test_truncate_ttl() {
-        let db = DownloadedDb::open(crate::gen_temp_path()).unwrap();
+        let db = CrawledDb::open(crate::gen_temp_path()).unwrap();
 
         let url = Url::parse("https://example.com").unwrap();
         db.insert(&url).unwrap();
 
-        assert!(db.has_downloaded(&url).unwrap());
+        assert!(db.has_crawled(&url).unwrap());
 
         let ttl = Duration::from_secs(1);
         std::thread::sleep(ttl + Duration::from_secs(1));
 
         db.inner.lock().unwrap().truncate(ttl).unwrap();
 
-        assert!(!db.has_downloaded(&url).unwrap());
+        assert!(!db.has_crawled(&url).unwrap());
     }
 
     #[test]
     fn test_sharded_downloaded_db() {
-        let db = ShardedDownloadedDb::open(crate::gen_temp_path()).unwrap();
+        let db = ShardedCrawledDb::open(crate::gen_temp_path()).unwrap();
 
         let url = Url::parse("https://example.com").unwrap();
-        assert!(!db.has_downloaded(&url).unwrap());
+        assert!(!db.has_crawled(&url).unwrap());
 
         db.insert(&url).unwrap();
-        assert!(db.has_downloaded(&url).unwrap());
+        assert!(db.has_crawled(&url).unwrap());
 
         let url = Url::parse("https://example.com/foo").unwrap();
-        assert!(!db.has_downloaded(&url).unwrap());
+        assert!(!db.has_crawled(&url).unwrap());
 
         db.insert(&url).unwrap();
-        assert!(db.has_downloaded(&url).unwrap());
+        assert!(db.has_crawled(&url).unwrap());
 
         let url = Url::parse("https://another_example.com/bar").unwrap();
-        assert!(!db.has_downloaded(&url).unwrap());
+        assert!(!db.has_crawled(&url).unwrap());
     }
 }

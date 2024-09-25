@@ -17,7 +17,7 @@
 mod budgets;
 mod checker;
 mod crawlable_site;
-mod downloaded_db;
+mod crawled_db;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -37,7 +37,7 @@ use crate::{
     entrypoint::{indexer::IndexableWebpage, live_index},
 };
 use crawlable_site::{CrawlableSite, CrawlableSiteGuard};
-use downloaded_db::ShardedDownloadedDb;
+use crawled_db::ShardedCrawledDb;
 use tokio::sync::Mutex;
 use tokio::sync::Semaphore;
 use url::Url;
@@ -99,7 +99,7 @@ impl Client {
         Ok(())
     }
 
-    pub async fn get_site_urls(&self, site: &str) -> Result<Vec<Url>> {
+    async fn get_site_urls_from_backbone(&self, site: &str) -> Result<Vec<Url>> {
         let mut res = Vec::new();
         let conn = self.search_conn().await;
         let mut offset = 0;
@@ -129,9 +129,54 @@ impl Client {
             offset += SITE_URL_BATCH_SIZE;
         }
 
-        todo!("get urls from live conn as well");
+        Ok(res)
+    }
+
+    async fn get_site_urls_from_live(&self, site: &str) -> Result<Vec<Url>> {
+        let mut res = Vec::new();
+        let conn = self.live_conn().await;
+        let mut offset = 0;
+
+        while let Ok(resp) = conn
+            .send(
+                search_server::GetSiteUrls {
+                    site: site.to_string(),
+                    offset,
+                    limit: SITE_URL_BATCH_SIZE,
+                },
+                &AllShardsSelector,
+                &RandomReplicaSelector,
+            )
+            .await
+        {
+            let urls: Vec<_> = resp
+                .into_iter()
+                .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v.urls))
+                .collect();
+
+            if urls.is_empty() {
+                break;
+            }
+
+            res.extend(urls);
+            offset += SITE_URL_BATCH_SIZE;
+        }
 
         Ok(res)
+    }
+
+    pub async fn get_site_urls(&self, site: &str) -> Vec<Url> {
+        let mut res = Vec::new();
+
+        if let Ok(urls) = self.get_site_urls_from_backbone(site).await {
+            res.extend(urls);
+        }
+
+        if let Ok(urls) = self.get_site_urls_from_live(site).await {
+            res.extend(urls);
+        }
+
+        res
     }
 }
 
@@ -190,7 +235,7 @@ impl SiteStats {
 
 pub struct Crawler {
     client: Arc<Client>,
-    db: Arc<ShardedDownloadedDb>,
+    db: Arc<ShardedCrawledDb>,
     sites: Vec<Arc<CrawlableSite>>,
     num_worker_threads: usize,
     check_intervals: CheckIntervals,
@@ -210,7 +255,7 @@ impl Crawler {
         );
 
         let client = Arc::new(Client::new(cluster, &crawler_config).await?);
-        let db = Arc::new(ShardedDownloadedDb::open(config.downloaded_db_path)?);
+        let db = Arc::new(ShardedCrawledDb::open(config.crawled_db_path)?);
 
         let site_stats = SiteStats::open(config.site_stats_path)?;
         let sites: Vec<_> = site_stats.all().cloned().collect();
@@ -224,8 +269,8 @@ impl Crawler {
         let mut crawlable_sites = Vec::new();
         tracing::debug!("Initializing crawler db with previously crawled urls");
         for site in sites {
-            for url in client.get_site_urls(site.site().as_str()).await? {
-                if !db.has_downloaded(&url)? {
+            for url in client.get_site_urls(site.site().as_str()).await {
+                if !db.has_crawled(&url)? {
                     db.insert(&url)?;
                 }
             }

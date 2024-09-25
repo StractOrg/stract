@@ -44,7 +44,7 @@ use tracing::info;
 
 use crate::entrypoint::{
     indexer::{self, IndexableWebpage},
-    search_server::{RetrieveWebsites, Search},
+    search_server::{GetSiteUrls, RetrieveWebsites, Search, SiteUrls},
 };
 
 const INDEXING_TIMEOUT: Duration = Duration::from_secs(60);
@@ -55,6 +55,7 @@ sonic_service!(
     [
         RetrieveWebsites,
         Search,
+        GetSiteUrls,
         IndexWebpages,
         GetIndexPath,
         RemoteDownload
@@ -326,6 +327,17 @@ impl sonic::service::Message<LiveIndexService> for Search {
     type Response = Option<InitialWebsiteResult>;
     async fn handle(self, server: &LiveIndexService) -> Self::Response {
         server.local_searcher.search_initial(&self.query, true).ok()
+    }
+}
+
+impl sonic::service::Message<LiveIndexService> for GetSiteUrls {
+    type Response = SiteUrls;
+    async fn handle(self, server: &LiveIndexService) -> Self::Response {
+        let urls = server
+            .local_searcher
+            .get_site_urls(&self.site, self.offset, self.limit);
+
+        SiteUrls { urls }
     }
 }
 

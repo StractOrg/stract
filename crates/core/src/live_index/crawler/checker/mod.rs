@@ -30,6 +30,7 @@ use crate::dated_url::DatedUrl;
 
 use crate::Result;
 
+#[derive(Debug)]
 pub struct CrawlableUrl {
     pub url: Url,
     pub last_modified: Option<DateTime<Utc>>,

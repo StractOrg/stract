@@ -427,7 +427,7 @@ pub struct CheckIntervals {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct LiveCrawlerConfig {
-    pub downloaded_db_path: PathBuf,
+    pub crawled_db_path: PathBuf,
     pub gossip: GossipConfig,
     pub site_stats_path: PathBuf,
     pub host_centrality_path: PathBuf,
