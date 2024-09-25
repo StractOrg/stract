@@ -179,7 +179,7 @@ enum LiveIndex {
     Serve { config_path: String },
 
     /// Start the live index crawler.
-    Crawl { config_path: String },
+    Crawler { config_path: String },
 }
 
 #[derive(Subcommand)]
@@ -450,7 +450,7 @@ fn main() -> Result<()> {
                     .build()?
                     .block_on(entrypoint::live_index::search_server::serve(config))?;
             }
-            LiveIndex::Crawl { config_path } => {
+            LiveIndex::Crawler { config_path } => {
                 let config = load_toml_config(config_path);
 
                 tokio::runtime::Builder::new_multi_thread()

@@ -264,6 +264,7 @@ impl LiveIndex {
     }
 
     pub fn commit(&self) {
+        tracing::debug!("committing index");
         futures::executor::block_on(
             self.inner
                 .write()
@@ -273,6 +274,7 @@ impl LiveIndex {
     }
 
     pub fn prune_segments(&self) {
+        tracing::debug!("pruning segments");
         self.inner
             .write()
             .unwrap_or_else(|e| e.into_inner())
@@ -287,6 +289,7 @@ impl LiveIndex {
     }
 
     pub fn compact_segments_by_date(&self) {
+        tracing::debug!("compacting segments by date");
         self.inner
             .write()
             .unwrap_or_else(|e| e.into_inner())
@@ -294,6 +297,7 @@ impl LiveIndex {
     }
 
     pub fn insert(&self, pages: &[IndexableWebpage]) {
+        tracing::debug!("inserting pages into index");
         self.inner
             .write()
             .unwrap_or_else(|e| e.into_inner())

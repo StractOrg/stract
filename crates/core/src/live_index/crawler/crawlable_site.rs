@@ -34,6 +34,7 @@ use crate::{
         site_stats::{self, FinalSiteStats},
     },
     live_index::crawler::checker::{Feeds, Frontpage, Sitemap},
+    webpage::url_ext::UrlExt,
     Result,
 };
 
@@ -45,7 +46,7 @@ use super::{
 
 pub const MAX_PENDING_BUDGET: u64 = 128;
 
-pub struct CrawlableSite {
+struct InnerCrawlableSite {
     site: site_stats::Site,
     feeds: Feeds,
     sitemap: Sitemap,
@@ -53,10 +54,9 @@ pub struct CrawlableSite {
     last_drip: Instant,
     drip_rate: Duration,
     budget: u64,
-    currently_crawling: AtomicBool,
 }
 
-impl CrawlableSite {
+impl InnerCrawlableSite {
     pub fn new(site: FinalSiteStats, client: &Client, drip_rate: Duration) -> Result<Self> {
         Ok(Self {
             site: site.site().clone(),
@@ -74,15 +74,10 @@ impl CrawlableSite {
             last_drip: Instant::now(),
             drip_rate,
             budget: 0,
-            currently_crawling: AtomicBool::new(false),
         })
     }
 
     pub fn drip(&mut self) {
-        if self.currently_crawling.load(Ordering::Relaxed) {
-            return;
-        }
-
         let pages_to_drip =
             (self.last_drip.elapsed().as_secs_f32() / self.drip_rate.as_secs_f32()) as u64;
 
@@ -100,11 +95,44 @@ impl CrawlableSite {
             || self.sitemap.should_check(interval)
             || self.feeds.should_check(interval))
             && self.budget > 0
-            && !self.currently_crawling.load(Ordering::Relaxed)
+    }
+}
+
+pub struct CrawlableSite {
+    inner: Arc<Mutex<InnerCrawlableSite>>,
+    currently_crawling: AtomicBool,
+    site: site_stats::Site,
+}
+
+impl CrawlableSite {
+    pub fn new(site: FinalSiteStats, client: &Client, drip_rate: Duration) -> Result<Self> {
+        Ok(Self {
+            site: site.site().clone(),
+            inner: Arc::new(Mutex::new(InnerCrawlableSite::new(
+                site, client, drip_rate,
+            )?)),
+            currently_crawling: AtomicBool::new(false),
+        })
     }
 
     pub fn currently_crawling(&self) -> bool {
         self.currently_crawling.load(Ordering::Relaxed)
+    }
+
+    pub fn site(&self) -> &site_stats::Site {
+        &self.site
+    }
+
+    pub async fn should_crawl(&self, interval: &CheckIntervals) -> bool {
+        !self.currently_crawling() && self.inner.lock().await.should_crawl(interval)
+    }
+
+    pub async fn drip(&self) {
+        if self.currently_crawling() {
+            return;
+        }
+
+        self.inner.lock().await.drip();
     }
 }
 
@@ -120,25 +148,22 @@ impl crawler::DatumStream for tokio::sync::Mutex<Vec<crawler::CrawlDatum>> {
 }
 
 pub struct CrawlableSiteGuard {
-    site: Arc<Mutex<CrawlableSite>>,
+    site: Arc<CrawlableSite>,
     downloaded_db: Arc<ShardedDownloadedDb>,
     config: Arc<CrawlerConfig>,
 }
 
 impl CrawlableSiteGuard {
-    pub fn new(
-        site: Arc<Mutex<CrawlableSite>>,
+    pub async fn new(
+        site: Arc<CrawlableSite>,
         downloaded_db: Arc<ShardedDownloadedDb>,
         config: Arc<CrawlerConfig>,
     ) -> Self {
         {
-            let lock = site.blocking_lock();
-
-            if lock.currently_crawling() {
+            let currently_crawling = site.currently_crawling.swap(true, Ordering::Relaxed);
+            if currently_crawling {
                 panic!("site is already being crawled");
             }
-
-            lock.currently_crawling.store(true, Ordering::Relaxed);
         }
 
         Self {
@@ -148,23 +173,25 @@ impl CrawlableSiteGuard {
         }
     }
 
-    pub async fn url(&self) -> Result<Url> {
-        self.site.lock().await.site.url()
+    pub fn url(&self) -> Result<Url> {
+        self.site.site().url()
     }
 }
 
 impl Drop for CrawlableSiteGuard {
     fn drop(&mut self) {
-        self.site
-            .blocking_lock()
-            .currently_crawling
-            .store(false, Ordering::Relaxed);
+        self.site.currently_crawling.store(false, Ordering::Relaxed);
+
+        tracing::debug!(
+            "Dropping crawlable site guard for site {}",
+            self.site.site().as_str()
+        );
     }
 }
 
 impl CrawlableSiteGuard {
     pub async fn crawl(self, client: &Client, interval: &CheckIntervals) -> Result<()> {
-        let mut site = self.site.lock().await;
+        let mut site = self.site.inner.lock().await;
         let mut urls = Vec::new();
 
         if site.feeds.should_check(interval) {
@@ -179,18 +206,37 @@ impl CrawlableSiteGuard {
             urls.extend(site.frontpage.get_urls().await.unwrap_or_default());
         }
 
-        urls = urls.into_iter().unique_by(|u| u.url.clone()).collect();
+        let url = site.site.url()?;
+        let icann_domain = url.icann_domain();
+        urls = urls
+            .into_iter()
+            .filter(|u| u.url.icann_domain() == icann_domain)
+            .unique_by(|u| u.url.clone())
+            .collect();
 
         urls.retain(|url| !self.downloaded_db.has_downloaded(&url.url).unwrap_or(false));
-
-        for url in &urls {
-            self.downloaded_db.insert(&url.url)?;
-        }
 
         order_urls(&mut urls);
 
         let budget = site.budget.min(urls.len() as u64);
         site.budget = site.budget.saturating_sub(budget);
+
+        urls.truncate(budget as usize);
+
+        if urls.is_empty() {
+            tracing::debug!("No new urls to crawl for site {}", site.site.as_str());
+            return Ok(());
+        }
+
+        tracing::debug!(
+            "Crawling {} urls for site {}",
+            urls.len(),
+            site.site.as_str()
+        );
+
+        for crawlable_url in &urls {
+            self.downloaded_db.insert(&crawlable_url.url)?;
+        }
 
         let crawl_data = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
@@ -220,9 +266,16 @@ impl CrawlableSiteGuard {
 
         let crawl_data = crawl_data.lock().await.clone();
 
+        tracing::debug!(
+            "Indexing {} urls for site {}",
+            crawl_data.len(),
+            site.site.as_str()
+        );
         client
             .index(crawl_data.into_iter().map(IndexableWebpage::from).collect())
             .await?;
+
+        tracing::debug!("Finished crawling site {}", site.site.as_str());
 
         Ok(())
     }

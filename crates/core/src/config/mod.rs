@@ -37,7 +37,7 @@ pub fn parse_duration<'de, D: serde::de::Deserializer<'de>>(
         .parse()
         .map_err(|_| err("invalid number".to_string()))?;
 
-    let ret = match suffix {
+    let ret = match suffix.trim() {
         "s" => Duration::from_secs(num),
         "sec" => Duration::from_secs(num),
         "secs" => Duration::from_secs(num),

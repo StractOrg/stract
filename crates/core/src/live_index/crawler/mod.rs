@@ -46,7 +46,7 @@ const SITE_URL_BATCH_SIZE: usize = 100;
 const DEFAULT_CONSISTENCY_FRACTION: f64 = 0.5;
 const BLOG_FRACTION_THRESHOLD: f64 = 0.5;
 const NEWS_FRACTION_THRESHOLD: f64 = 0.5;
-const MIN_CRAWL_DELAY: Duration = Duration::from_secs(60);
+const MIN_CRAWL_DELAY: Duration = Duration::from_secs(30);
 const MAX_CRAWL_DELAY: Duration = Duration::from_secs(300);
 const TICK_INTERVAL: Duration = Duration::from_secs(5);
 
@@ -82,6 +82,7 @@ impl Client {
 
     pub async fn index(&self, pages: Vec<IndexableWebpage>) -> Result<()> {
         let conn = self.live_conn().await;
+
         let req = live_index::IndexWebpages {
             pages,
             consistency_fraction: Some(DEFAULT_CONSISTENCY_FRACTION),
@@ -91,7 +92,7 @@ impl Client {
             .send(req.clone(), &RandomShardSelector, &RandomReplicaSelector)
             .await
         {
-            tracing::error!("Failed to index webpages: {e}");
+            tracing::error!("Failed to index pages: {e}");
             tokio::time::sleep(Duration::from_millis(1_000)).await;
         }
 
@@ -128,6 +129,8 @@ impl Client {
             offset += SITE_URL_BATCH_SIZE;
         }
 
+        todo!("get urls from live conn as well");
+
         Ok(res)
     }
 }
@@ -138,8 +141,8 @@ impl From<LiveCrawlerConfig> for CrawlerConfig {
             num_worker_threads: 1,
             user_agent: config.user_agent,
             robots_txt_cache_sec: crate::config::defaults::Crawler::robots_txt_cache_sec(),
-            min_politeness_factor: crate::config::defaults::Crawler::min_politeness_factor(),
-            start_politeness_factor: crate::config::defaults::Crawler::start_politeness_factor(),
+            min_politeness_factor: 0,
+            start_politeness_factor: 1,
             min_crawl_delay_ms: MIN_CRAWL_DELAY.as_millis() as u64,
             max_crawl_delay_ms: MAX_CRAWL_DELAY.as_millis() as u64,
             max_politeness_factor: crate::config::defaults::Crawler::max_politeness_factor(),
@@ -188,7 +191,7 @@ impl SiteStats {
 pub struct Crawler {
     client: Arc<Client>,
     db: Arc<ShardedDownloadedDb>,
-    sites: Vec<Arc<Mutex<CrawlableSite>>>,
+    sites: Vec<Arc<CrawlableSite>>,
     num_worker_threads: usize,
     check_intervals: CheckIntervals,
     crawler_config: Arc<CrawlerConfig>,
@@ -210,11 +213,7 @@ impl Crawler {
         let db = Arc::new(ShardedDownloadedDb::open(config.downloaded_db_path)?);
 
         let site_stats = SiteStats::open(config.site_stats_path)?;
-        let sites: Vec<_> = site_stats
-            .news()
-            .chain(site_stats.blogs())
-            .cloned()
-            .collect();
+        let sites: Vec<_> = site_stats.all().cloned().collect();
 
         let budgets = budgets::SiteBudgets::new(
             &config.host_centrality_path,
@@ -223,6 +222,7 @@ impl Crawler {
         )?;
 
         let mut crawlable_sites = Vec::new();
+        tracing::debug!("Initializing crawler db with previously crawled urls");
         for site in sites {
             for url in client.get_site_urls(site.site().as_str()).await? {
                 if !db.has_downloaded(&url)? {
@@ -231,9 +231,7 @@ impl Crawler {
             }
 
             if let Some(drip_rate) = budgets.drip_rate(site.site()) {
-                crawlable_sites.push(Arc::new(Mutex::new(CrawlableSite::new(
-                    site, &client, drip_rate,
-                )?)));
+                crawlable_sites.push(Arc::new(CrawlableSite::new(site, &client, drip_rate)?));
             }
         }
 
@@ -253,28 +251,31 @@ impl Crawler {
 
         loop {
             interval.tick().await;
+            tracing::debug!("Tick");
 
             for site in &mut self.sites {
-                let mut site_lock = site.lock().await;
-                if site_lock.currently_crawling() {
+                if site.currently_crawling() {
+                    tracing::debug!("Site {} is currently crawling", site.site().as_str());
                     continue;
                 }
 
-                site_lock.drip();
+                site.drip().await;
 
-                if site_lock.should_crawl(&self.check_intervals) {
+                if site.should_crawl(&self.check_intervals).await {
+                    tracing::debug!("Site {} should crawl", site.site().as_str());
                     let client = self.client.clone();
                     let intervals = self.check_intervals.clone();
                     let guard = CrawlableSiteGuard::new(
                         site.clone(),
                         self.db.clone(),
                         self.crawler_config.clone(),
-                    );
+                    )
+                    .await;
                     let semaphore = semaphore.clone();
 
-                    tokio::spawn(async move {
+                    tokio::task::spawn(async move {
                         let _permit = semaphore.acquire().await.unwrap();
-                        let url = guard.url().await;
+                        let url = guard.url();
 
                         if let Err(e) = guard.crawl(&client, &intervals).await {
                             if let Ok(url) = url {

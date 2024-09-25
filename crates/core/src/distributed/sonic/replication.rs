@@ -341,6 +341,10 @@ where
     pub fn new(id: Id, replicas: ReplicatedClient<S>) -> Self {
         Self { replicas, id }
     }
+
+    pub fn id(&self) -> &Id {
+        &self.id
+    }
 }
 
 pub struct ShardedClient<S: sonic::service::Service, Id: ShardIdentifier> {
@@ -358,6 +362,10 @@ where
 
     pub fn is_empty(&self) -> bool {
         self.shards.is_empty()
+    }
+
+    pub fn shards(&self) -> &[Shard<S, Id>] {
+        &self.shards
     }
 
     async fn send_single<Req, Sel>(
@@ -395,6 +403,10 @@ where
         let mut futures = Vec::new();
         for shard in shard_selector.select(&self.shards) {
             futures.push(self.send_single(req.clone(), shard, replica_selector, timeout));
+        }
+
+        if futures.is_empty() {
+            return Err(anyhow::anyhow!("no shards available").into());
         }
 
         let mut results = Vec::new();

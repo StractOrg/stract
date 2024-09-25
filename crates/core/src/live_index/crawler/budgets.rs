@@ -70,6 +70,7 @@ impl SiteBudgets {
         stats: &SiteStats,
         daily_budget: DailyLiveIndexCrawlerBudget,
     ) -> Result<Self> {
+        tracing::debug!("Assigning budgets");
         let host_centrality: speedy_kv::Db<webgraph::NodeID, f64> =
             speedy_kv::Db::open_or_create(host_centrality)?;
 
@@ -116,6 +117,13 @@ impl SiteBudgets {
             &host_centrality,
         );
 
+        tracing::debug!("Budgets assigned");
+        tracing::debug!(
+            "Number of sites with budgets: blogs: {}, news: {}, remaining: {}",
+            blogs.len(),
+            news.len(),
+            remaining.len(),
+        );
         Ok(Self {
             blogs,
             news,
@@ -130,6 +138,10 @@ impl SiteBudgets {
             .or_else(|| self.news.get(site))
             .or_else(|| self.remaining.get(site))?;
 
-        Some(Duration::from_millis(MILLIS_PER_DAY / budget as u64))
+        if budget == 0.0 {
+            Some(Duration::from_millis(MILLIS_PER_DAY / 1))
+        } else {
+            Some(Duration::from_millis(MILLIS_PER_DAY / budget as u64))
+        }
     }
 }

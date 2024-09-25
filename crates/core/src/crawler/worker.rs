@@ -304,8 +304,10 @@ impl<S: DatumStream> JobExecutor<S> {
     }
 
     pub async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>) {
+        tracing::debug!("processing {} urls", urls.len());
         while let Some(retryable_url) = urls.pop_front() {
             if let UrlVisit::Skip = self.verify_url(&retryable_url).await {
+                tracing::debug!("skipping url: {}", retryable_url.url());
                 continue;
             }
 
@@ -428,7 +430,7 @@ impl<S: DatumStream> JobExecutor<S> {
     }
 
     async fn process_url(&mut self, url: Url) -> Result<ProcessedUrl> {
-        let datum = self.crawl_url(url.clone()).await?;
+        let datum = self.polite_crawl_url(url.clone()).await?;
         self.save_datum(datum.clone()).await;
 
         match Html::parse(&datum.body, datum.url.as_str()) {
@@ -535,7 +537,6 @@ impl<S: DatumStream> JobExecutor<S> {
         res: &reqwest::Response,
         url: &Url,
         payload_type: warc::PayloadType,
-        fetch_time: Duration,
     ) -> Result<Option<CrawlDatum>> {
         let status_code = res.status().as_u16();
 
@@ -555,14 +556,51 @@ impl<S: DatumStream> JobExecutor<S> {
                 url,
                 payload_type,
                 body: String::new(),
-                fetch_time_ms: fetch_time.as_millis() as u64,
+                fetch_time_ms: 0,
             }))
         } else {
             Ok(None)
         }
     }
 
-    async fn crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
+    async fn unpolite_crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
+        tracing::debug!("crawling url: {}", url);
+
+        let res = self.fetch_with_https_priority(url.clone()).await?;
+
+        let payload_type = self.check_headers(&res);
+        let status_code = res.status();
+        let mut res_url = res.url().clone();
+
+        if let Ok(payload_type) = payload_type {
+            if let Ok(Some(datum)) = self.redirect_datum(&res, &url, payload_type) {
+                return Ok(datum);
+            }
+        }
+        if status_code != reqwest::StatusCode::OK {
+            return Err(Error::FetchFailed {
+                status_code,
+                headers: res.headers().clone(),
+            });
+        }
+
+        let body = encoded_body(res).await;
+
+        self.crawled_urls.insert(url.clone());
+
+        res_url.normalize_in_place();
+
+        self.crawled_urls.insert(res_url.clone());
+
+        Ok(CrawlDatum {
+            url: res_url,
+            body: body?,
+            payload_type: payload_type?,
+            fetch_time_ms: 0,
+        })
+    }
+
+    async fn polite_crawl_url(&mut self, url: Url) -> Result<CrawlDatum> {
         let mut url = url;
         url.normalize_in_place();
 
@@ -571,42 +609,12 @@ impl<S: DatumStream> JobExecutor<S> {
         }
 
         let start = Instant::now();
-        let res = self.fetch_with_https_priority(url.clone()).await;
+        let res = self.unpolite_crawl_url(url).await;
         let fetch_time = start.elapsed();
         self.politeness_delay(fetch_time).await;
-
-        // we want to delay before returning the error
-        let res = res?;
-
-        self.crawled_urls.insert(url.clone());
-        let payload_type = self.check_headers(&res)?;
-
-        if let Some(datum) = self.redirect_datum(&res, &url, payload_type, fetch_time)? {
-            return Ok(datum);
-        }
-
-        let status_code = res.status();
-
-        if status_code != reqwest::StatusCode::OK {
-            return Err(Error::FetchFailed {
-                status_code,
-                headers: res.headers().clone(),
-            });
-        }
-
-        let mut res_url = res.url().clone();
-        res_url.normalize_in_place();
-
-        self.crawled_urls.insert(res_url.clone());
-
-        let body = encoded_body(res).await?;
-
-        Ok(CrawlDatum {
-            url: res_url,
-            body,
-            payload_type,
-            fetch_time_ms: fetch_time.as_millis() as u64,
-        })
+        let mut datum = res?;
+        datum.fetch_time_ms = fetch_time.as_millis() as u64;
+        Ok(datum)
     }
 
     async fn urls_from_sitemap(&self, sitemap: Url, max_depth: usize) -> Vec<DatedUrl> {
