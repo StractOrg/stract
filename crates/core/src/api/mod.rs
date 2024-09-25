@@ -184,7 +184,7 @@ pub async fn router(
         .iter()
         .any(|m| m.service.is_searcher())
     {
-        log::warn!("Waiting for search nodes to join the cluster");
+        log::info!("Waiting for search nodes to join the cluster");
         cluster.await_member(|m| m.service.is_searcher()).await;
         log::info!("Search nodes joined the cluster");
     }

@@ -114,35 +114,36 @@ where
 #[derive(Clone)]
 pub struct RemoteWebgraph<G: WebgraphGranularity> {
     client: Arc<Mutex<sonic::replication::ReusableShardedClient<WebgraphClientManager<G>>>>,
+    cluster: Arc<Cluster>,
 }
 
 impl<G: WebgraphGranularity> RemoteWebgraph<G> {
     pub async fn new(cluster: Arc<Cluster>) -> Self {
-        #[cfg(feature = "dev")]
-        {
-            let granularity = G::granularity();
-            tracing::info!("waiting for {granularity} webgraph to come online...");
-            cluster
-                .await_member(|member| {
-                    if let Service::Webgraph {
-                        host: _,
-                        shard: _,
-                        granularity: remote_granularity,
-                    } = member.service
-                    {
-                        granularity == remote_granularity
-                    } else {
-                        false
-                    }
-                })
-                .await;
-        }
-
         Self {
             client: Arc::new(Mutex::new(
-                sonic::replication::ReusableShardedClient::new(cluster).await,
+                sonic::replication::ReusableShardedClient::new(cluster.clone()).await,
             )),
+            cluster,
         }
+    }
+
+    pub async fn await_ready(&self) {
+        let granularity = G::granularity();
+        tracing::info!("waiting for {granularity} webgraph to come online...");
+        self.cluster
+            .await_member(|member| {
+                if let Service::Webgraph {
+                    host: _,
+                    shard: _,
+                    granularity: remote_granularity,
+                } = member.service
+                {
+                    granularity == remote_granularity
+                } else {
+                    false
+                }
+            })
+            .await;
     }
 
     async fn conn(&self) -> Arc<sonic::replication::ShardedClient<WebGraphService, ShardId>> {

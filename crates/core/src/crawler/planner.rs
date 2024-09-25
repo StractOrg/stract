@@ -166,7 +166,9 @@ impl CrawlPlanner {
         Self::check_config(&config)?;
 
         let page_graph = RemoteWebgraph::new(cluster.clone()).await;
+        page_graph.await_ready().await;
         let host_graph = RemoteWebgraph::new(cluster.clone()).await;
+        host_graph.await_ready().await;
 
         let domain_boosts = config
             .domain_boosts
