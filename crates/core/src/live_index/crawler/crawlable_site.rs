@@ -235,7 +235,8 @@ impl CrawlableSiteGuard {
         );
 
         for crawlable_url in &urls {
-            self.crawled_db.insert(&crawlable_url.url)?;
+            self.crawled_db
+                .insert(&crawlable_url.url.clone().normalize())?;
         }
 
         let crawl_data = Arc::new(tokio::sync::Mutex::new(Vec::new()));
