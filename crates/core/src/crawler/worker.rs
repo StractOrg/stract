@@ -305,7 +305,9 @@ impl<S: DatumStream> JobExecutor<S> {
 
     pub async fn process_urls(&mut self, mut urls: VecDeque<RetrieableUrl>) {
         tracing::debug!("processing {} urls", urls.len());
-        while let Some(retryable_url) = urls.pop_front() {
+        while let Some(mut retryable_url) = urls.pop_front() {
+            retryable_url.weighted_url.url.normalize_in_place();
+
             if let UrlVisit::Skip = self.verify_url(&retryable_url).await {
                 tracing::debug!("skipping url: {}", retryable_url.url());
                 continue;

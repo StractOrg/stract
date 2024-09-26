@@ -212,6 +212,10 @@ impl CrawlableSiteGuard {
             .into_iter()
             .filter(|u| u.url.icann_domain() == icann_domain)
             .unique_by(|u| u.url.clone())
+            .map(|mut u| {
+                u.url.normalize_in_place();
+                u
+            })
             .collect();
 
         urls.retain(|url| !self.crawled_db.has_crawled(&url.url).unwrap_or(false));
