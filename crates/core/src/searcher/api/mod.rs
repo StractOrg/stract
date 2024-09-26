@@ -672,6 +672,11 @@ where
         let num_docs = initial_results
             .iter()
             .map(|result| result.local_result.num_websites)
+            .chain(live_results.iter().flat_map(|results| {
+                results
+                    .iter()
+                    .map(|result| result.local_result.num_websites)
+            }))
             .fold(approx_count::Count::Exact(0), |acc, count| acc + count);
 
         let (top_websites, has_more_results) = self
