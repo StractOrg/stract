@@ -425,6 +425,26 @@ pub struct CheckIntervals {
     pub frontpage: Duration,
 }
 
+impl Default for CheckIntervals {
+    fn default() -> Self {
+        Self {
+            feeds: defaults::LiveIndex::feeds_crawl_interval(),
+            sitemap: defaults::LiveIndex::sitemap_crawl_interval(),
+            frontpage: defaults::LiveIndex::frontpage_crawl_interval(),
+        }
+    }
+}
+
+impl Default for DailyLiveIndexCrawlerBudget {
+    fn default() -> Self {
+        Self {
+            blogs: defaults::LiveIndex::blogs_budget(),
+            news: defaults::LiveIndex::news_budget(),
+            remaining: defaults::LiveIndex::remaining_budget(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct LiveCrawlerConfig {
     pub crawled_db_path: PathBuf,
@@ -433,7 +453,9 @@ pub struct LiveCrawlerConfig {
     pub host_centrality_path: PathBuf,
     pub user_agent: UserAgent,
     pub num_worker_threads: usize,
+    #[serde(default)]
     pub check_intervals: CheckIntervals,
+    #[serde(default)]
     pub daily_budget: DailyLiveIndexCrawlerBudget,
 }
 
