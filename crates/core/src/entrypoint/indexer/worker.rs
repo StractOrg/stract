@@ -153,12 +153,18 @@ impl Webgraph {
             IndexerGraphConfig::Remote { gossip } => {
                 let cluster = crate::start_gossip_cluster_thread(gossip.clone(), None);
                 let remote = RemoteWebgraph::new(cluster).await;
-                remote.await_ready().await;
+                #[cfg(not(feature = "dev"))]
+                {
+                    remote.await_ready().await;
+                }
                 Self::Remote(remote)
             }
             IndexerGraphConfig::Existing { cluster } => {
                 let remote = RemoteWebgraph::new(cluster.clone()).await;
-                remote.await_ready().await;
+                #[cfg(not(feature = "dev"))]
+                {
+                    remote.await_ready().await;
+                }
                 Self::Remote(remote)
             }
         }
