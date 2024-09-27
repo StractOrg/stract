@@ -205,11 +205,16 @@ impl InvertedIndex {
     }
 
     pub fn segment_ids(&self) -> Vec<SegmentId> {
-        self.tantivy_index.searchable_segment_ids().unwrap()
+        self.tantivy_index
+            .searchable_segment_ids()
+            .unwrap_or_default()
     }
 
     pub fn num_segments(&self) -> usize {
-        self.tantivy_index.searchable_segments().unwrap().len()
+        self.tantivy_index
+            .searchable_segments()
+            .unwrap_or_default()
+            .len()
     }
 
     pub fn num_documents(&self) -> u64 {

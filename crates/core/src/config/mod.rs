@@ -50,6 +50,7 @@ pub fn parse_duration<'de, D: serde::de::Deserializer<'de>>(
         "h" => Duration::from_secs(num * 60 * 60),
         "hours" => Duration::from_secs(num * 60 * 60),
         "d" => Duration::from_secs(num * 24 * 60 * 60),
+        "day" => Duration::from_secs(num * 24 * 60 * 60),
         "days" => Duration::from_secs(num * 24 * 60 * 60),
         other => return Err(err(format!("invalid suffix {other}"))),
     };

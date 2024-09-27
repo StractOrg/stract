@@ -225,6 +225,7 @@ impl InnerIndex {
             .write_ahead_log
             .iter()
             .unwrap()
+            .unique_by(|page| page.url.clone())
             .chunks(BATCH_SIZE)
             .into_iter()
         {
@@ -233,6 +234,7 @@ impl InnerIndex {
                 self.index.insert(&webpage).unwrap();
             }
         }
+        self.write_ahead_log.clear().unwrap();
         self.index.commit().unwrap();
         self.update_meta();
         self.has_inserts = false;
@@ -271,6 +273,7 @@ impl LiveIndex {
                 .unwrap_or_else(|e| e.into_inner())
                 .commit(),
         );
+        tracing::debug!("index committed");
     }
 
     pub fn prune_segments(&self) {
@@ -297,7 +300,7 @@ impl LiveIndex {
     }
 
     pub fn insert(&self, pages: &[IndexableWebpage]) {
-        tracing::debug!("inserting pages into index");
+        tracing::debug!("inserting {} pages into index", pages.len());
         self.inner
             .write()
             .unwrap_or_else(|e| e.into_inner())

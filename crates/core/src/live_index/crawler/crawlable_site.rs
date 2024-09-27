@@ -44,7 +44,7 @@ use super::{
     Client,
 };
 
-pub const MAX_PENDING_BUDGET: u64 = 128;
+pub const MAX_PENDING_BUDGET: u64 = 32;
 
 struct InnerCrawlableSite {
     site: site_stats::Site,
