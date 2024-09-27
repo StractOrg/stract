@@ -82,7 +82,12 @@ impl remote_cp::Stepper for FileDownloadStepper {
     }
 }
 
-async fn other_replicas(cluster: &Cluster, shard: &ShardId, id: &str) -> Vec<SocketAddr> {
+async fn other_replicas(
+    cluster: &Cluster,
+    shard: &ShardId,
+    host: &SocketAddr,
+    id: &str,
+) -> Vec<SocketAddr> {
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     cluster
         .members()
@@ -91,13 +96,16 @@ async fn other_replicas(cluster: &Cluster, shard: &ShardId, id: &str) -> Vec<Soc
         .filter_map(|member| {
             if member.id != id {
                 if let Service::LiveIndex {
-                    host,
+                    host: member_host,
                     shard: member_shard,
                     state,
                 } = member.service
                 {
-                    if &member_shard == shard && matches!(state, LiveIndexState::Ready) {
-                        return Some(host);
+                    if &member_shard == shard
+                        && matches!(state, LiveIndexState::Ready)
+                        && member_host != *host
+                    {
+                        return Some(member_host);
                     }
                 }
             }
@@ -121,7 +129,7 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
         panic!("self node should be a live index")
     };
 
-    let mut others = other_replicas(&cluster, &shard, &self_node.id).await;
+    let mut others = other_replicas(&cluster, &shard, &host, &self_node.id).await;
 
     if let Some(other) = others.pop() {
         let mut conn: sonic::service::Connection<LiveIndexService> =
@@ -150,6 +158,7 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
         let pages: Vec<_> = pages.into_iter().collect();
         index.insert(&pages);
     }
+    index.commit();
 
     wal.clear().unwrap();
 
