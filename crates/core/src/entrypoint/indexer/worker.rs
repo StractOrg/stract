@@ -38,6 +38,7 @@ use crate::webpage::{safety_classifier, Html, Webpage};
 
 const MAX_BACKLINKS: EdgeLimit = EdgeLimit::Limit(1024);
 
+#[derive(Clone)]
 pub enum IndexerGraphConfig {
     Local { path: String },
     Remote { gossip: GossipConfig },
@@ -55,6 +56,7 @@ impl From<crate::config::IndexerGraphConfig> for IndexerGraphConfig {
     }
 }
 
+#[derive(Clone)]
 pub struct Config {
     pub host_centrality_store_path: String,
     pub page_centrality_store_path: Option<String>,

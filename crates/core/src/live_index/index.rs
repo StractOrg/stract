@@ -36,13 +36,23 @@ use crate::{
 };
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct Segment {
+pub struct Segment {
     id: SegmentId,
     created: DateTime<Utc>,
 }
 
+impl Segment {
+    pub fn id(&self) -> SegmentId {
+        self.id
+    }
+
+    pub fn created(&self) -> DateTime<Utc> {
+        self.created
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
-struct Meta {
+pub struct Meta {
     segments: Vec<Segment>,
 }
 
@@ -71,6 +81,10 @@ impl Meta {
         let writer = BufWriter::new(file);
 
         serde_json::to_writer_pretty(writer, self).unwrap();
+    }
+
+    pub fn segments(&self) -> &[Segment] {
+        &self.segments
     }
 }
 
@@ -249,6 +263,10 @@ impl InnerIndex {
     pub fn path(&self) -> &Path {
         &self.path
     }
+
+    pub fn meta(&self) -> &Meta {
+        &self.meta
+    }
 }
 
 pub struct LiveIndex {
@@ -343,5 +361,13 @@ impl LiveIndex {
             .index
             .inverted_index
             .re_open()
+    }
+
+    pub fn meta(&self) -> Meta {
+        self.inner
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .meta
+            .clone()
     }
 }
