@@ -234,8 +234,8 @@ impl InnerIndex {
                 self.index.insert(&webpage).unwrap();
             }
         }
-        self.write_ahead_log.clear().unwrap();
         self.index.commit().unwrap();
+        self.write_ahead_log.clear().unwrap();
         self.update_meta();
         self.has_inserts = false;
     }
@@ -332,5 +332,14 @@ impl LiveIndex {
             .write()
             .unwrap_or_else(|e| e.into_inner())
             .delete_all_pages();
+    }
+
+    pub fn re_open(&self) -> Result<()> {
+        self.inner
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .index
+            .inverted_index
+            .re_open()
     }
 }

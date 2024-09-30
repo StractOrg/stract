@@ -135,7 +135,7 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
         let mut conn: sonic::service::Connection<LiveIndexService> =
             sonic::service::Connection::create(other).await?;
         index.delete_all_pages();
-        let local_path = index.path();
+        let local_path = dbg!(index.path());
         let remote_path = conn.send(GetIndexPath).await?;
 
         remote_cp::Request::download(
@@ -146,6 +146,7 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
             },
         )
         .await;
+        index.re_open().unwrap();
     }
 
     let mut wal = temp_wal
