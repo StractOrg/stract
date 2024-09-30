@@ -377,12 +377,13 @@ impl TermDict {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gen_temp_path;
     use anyhow::Result;
 
     #[test]
     fn test_term_dict() -> Result<()> {
-        let mut dict = TermDict::open(gen_temp_path())?;
+        let temp_dir = file_store::gen_temp_dir().unwrap();
+        let path = temp_dir.as_ref().join("dicts");
+        let mut dict = TermDict::open(&path)?;
 
         dict.insert("foo");
         dict.insert("bar");
@@ -417,7 +418,8 @@ mod tests {
 
     #[test]
     fn reopen() {
-        let path = gen_temp_path();
+        let temp_dir = file_store::gen_temp_dir().unwrap();
+        let path = temp_dir.as_ref().join("dicts");
 
         {
             let mut dict = TermDict::open(&path).unwrap();

@@ -15,10 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
+use file_store::temp::{TempDir, TempFile};
 use std::{
     cmp::Reverse,
     collections::BinaryHeap,
-    fs::{File, OpenOptions},
+    fs::File,
     io::{BufReader, BufWriter, Read, Seek, Write},
 };
 
@@ -74,76 +75,9 @@ impl<T> Chunk<T> {
         T: bincode::Encode + Ord,
     {
         self.sort();
-        self.write_into(&mut file.inner)?;
+        self.write_into(file.inner_mut())?;
 
         StoredChunk::new(file)
-    }
-}
-
-struct TempDir {
-    path: std::path::PathBuf,
-}
-
-impl TempDir {
-    fn new() -> Result<Self> {
-        let path = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
-
-        std::fs::create_dir(&path)?;
-
-        Ok(Self { path })
-    }
-
-    fn as_ref(&self) -> &std::path::Path {
-        self.path.as_ref()
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        if self.path.exists() {
-            std::fs::remove_dir_all(&self.path).unwrap();
-        }
-    }
-}
-
-struct TempFile {
-    inner: File,
-    path: std::path::PathBuf,
-}
-
-impl TempFile {
-    fn new(dir: &TempDir) -> Result<Self> {
-        let path = dir.as_ref().join(uuid::Uuid::new_v4().to_string());
-
-        Ok(Self {
-            inner: OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(&path)?,
-            path,
-        })
-    }
-}
-
-impl Drop for TempFile {
-    fn drop(&mut self) {
-        if self.path.exists() {
-            std::fs::remove_file(&self.path).unwrap();
-        }
-    }
-}
-
-impl Read for TempFile {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.inner.read(buf)
-    }
-}
-
-impl Seek for TempFile {
-    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
-        self.inner.seek(pos)
     }
 }
 

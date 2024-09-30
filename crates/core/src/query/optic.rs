@@ -252,7 +252,7 @@ mod tests {
 
     use crate::{
         bangs::Bangs,
-        enum_map, gen_temp_path,
+        enum_map,
         index::Index,
         searcher::{
             api::{ApiSearcher, Config},
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     #[allow(clippy::too_many_lines)]
     fn discard_and_boost_hosts() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {
@@ -391,7 +391,7 @@ mod tests {
 
     #[test]
     fn example_optics_dont_crash() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {
@@ -489,7 +489,7 @@ mod tests {
     #[test]
     #[allow(clippy::too_many_lines)]
     fn empty_discard() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {
@@ -602,10 +602,11 @@ mod tests {
     #[tokio::test]
     #[allow(clippy::too_many_lines)]
     async fn liked_hosts() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let dir = crate::gen_temp_dir().unwrap();
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         let mut writer = WebgraphWriter::new(
-            gen_temp_path(),
+            &dir,
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
             None,
@@ -761,7 +762,7 @@ mod tests {
     #[test]
     #[allow(clippy::too_many_lines)]
     fn schema_org_search() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {
@@ -941,7 +942,7 @@ mod tests {
 
     #[test]
     fn pattern_same_phrase() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {
@@ -1007,7 +1008,7 @@ mod tests {
 
     #[test]
     fn discard_all_discard_like() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {
@@ -1094,7 +1095,7 @@ mod tests {
     #[test]
     #[allow(clippy::too_many_lines)]
     fn special_pattern_syntax() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {
@@ -1250,7 +1251,7 @@ mod tests {
 
     #[test]
     fn active_optic_with_blocked_hosts() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {
@@ -1318,7 +1319,7 @@ mod tests {
 
     #[test]
     fn empty_optic_noop() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {
@@ -1374,7 +1375,7 @@ mod tests {
     #[test]
     #[allow(clippy::too_many_lines)]
     fn wildcard_edge_cases() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {
@@ -1496,7 +1497,7 @@ mod tests {
 
     #[test]
     fn empty_double_anchor() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1564,7 +1565,7 @@ mod tests {
 
     #[test]
     fn indieweb_search() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1648,7 +1649,7 @@ mod tests {
 
     #[test]
     fn site_double_anchor() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1741,7 +1742,7 @@ mod tests {
 
     #[test]
     fn apostrophe_token() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1830,7 +1831,7 @@ mod tests {
 
     #[test]
     fn discard_double_matching() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         let mut page = Webpage {
             html: Html::parse(
@@ -1918,7 +1919,7 @@ mod tests {
 
     #[test]
     fn test_site_in_domain_rule() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         let page = Webpage {
             html: Html::parse(

@@ -424,7 +424,7 @@ impl NextWordsStrategy for IntoMiddle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gen_temp_path;
+    use crate::gen_temp_dir;
 
     #[test]
     fn test_contexts() {
@@ -434,11 +434,11 @@ mod tests {
             "a b c d e f g h i j k l m n o p q r s t u v w x y z",
         ));
 
-        let path = gen_temp_path();
+        let temp_dir = gen_temp_dir().unwrap();
 
-        trainer.build(&path).unwrap();
+        trainer.build(&temp_dir).unwrap();
 
-        let model = StupidBackoff::open(&path).unwrap();
+        let model = StupidBackoff::open(&temp_dir).unwrap();
 
         assert_eq!(
             model.contexts("b"),
@@ -456,11 +456,11 @@ mod tests {
             "a b c d e f g h i j k l m n o p q r s t u v w x y z",
         ));
 
-        let path = gen_temp_path();
+        let temp_dir = gen_temp_dir().unwrap();
 
-        a.build(&path).unwrap();
+        a.build(&temp_dir.as_ref().join("a")).unwrap();
 
-        let a = StupidBackoff::open(&path).unwrap();
+        let a = StupidBackoff::open(&temp_dir.as_ref().join("a")).unwrap();
 
         let mut b = StupidBackoffTrainer::new(3);
 
@@ -468,18 +468,15 @@ mod tests {
             "a b c d e f g h i j k l m n o p q r s t u v w x y z",
         ));
 
-        let path = gen_temp_path();
+        b.build(&temp_dir.as_ref().join("b")).unwrap();
 
-        b.build(&path).unwrap();
+        let b = StupidBackoff::open(&temp_dir.as_ref().join("b")).unwrap();
 
-        let b = StupidBackoff::open(&path).unwrap();
-
-        let path = gen_temp_path();
-        let model = StupidBackoff::merge(vec![a, b], &path).unwrap();
+        let model = StupidBackoff::merge(vec![a, b], &temp_dir.as_ref().join("merged")).unwrap();
 
         assert_eq!(model.n_counts, vec![48, 48, 48]);
 
-        let model = StupidBackoff::open(path).unwrap();
+        let model = StupidBackoff::open(&temp_dir.as_ref().join("merged")).unwrap();
 
         assert_eq!(model.n_counts, vec![48, 48, 48]);
     }

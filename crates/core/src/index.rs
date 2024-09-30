@@ -70,13 +70,13 @@ impl Index {
     }
 
     #[cfg(test)]
-    pub fn temporary() -> Result<Self> {
-        let path = crate::gen_temp_path();
-        let mut s = Self::open(path)?;
+    pub fn temporary() -> Result<(Self, file_store::temp::TempDir)> {
+        let dir = crate::gen_temp_dir()?;
+        let mut s = Self::open(&dir)?;
 
         s.prepare_writer()?;
 
-        Ok(s)
+        Ok((s, dir))
     }
 
     pub fn insert(&self, webpage: &Webpage) -> Result<()> {
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn bm25_all_docs() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(

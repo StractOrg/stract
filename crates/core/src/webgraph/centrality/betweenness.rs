@@ -163,15 +163,17 @@ impl Betweenness {
 
 #[cfg(test)]
 mod tests {
+    use file_store::temp::TempDir;
     use maplit::hashmap;
 
     use crate::{webgraph::WebgraphWriter, webpage::html::links::RelFlags};
 
     use super::*;
 
-    fn create_path_graph(n: usize) -> Webgraph {
+    fn create_path_graph(n: usize) -> (Webgraph, TempDir) {
+        let temp_dir = file_store::gen_temp_dir().unwrap();
         let mut writer = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            temp_dir.as_ref().join("test-webgraph"),
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
             None,
@@ -186,12 +188,13 @@ mod tests {
             );
         }
 
-        writer.finalize()
+        let graph = writer.finalize();
+        (graph, temp_dir)
     }
 
     #[test]
     fn path() {
-        let p = create_path_graph(5);
+        let (p, _temp_dir) = create_path_graph(5);
         let centrality = Betweenness::calculate(&p);
 
         assert_eq!(

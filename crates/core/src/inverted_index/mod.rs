@@ -222,13 +222,13 @@ impl InvertedIndex {
     }
 
     #[cfg(test)]
-    pub fn temporary() -> Result<Self> {
-        let path = crate::gen_temp_path();
-        let mut s = Self::open(path)?;
+    pub fn temporary() -> Result<(Self, file_store::temp::TempDir)> {
+        let dir = crate::gen_temp_dir()?;
+        let mut s = Self::open(dir.as_ref().join("index"))?;
 
         s.prepare_writer()?;
 
-        Ok(s)
+        Ok((s, dir))
     }
 }
 
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn simple_search() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
         let ctx = index.local_search_ctx();
 
         let query = Query::parse(
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn document_not_matching() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -387,7 +387,7 @@ mod tests {
 
     #[test]
     fn english_stemming() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -435,7 +435,7 @@ mod tests {
 
     #[test]
     fn stemmed_query_english() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -483,7 +483,7 @@ mod tests {
 
     #[test]
     fn not_searchable_backlinks() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn limited_top_docs() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         for _ in 0..100 {
             let dedup_s = crate::rand_words(100);
@@ -618,7 +618,7 @@ mod tests {
 
     #[test]
     fn host_search() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -666,7 +666,7 @@ mod tests {
 
     #[test]
     fn merge() {
-        let index1 = InvertedIndex::temporary().expect("Unable to open index");
+        let (index1, _dir1) = InvertedIndex::temporary().expect("Unable to open index");
 
         index1
             .insert(
@@ -690,7 +690,7 @@ mod tests {
             )
             .expect("failed to insert webpage");
 
-        let index2 = InvertedIndex::temporary().expect("Unable to open index");
+        let (index2, _dir2) = InvertedIndex::temporary().expect("Unable to open index");
 
         index2
             .insert(
@@ -743,7 +743,7 @@ mod tests {
 
     #[test]
     fn match_across_fields() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         let ctx = index.local_search_ctx();
         let query = Query::parse(
@@ -801,7 +801,7 @@ mod tests {
 
     #[test]
     fn id_links_removed_during_indexing() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -849,7 +849,7 @@ mod tests {
 
     #[test]
     fn schema_org_stored() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage::test_parse(
@@ -928,7 +928,7 @@ mod tests {
 
     #[test]
     fn get_webpage() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage::test_parse(
@@ -962,7 +962,7 @@ mod tests {
 
     #[test]
     fn get_homepage() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage::test_parse(
@@ -999,7 +999,7 @@ mod tests {
 
     #[test]
     fn test_title_embeddings_stored() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         let mut webpage = Webpage::test_parse(
             &format!(
@@ -1087,7 +1087,7 @@ mod tests {
 
     #[test]
     fn test_approximate_count() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         let webpage = Webpage::test_parse(
             &format!(
@@ -1145,7 +1145,7 @@ mod tests {
 
     #[test]
     fn test_search_special_characters() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         let webpage = Webpage::test_parse(
             &format!(
@@ -1202,7 +1202,7 @@ mod tests {
 
     #[test]
     fn test_unicode_normalization() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         let webpage = Webpage::test_parse(
             &format!(

@@ -366,7 +366,7 @@ mod tests {
         const NUM_PAGES: usize = 50;
         const NUM_WEBSITES: usize = NUM_PAGES * NUM_RESULTS_PER_PAGE;
 
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         for i in 0..NUM_WEBSITES {
             index

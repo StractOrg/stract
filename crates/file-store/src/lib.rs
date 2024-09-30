@@ -22,9 +22,11 @@ pub mod const_serializable;
 pub mod iterable;
 pub mod peekable;
 pub mod random_lookup;
+pub mod temp;
 
 pub use const_serializable::ConstSerializable;
 pub use peekable::Peekable;
+use temp::TempDir;
 
 // taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
 pub fn gen_temp_path() -> std::path::PathBuf {
@@ -51,4 +53,8 @@ pub fn gen_temp_path() -> std::path::PathBuf {
     } else {
         std::env::temp_dir().join(format!("pagecache.tmp.{salt}"))
     }
+}
+
+pub fn gen_temp_dir() -> Result<TempDir> {
+    TempDir::new()
 }

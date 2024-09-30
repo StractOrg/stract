@@ -169,7 +169,7 @@ fn files(root: PathBuf) -> Vec<PathBuf> {
 mod tests {
     use std::path::Path;
 
-    use file_store::gen_temp_path;
+    use file_store::gen_temp_dir;
 
     use super::*;
 
@@ -183,104 +183,104 @@ mod tests {
 
     #[tokio::test]
     async fn test_directory() {
-        let a = gen_temp_path();
-        std::fs::create_dir_all(a.join("test")).unwrap();
+        let a = gen_temp_dir().unwrap();
+        std::fs::create_dir_all(a.as_ref().join("test")).unwrap();
         let contents = "this is a test";
-        std::fs::write(a.join("test").join("file.txt"), contents).unwrap();
+        std::fs::write(a.as_ref().join("test").join("file.txt"), contents).unwrap();
 
-        let b = gen_temp_path();
+        let b = gen_temp_dir().unwrap();
         download(&a, &b).await;
 
-        assert!(b.join("test").exists());
-        assert!(b.join("test").join("file.txt").exists());
+        assert!(b.as_ref().join("test").exists());
+        assert!(b.as_ref().join("test").join("file.txt").exists());
 
-        let res = std::fs::read_to_string(b.join("test").join("file.txt")).unwrap();
+        let res = std::fs::read_to_string(b.as_ref().join("test").join("file.txt")).unwrap();
 
         assert_eq!(contents, res);
     }
 
     #[tokio::test]
     async fn test_single_file() {
-        let a = gen_temp_path();
+        let a = gen_temp_dir().unwrap();
         std::fs::create_dir_all(&a).unwrap();
         let contents = "this is a test";
-        std::fs::write(a.join("file.txt"), contents).unwrap();
+        std::fs::write(a.as_ref().join("file.txt"), contents).unwrap();
 
-        let b = gen_temp_path();
+        let b = gen_temp_dir().unwrap();
         download(&a, &b).await;
 
-        assert!(b.join("file.txt").exists());
+        assert!(b.as_ref().join("file.txt").exists());
 
-        let res = std::fs::read_to_string(b.join("file.txt")).unwrap();
+        let res = std::fs::read_to_string(b.as_ref().join("file.txt")).unwrap();
 
         assert_eq!(contents, res);
     }
 
     #[tokio::test]
     async fn test_overwrite() {
-        let a = gen_temp_path();
+        let a = gen_temp_dir().unwrap();
         std::fs::create_dir_all(&a).unwrap();
         let contents = "this is a test";
-        std::fs::write(a.join("file.txt"), contents).unwrap();
+        std::fs::write(a.as_ref().join("file.txt"), contents).unwrap();
 
-        let b = gen_temp_path();
+        let b = gen_temp_dir().unwrap();
         std::fs::create_dir_all(&b).unwrap();
-        std::fs::write(b.join("file.txt"), "this is another test").unwrap();
+        std::fs::write(b.as_ref().join("file.txt"), "this is another test").unwrap();
         download(&a, &b).await;
 
-        assert!(b.join("file.txt").exists());
+        assert!(b.as_ref().join("file.txt").exists());
 
-        let res = std::fs::read_to_string(b.join("file.txt")).unwrap();
+        let res = std::fs::read_to_string(b.as_ref().join("file.txt")).unwrap();
 
         assert_eq!(contents, res);
     }
 
     #[tokio::test]
     async fn test_keep_non_copied() {
-        let a = gen_temp_path();
-        std::fs::create_dir_all(a.join("test")).unwrap();
+        let a = gen_temp_dir().unwrap();
+        std::fs::create_dir_all(a.as_ref().join("test")).unwrap();
         let contents = "this is a test";
-        std::fs::write(a.join("test").join("a.txt"), contents).unwrap();
+        std::fs::write(a.as_ref().join("test").join("a.txt"), contents).unwrap();
 
-        let b = gen_temp_path();
-        std::fs::create_dir_all(b.join("test")).unwrap();
-        std::fs::write(b.join("test").join("b.txt"), contents).unwrap();
+        let b = gen_temp_dir().unwrap();
+        std::fs::create_dir_all(b.as_ref().join("test")).unwrap();
+        std::fs::write(b.as_ref().join("test").join("b.txt"), contents).unwrap();
 
         download(&a, &b).await;
 
-        assert!(b.join("test").exists());
-        assert!(b.join("test").join("a.txt").exists());
-        assert!(b.join("test").join("b.txt").exists());
+        assert!(b.as_ref().join("test").exists());
+        assert!(b.as_ref().join("test").join("a.txt").exists());
+        assert!(b.as_ref().join("test").join("b.txt").exists());
 
-        let res = std::fs::read_to_string(b.join("test").join("a.txt")).unwrap();
+        let res = std::fs::read_to_string(b.as_ref().join("test").join("a.txt")).unwrap();
         assert_eq!(contents, res);
 
-        let res = std::fs::read_to_string(b.join("test").join("b.txt")).unwrap();
+        let res = std::fs::read_to_string(b.as_ref().join("test").join("b.txt")).unwrap();
         assert_eq!(contents, res);
     }
 
     #[tokio::test]
     async fn test_file_size_edge_case() {
         let content = "a".repeat(CHUNK_SIZE_BYTES - 1);
-        let a = gen_temp_path();
+        let a = gen_temp_dir().unwrap();
         std::fs::create_dir_all(&a).unwrap();
-        std::fs::write(a.join("minus_1.txt"), &content).unwrap();
-        std::fs::write(a.join("edge.txt"), format!("{}a", &content)).unwrap();
-        std::fs::write(a.join("plus_1.txt"), format!("{}aa", &content)).unwrap();
+        std::fs::write(a.as_ref().join("minus_1.txt"), &content).unwrap();
+        std::fs::write(a.as_ref().join("edge.txt"), format!("{}a", &content)).unwrap();
+        std::fs::write(a.as_ref().join("plus_1.txt"), format!("{}aa", &content)).unwrap();
 
-        let b = gen_temp_path();
+        let b = gen_temp_dir().unwrap();
         download(&a, &b).await;
-        assert!(b.join("minus_1.txt").exists());
-        assert!(b.join("edge.txt").exists());
-        assert!(b.join("plus_1.txt").exists());
+        assert!(b.as_ref().join("minus_1.txt").exists());
+        assert!(b.as_ref().join("edge.txt").exists());
+        assert!(b.as_ref().join("plus_1.txt").exists());
 
-        let res = std::fs::read_to_string(b.join("minus_1.txt")).unwrap();
+        let res = std::fs::read_to_string(b.as_ref().join("minus_1.txt")).unwrap();
         assert_eq!(content, res);
 
-        let res = std::fs::read_to_string(b.join("edge.txt")).unwrap();
+        let res = std::fs::read_to_string(b.as_ref().join("edge.txt")).unwrap();
         assert_eq!(format!("{}a", &content), res);
 
-        let res = std::fs::read_to_string(b.join("plus_1.txt")).unwrap();
+        let res = std::fs::read_to_string(b.as_ref().join("plus_1.txt")).unwrap();
         assert_eq!(format!("{}aa", &content), res);
 
         std::fs::remove_dir_all(&a).unwrap();

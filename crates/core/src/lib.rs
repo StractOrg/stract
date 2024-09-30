@@ -33,7 +33,7 @@ use distributed::{
     cluster::Cluster,
     member::{Member, Service},
 };
-pub use file_store::gen_temp_path;
+pub use file_store::{gen_temp_dir, gen_temp_path};
 use std::{cmp::Reverse, sync::Arc};
 use thiserror::Error;
 

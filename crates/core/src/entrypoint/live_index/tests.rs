@@ -20,7 +20,7 @@ use crate::{
 };
 use std::{net::SocketAddr, sync::Arc};
 
-use file_store::gen_temp_path;
+use file_store::{gen_temp_dir, temp::TempDir};
 
 use crate::{
     ampc::dht::ShardId,
@@ -41,11 +41,12 @@ struct RemoteIndex {
     gossip_addr: SocketAddr,
     underlying_index: Arc<LiveIndex>,
     cluster: Arc<Cluster>,
+    _temp_dir: TempDir,
 }
 
 impl RemoteIndex {
     async fn start(shard: ShardId, gossip_seed: Vec<SocketAddr>) -> Result<Self> {
-        let path = gen_temp_path();
+        let dir = gen_temp_dir()?;
 
         let host = free_socket_addr();
         let gossip_addr = free_socket_addr();
@@ -57,8 +58,8 @@ impl RemoteIndex {
         };
 
         let config = LiveIndexConfig {
-            host_centrality_store_path: path
-                .as_path()
+            host_centrality_store_path: dir
+                .as_ref()
                 .join("host_centrality")
                 .to_str()
                 .unwrap()
@@ -70,7 +71,7 @@ impl RemoteIndex {
             gossip_seed_nodes: gossip_seed,
             gossip_addr,
             shard_id: shard,
-            index_path: path.as_path().join("index").to_str().unwrap().to_string(),
+            index_path: dir.as_ref().join("index").to_str().unwrap().to_string(),
             linear_model_path: None,
             lambda_model_path: None,
             host,
@@ -100,6 +101,7 @@ impl RemoteIndex {
             gossip_addr,
             underlying_index: index,
             cluster,
+            _temp_dir: dir,
         })
     }
 
