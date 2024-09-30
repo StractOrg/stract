@@ -24,7 +24,7 @@ pub use crate::common::{AntiCallToken, OwnedBytes, TerminatingWrite};
 
 pub(crate) use self::composite_file::{CompositeFile, CompositeWrite};
 pub use self::directory::{Directory, DirectoryClone, DirectoryLock};
-pub use self::directory_lock::{Lock, META_LOCK};
+pub use self::directory_lock::Lock;
 pub use self::ram_directory::RamDirectory;
 pub use self::watch_event_router::{WatchCallback, WatchCallbackList, WatchHandle};
 

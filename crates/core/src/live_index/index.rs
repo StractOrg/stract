@@ -194,6 +194,8 @@ impl InnerIndex {
                 created: Utc::now(),
             })
         }
+
+        self.save_meta();
     }
 
     fn save_meta(&self) {

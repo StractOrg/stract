@@ -569,8 +569,6 @@ mod tests {
 
     use super::super::operation::UserOperation;
     use crate::collector::{Count, TopDocs};
-    use crate::directory::error::LockError;
-    use crate::error::*;
     use crate::indexer::index_writer::MEMORY_BUDGET_NUM_BYTES_MIN;
     use crate::indexer::NoMergePolicy;
     use crate::query::{QueryParser, TermQuery};

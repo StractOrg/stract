@@ -1,18 +1,10 @@
 use std::path::PathBuf;
 
-use std::sync::LazyLock;
-
 /// A directory lock.
 ///
 /// A lock is associated with a specific path.
 ///
 /// The lock will be passed to [`Directory::acquire_lock`](crate::Directory::acquire_lock).
-///
-/// Tantivy itself uses only two locks but client application
-/// can use the directory facility to define their own locks.
-/// - [`META_LOCK`]
-///
-/// Check out these locks documentation for more information.
 #[derive(Debug)]
 pub struct Lock {
     /// The lock needs to be associated with its own file `path`.
@@ -30,16 +22,3 @@ pub struct Lock {
     /// the lock.
     pub is_blocking: bool,
 }
-
-/// The meta lock file is here to protect the segment files being opened by
-/// `IndexReader::reload()` from being garbage collected.
-///
-/// It makes it possible for another process to safely consume
-/// our index in-writing. Ideally, we may have preferred `RWLock` semantics
-/// here, but it is difficult to achieve on Windows.
-///
-/// Opening segment readers is a very fast process.
-pub static META_LOCK: LazyLock<Lock> = LazyLock::new(|| Lock {
-    filepath: PathBuf::from(".tantivy-meta.lock"),
-    is_blocking: true,
-});
