@@ -135,7 +135,7 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
         let mut conn: sonic::service::Connection<LiveIndexService> =
             sonic::service::Connection::create(other).await?;
         index.delete_all_pages();
-        let local_path = dbg!(index.path());
+        let local_path = index.path();
         let remote_path = conn.send(GetIndexPath).await?;
 
         remote_cp::Request::download(
@@ -203,7 +203,7 @@ impl LiveIndexService {
 
         let index = Arc::new(
             LiveIndex::new(
-                index_path.join("index"),
+                index_path,
                 indexer::worker::Config {
                     host_centrality_store_path: config.host_centrality_store_path.clone(),
                     page_centrality_store_path: config.page_centrality_store_path.clone(),

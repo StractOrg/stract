@@ -88,7 +88,7 @@ impl InnerIndex {
         path: P,
         indexer_worker_config: indexer::worker::Config,
     ) -> Result<Self> {
-        let mut index = crate::index::Index::open(path.as_ref().join("index"))?;
+        let mut index = crate::index::Index::open(path.as_ref())?;
         index.prepare_writer()?;
 
         let write_ahead_log = Wal::open(path.as_ref().join("wal"))?;
