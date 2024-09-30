@@ -12,7 +12,7 @@ use crate::core::{Executor, META_FILEPATH};
 use crate::directory::error::OpenReadError;
 #[cfg(feature = "mmap")]
 use crate::directory::MmapDirectory;
-use crate::directory::{Directory, ManagedDirectory, RamDirectory, INDEX_WRITER_LOCK};
+use crate::directory::{Directory, ManagedDirectory, RamDirectory};
 use crate::error::{DataCorruption, TantivyError};
 use crate::index::{IndexMeta, SegmentId, SegmentMeta, SegmentMetaInventory};
 use crate::indexer::index_writer::{MAX_NUM_THREAD, MEMORY_BUDGET_NUM_BYTES_MIN};
@@ -574,27 +574,8 @@ impl Index {
         num_threads: usize,
         overall_memory_budget_in_bytes: usize,
     ) -> crate::Result<IndexWriter<D>> {
-        let directory_lock = self
-            .directory
-            .acquire_lock(&INDEX_WRITER_LOCK)
-            .map_err(|err| {
-                TantivyError::LockFailure(
-                    err,
-                    Some(
-                        "Failed to acquire index lock. If you are using a regular directory, this \
-                         means there is already an `IndexWriter` working on this `Directory`, in \
-                         this process or in a different process."
-                            .to_string(),
-                    ),
-                )
-            })?;
         let memory_arena_in_bytes_per_thread = overall_memory_budget_in_bytes / num_threads;
-        IndexWriter::new(
-            self,
-            num_threads,
-            memory_arena_in_bytes_per_thread,
-            directory_lock,
-        )
+        IndexWriter::new(self, num_threads, memory_arena_in_bytes_per_thread)
     }
 
     /// Helper to create an index writer for tests.
