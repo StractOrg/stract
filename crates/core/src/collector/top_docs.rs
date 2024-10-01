@@ -196,6 +196,7 @@ impl TopSegmentCollector {
     }
 }
 
+#[derive(Debug, Clone)]
 struct ScoredDoc<T: Doc> {
     doc: T,
     adjusted_score: f64,
@@ -337,7 +338,11 @@ impl<T: Doc> BucketCollector<T> {
             }
         }
 
-        res.extend(simhash_dups);
+        res.extend(
+            simhash_dups
+                .into_iter()
+                .take(self.top_n.saturating_sub(res.len())),
+        );
 
         res
     }
