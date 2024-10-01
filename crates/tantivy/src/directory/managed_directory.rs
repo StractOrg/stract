@@ -11,7 +11,7 @@ use crate::directory::error::{DeleteError, LockError, OpenReadError, OpenWriteEr
 use crate::directory::footer::{Footer, FooterProxy};
 use crate::directory::{
     DirectoryLock, FileHandle, FileSlice, GarbageCollectionResult, Lock, WatchCallback,
-    WatchHandle, WritePtr, META_LOCK,
+    WatchHandle, WritePtr,
 };
 use crate::error::DataCorruption;
 use crate::Directory;
@@ -129,24 +129,10 @@ impl ManagedDirectory {
                 .read()
                 .expect("Managed directory rlock poisoned in garbage collect.");
 
-            // The point of this second "file" lock is to enforce the following scenario
-            // 1) process B tries to load a new set of searcher.
-            // The list of segments is loaded
-            // 2) writer change meta.json (for instance after a merge or a commit)
-            // 3) gc kicks in.
-            // 4) gc removes a file that was useful for process B, before process B opened it.
-            match self.acquire_lock(&META_LOCK) {
-                Ok(_meta_lock) => {
-                    let living_files = get_living_files();
-                    for managed_path in &meta_informations_rlock.managed_paths {
-                        if !living_files.contains(managed_path) {
-                            files_to_delete.push(managed_path.clone());
-                        }
-                    }
-                }
-                Err(err) => {
-                    error!("Failed to acquire lock for GC");
-                    return Err(crate::TantivyError::from(err));
+            let living_files = get_living_files();
+            for managed_path in &meta_informations_rlock.managed_paths {
+                if !living_files.contains(managed_path) {
+                    files_to_delete.push(managed_path.clone());
                 }
             }
         }
