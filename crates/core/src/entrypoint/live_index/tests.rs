@@ -15,10 +15,14 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    config::LiveIndexConfig, entrypoint::search_server, inverted_index, live_index::LiveIndex,
+    config::LiveIndexConfig,
+    entrypoint::search_server,
+    inverted_index,
+    live_index::LiveIndex,
+    searcher::{LocalSearcher, SearchQuery},
     Result,
 };
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, path::Path, sync::Arc};
 
 use file_store::{gen_temp_dir, temp::TempDir};
 
@@ -35,6 +39,30 @@ use crate::{
 
 use super::LiveIndexService;
 
+fn config<P: AsRef<Path>>(path: P) -> LiveIndexConfig {
+    LiveIndexConfig {
+        host_centrality_store_path: path
+            .as_ref()
+            .join("host_centrality")
+            .to_str()
+            .unwrap()
+            .to_string(),
+        page_centrality_store_path: None,
+        safety_classifier_path: None,
+        host_centrality_threshold: None,
+        minimum_clean_words: None,
+        gossip_seed_nodes: None,
+        gossip_addr: free_socket_addr(),
+        shard_id: ShardId::new(0),
+        index_path: path.as_ref().join("index").to_str().unwrap().to_string(),
+        linear_model_path: None,
+        lambda_model_path: None,
+        host: free_socket_addr(),
+        collector: Default::default(),
+        snippet: Default::default(),
+    }
+}
+
 struct RemoteIndex {
     host: SocketAddr,
     shard: ShardId,
@@ -47,37 +75,15 @@ struct RemoteIndex {
 impl RemoteIndex {
     async fn start(shard: ShardId, gossip_seed: Vec<SocketAddr>) -> Result<Self> {
         let dir = gen_temp_dir()?;
+        let mut config = config(&dir);
 
-        let host = free_socket_addr();
-        let gossip_addr = free_socket_addr();
+        config.shard_id = shard;
+        let host = config.host;
+        let gossip_addr = config.gossip_addr;
 
-        let gossip_seed = if gossip_seed.is_empty() {
-            None
-        } else {
-            Some(gossip_seed)
-        };
-
-        let config = LiveIndexConfig {
-            host_centrality_store_path: dir
-                .as_ref()
-                .join("host_centrality")
-                .to_str()
-                .unwrap()
-                .to_string(),
-            page_centrality_store_path: None,
-            safety_classifier_path: None,
-            host_centrality_threshold: None,
-            minimum_clean_words: None,
-            gossip_seed_nodes: gossip_seed,
-            gossip_addr,
-            shard_id: shard,
-            index_path: dir.as_ref().join("index").to_str().unwrap().to_string(),
-            linear_model_path: None,
-            lambda_model_path: None,
-            host,
-            collector: Default::default(),
-            snippet: Default::default(),
-        };
+        if !gossip_seed.is_empty() {
+            config.gossip_seed_nodes = Some(gossip_seed);
+        }
 
         let service = LiveIndexService::new(config).await?;
         let cluster = service.cluster_handle();
@@ -392,6 +398,101 @@ async fn test_replica_recovery() -> Result<()> {
 
     let res2 = rep2.search("test").await?;
     assert_eq!(res2.len(), 2);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_meta_segments() -> Result<()> {
+    let dir = gen_temp_dir()?;
+    let config = config(&dir);
+    let indexer_config = crate::entrypoint::indexer::worker::Config {
+        host_centrality_store_path: config.host_centrality_store_path.clone(),
+        page_centrality_store_path: config.page_centrality_store_path.clone(),
+        page_webgraph: None,
+        safety_classifier_path: None,
+        dual_encoder: None,
+    };
+
+    let index = LiveIndex::new(&config.index_path, indexer_config.clone()).await?;
+    assert!(index.meta().segments().is_empty());
+
+    index.insert(&[IndexableWebpage {
+        url: "https://a.com/".to_string(),
+        body: "
+            <title>test page</title>
+            Example webpage
+            "
+        .to_string(),
+        fetch_time_ms: 100,
+    }]);
+    index.commit();
+
+    assert_eq!(index.meta().segments().len(), 1);
+
+    index.re_open()?;
+
+    assert_eq!(index.meta().segments().len(), 1);
+
+    let copy_index = LiveIndex::new(&config.index_path, indexer_config).await?;
+
+    assert_eq!(copy_index.meta().segments().len(), 1);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_segment_compaction() -> Result<()> {
+    let dir = gen_temp_dir()?;
+    let config = config(&dir);
+    let indexer_config = crate::entrypoint::indexer::worker::Config {
+        host_centrality_store_path: config.host_centrality_store_path.clone(),
+        page_centrality_store_path: config.page_centrality_store_path.clone(),
+        page_webgraph: None,
+        safety_classifier_path: None,
+        dual_encoder: None,
+    };
+
+    let index = Arc::new(LiveIndex::new(&config.index_path, indexer_config).await?);
+
+    index.insert(&[IndexableWebpage {
+        url: "https://a.com/".to_string(),
+        body: "
+            <title>test page</title>
+            Example webpage
+            "
+        .to_string(),
+        fetch_time_ms: 100,
+    }]);
+
+    index.commit();
+
+    index.insert(&[IndexableWebpage {
+        url: "https://b.com/".to_string(),
+        body: "
+            <title>test page</title>
+            Example webpage
+            "
+        .to_string(),
+        fetch_time_ms: 100,
+    }]);
+
+    index.commit();
+
+    assert_eq!(index.meta().segments().len(), 2);
+
+    index.compact_segments_by_date();
+
+    assert_eq!(index.meta().segments().len(), 1);
+
+    let searcher = LocalSearcher::from(index.clone());
+
+    let res = searcher.search(&SearchQuery {
+        query: "test".to_string(),
+        ..Default::default()
+    })?;
+
+    assert_eq!(res.webpages.len(), 2);
 
     Ok(())
 }

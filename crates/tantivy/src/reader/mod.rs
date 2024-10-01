@@ -8,7 +8,7 @@ pub use warming::Warmer;
 
 use self::warming::WarmingState;
 use crate::core::searcher::{SearcherGeneration, SearcherInner};
-use crate::directory::{Directory, WatchCallback, WatchHandle, META_LOCK};
+use crate::directory::{Directory, WatchCallback, WatchHandle};
 use crate::store::DOCSTORE_CACHE_CAPACITY;
 use crate::{Index, Inventory, Searcher, SegmentReader, TrackedObject};
 
@@ -193,8 +193,6 @@ impl InnerIndexReader {
     /// This function acquires a lock to prevent GC from removing files
     /// as we are opening our index.
     fn open_segment_readers(index: &Index) -> crate::Result<Vec<SegmentReader>> {
-        // Prevents segment files from getting deleted while we are in the process of opening them
-        let _meta_lock = index.directory().acquire_lock(&META_LOCK)?;
         let searchable_segments = index.searchable_segments()?;
         let segment_readers = searchable_segments
             .iter()

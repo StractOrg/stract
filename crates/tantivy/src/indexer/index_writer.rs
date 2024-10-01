@@ -8,7 +8,7 @@ use smallvec::smallvec;
 use super::operation::{AddOperation, UserOperation};
 use super::segment_updater::SegmentUpdater;
 use super::{AddBatch, AddBatchReceiver, AddBatchSender, PreparedCommit};
-use crate::directory::{DirectoryLock, GarbageCollectionResult};
+use crate::directory::GarbageCollectionResult;
 use crate::error::TantivyError;
 use crate::index::{Index, Segment, SegmentId, SegmentMeta};
 use crate::indexer::index_writer_status::IndexWriterStatus;
@@ -46,10 +46,6 @@ fn error_in_index_worker_thread(context: &str) -> TantivyError {
 /// Each indexing thread builds its own independent [`Segment`], via
 /// a `SegmentWriter` object.
 pub struct IndexWriter<D: Document = TantivyDocument> {
-    // the lock is just used to bind the
-    // lifetime of the lock with that of the IndexWriter.
-    _directory_lock: Option<DirectoryLock>,
-
     index: Index,
 
     // The memory budget per thread, after which a commit is triggered.
@@ -132,7 +128,6 @@ impl<D: Document> IndexWriter<D> {
         index: &Index,
         num_threads: usize,
         memory_budget_in_bytes_per_thread: usize,
-        directory_lock: DirectoryLock,
     ) -> crate::Result<Self> {
         if memory_budget_in_bytes_per_thread < MEMORY_BUDGET_NUM_BYTES_MIN {
             let err_msg = format!(
@@ -157,8 +152,6 @@ impl<D: Document> IndexWriter<D> {
         let segment_updater = SegmentUpdater::create(index.clone(), stamper.clone())?;
 
         let mut index_writer = Self {
-            _directory_lock: Some(directory_lock),
-
             memory_budget_in_bytes_per_thread,
             index: index.clone(),
             index_writer_status: IndexWriterStatus::from(document_receiver),
@@ -371,17 +364,10 @@ impl<D: Document> IndexWriter<D> {
         self.segment_updater.kill();
         let document_receiver_res = self.operation_receiver();
 
-        // take the directory lock to create a new index_writer.
-        let directory_lock = self
-            ._directory_lock
-            .take()
-            .expect("The IndexWriter does not have any lock. This is a bug, please report.");
-
         let new_index_writer = IndexWriter::new(
             &self.index,
             self.num_threads,
             self.memory_budget_in_bytes_per_thread,
-            directory_lock,
         )?;
 
         // the current `self` is dropped right away because of this call.
@@ -583,8 +569,6 @@ mod tests {
 
     use super::super::operation::UserOperation;
     use crate::collector::{Count, TopDocs};
-    use crate::directory::error::LockError;
-    use crate::error::*;
     use crate::indexer::index_writer::MEMORY_BUDGET_NUM_BYTES_MIN;
     use crate::indexer::NoMergePolicy;
     use crate::query::{QueryParser, TermQuery};
@@ -632,31 +616,6 @@ mod tests {
         let operations2 = vec![];
         let batch_opstamp2 = index_writer.run(operations2).unwrap();
         assert_eq!(batch_opstamp2, 1u64);
-    }
-
-    #[test]
-    fn test_lockfile_stops_duplicates() {
-        let schema_builder = schema::Schema::builder();
-        let index = Index::create_in_ram(schema_builder.build());
-        let _index_writer: IndexWriter = index.writer_for_tests().unwrap();
-        match index.writer_for_tests::<TantivyDocument>() {
-            Err(TantivyError::LockFailure(LockError::LockBusy, _)) => {}
-            _ => panic!("Expected a `LockFailure` error"),
-        }
-    }
-
-    #[test]
-    fn test_lockfile_already_exists_error_msg() {
-        let schema_builder = schema::Schema::builder();
-        let index = Index::create_in_ram(schema_builder.build());
-        let _index_writer: IndexWriter = index.writer_for_tests().unwrap();
-        match index.writer_for_tests::<TantivyDocument>() {
-            Err(err) => {
-                let err_msg = err.to_string();
-                assert!(err_msg.contains("already an `IndexWriter`"));
-            }
-            _ => panic!("Expected LockfileAlreadyExists error"),
-        }
     }
 
     #[test]

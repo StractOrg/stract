@@ -36,13 +36,23 @@ use crate::{
 };
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct Segment {
+pub struct Segment {
     id: SegmentId,
     created: DateTime<Utc>,
 }
 
+impl Segment {
+    pub fn id(&self) -> SegmentId {
+        self.id
+    }
+
+    pub fn created(&self) -> DateTime<Utc> {
+        self.created
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
-struct Meta {
+pub struct Meta {
     segments: Vec<Segment>,
 }
 
@@ -72,6 +82,10 @@ impl Meta {
 
         serde_json::to_writer_pretty(writer, self).unwrap();
     }
+
+    pub fn segments(&self) -> &[Segment] {
+        &self.segments
+    }
 }
 
 pub struct InnerIndex {
@@ -88,7 +102,7 @@ impl InnerIndex {
         path: P,
         indexer_worker_config: indexer::worker::Config,
     ) -> Result<Self> {
-        let mut index = crate::index::Index::open(path.as_ref().join("index"))?;
+        let mut index = crate::index::Index::open(path.as_ref())?;
         index.prepare_writer()?;
 
         let write_ahead_log = Wal::open(path.as_ref().join("wal"))?;
@@ -194,6 +208,8 @@ impl InnerIndex {
                 created: Utc::now(),
             })
         }
+
+        self.save_meta();
     }
 
     fn save_meta(&self) {
@@ -234,8 +250,8 @@ impl InnerIndex {
                 self.index.insert(&webpage).unwrap();
             }
         }
-        self.write_ahead_log.clear().unwrap();
         self.index.commit().unwrap();
+        self.write_ahead_log.clear().unwrap();
         self.update_meta();
         self.has_inserts = false;
     }
@@ -246,6 +262,10 @@ impl InnerIndex {
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    pub fn meta(&self) -> &Meta {
+        &self.meta
     }
 }
 
@@ -332,5 +352,22 @@ impl LiveIndex {
             .write()
             .unwrap_or_else(|e| e.into_inner())
             .delete_all_pages();
+    }
+
+    pub fn re_open(&self) -> Result<()> {
+        self.inner
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .index
+            .inverted_index
+            .re_open()
+    }
+
+    pub fn meta(&self) -> Meta {
+        self.inner
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .meta
+            .clone()
     }
 }

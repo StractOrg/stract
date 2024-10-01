@@ -184,6 +184,11 @@ impl InvertedIndex {
         })
     }
 
+    pub fn re_open(&mut self) -> Result<()> {
+        *self = Self::open(self.path.clone())?;
+        Ok(())
+    }
+
     pub fn columnfield_reader(&self) -> NumericalFieldReader {
         self.columnfield_reader.clone()
     }
@@ -205,16 +210,11 @@ impl InvertedIndex {
     }
 
     pub fn segment_ids(&self) -> Vec<SegmentId> {
-        self.tantivy_index
-            .searchable_segment_ids()
-            .unwrap_or_default()
+        self.tantivy_index.searchable_segment_ids().unwrap()
     }
 
     pub fn num_segments(&self) -> usize {
-        self.tantivy_index
-            .searchable_segments()
-            .unwrap_or_default()
-            .len()
+        self.tantivy_index.searchable_segments().unwrap().len()
     }
 
     pub fn num_documents(&self) -> u64 {

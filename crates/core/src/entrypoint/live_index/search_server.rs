@@ -146,6 +146,7 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
             },
         )
         .await;
+        index.re_open().unwrap();
     }
 
     let mut wal = temp_wal
@@ -202,7 +203,7 @@ impl LiveIndexService {
 
         let index = Arc::new(
             LiveIndex::new(
-                index_path.join("index"),
+                index_path,
                 indexer::worker::Config {
                     host_centrality_store_path: config.host_centrality_store_path.clone(),
                     page_centrality_store_path: config.page_centrality_store_path.clone(),
