@@ -26,7 +26,7 @@ use crate::{
         remote::{RemoteWebgraph, WebgraphGranularity},
         EdgeLimit, Node, NodeID,
     },
-    webpage::url_ext::UrlExt,
+    webpage::{html::links::RelFlags, url_ext::UrlExt},
     SortableFloat,
 };
 
@@ -86,6 +86,7 @@ impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
         let backlink_nodes = in_edges
             .iter()
             .flatten()
+            .filter(|e| !e.rel.contains(RelFlags::NOFOLLOW))
             .map(|e| e.from.node())
             .unique()
             .collect::<Vec<_>>();
@@ -99,6 +100,7 @@ impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
         let potential_nodes: Vec<_> = outgoing_edges
             .iter()
             .flatten()
+            .filter(|e| !e.rel.contains(RelFlags::NOFOLLOW))
             .map(|e| e.to.node())
             .unique()
             .filter(|n| !nodes.contains(n))

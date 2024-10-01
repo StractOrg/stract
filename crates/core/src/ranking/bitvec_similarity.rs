@@ -186,6 +186,12 @@ impl BitVec {
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        executor::Executor,
+        webgraph::{Compression, Node, WebgraphWriter},
+        webpage::html::links::RelFlags,
+    };
+
     use super::*;
     use std::iter::repeat;
 
@@ -283,5 +289,32 @@ mod tests {
         let sim = a.sim(&b);
 
         assert!((expected - sim).abs() < 0.1);
+    }
+
+    #[tokio::test]
+    async fn test_ignores_no_follow() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
+
+        let mut writer = WebgraphWriter::new(
+            &temp_dir,
+            Executor::single_thread(),
+            Compression::default(),
+            None,
+        );
+
+        let a = Node::from("A");
+        let b = Node::from("B");
+        let c = Node::from("C");
+
+        writer.insert(a.clone(), b.clone(), String::new(), RelFlags::NOFOLLOW);
+
+        writer.insert(a.clone(), c.clone(), String::new(), RelFlags::default());
+
+        let graph = writer.finalize();
+
+        let bitvecs = BitVec::batch_new_for(&[b.id(), c.id()], &graph).await;
+
+        assert_eq!(bitvecs.len(), 2);
+        assert_eq!(bitvecs[0].sim(&bitvecs[1]), 0.0);
     }
 }

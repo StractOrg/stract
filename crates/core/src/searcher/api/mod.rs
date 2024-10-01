@@ -43,6 +43,7 @@ use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSp
 use crate::web_spell::SpellChecker;
 use crate::webgraph::remote::{RemoteWebgraph, WebgraphGranularity};
 use crate::webgraph::EdgeLimit;
+use crate::webpage::html::links::RelFlags;
 use crate::widgets::{Widget, Widgets};
 use crate::{
     bangs::Bangs,
@@ -223,7 +224,13 @@ where
         self.batch_raw_ingoing(nodes, EdgeLimit::Limit(1024))
             .await
             .into_iter()
-            .map(|edges| edges.into_iter().map(|edge| edge.from.node()).collect())
+            .map(|edges| {
+                edges
+                    .into_iter()
+                    .filter(|edge| !edge.rel.contains(RelFlags::NOFOLLOW))
+                    .map(|edge| edge.from.node())
+                    .collect()
+            })
             .collect()
     }
 }
