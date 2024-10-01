@@ -116,7 +116,7 @@ impl Crawler {
     }
 
     pub fn min_crawl_delay_ms() -> u64 {
-        5_000
+        10_000
     }
 
     pub fn max_crawl_delay_ms() -> u64 {
