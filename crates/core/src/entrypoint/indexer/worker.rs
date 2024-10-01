@@ -496,14 +496,22 @@ impl IndexingWorker {
 
 #[cfg(test)]
 mod tests {
+    use file_store::temp::TempDir;
+
     use crate::config::WarcSource;
 
     use super::*;
 
-    fn setup_worker(data_path: &Path, threshold: Option<u64>) -> IndexingWorker {
-        crate::block_on(IndexingWorker::new(
+    fn setup_worker(data_path: &Path, threshold: Option<u64>) -> (IndexingWorker, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let worker = crate::block_on(IndexingWorker::new(
             IndexerConfig {
-                host_centrality_store_path: crate::gen_temp_path().to_str().unwrap().to_string(),
+                host_centrality_store_path: temp_dir
+                    .as_ref()
+                    .join("host_centrality")
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
                 page_centrality_store_path: None,
                 page_webgraph: None,
                 safety_classifier_path: None,
@@ -511,11 +519,16 @@ mod tests {
                     model_path: data_path.to_str().unwrap().to_string(),
                     page_centrality_rank_threshold: threshold,
                 }),
-                output_path: crate::gen_temp_path().to_str().unwrap().to_string(),
+                output_path: temp_dir
+                    .as_ref()
+                    .join("output")
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
                 limit_warc_files: None,
                 skip_warc_files: None,
                 warc_source: WarcSource::Local(crate::config::LocalConfig {
-                    folder: crate::gen_temp_path().to_str().unwrap().to_string(),
+                    folder: temp_dir.as_ref().join("warc").to_str().unwrap().to_string(),
                     names: vec!["".to_string()],
                 }),
                 host_centrality_threshold: None,
@@ -525,7 +538,9 @@ mod tests {
                     crate::config::defaults::Indexing::autocommit_after_num_inserts(),
             }
             .into(),
-        ))
+        ));
+
+        (worker, temp_dir)
     }
 
     #[test]
@@ -535,7 +550,7 @@ mod tests {
             // Skip the test if the test data is not available
             return;
         }
-        let worker = setup_worker(data_path, None);
+        let (worker, _temp_dir) = setup_worker(data_path, None);
 
         let webpages = vec![
             IndexableWebpage {
@@ -637,7 +652,7 @@ mod tests {
             // Skip the test if the test data is not available
             return;
         }
-        let worker = setup_worker(data_path, Some(100_000));
+        let (worker, _temp_dir) = setup_worker(data_path, Some(100_000));
 
         let mut a = Webpage::test_parse("<html><head><title>Homemade Heart Brownie Recipe</title></head><body>Example</body></html>", "https://a.com").unwrap();
         a.page_centrality_rank = 1;

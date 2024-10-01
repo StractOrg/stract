@@ -24,7 +24,7 @@ use crate::{
 };
 use std::{net::SocketAddr, path::Path, sync::Arc};
 
-use file_store::gen_temp_path;
+use file_store::{gen_temp_dir, temp::TempDir};
 
 use crate::{
     ampc::dht::ShardId,
@@ -69,15 +69,15 @@ struct RemoteIndex {
     gossip_addr: SocketAddr,
     underlying_index: Arc<LiveIndex>,
     cluster: Arc<Cluster>,
+    _temp_dir: TempDir,
 }
 
 impl RemoteIndex {
     async fn start(shard: ShardId, gossip_seed: Vec<SocketAddr>) -> Result<Self> {
-        let path = gen_temp_path();
-        let mut config = config(&path);
+        let dir = gen_temp_dir()?;
+        let mut config = config(&dir);
 
         config.shard_id = shard;
-
         let host = config.host;
         let gossip_addr = config.gossip_addr;
 
@@ -107,6 +107,7 @@ impl RemoteIndex {
             gossip_addr,
             underlying_index: index,
             cluster,
+            _temp_dir: dir,
         })
     }
 
@@ -403,7 +404,8 @@ async fn test_replica_recovery() -> Result<()> {
 
 #[tokio::test]
 async fn test_meta_segments() -> Result<()> {
-    let config = config(gen_temp_path());
+    let dir = gen_temp_dir()?;
+    let config = config(&dir);
     let indexer_config = crate::entrypoint::indexer::worker::Config {
         host_centrality_store_path: config.host_centrality_store_path.clone(),
         page_centrality_store_path: config.page_centrality_store_path.clone(),
@@ -441,7 +443,8 @@ async fn test_meta_segments() -> Result<()> {
 
 #[tokio::test]
 async fn test_segment_compaction() -> Result<()> {
-    let config = config(gen_temp_path());
+    let dir = gen_temp_dir()?;
+    let config = config(&dir);
     let indexer_config = crate::entrypoint::indexer::worker::Config {
         host_centrality_store_path: config.host_centrality_store_path.clone(),
         page_centrality_store_path: config.page_centrality_store_path.clone(),

@@ -143,7 +143,6 @@ mod tests {
 
     use crate::{
         bangs::Bangs,
-        gen_temp_path,
         index::Index,
         rand_words,
         searcher::{
@@ -167,8 +166,9 @@ mod tests {
 
     #[tokio::test]
     async fn it_favors_liked_hosts() {
+        let dir = crate::gen_temp_dir().unwrap();
         let mut wrt = WebgraphWriter::new(
-            gen_temp_path(),
+            &dir,
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
             None,
@@ -236,8 +236,9 @@ mod tests {
     #[tokio::test]
     #[allow(clippy::too_many_lines)]
     async fn it_ranks_search_results() {
+        let dir = crate::gen_temp_dir().unwrap();
         let mut wrt = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            &dir,
             crate::executor::Executor::single_thread(),
             crate::webgraph::Compression::default(),
             None,
@@ -270,7 +271,7 @@ mod tests {
 
         let graph = wrt.finalize();
 
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(&Webpage {

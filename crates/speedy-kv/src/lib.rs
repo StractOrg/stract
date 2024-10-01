@@ -510,37 +510,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // taken from https://docs.rs/sled/0.34.7/src/sled/config.rs.html#445
-    fn gen_temp_path() -> PathBuf {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        use std::time::SystemTime;
-
-        static SALT_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-        let seed = SALT_COUNTER.fetch_add(1, Ordering::SeqCst) as u128;
-
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-            << 48;
-
-        let pid = u128::from(std::process::id());
-
-        let salt = (pid << 16) + now + seed;
-
-        if cfg!(target_os = "linux") {
-            // use shared memory for temporary linux files
-            format!("/dev/shm/pagecache.tmp.{salt}").into()
-        } else {
-            std::env::temp_dir().join(format!("pagecache.tmp.{salt}"))
-        }
-    }
+    use file_store::gen_temp_dir;
 
     #[test]
     fn test_simple() {
-        let mut db = Db::open_or_create(gen_temp_path()).unwrap();
+        let temp_dir = gen_temp_dir().unwrap();
+        let mut db = Db::open_or_create(&temp_dir).unwrap();
 
         db.insert(1, 2).unwrap();
         db.insert(2, 3).unwrap();
@@ -553,7 +528,8 @@ mod tests {
 
     #[test]
     fn test_multiple_segments() {
-        let mut db = Db::open_or_create(gen_temp_path()).unwrap();
+        let temp_dir = gen_temp_dir().unwrap();
+        let mut db = Db::open_or_create(&temp_dir).unwrap();
 
         db.insert(1, 2).unwrap();
         db.insert(2, 3).unwrap();
@@ -573,7 +549,8 @@ mod tests {
 
     #[test]
     fn test_segment_merge() {
-        let mut db = Db::open_or_create(gen_temp_path()).unwrap();
+        let temp_dir = gen_temp_dir().unwrap();
+        let mut db = Db::open_or_create(&temp_dir).unwrap();
 
         db.insert(1, 2).unwrap();
         db.insert(2, 3).unwrap();
@@ -601,7 +578,8 @@ mod tests {
 
     #[test]
     fn test_overwrite_key() {
-        let mut db = Db::open_or_create(gen_temp_path()).unwrap();
+        let temp_dir = gen_temp_dir().unwrap();
+        let mut db = Db::open_or_create(&temp_dir).unwrap();
 
         db.insert(1, 2).unwrap();
         db.insert(1, 3).unwrap();
@@ -622,7 +600,8 @@ mod tests {
 
     #[test]
     fn test_len() {
-        let mut db = Db::open_or_create(gen_temp_path()).unwrap();
+        let temp_dir = gen_temp_dir().unwrap();
+        let mut db = Db::open_or_create(&temp_dir).unwrap();
 
         assert_eq!(db.len(), 0);
 
@@ -638,8 +617,9 @@ mod tests {
 
     #[test]
     fn test_merge_db() {
-        let mut db1 = Db::open_or_create(gen_temp_path()).unwrap();
-        let mut db2 = Db::open_or_create(gen_temp_path()).unwrap();
+        let temp_dir = gen_temp_dir().unwrap();
+        let mut db1 = Db::open_or_create(&temp_dir.as_ref().join("db1")).unwrap();
+        let mut db2 = Db::open_or_create(&temp_dir.as_ref().join("db2")).unwrap();
 
         db1.insert(1, 2).unwrap();
         db1.insert(2, 3).unwrap();

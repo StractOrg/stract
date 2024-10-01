@@ -435,7 +435,8 @@ mod tests {
 
     #[test]
     fn stopwords_title_ignored() {
-        let mut index = EntityIndex::open(crate::gen_temp_path()).unwrap();
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut index = EntityIndex::open(&temp_dir).unwrap();
         index.prepare_writer();
 
         index.insert(Entity {
@@ -465,7 +466,8 @@ mod tests {
 
     #[test]
     fn image() {
-        let mut index = EntityIndex::open(crate::gen_temp_path()).unwrap();
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut index = EntityIndex::open(&temp_dir).unwrap();
         index.prepare_writer();
 
         index.insert(Entity {

@@ -616,12 +616,9 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
-            crate::gen_temp_path().join("test-segment"),
-            Compression::default(),
-            false,
-            None,
-        );
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut kv: EdgeStoreWriter =
+            EdgeStoreWriter::new(&temp_dir, Compression::default(), false, None);
 
         let e = InsertableEdge {
             from: FullNodeID {
@@ -656,12 +653,9 @@ mod tests {
 
     #[test]
     fn test_reversed() {
-        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
-            crate::gen_temp_path().join("test-segment"),
-            Compression::default(),
-            true,
-            None,
-        );
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut kv: EdgeStoreWriter =
+            EdgeStoreWriter::new(&temp_dir, Compression::default(), true, None);
 
         let e = InsertableEdge {
             from: FullNodeID {
@@ -690,12 +684,9 @@ mod tests {
 
     #[test]
     fn test_limit() {
-        let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
-            crate::gen_temp_path().join("test-segment"),
-            Compression::default(),
-            true,
-            None,
-        );
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut kv: EdgeStoreWriter =
+            EdgeStoreWriter::new(&temp_dir, Compression::default(), true, None);
 
         for i in 0..10 {
             let e = InsertableEdge {
@@ -722,8 +713,9 @@ mod tests {
 
     #[test]
     fn test_edge_ordering() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
         let mut rank_store =
-            speedy_kv::Db::open_or_create(crate::gen_temp_path().join("test-rank-store")).unwrap();
+            speedy_kv::Db::open_or_create(temp_dir.as_ref().join("test-rank-store")).unwrap();
 
         rank_store.insert(NodeID::from(2_u64), 1).unwrap();
         rank_store.insert(NodeID::from(3_u64), 2).unwrap();
@@ -732,7 +724,7 @@ mod tests {
         rank_store.commit().unwrap();
 
         let mut kv: EdgeStoreWriter = EdgeStoreWriter::new(
-            crate::gen_temp_path().join("test-segment"),
+            &temp_dir.as_ref().join("test-segment"),
             Compression::default(),
             true,
             Some(Arc::new(rank_store)),

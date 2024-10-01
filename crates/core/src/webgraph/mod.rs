@@ -438,6 +438,7 @@ pub mod tests {
     use crate::webpage::html::links::RelFlags;
 
     use super::*;
+    use file_store::temp::TempDir;
     use proptest::prelude::*;
 
     pub fn test_edges() -> Vec<(Node, Node, String)> {
@@ -450,7 +451,7 @@ pub mod tests {
         ]
     }
 
-    pub fn test_graph() -> Webgraph {
+    pub fn test_graph() -> (Webgraph, TempDir) {
         //     ┌-----┐
         //     │     │
         // ┌───A◄─┐  │
@@ -462,8 +463,9 @@ pub mod tests {
         //        │
         //        D
 
+        let temp_dir = crate::gen_temp_dir().unwrap();
         let mut graph = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            &temp_dir,
             Executor::single_thread(),
             Compression::default(),
             None,
@@ -475,12 +477,12 @@ pub mod tests {
 
         graph.commit();
 
-        graph.finalize()
+        (graph.finalize(), temp_dir)
     }
 
     #[test]
     fn distance_calculation() {
-        let graph = test_graph();
+        let (graph, _temp_dir) = test_graph();
 
         let distances = graph.distances(Node::from("D"));
 
@@ -491,14 +493,14 @@ pub mod tests {
 
     #[test]
     fn nonexisting_node() {
-        let graph = test_graph();
+        let (graph, _temp_dir) = test_graph();
         assert_eq!(graph.distances(Node::from("E")).len(), 0);
         assert_eq!(graph.reversed_distances(Node::from("E")).len(), 0);
     }
 
     #[test]
     fn reversed_distance_calculation() {
-        let graph = test_graph();
+        let (graph, _temp_dir) = test_graph();
 
         let distances = graph.reversed_distances(Node::from("D"));
 
@@ -516,7 +518,8 @@ pub mod tests {
     #[test]
     fn merge_path() {
         let mut graphs = Vec::new();
-        for (from, to, label) in &[
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        for (i, (from, to, label)) in (0..).zip(&[
             (Node::from("A"), Node::from("B"), String::new()),
             (Node::from("B"), Node::from("C"), String::new()),
             (Node::from("C"), Node::from("D"), String::new()),
@@ -524,9 +527,9 @@ pub mod tests {
             (Node::from("E"), Node::from("F"), String::new()),
             (Node::from("F"), Node::from("G"), String::new()),
             (Node::from("G"), Node::from("H"), String::new()),
-        ] {
+        ]) {
             let mut wrt = WebgraphWriter::new(
-                crate::gen_temp_path(),
+                &temp_dir.as_ref().join(format!("test_{}", i)),
                 Executor::single_thread(),
                 Compression::default(),
                 None,
@@ -560,9 +563,10 @@ pub mod tests {
     #[test]
     fn merge_simple() {
         let mut graphs = Vec::new();
-        for (from, to, label) in test_edges() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        for (i, (from, to, label)) in (0..).zip(&test_edges()) {
             let mut wrt = WebgraphWriter::new(
-                crate::gen_temp_path(),
+                &temp_dir.as_ref().join(format!("test_{}", i)),
                 Executor::single_thread(),
                 Compression::default(),
                 None,
@@ -629,14 +633,15 @@ pub mod tests {
     #[test]
     fn merge_cycle() {
         let mut graphs = Vec::new();
-        for (from, to, label) in &[
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        for (i, (from, to, label)) in (0..).zip(&[
             (Node::from("A"), Node::from("B"), String::new()),
             (Node::from("B"), Node::from("B"), String::new()),
             (Node::from("B"), Node::from("C"), String::new()),
             (Node::from("C"), Node::from("A"), String::new()),
-        ] {
+        ]) {
             let mut wrt = WebgraphWriter::new(
-                crate::gen_temp_path(),
+                &temp_dir.as_ref().join(format!("test_{}", i)),
                 Executor::single_thread(),
                 Compression::default(),
                 None,
@@ -686,14 +691,15 @@ pub mod tests {
     #[test]
     fn merge_star() {
         let mut graphs = Vec::new();
-        for (from, to, label) in &[
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        for (i, (from, to, label)) in (0..).zip(&[
             (Node::from("A"), Node::from("B"), String::new()),
             (Node::from("A"), Node::from("C"), String::new()),
             (Node::from("A"), Node::from("D"), String::new()),
             (Node::from("A"), Node::from("E"), String::new()),
-        ] {
+        ]) {
             let mut wrt = WebgraphWriter::new(
-                crate::gen_temp_path(),
+                &temp_dir.as_ref().join(format!("test_{}", i)),
                 Executor::single_thread(),
                 Compression::default(),
                 None,
@@ -743,14 +749,15 @@ pub mod tests {
     #[test]
     fn merge_reverse_star() {
         let mut graphs = Vec::new();
-        for (from, to, label) in &[
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        for (i, (from, to, label)) in (0..).zip(&[
             (Node::from("B"), Node::from("A"), String::new()),
             (Node::from("C"), Node::from("A"), String::new()),
             (Node::from("D"), Node::from("A"), String::new()),
             (Node::from("E"), Node::from("A"), String::new()),
-        ] {
+        ]) {
             let mut wrt = WebgraphWriter::new(
-                crate::gen_temp_path(),
+                &temp_dir.as_ref().join(format!("test_{}", i)),
                 Executor::single_thread(),
                 Compression::default(),
                 None,
@@ -806,19 +813,20 @@ pub mod tests {
             )
         ) {
             let mut graphs = Vec::new();
-                let mut wrt = WebgraphWriter::new(
-                    crate::gen_temp_path(),
-                    Executor::single_thread(),
-                    Compression::default(),
-                    None,
-                );
+            let temp_dir = crate::gen_temp_dir().unwrap();
+            let mut wrt = WebgraphWriter::new(
+                temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
+                Executor::single_thread(),
+                Compression::default(),
+                None,
+            );
             for (from, to) in nodes.clone() {
                 wrt.insert(Node::new_for_test(from.as_str()), Node::new_for_test(to.as_str()), String::new(), RelFlags::default());
 
                 if rand::random::<usize>() % 10 == 0 {
                     graphs.push(wrt.finalize());
                     wrt = WebgraphWriter::new(
-                        crate::gen_temp_path(),
+                        temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
                         Executor::single_thread(),
                         Compression::default(),
                         None,
@@ -860,8 +868,9 @@ pub mod tests {
 
     fn proptest_case(nodes: &[(&str, &str)]) {
         let mut graphs = Vec::new();
+        let temp_dir = crate::gen_temp_dir().unwrap();
         let mut wrt = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
             Executor::single_thread(),
             Compression::default(),
             None,
@@ -878,7 +887,7 @@ pub mod tests {
             if i % 2 == 0 {
                 graphs.push(wrt.finalize());
                 wrt = WebgraphWriter::new(
-                    crate::gen_temp_path(),
+                    temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
                     Executor::single_thread(),
                     Compression::default(),
                     None,
@@ -953,8 +962,9 @@ pub mod tests {
 
     #[test]
     fn cap_label_length() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
         let mut writer = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
             Executor::single_thread(),
             Compression::default(),
             None,
@@ -978,7 +988,7 @@ pub mod tests {
 
     #[test]
     fn test_edge_limits() {
-        let graph = test_graph();
+        let (graph, temp_dir) = test_graph();
 
         assert_eq!(
             graph
@@ -1000,7 +1010,7 @@ pub mod tests {
             (Node::from("A"), Node::from("C"), String::new()),
         ] {
             let mut wrt = WebgraphWriter::new(
-                crate::gen_temp_path(),
+                temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
                 Executor::single_thread(),
                 Compression::default(),
                 None,
@@ -1057,8 +1067,9 @@ pub mod tests {
 
     #[test]
     fn test_rel_flags() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
         let mut writer = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            &temp_dir,
             Executor::single_thread(),
             Compression::default(),
             None,

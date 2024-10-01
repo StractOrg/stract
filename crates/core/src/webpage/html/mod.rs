@@ -784,7 +784,7 @@ mod tests {
         assert!(webpage.all_text().is_some());
         assert!(!webpage.all_text().unwrap().is_empty());
 
-        let index =
+        let (index, _dir) =
             crate::inverted_index::InvertedIndex::temporary().expect("Unable to open index");
         webpage.as_tantivy(&index).unwrap();
     }

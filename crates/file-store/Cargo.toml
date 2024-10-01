@@ -12,3 +12,5 @@ bincode.workspace = true
 common.workspace = true
 memmap2.workspace = true
 ownedbytes.workspace = true
+uuid.workspace = true
+tracing.workspace = true

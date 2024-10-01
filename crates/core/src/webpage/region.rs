@@ -229,19 +229,18 @@ impl RegionCount {
 
 #[cfg(test)]
 mod tests {
-    use crate::gen_temp_path;
-
     use super::*;
 
     #[test]
     fn simple() {
-        let mut a = RegionCount::open(gen_temp_path().join("region_count.json"));
+        let temp_dir = file_store::gen_temp_dir().unwrap();
+        let mut a = RegionCount::open(temp_dir.as_ref().join("a").join("region_count.json"));
 
         a.increment(&Region::Denmark);
         a.increment(&Region::Denmark);
         a.increment(&Region::US);
 
-        let mut b = RegionCount::open(gen_temp_path().join("region_count.json"));
+        let mut b = RegionCount::open(temp_dir.as_ref().join("b").join("region_count.json"));
 
         b.increment(&Region::US);
         b.increment(&Region::Germany);

@@ -356,7 +356,8 @@ mod tests {
 
     #[test]
     fn test_downloaded_db() {
-        let db = CrawledDb::open(crate::gen_temp_path()).unwrap();
+        let dir = crate::gen_temp_dir().unwrap();
+        let db = CrawledDb::open(&dir).unwrap();
 
         let url = Url::parse("https://example.com").unwrap();
         assert!(!db.has_crawled(&url).unwrap());
@@ -367,7 +368,8 @@ mod tests {
 
     #[test]
     fn test_truncate_ttl() {
-        let db = CrawledDb::open(crate::gen_temp_path()).unwrap();
+        let dir = crate::gen_temp_dir().unwrap();
+        let db = CrawledDb::open(&dir).unwrap();
 
         let url = Url::parse("https://example.com").unwrap();
         db.insert(&url).unwrap();
@@ -384,7 +386,8 @@ mod tests {
 
     #[test]
     fn test_sharded_downloaded_db() {
-        let db = ShardedCrawledDb::open(crate::gen_temp_path()).unwrap();
+        let dir = crate::gen_temp_dir().unwrap();
+        let db = ShardedCrawledDb::open(&dir).unwrap();
 
         let url = Url::parse("https://example.com").unwrap();
         assert!(!db.has_crawled(&url).unwrap());

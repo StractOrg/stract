@@ -312,7 +312,7 @@ mod test {
 
     #[test]
     fn test_delete_segments() {
-        let mut index = InvertedIndex::temporary().expect("Unable to open index");
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
 
         index
             .insert(

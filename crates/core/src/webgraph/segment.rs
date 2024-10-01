@@ -218,6 +218,7 @@ mod test {
     #[test]
     #[allow(clippy::too_many_lines)]
     fn simple_triangle_graph() {
+        let temp_dir = file_store::gen_temp_dir().unwrap();
         //     ┌────┐
         //     │    │
         // ┌───0◄─┐ │
@@ -226,7 +227,7 @@ mod test {
         // 1─────►2◄┘
 
         let mut writer = SegmentWriter::open(
-            crate::gen_temp_path(),
+            temp_dir.as_ref(),
             "test".to_string(),
             Compression::default(),
             None,

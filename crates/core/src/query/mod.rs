@@ -211,13 +211,13 @@ mod tests {
 
     use super::*;
 
-    fn empty_index() -> InvertedIndex {
+    fn empty_index() -> (InvertedIndex, file_store::temp::TempDir) {
         InvertedIndex::temporary().unwrap()
     }
 
     #[test]
     fn simple_parse() {
-        let index = empty_index();
+        let (index, _dir) = empty_index();
         let ctx = index.local_search_ctx();
 
         let query = Query::parse(
@@ -244,7 +244,7 @@ mod tests {
 
     #[test]
     fn parse_trailing_leading_whitespace() {
-        let index = empty_index();
+        let (index, _dir) = empty_index();
         let ctx = index.local_search_ctx();
 
         let query = Query::parse(
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn parse_weird_characters() {
-        let index = empty_index();
+        let (index, _dir) = empty_index();
         let ctx = index.local_search_ctx();
 
         let terms = Query::parse(
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn simple_terms_phrase() {
-        let index = empty_index();
+        let (index, _dir) = empty_index();
         let ctx = index.local_search_ctx();
 
         let terms = Query::parse(
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn not_query() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
         let query = SearchQuery {
             query: "test -website".to_string(),
             ..Default::default()
@@ -391,7 +391,7 @@ mod tests {
 
     #[test]
     fn site_query() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -481,7 +481,7 @@ mod tests {
 
     #[test]
     fn links_to_query() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -583,7 +583,7 @@ mod tests {
 
     #[test]
     fn links_to_uppercase() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -637,7 +637,7 @@ mod tests {
 
     #[test]
     fn title_query() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -689,7 +689,7 @@ mod tests {
 
     #[test]
     fn url_query() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -741,7 +741,7 @@ mod tests {
 
     #[test]
     fn empty_query() {
-        let index = empty_index();
+        let (index, _dir) = empty_index();
         let ctx = index.local_search_ctx();
 
         let query = Query::parse(
@@ -762,7 +762,7 @@ mod tests {
 
     #[test]
     fn query_term_only_special_char() {
-        let index = empty_index();
+        let (index, _dir) = empty_index();
         let ctx = index.local_search_ctx();
 
         let _query = Query::parse(
@@ -778,7 +778,7 @@ mod tests {
 
     #[test]
     fn site_query_split_domain() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -851,7 +851,7 @@ mod tests {
 
     #[test]
     fn phrase_query() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -916,7 +916,7 @@ mod tests {
 
     #[test]
     fn match_compound_words() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -997,7 +997,7 @@ mod tests {
 
     #[test]
     fn safe_search() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
         let mut webpage = Webpage::test_parse(
             &format!(
                 r#"
@@ -1070,7 +1070,7 @@ mod tests {
 
     #[test]
     fn suffix_domain_prefix_path_site_operator() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -1177,7 +1177,7 @@ mod tests {
 
     #[test]
     fn exact_url_operator() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(
@@ -1262,7 +1262,7 @@ mod tests {
 
     #[test]
     fn mix_phrase_term_query() {
-        let mut index = Index::temporary().expect("Unable to open index");
+        let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
         index
             .insert(

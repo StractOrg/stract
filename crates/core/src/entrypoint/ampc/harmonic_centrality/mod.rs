@@ -94,20 +94,21 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_simple_graph() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
         let mut combined = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            temp_dir.as_ref().join("combined"),
             Executor::single_thread(),
             Compression::default(),
             None,
         );
         let mut a = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            temp_dir.as_ref().join("a"),
             Executor::single_thread(),
             Compression::default(),
             None,
         );
         let mut b = WebgraphWriter::new(
-            crate::gen_temp_path(),
+            temp_dir.as_ref().join("b"),
             Executor::single_thread(),
             Compression::default(),
             None,
