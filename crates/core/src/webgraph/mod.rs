@@ -325,6 +325,20 @@ impl Webgraph {
             .collect()
     }
 
+    pub fn out_degree_upper_bound(&self, node: &NodeID) -> u64 {
+        self.segments
+            .iter()
+            .map(|segment| segment.out_degree(node))
+            .sum()
+    }
+
+    pub fn in_degree_upper_bound(&self, node: &NodeID) -> u64 {
+        self.segments
+            .iter()
+            .map(|segment| segment.in_degree(node))
+            .sum()
+    }
+
     pub fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<FullEdge> {
         let dedup = |edges: &mut Vec<SegmentEdge<String>>| {
             edges.sort_by_key(|e| e.to.node());

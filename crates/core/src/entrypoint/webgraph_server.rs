@@ -180,6 +180,32 @@ impl Message<WebGraphService> for PagesByHosts {
     }
 }
 
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct InDegreeUpperBound {
+    pub node: NodeID,
+}
+
+impl Message<WebGraphService> for InDegreeUpperBound {
+    type Response = u64;
+
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        server.graph.in_degree_upper_bound(&self.node)
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct OutDegreeUpperBound {
+    pub node: NodeID,
+}
+
+impl Message<WebGraphService> for OutDegreeUpperBound {
+    type Response = u64;
+
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        server.graph.out_degree_upper_bound(&self.node)
+    }
+}
+
 pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
 

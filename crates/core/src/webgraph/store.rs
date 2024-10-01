@@ -486,6 +486,18 @@ impl EdgeStore {
         Ok(())
     }
 
+    pub fn degree(&self, node: &NodeID) -> u64 {
+        let node_bytes = node.as_u64().to_be_bytes();
+
+        match self.ranges.edges.get_raw(&node_bytes) {
+            Some(node_range_bytes) => {
+                let range = EdgeRange::deserialize(node_range_bytes.as_bytes());
+                self.edges.slice(usize_range(range.range)).len() as u64
+            }
+            None => 0,
+        }
+    }
+
     pub fn get_with_label(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<SegmentEdge<String>> {
         let node_bytes = node.as_u64().to_be_bytes();
 
@@ -791,5 +803,32 @@ mod tests {
             Edge::from(edges[2].clone()).from.node(),
             Edge::from(e1.clone()).from.node()
         );
+    }
+
+    #[test]
+    fn test_degree() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut kv: EdgeStoreWriter =
+            EdgeStoreWriter::new(&temp_dir, Compression::default(), false, None);
+
+        let e1 = InsertableEdge {
+            from: FullNodeID {
+                id: NodeID::from(1_u64),
+                host: NodeID::from(1_u64),
+            },
+            to: FullNodeID {
+                id: NodeID::from(2_u64),
+                host: NodeID::from(2_u64),
+            },
+            label: "1".to_string(),
+            rel: RelFlags::default(),
+        };
+
+        kv.put(e1.clone());
+
+        let store = kv.finalize();
+
+        assert_eq!(store.degree(&NodeID::from(1_u64)), 1);
+        assert_eq!(store.degree(&NodeID::from(2_u64)), 0);
     }
 }

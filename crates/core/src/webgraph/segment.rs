@@ -172,6 +172,10 @@ impl Segment {
         self.adjacency.get_without_label(node, limit)
     }
 
+    pub fn out_degree(&self, node: &NodeID) -> u64 {
+        self.adjacency.degree(node)
+    }
+
     pub fn ingoing_edges_with_label(
         &self,
         node: &NodeID,
@@ -182,6 +186,10 @@ impl Segment {
 
     pub fn ingoing_edges(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<SegmentEdge<()>> {
         self.reversed_adjacency.get_without_label(node, limit)
+    }
+
+    pub fn in_degree(&self, node: &NodeID) -> u64 {
+        self.reversed_adjacency.degree(node)
     }
 
     pub fn pages_by_host(&self, host_node: &NodeID) -> Vec<NodeID> {
