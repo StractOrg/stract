@@ -546,6 +546,7 @@ pub struct CrawlPlannerDomainBoost {
 pub struct CrawlPlannerConfig {
     pub host_harmonic_path: String,
     pub page_harmonic_path: String,
+    pub host_centrality_rank_store_path: String,
     pub output_path: String,
 
     pub num_job_queues: usize,

@@ -62,8 +62,10 @@ pub async fn router(config: config::CrawlRouterConfig) -> Result<()> {
 }
 
 pub async fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
-    let page_centrality = speedy_kv::Db::open_or_create(&config.page_harmonic_path).unwrap();
-    let host_centrality = speedy_kv::Db::open_or_create(&config.host_harmonic_path).unwrap();
+    let page_centrality = speedy_kv::Db::open_or_create(&config.page_harmonic_path)?;
+    let host_centrality = speedy_kv::Db::open_or_create(&config.host_harmonic_path)?;
+    let host_centrality_rank =
+        speedy_kv::Db::open_or_create(&config.host_centrality_rank_store_path)?;
 
     let gossip = config.gossip.clone();
     let cluster = Arc::new(
@@ -74,7 +76,14 @@ pub async fn planner(config: config::CrawlPlannerConfig) -> Result<()> {
         .await?,
     );
 
-    let planner = CrawlPlanner::new(host_centrality, page_centrality, cluster, config).await?;
+    let planner = CrawlPlanner::new(
+        host_centrality,
+        host_centrality_rank,
+        page_centrality,
+        cluster,
+        config,
+    )
+    .await?;
 
     planner.build().await?;
 
