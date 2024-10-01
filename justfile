@@ -30,3 +30,9 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 
 @setup_python_env:
     python3 -m venv .venv || true
+
+@update:
+    cargo update
+    cd frontend && npm update
+    cd tools/annotate-results && npm update
+    cd tools/ranking-diff && npm update
