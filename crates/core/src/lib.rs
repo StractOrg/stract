@@ -65,6 +65,7 @@ pub mod image_store;
 mod improvement;
 pub mod index;
 mod intmap;
+pub mod iter_ext;
 mod kahan_sum;
 mod leaky_queue;
 mod live_index;

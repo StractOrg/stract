@@ -28,6 +28,7 @@ use self::id_node_db::Id2NodeDb;
 use self::segment::Segment;
 use crate::executor::Executor;
 
+use crate::iter_ext::VectorExt;
 use crate::Result;
 pub use builder::WebgraphBuilder;
 pub use compression::Compression;
@@ -95,6 +96,7 @@ impl Meta {
 pub enum EdgeLimit {
     Unlimited,
     Limit(usize),
+    LimitAndOffset { limit: usize, offset: usize },
 }
 
 impl EdgeLimit {
@@ -105,6 +107,7 @@ impl EdgeLimit {
         match self {
             EdgeLimit::Unlimited => Box::new(it),
             EdgeLimit::Limit(limit) => Box::new(it.take(*limit)),
+            EdgeLimit::LimitAndOffset { limit, offset } => Box::new(it.skip(*offset).take(*limit)),
         }
     }
 }
@@ -211,19 +214,16 @@ impl Webgraph {
     }
 
     pub fn ingoing_edges_by_id(&self, node_id: &NodeID, limit: EdgeLimit) -> Vec<FullEdge> {
-        let dedup = |edges: &mut Vec<SegmentEdge<String>>| {
-            edges.sort_by_key(|e| e.from.node());
-            edges.dedup_by_key(|e| e.from.node());
-        };
-
-        let mut edges = self.inner_edges(
-            |segment| segment.ingoing_edges_with_label(node_id, &limit),
-            dedup,
-        );
-        edges.sort_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()));
+        let edges = self
+            .segments
+            .iter()
+            .map(|segment| segment.ingoing_edges_with_label(node_id))
+            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
+            .flat_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
+            .unique_by(|edge| edge.from.node());
 
         limit
-            .apply(edges.into_iter())
+            .apply(edges)
             .map(|e| FullEdge {
                 from: self.id2node(&e.from.node()).unwrap(),
                 to: self.id2node(&e.to.node()).unwrap(),
@@ -251,16 +251,16 @@ impl Webgraph {
     }
 
     pub fn raw_ingoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<Edge<()>> {
-        let dedup = |edges: &mut Vec<SegmentEdge<()>>| {
-            edges.sort_by_key(|e| e.from.node());
-            edges.dedup_by_key(|e| e.from.node());
-        };
-
-        let mut edges = self.inner_edges(|segment| segment.ingoing_edges(node, &limit), dedup);
-        edges.sort_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()));
+        let edges = self
+            .segments
+            .iter()
+            .map(|segment| segment.ingoing_edges(node))
+            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
+            .flat_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
+            .unique_by(|edge| edge.from.node());
 
         limit
-            .apply(edges.into_iter())
+            .apply(edges)
             .map(|e| Edge {
                 from: e.from,
                 to: e.to,
@@ -275,19 +275,16 @@ impl Webgraph {
         node: &NodeID,
         limit: EdgeLimit,
     ) -> Vec<Edge<String>> {
-        let dedup = |edges: &mut Vec<SegmentEdge<String>>| {
-            edges.sort_by_key(|e| e.from.node());
-            edges.dedup_by_key(|e| e.from.node());
-        };
-
-        let mut edges = self.inner_edges(
-            |segment| segment.ingoing_edges_with_label(node, &limit),
-            dedup,
-        );
-        edges.sort_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()));
+        let edges = self
+            .segments
+            .iter()
+            .map(|segment| segment.ingoing_edges_with_label(node))
+            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
+            .flat_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
+            .unique_by(|edge| edge.from.node());
 
         limit
-            .apply(edges.into_iter())
+            .apply(edges)
             .map(|e| Edge {
                 from: e.from,
                 to: e.to,
@@ -302,20 +299,16 @@ impl Webgraph {
         node: &NodeID,
         limit: EdgeLimit,
     ) -> Vec<Edge<String>> {
-        let dedup = |edges: &mut Vec<SegmentEdge<String>>| {
-            edges.sort_by_key(|e| e.to.node());
-            edges.dedup_by_key(|e| e.to.node());
-        };
-
-        let mut edges = self.inner_edges(
-            |segment| segment.outgoing_edges_with_label(node, &limit),
-            dedup,
-        );
-
-        edges.sort_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()));
+        let edges = self
+            .segments
+            .iter()
+            .map(|segment| segment.outgoing_edges_with_label(node))
+            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
+            .flat_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
+            .unique_by(|edge| edge.to.node());
 
         limit
-            .apply(edges.into_iter())
+            .apply(edges)
             .map(|e| Edge {
                 from: e.from,
                 to: e.to,
@@ -340,19 +333,17 @@ impl Webgraph {
     }
 
     pub fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<FullEdge> {
-        let dedup = |edges: &mut Vec<SegmentEdge<String>>| {
-            edges.sort_by_key(|e| e.to.node());
-            edges.dedup_by_key(|e| e.to.node());
-        };
-
-        let mut edges = self.inner_edges(
-            |segment| segment.outgoing_edges_with_label(&node.id(), &limit),
-            dedup,
-        );
-        edges.sort_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()));
+        let id = node.id();
+        let edges = self
+            .segments
+            .iter()
+            .map(|segment| segment.outgoing_edges_with_label(&id))
+            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
+            .flat_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
+            .unique_by(|edge| edge.to.node());
 
         limit
-            .apply(edges.into_iter())
+            .apply(edges)
             .map(|e| FullEdge {
                 from: self.id2node(&e.from.node()).unwrap(),
                 to: self.id2node(&e.to.node()).unwrap(),
@@ -362,16 +353,16 @@ impl Webgraph {
     }
 
     pub fn raw_outgoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<Edge<()>> {
-        let dedup = |edges: &mut Vec<SegmentEdge<()>>| {
-            edges.sort_by_key(|e| e.to.node());
-            edges.dedup_by_key(|e| e.to.node());
-        };
-
-        let mut edges = self.inner_edges(|segment| segment.outgoing_edges(node, &limit), dedup);
-        edges.sort_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()));
+        let edges = self
+            .segments
+            .iter()
+            .map(|segment| segment.outgoing_edges(node))
+            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
+            .flat_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
+            .unique_by(|edge| edge.to.node());
 
         limit
-            .apply(edges.into_iter())
+            .apply(edges)
             .map(|e| Edge {
                 from: e.from,
                 to: e.to,
@@ -379,25 +370,6 @@ impl Webgraph {
                 rel: e.rel,
             })
             .collect()
-    }
-
-    fn inner_edges<F1, F2, L>(&self, loader: F1, dedup: F2) -> Vec<SegmentEdge<L>>
-    where
-        L: EdgeLabel,
-        F1: Sized + Sync + Fn(&Segment) -> Vec<SegmentEdge<L>>,
-        F2: Fn(&mut Vec<SegmentEdge<L>>),
-    {
-        let mut edges: Vec<_> = self
-            .executor
-            .map(loader, self.segments.iter())
-            .unwrap()
-            .into_iter()
-            .flatten()
-            .collect();
-
-        dedup(&mut edges);
-
-        edges
     }
 
     pub fn id2node(&self, id: &NodeID) -> Option<Node> {
@@ -1102,5 +1074,29 @@ pub mod tests {
             graph.raw_outgoing_edges(&Node::from("A").id(), EdgeLimit::Unlimited)[0].rel,
             RelFlags::IS_IN_FOOTER | RelFlags::TAG,
         );
+    }
+
+    #[test]
+    fn test_limit_and_offset() {
+        let (graph, _temp_dir) = test_graph();
+
+        let no_offset = graph.raw_outgoing_edges(
+            &Node::from("A").id(),
+            EdgeLimit::LimitAndOffset {
+                limit: 2,
+                offset: 0,
+            },
+        );
+        assert_eq!(no_offset.len(), 2);
+
+        let edges = graph.raw_outgoing_edges(
+            &Node::from("A").id(),
+            EdgeLimit::LimitAndOffset {
+                limit: 2,
+                offset: 1,
+            },
+        );
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].to, no_offset[1].to);
     }
 }

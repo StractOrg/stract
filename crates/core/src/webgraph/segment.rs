@@ -21,8 +21,8 @@ use std::{
 };
 
 use super::{
-    store::EdgeStore, store_writer::EdgeStoreWriter, Compression, EdgeLimit, InsertableEdge,
-    NodeID, SegmentEdge,
+    store::EdgeStore, store_writer::EdgeStoreWriter, Compression, InsertableEdge, NodeID,
+    SegmentEdge,
 };
 use crate::Result;
 
@@ -160,32 +160,36 @@ impl Segment {
         Ok(())
     }
 
-    pub fn outgoing_edges_with_label(
-        &self,
-        node: &NodeID,
-        limit: &EdgeLimit,
-    ) -> Vec<SegmentEdge<String>> {
-        self.adjacency.get_with_label(node, limit)
+    pub fn outgoing_edges_with_label<'a>(
+        &'a self,
+        node: &'a NodeID,
+    ) -> Box<dyn Iterator<Item = SegmentEdge<String>> + Send + Sync + 'a> {
+        self.adjacency.get_with_label(node)
     }
 
-    pub fn outgoing_edges(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<SegmentEdge<()>> {
-        self.adjacency.get_without_label(node, limit)
+    pub fn outgoing_edges<'a>(
+        &'a self,
+        node: &'a NodeID,
+    ) -> Box<dyn Iterator<Item = SegmentEdge<()>> + Send + Sync + 'a> {
+        self.adjacency.get_without_label(node)
     }
 
     pub fn out_degree(&self, node: &NodeID) -> u64 {
         self.adjacency.degree(node)
     }
 
-    pub fn ingoing_edges_with_label(
-        &self,
-        node: &NodeID,
-        limit: &EdgeLimit,
-    ) -> Vec<SegmentEdge<String>> {
-        self.reversed_adjacency.get_with_label(node, limit)
+    pub fn ingoing_edges_with_label<'a>(
+        &'a self,
+        node: &'a NodeID,
+    ) -> Box<dyn Iterator<Item = SegmentEdge<String>> + Send + Sync + 'a> {
+        self.reversed_adjacency.get_with_label(node)
     }
 
-    pub fn ingoing_edges(&self, node: &NodeID, limit: &EdgeLimit) -> Vec<SegmentEdge<()>> {
-        self.reversed_adjacency.get_without_label(node, limit)
+    pub fn ingoing_edges<'a>(
+        &'a self,
+        node: &'a NodeID,
+    ) -> Box<dyn Iterator<Item = SegmentEdge<()>> + Send + Sync + 'a> {
+        self.reversed_adjacency.get_without_label(node)
     }
 
     pub fn in_degree(&self, node: &NodeID) -> u64 {
@@ -286,7 +290,7 @@ mod test {
         }
         let segment = writer.finalize();
 
-        let mut out: Vec<_> = segment.outgoing_edges(&a.id, &EdgeLimit::Unlimited);
+        let mut out: Vec<_> = segment.outgoing_edges(&a.id).collect();
 
         out.sort_by(|a, b| a.to.node().cmp(&b.to.node()));
 
@@ -310,7 +314,7 @@ mod test {
             ]
         );
 
-        let mut out: Vec<_> = segment.outgoing_edges(&b.id, &EdgeLimit::Unlimited);
+        let mut out: Vec<_> = segment.outgoing_edges(&b.id).collect();
         out.sort_by(|a, b| a.to.node().cmp(&b.to.node()));
         assert_eq!(
             out,
@@ -323,7 +327,7 @@ mod test {
             .into(),]
         );
 
-        let mut out: Vec<_> = segment.outgoing_edges(&c.id, &EdgeLimit::Unlimited);
+        let mut out: Vec<_> = segment.outgoing_edges(&c.id).collect();
         out.sort_by(|a, b| a.to.node().cmp(&b.to.node()));
         assert_eq!(
             out,
@@ -336,7 +340,7 @@ mod test {
             .into(),]
         );
 
-        let out: Vec<_> = segment.ingoing_edges(&a.id, &EdgeLimit::Unlimited);
+        let out: Vec<_> = segment.ingoing_edges(&a.id).collect();
         assert_eq!(
             out,
             vec![Edge {
@@ -348,7 +352,7 @@ mod test {
             .into(),]
         );
 
-        let out: Vec<_> = segment.ingoing_edges(&b.id, &EdgeLimit::Unlimited);
+        let out: Vec<_> = segment.ingoing_edges(&b.id).collect();
         assert_eq!(
             out,
             vec![Edge {
@@ -360,7 +364,7 @@ mod test {
             .into(),]
         );
 
-        let mut out: Vec<_> = segment.ingoing_edges(&c.id, &EdgeLimit::Unlimited);
+        let mut out: Vec<_> = segment.ingoing_edges(&c.id).collect();
         out.sort_by(|a, b| a.from.node().cmp(&b.from.node()));
         assert_eq!(
             out,
