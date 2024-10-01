@@ -59,7 +59,7 @@ pub mod improvement;
 mod metrics;
 pub mod search;
 pub mod user_count;
-mod webgraph;
+pub mod webgraph;
 
 const WARMUP_QUERIES: usize = 100;
 

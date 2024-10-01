@@ -30,24 +30,24 @@ use super::State;
 pub mod host {
     use url::Url;
 
-    use crate::entrypoint::webgraph_server::ScoredHost;
+    pub use crate::entrypoint::webgraph_server::ScoredHost;
 
     use super::*;
 
-    #[derive(serde::Deserialize, ToSchema)]
+    #[derive(serde::Serialize, serde::Deserialize, ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub struct SimilarHostsParams {
         pub hosts: Vec<String>,
         pub top_n: usize,
     }
 
-    #[derive(serde::Deserialize, IntoParams)]
+    #[derive(serde::Serialize, serde::Deserialize, IntoParams)]
     #[serde(rename_all = "camelCase")]
     pub struct KnowsHostParams {
         pub host: String,
     }
 
-    #[derive(serde::Deserialize, IntoParams)]
+    #[derive(serde::Serialize, serde::Deserialize, IntoParams)]
     #[serde(rename_all = "camelCase")]
     pub struct HostLinksParams {
         pub host: String,
@@ -162,7 +162,7 @@ pub mod page {
 
     use super::*;
 
-    #[derive(serde::Deserialize, IntoParams)]
+    #[derive(serde::Serialize, serde::Deserialize, IntoParams)]
     #[serde(rename_all = "camelCase")]
     pub struct PageLinksParams {
         pub page: String,

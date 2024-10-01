@@ -42,7 +42,7 @@ pub mod inverted_index;
 
 pub mod ampc;
 
-mod api;
+pub mod api;
 pub mod autosuggest;
 mod backlink_grouper;
 pub mod bangs;
