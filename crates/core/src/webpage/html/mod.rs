@@ -33,6 +33,7 @@ pub use fn_cache::FnCache;
 
 mod feeds;
 mod fn_cache;
+mod headings;
 mod into_tantivy;
 pub mod links;
 mod microformats;

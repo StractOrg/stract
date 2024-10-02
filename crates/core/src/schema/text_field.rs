@@ -172,15 +172,15 @@ pub enum TextFieldEnum {
     SiteNoTokenizer,
     DomainNoTokenizer,
     DomainNameNoTokenizer,
-    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost during ranking
     SiteIfHomepageNoTokenizer,
-    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost during ranking
     DomainIfHomepage,
-    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost during ranking
     DomainNameIfHomepageNoTokenizer,
-    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost during ranking
     DomainIfHomepageNoTokenizer,
-    /// this field is only set if the webpage is the homepage for the site. Allows us to boost
+    /// this field is only set if the webpage is the homepage for the site. Allows us to boost during ranking
     TitleIfHomepage,
     BacklinkText,
     Description,
@@ -209,6 +209,9 @@ pub enum TextFieldEnum {
     BacklinkLabelsGroup7,
     BacklinkLabelsGroup8,
     BacklinkLabelsGroup9,
+    FirstH1,
+    AllH2,
+    AllH3,
 }
 
 enum_dispatch_from_discriminant!(TextFieldEnumDiscriminants => TextFieldEnum,
@@ -257,6 +260,9 @@ enum_dispatch_from_discriminant!(TextFieldEnumDiscriminants => TextFieldEnum,
     BacklinkLabelsGroup7,
     BacklinkLabelsGroup8,
     BacklinkLabelsGroup9,
+    FirstH1,
+    AllH2,
+    AllH3,
 ]);
 
 impl TextFieldEnum {
@@ -1735,3 +1741,75 @@ impl_backlink_group!(BacklinkLabelsGroup6, 6);
 impl_backlink_group!(BacklinkLabelsGroup7, 7);
 impl_backlink_group!(BacklinkLabelsGroup8, 8);
 impl_backlink_group!(BacklinkLabelsGroup9, 9);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FirstH1;
+impl TextField for FirstH1 {
+    fn name(&self) -> &str {
+        "first_h1"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _: &mut FnCache,
+        doc: &mut TantivyDocument,
+        index: &crate::inverted_index::InvertedIndex,
+    ) -> Result<()> {
+        doc.add_text(
+            self.tantivy_field(index.schema_ref())
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            html.h1().next().unwrap_or_default(),
+        );
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AllH2;
+impl TextField for AllH2 {
+    fn name(&self) -> &str {
+        "all_h2"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _: &mut FnCache,
+        doc: &mut TantivyDocument,
+        index: &crate::inverted_index::InvertedIndex,
+    ) -> Result<()> {
+        doc.add_text(
+            self.tantivy_field(index.schema_ref())
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            html.h2().join("\n"),
+        );
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AllH3;
+impl TextField for AllH3 {
+    fn name(&self) -> &str {
+        "all_h3"
+    }
+
+    fn add_html_tantivy(
+        &self,
+        html: &Html,
+        _: &mut FnCache,
+        doc: &mut TantivyDocument,
+        index: &crate::inverted_index::InvertedIndex,
+    ) -> Result<()> {
+        doc.add_text(
+            self.tantivy_field(index.schema_ref())
+                .unwrap_or_else(|| panic!("could not find field '{}' in index", self.name())),
+            html.h3().join("\n"),
+        );
+
+        Ok(())
+    }
+}
