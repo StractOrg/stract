@@ -224,14 +224,18 @@ impl Crawler {
         )?;
 
         let mut crawlable_sites = Vec::new();
-        tracing::debug!("Initializing crawler db with previously crawled urls");
-        for site in sites {
-            for url in client.get_site_urls(site.site().as_str()).await {
-                if !db.has_crawled(&url)? {
-                    db.insert(&url)?;
+        if config.init_crawl_db {
+            tracing::debug!("Initializing crawler db with previously crawled urls");
+            for site in &sites {
+                for url in client.get_site_urls(site.site().as_str()).await {
+                    if !db.has_crawled(&url)? {
+                        db.insert(&url)?;
+                    }
                 }
             }
+        }
 
+        for site in sites {
             if let Some(drip_rate) = budgets.drip_rate(site.site()) {
                 crawlable_sites.push(Arc::new(CrawlableSite::new(site, &client, drip_rate)?));
             }
@@ -250,6 +254,8 @@ impl Crawler {
     pub async fn run(mut self) -> Result<()> {
         let mut interval = tokio::time::interval(TICK_INTERVAL);
         let semaphore = Arc::new(Semaphore::new(self.num_worker_threads));
+
+        tracing::info!("Crawler running with {} threads", self.num_worker_threads);
 
         loop {
             interval.tick().await;

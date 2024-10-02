@@ -458,6 +458,8 @@ pub struct LiveCrawlerConfig {
     pub check_intervals: CheckIntervals,
     #[serde(default)]
     pub daily_budget: DailyLiveIndexCrawlerBudget,
+    #[serde(default = "defaults::LiveCrawler::init_crawl_db")]
+    pub init_crawl_db: bool,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -689,4 +691,13 @@ pub struct CanonicalIndexConfig {
     pub warc_source: WarcSource,
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct HarmonicNearestSeedConfig {
+    pub gossip: GossipConfig,
+    pub original_centrality_path: String,
+    pub output_path: String,
+    #[serde(default = "defaults::HarmonicNearestSeed::discount_factor")]
+    pub discount_factor: f64,
 }

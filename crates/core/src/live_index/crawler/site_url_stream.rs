@@ -59,6 +59,8 @@ impl StreamingResponse for SiteUrlStream<search_server::SearchService> {
             limit: SITE_URL_BATCH_SIZE as u64,
         };
 
+        self.offset += SITE_URL_BATCH_SIZE;
+
         let res = self
             .conn
             .send(req, &AllShardsSelector, &RandomReplicaSelector)

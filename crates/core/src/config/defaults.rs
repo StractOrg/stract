@@ -241,3 +241,17 @@ impl LiveIndex {
         200_000
     }
 }
+
+pub struct LiveCrawler;
+impl LiveCrawler {
+    pub fn init_crawl_db() -> bool {
+        true
+    }
+}
+
+pub struct HarmonicNearestSeed;
+impl HarmonicNearestSeed {
+    pub fn discount_factor() -> f64 {
+        0.5
+    }
+}
