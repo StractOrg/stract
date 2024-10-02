@@ -185,7 +185,7 @@ impl Html {
                 };
 
                 let image_type = node.attributes.borrow().get("type").map(|t| t.to_string());
-                let link = Url::parse_with_base_url(self.url(), link).ok()?;
+                let link = Url::parse_with_base_url(self.base_url(), link).ok()?;
 
                 let favicon = FaviconLink {
                     link,
@@ -214,7 +214,7 @@ impl Html {
             .and_then(|metadata| {
                 metadata
                     .get("content")
-                    .and_then(|link| Url::parse_with_base_url(self.url(), link).ok())
+                    .and_then(|link| Url::parse_with_base_url(self.base_url(), link).ok())
             })
             .map(|url| ImageLink {
                 url,
@@ -279,7 +279,9 @@ impl Html {
                                         continue;
                                     }
 
-                                    if let Ok(dest) = Url::parse_with_base_url(self.url(), dest) {
+                                    if let Ok(dest) =
+                                        Url::parse_with_base_url(self.base_url(), dest)
+                                    {
                                         let mut rel = RelFlags::from_html(
                                             &dest,
                                             &attributes.borrow(),
@@ -327,7 +329,7 @@ impl Html {
                     continue;
                 }
 
-                if let Ok(dest) = Url::parse_with_base_url(self.url(), dest) {
+                if let Ok(dest) = Url::parse_with_base_url(self.base_url(), dest) {
                     let mut rel = RelFlags::from_html(&dest, &attributes.borrow(), &location);
 
                     if icann_domain == dest.icann_domain() {
@@ -356,7 +358,7 @@ impl Html {
         for node in self.root.select("link").unwrap() {
             if let Some(element) = node.as_node().as_element() {
                 if let Some(href) = element.attributes.borrow().get("href") {
-                    if let Ok(href) = Url::parse_with_base_url(self.url(), href) {
+                    if let Ok(href) = Url::parse_with_base_url(self.base_url(), href) {
                         let mut rel =
                             RelFlags::from_html(&href, &element.attributes.borrow(), &location);
 
@@ -401,7 +403,7 @@ impl Html {
                     ) {
                         if let Some(content) = metadata.get("content") {
                             if let Ok(destination) =
-                                Url::parse_with_base_url(self.url(), content.as_str())
+                                Url::parse_with_base_url(self.base_url(), content.as_str())
                             {
                                 let mut rel = location.as_rel();
 
@@ -432,7 +434,7 @@ impl Html {
                     ) {
                         if let Some(content) = metadata.get("content") {
                             if let Ok(destination) =
-                                Url::parse_with_base_url(self.url(), content.as_str())
+                                Url::parse_with_base_url(self.base_url(), content.as_str())
                             {
                                 let mut rel = location.as_rel();
 
@@ -464,7 +466,8 @@ impl Html {
         links.extend(self.scripts().into_iter().filter_map(|script| {
             match script.attributes.get("src") {
                 Some(url) => {
-                    let script_url = Url::parse_with_base_url(self.url(), url.as_str()).ok()?;
+                    let script_url =
+                        Url::parse_with_base_url(self.base_url(), url.as_str()).ok()?;
 
                     if script_url.root_domain() != root_domain {
                         let mut rel = Location::SCRIPT.as_rel();
