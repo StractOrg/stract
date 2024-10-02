@@ -343,9 +343,11 @@ impl sonic::service::Message<LiveIndexService> for Search {
 impl sonic::service::Message<LiveIndexService> for GetSiteUrls {
     type Response = SiteUrls;
     async fn handle(self, server: &LiveIndexService) -> Self::Response {
-        let urls = server
-            .local_searcher
-            .get_site_urls(&self.site, self.offset, self.limit);
+        let urls = server.local_searcher.get_site_urls(
+            &self.site,
+            self.offset as usize,
+            self.limit as usize,
+        );
 
         SiteUrls { urls }
     }

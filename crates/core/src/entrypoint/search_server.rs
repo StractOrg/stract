@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -190,8 +190,8 @@ impl sonic::service::Message<SearchService> for Size {
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct GetSiteUrls {
     pub site: String,
-    pub offset: usize,
-    pub limit: usize,
+    pub offset: u64,
+    pub limit: u64,
 }
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
@@ -203,9 +203,11 @@ pub struct SiteUrls {
 impl sonic::service::Message<SearchService> for GetSiteUrls {
     type Response = SiteUrls;
     async fn handle(self, server: &SearchService) -> Self::Response {
-        let urls = server
-            .local_searcher
-            .get_site_urls(&self.site, self.offset, self.limit);
+        let urls = server.local_searcher.get_site_urls(
+            &self.site,
+            self.offset as usize,
+            self.limit as usize,
+        );
 
         SiteUrls { urls }
     }

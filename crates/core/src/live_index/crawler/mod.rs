@@ -18,6 +18,7 @@ mod budgets;
 mod checker;
 mod crawlable_site;
 mod crawled_db;
+mod site_url_stream;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -27,8 +28,9 @@ use crate::ampc::dht::ShardId;
 use crate::config::{CheckIntervals, CrawlerConfig, LiveCrawlerConfig};
 use crate::distributed::cluster::Cluster;
 use crate::distributed::sonic::replication::{
-    AllShardsSelector, RandomReplicaSelector, RandomShardSelector, ShardedClient,
+    RandomReplicaSelector, RandomShardSelector, ShardedClient,
 };
+use crate::distributed::streaming_response::StreamingResponse;
 use crate::entrypoint::search_server;
 use crate::entrypoint::site_stats::FinalSiteStats;
 use crate::{crawler, Result};
@@ -38,11 +40,12 @@ use crate::{
 };
 use crawlable_site::{CrawlableSite, CrawlableSiteGuard};
 use crawled_db::ShardedCrawledDb;
+use futures::StreamExt;
+use site_url_stream::SiteUrlStream;
 use tokio::sync::Mutex;
 use tokio::sync::Semaphore;
 use url::Url;
 
-const SITE_URL_BATCH_SIZE: usize = 100;
 const DEFAULT_CONSISTENCY_FRACTION: f64 = 0.5;
 const BLOG_FRACTION_THRESHOLD: f64 = 0.5;
 const NEWS_FRACTION_THRESHOLD: f64 = 0.5;
@@ -99,82 +102,36 @@ impl Client {
         Ok(())
     }
 
-    async fn get_site_urls_from_backbone(&self, site: &str) -> Result<Vec<Url>> {
+    async fn get_site_urls_from_backbone(&self, site: &str) -> Vec<Url> {
         let mut res = Vec::new();
         let conn = self.search_conn().await;
-        let mut offset = 0;
+        let mut stream = SiteUrlStream::new(site.to_string(), conn).stream();
 
-        while let Ok(resp) = conn
-            .send(
-                search_server::GetSiteUrls {
-                    site: site.to_string(),
-                    offset,
-                    limit: SITE_URL_BATCH_SIZE,
-                },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await
-        {
-            let urls: Vec<_> = resp
-                .into_iter()
-                .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v.urls))
-                .collect();
-
-            if urls.is_empty() {
-                break;
-            }
-
-            res.extend(urls);
-            offset += SITE_URL_BATCH_SIZE;
+        while let Some(url) = stream.next().await {
+            res.push(url);
         }
 
-        Ok(res)
+        res
     }
 
-    async fn get_site_urls_from_live(&self, site: &str) -> Result<Vec<Url>> {
+    async fn get_site_urls_from_live(&self, site: &str) -> Vec<Url> {
         let mut res = Vec::new();
         let conn = self.live_conn().await;
-        let mut offset = 0;
 
-        while let Ok(resp) = conn
-            .send(
-                search_server::GetSiteUrls {
-                    site: site.to_string(),
-                    offset,
-                    limit: SITE_URL_BATCH_SIZE,
-                },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await
-        {
-            let urls: Vec<_> = resp
-                .into_iter()
-                .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v.urls))
-                .collect();
+        let mut stream = SiteUrlStream::new(site.to_string(), conn).stream();
 
-            if urls.is_empty() {
-                break;
-            }
-
-            res.extend(urls);
-            offset += SITE_URL_BATCH_SIZE;
+        while let Some(url) = stream.next().await {
+            res.push(url);
         }
 
-        Ok(res)
+        res
     }
 
     pub async fn get_site_urls(&self, site: &str) -> Vec<Url> {
         let mut res = Vec::new();
 
-        if let Ok(urls) = self.get_site_urls_from_backbone(site).await {
-            res.extend(urls);
-        }
-
-        if let Ok(urls) = self.get_site_urls_from_live(site).await {
-            res.extend(urls);
-        }
+        res.extend(self.get_site_urls_from_backbone(site).await);
+        res.extend(self.get_site_urls_from_live(site).await);
 
         res
     }

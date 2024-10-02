@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod cluster;
 pub mod member;
+pub mod remote_cp;
 pub mod retry_strategy;
 pub mod sonic;
-pub mod remote_cp;
+pub mod streaming_response;
