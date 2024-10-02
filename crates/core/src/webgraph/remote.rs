@@ -31,9 +31,10 @@ use crate::{
                 AllShardsSelector, RandomReplicaSelector, RemoteClient, ReplicatedClient,
             },
         },
+        streaming_response::StreamingResponse,
     },
     entrypoint::webgraph_server::{
-        GetNode, IngoingEdges, OutgoingEdges, PagesByHosts, RawIngoingEdges,
+        GetNode, GetNodeIDs, IngoingEdges, OutgoingEdges, PagesByHosts, RawIngoingEdges,
         RawIngoingEdgesWithLabels, RawOutgoingEdges, RawOutgoingEdgesWithLabels, WebGraphService,
     },
     Result,
@@ -456,6 +457,48 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
                 reps.into_iter().flat_map(|(_, rep)| rep)
             })
             .unique()
+            .collect())
+    }
+
+    pub async fn stream_node_ids(&self) -> impl futures::Stream<Item = NodeID> {
+        StreamNodeIDs::new(self.conn().await).stream()
+    }
+}
+
+pub struct StreamNodeIDs {
+    offset: u64,
+    limit: u64,
+    conn: Arc<sonic::replication::ShardedClient<WebGraphService, ShardId>>,
+}
+
+impl StreamNodeIDs {
+    pub fn new(conn: Arc<sonic::replication::ShardedClient<WebGraphService, ShardId>>) -> Self {
+        Self {
+            offset: 0,
+            limit: 2048,
+            conn,
+        }
+    }
+}
+
+impl StreamingResponse for StreamNodeIDs {
+    type Item = NodeID;
+
+    async fn next_batch(&mut self) -> Result<Vec<Self::Item>> {
+        let req = GetNodeIDs {
+            offset: self.offset,
+            limit: self.limit,
+        };
+
+        let res = self
+            .conn
+            .send(req, &AllShardsSelector, &RandomReplicaSelector)
+            .await?;
+        self.offset += self.limit;
+
+        Ok(res
+            .into_iter()
+            .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v))
             .collect())
     }
 }

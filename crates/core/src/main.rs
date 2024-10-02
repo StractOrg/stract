@@ -220,11 +220,16 @@ enum CentralityMode {
         webgraph_path: String,
         output_path: String,
     },
-    /// Calculate approximate harmonic centrality for the page webgraph.
+    /// Calculate approximate harmonic centrality.
     ApproxHarmonic {
         webgraph_path: String,
         output_path: String,
     },
+
+    /// Calculate harmonic centrality nearest neighbor that uses
+    /// the harmonic centrality of the highest neighbors node
+    /// as a seed node proxy for the centrality of that node (with a discount factor).
+    HarmonicNearestSeed { config_path: String },
 }
 
 #[derive(Subcommand)]
@@ -318,21 +323,26 @@ fn main() -> Result<()> {
                 entrypoint::canonical::create(config)?;
             }
         },
-        Commands::Centrality { mode } => {
-            match mode {
-                CentralityMode::Harmonic {
-                    webgraph_path,
-                    output_path,
-                } => {
-                    entrypoint::Centrality::build_harmonic(&webgraph_path, &output_path);
-                }
-                CentralityMode::ApproxHarmonic {
-                    webgraph_path,
-                    output_path,
-                } => entrypoint::Centrality::build_approx_harmonic(webgraph_path, output_path)?,
+        Commands::Centrality { mode } => match mode {
+            CentralityMode::Harmonic {
+                webgraph_path,
+                output_path,
+            } => {
+                entrypoint::Centrality::build_harmonic(&webgraph_path, &output_path);
             }
-            tracing::info!("Done");
-        }
+            CentralityMode::ApproxHarmonic {
+                webgraph_path,
+                output_path,
+            } => entrypoint::Centrality::build_approx_harmonic(webgraph_path, output_path)?,
+            CentralityMode::HarmonicNearestSeed { config_path } => {
+                let config: config::HarmonicNearestSeedConfig = load_toml_config(config_path);
+
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()?
+                    .block_on(entrypoint::Centrality::harmonic_nearest_seed(config))?;
+            }
+        },
         Commands::Webgraph { options } => match options {
             WebgraphOptions::Create { config_path } => {
                 let config = load_toml_config(config_path);

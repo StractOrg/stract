@@ -417,6 +417,39 @@ where
         self.segments.iter().flat_map(|segment| segment.iter_raw())
     }
 
+    pub fn iter_raw_with_offset(
+        &self,
+        offset: u64,
+    ) -> impl Iterator<Item = (SerializedRef<'_, K>, SerializedRef<'_, V>)> + '_ {
+        let mut remaining_offset = offset;
+        let mut segment_idx = 0;
+        let mut found_segment = false;
+
+        for (idx, segment) in self.segments.iter().enumerate() {
+            let segment_len = segment.len() as u64;
+            segment_idx = idx;
+            if remaining_offset < segment_len {
+                found_segment = true;
+                break;
+            }
+
+            remaining_offset -= segment_len;
+        }
+
+        if !found_segment {
+            segment_idx = self.segments.len();
+        }
+
+        self.segments
+            .iter()
+            .skip(segment_idx)
+            .flat_map(move |segment| {
+                let iter = segment.iter_raw_with_offset(remaining_offset);
+                remaining_offset = 0; // only offset into first segment
+                iter
+            })
+    }
+
     pub fn sorted_iter_raw(
         &self,
     ) -> impl Iterator<Item = (SerializedRef<'_, K>, SerializedRef<'_, V>)> + '_ {
@@ -490,6 +523,15 @@ where
 {
     pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
         self.iter_raw().filter_map(|(k, v)| {
+            let (k, _) = bincode::decode_from_slice(k.as_bytes(), common::bincode_config()).ok()?;
+            let (v, _) = bincode::decode_from_slice(v.as_bytes(), common::bincode_config()).ok()?;
+
+            Some((k, v))
+        })
+    }
+
+    pub fn iter_with_offset(&self, offset: u64) -> impl Iterator<Item = (K, V)> + '_ {
+        self.iter_raw_with_offset(offset).filter_map(|(k, v)| {
             let (k, _) = bincode::decode_from_slice(k.as_bytes(), common::bincode_config()).ok()?;
             let (v, _) = bincode::decode_from_slice(v.as_bytes(), common::bincode_config()).ok()?;
 
@@ -647,5 +689,40 @@ mod tests {
         assert_eq!(db.get(&2).unwrap(), Some(3));
         assert_eq!(db.get(&3).unwrap(), Some(4));
         assert_eq!(db.get(&4).unwrap(), Some(5));
+    }
+
+    #[test]
+    fn test_iter_with_offset() {
+        let temp_dir = gen_temp_dir().unwrap();
+        let mut db = Db::open_or_create(&temp_dir).unwrap();
+
+        db.insert(1, 2).unwrap();
+        db.insert(2, 3).unwrap();
+        db.commit().unwrap();
+        db.insert(3, 4).unwrap();
+        db.insert(4, 5).unwrap();
+        db.insert(5, 6).unwrap();
+        db.commit().unwrap();
+
+        let res: Vec<_> = db.iter_with_offset(0).take(2).collect();
+        assert_eq!(res, vec![(1, 2), (2, 3)]);
+
+        let res: Vec<_> = db.iter_with_offset(1).take(2).collect();
+        assert_eq!(res, vec![(2, 3), (3, 4)]);
+
+        let res: Vec<_> = db.iter_with_offset(2).take(2).collect();
+        assert_eq!(res, vec![(3, 4), (4, 5)]);
+
+        let res: Vec<_> = db.iter_with_offset(3).take(2).collect();
+        assert_eq!(res, vec![(4, 5), (5, 6)]);
+
+        let res: Vec<_> = db.iter_with_offset(4).take(2).collect();
+        assert_eq!(res, vec![(5, 6)]);
+
+        let res: Vec<_> = db.iter_with_offset(5).take(2).collect();
+        assert_eq!(res, vec![]);
+
+        let res: Vec<_> = db.iter_with_offset(6).take(2).collect();
+        assert_eq!(res, vec![]);
     }
 }

@@ -209,6 +209,16 @@ impl<K, V> Segment<K, V> {
         })
     }
 
+    pub fn iter_raw_with_offset(
+        &self,
+        offset: u64,
+    ) -> impl Iterator<Item = (SerializedRef<'_, K>, SerializedRef<'_, V>)> + '_ {
+        self.blob_index.iter_with_offset(offset).map(|ptr| {
+            let blob = self.store.get_raw(&ptr).unwrap();
+            (blob.key, blob.value)
+        })
+    }
+
     pub fn get_raw(&self, key: &[u8]) -> Result<Option<SerializedRef<'_, V>>> {
         if !self.bloom.contains_raw(key) {
             return Ok(None);

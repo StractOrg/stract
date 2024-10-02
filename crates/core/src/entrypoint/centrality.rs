@@ -15,16 +15,21 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
-use std::{cmp::Reverse, path::Path};
+use futures::StreamExt;
+use itertools::Itertools;
+use std::{cmp::Reverse, path::Path, sync::Arc};
 
 use crate::{
+    config,
+    distributed::cluster::Cluster,
     external_sort::ExternalSorter,
     webgraph::{
         centrality::{
             approx_harmonic::ApproxHarmonic, harmonic::HarmonicCentrality, store_csv,
             store_harmonic, TopNodes,
         },
-        WebgraphBuilder,
+        remote::{Page, RemoteWebgraph},
+        EdgeLimit, NodeID, WebgraphBuilder,
     },
     SortableFloat,
 };
@@ -51,6 +56,7 @@ impl Centrality {
                 .collect();
 
         store_csv(top_harmonics, base_output.as_ref().join("harmonic.csv"));
+        tracing::info!("done");
     }
 
     pub fn build_approx_harmonic<P: AsRef<Path>>(webgraph_path: P, base_output: P) -> Result<()> {
@@ -94,6 +100,82 @@ impl Centrality {
         approx_rank.merge_all_segments().unwrap();
 
         store_csv(top_nodes, base_output.as_ref().join("harmonic.csv"));
+
+        tracing::info!("done");
+
+        Ok(())
+    }
+
+    pub async fn harmonic_nearest_seed(config: config::HarmonicNearestSeedConfig) -> Result<()> {
+        let cluster = Arc::new(
+            Cluster::join_as_spectator(
+                config.gossip.addr,
+                config.gossip.seed_nodes.unwrap_or_default(),
+            )
+            .await?,
+        );
+        let graph: RemoteWebgraph<Page> = RemoteWebgraph::new(cluster).await;
+
+        let mut harmonic: speedy_kv::Db<NodeID, f64> =
+            speedy_kv::Db::open_or_create(config.output_path.join("harmonic"))?;
+        let original_centrality: speedy_kv::Db<NodeID, f64> =
+            speedy_kv::Db::open_or_create(&config.original_centrality_path)?;
+
+        let mut node_ids = graph.stream_node_ids().await;
+
+        while let Some(node_id) = node_ids.next().await {
+            match original_centrality.get(&node_id)? {
+                Some(original_centrality) => {
+                    harmonic.insert(node_id, original_centrality)?;
+                }
+                None => {
+                    if let Some(seed) = graph
+                        .raw_ingoing_edges(node_id, EdgeLimit::Limit(1))
+                        .await?
+                        .pop()
+                        .map(|edge| edge.from.node())
+                    {
+                        if let Some(seed_centrality) = original_centrality.get(&seed)? {
+                            harmonic.insert(node_id, seed_centrality * config.discount_factor)?;
+                        }
+                    }
+                }
+            }
+
+            if harmonic.uncommitted_inserts() > 100_000_000 {
+                harmonic.commit()?;
+            }
+        }
+
+        harmonic.commit()?;
+        harmonic.merge_all_segments()?;
+
+        let mut top_nodes = Vec::with_capacity(1_000_000);
+
+        for chunk in ExternalSorter::new()
+            .with_chunk_size(100_000_000)
+            .sort(
+                harmonic
+                    .iter()
+                    .map(|(node_id, centrality)| (Reverse(SortableFloat(centrality)), node_id)),
+            )?
+            .take(1_000_000)
+            .map(|(Reverse(SortableFloat(centrality)), node_id)| (node_id, centrality))
+            .chunks(10_000)
+            .into_iter()
+        {
+            let (ids, centrality): (Vec<_>, Vec<_>) = chunk.into_iter().unzip();
+
+            let nodes = graph.batch_get_node(&ids).await?;
+
+            for (node, centrality) in nodes.into_iter().zip(centrality) {
+                if let Some(node) = node {
+                    top_nodes.push((node, centrality));
+                }
+            }
+        }
+
+        store_csv(top_nodes, config.output_path.join("harmonic.csv"));
 
         Ok(())
     }

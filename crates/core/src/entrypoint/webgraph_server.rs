@@ -58,7 +58,8 @@ sonic_service!(
         RawOutgoingEdges,
         RawIngoingEdgesWithLabels,
         RawOutgoingEdgesWithLabels,
-        PagesByHosts
+        PagesByHosts,
+        GetNodeIDs
     ]
 );
 
@@ -203,6 +204,25 @@ impl Message<WebGraphService> for OutDegreeUpperBound {
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
         server.graph.out_degree_upper_bound(&self.node)
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct GetNodeIDs {
+    pub offset: u64,
+    pub limit: u64,
+}
+
+impl Message<WebGraphService> for GetNodeIDs {
+    type Response = Vec<NodeID>;
+
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        server
+            .graph
+            .iter_nodes_with_offset(self.offset)
+            .take(self.limit as usize)
+            .map(|(id, _)| id)
+            .collect()
     }
 }
 

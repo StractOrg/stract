@@ -400,6 +400,10 @@ impl Webgraph {
         self.id2node.estimate_num_keys()
     }
 
+    pub fn iter_nodes_with_offset(&self, offset: u64) -> impl Iterator<Item = (NodeID, Node)> + '_ {
+        self.id2node.iter_with_offset(offset)
+    }
+
     /// Iterate all edges in the graph at least once.
     /// Some edges may be returned multiple times.
     /// This happens if they are present in more than one segment.

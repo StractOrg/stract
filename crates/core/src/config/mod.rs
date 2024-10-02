@@ -696,8 +696,8 @@ pub struct CanonicalIndexConfig {
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct HarmonicNearestSeedConfig {
     pub gossip: GossipConfig,
-    pub original_centrality_path: String,
-    pub output_path: String,
+    pub original_centrality_path: PathBuf,
+    pub output_path: PathBuf,
     #[serde(default = "defaults::HarmonicNearestSeed::discount_factor")]
     pub discount_factor: f64,
 }

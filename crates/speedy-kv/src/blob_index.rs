@@ -52,6 +52,10 @@ impl BlobIndex {
         self.data.iter().map(|(_, v)| v)
     }
 
+    pub fn iter_with_offset(&self, offset: u64) -> impl Iterator<Item = BlobPointer> + '_ {
+        self.data.iter_with_offset(offset).map(|(_, v)| v)
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }

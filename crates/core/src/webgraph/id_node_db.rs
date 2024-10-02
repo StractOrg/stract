@@ -41,6 +41,10 @@ impl Id2NodeDb {
         self.db.iter().map(|(id, _)| id)
     }
 
+    pub fn iter_with_offset(&self, offset: u64) -> impl Iterator<Item = (NodeID, Node)> + '_ {
+        self.db.iter_with_offset(offset)
+    }
+
     pub fn estimate_num_keys(&self) -> usize {
         self.db.len()
     }

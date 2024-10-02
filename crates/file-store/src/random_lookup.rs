@@ -109,9 +109,13 @@ where
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (ItemId, V)> + '_ {
+        self.iter_with_offset(0)
+    }
+
+    pub fn iter_with_offset(&self, offset: u64) -> impl Iterator<Item = (ItemId, V)> + '_ {
         RandomLookupIter {
             data: &self.data,
-            next_id: 0,
+            next_id: offset,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -193,5 +197,34 @@ mod tests {
         let res = store.iter().map(|(_, val)| val).collect::<Vec<_>>();
 
         assert_eq!(items, res);
+    }
+
+    #[test]
+    fn test_iter_with_offset() {
+        let mut writer = RandomLookupWriter::new(Vec::new());
+
+        let items = vec![1u64, 2, 3, 4, 5];
+
+        for item in &items {
+            writer.write(item).unwrap();
+        }
+
+        let bytes = writer.finish().unwrap();
+
+        let store = RandomLookup::<u64>::from(OwnedBytes::new(bytes));
+
+        let res = store
+            .iter_with_offset(2)
+            .map(|(_, val)| val)
+            .collect::<Vec<_>>();
+
+        assert_eq!(items[2..], res);
+
+        let res = store
+            .iter_with_offset(3)
+            .map(|(_, val)| val)
+            .collect::<Vec<_>>();
+
+        assert_eq!(items[3..], res);
     }
 }

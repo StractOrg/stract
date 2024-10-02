@@ -143,7 +143,7 @@ impl SiteBudgets {
         if budget == 0 {
             Some(Duration::from_millis(MILLIS_PER_DAY)) // once per day
         } else {
-            Some(Duration::from_millis(MILLIS_PER_DAY / budget as u64))
+            Some(Duration::from_millis(MILLIS_PER_DAY / budget))
         }
     }
 }
