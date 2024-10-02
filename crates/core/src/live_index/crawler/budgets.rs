@@ -138,7 +138,9 @@ impl SiteBudgets {
             .or_else(|| self.news.get(site))
             .or_else(|| self.remaining.get(site))?;
 
-        if budget == 0.0 {
+        let budget = budget as u64;
+
+        if budget == 0 {
             Some(Duration::from_millis(MILLIS_PER_DAY)) // once per day
         } else {
             Some(Duration::from_millis(MILLIS_PER_DAY / budget as u64))
