@@ -225,6 +225,7 @@ where
                 Ok(r) => results.push(r),
                 Err(e) => {
                     tracing::error!("Failed to send request: {:?}", e);
+                    return Err(e);
                 }
             }
         }
@@ -275,6 +276,7 @@ where
                 Ok(r) => results.push(r),
                 Err(e) => {
                     tracing::error!("Failed to send request: {:?}", e);
+                    return Err(e);
                 }
             }
         }
@@ -415,6 +417,7 @@ where
                 Ok(r) => results.push(r),
                 Err(e) => {
                     tracing::error!("Failed to send request: {:?}", e);
+                    return Err(e);
                 }
             }
         }
@@ -475,6 +478,7 @@ where
                 Ok(r) => results.push(r),
                 Err(e) => {
                     tracing::error!("Failed to send request: {:?}", e);
+                    return Err(e);
                 }
             }
         }
