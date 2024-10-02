@@ -27,7 +27,7 @@ pub trait IteratorExt: Iterator {
 
 pub trait VectorExt {
     type Iter: Iterator;
-    fn flat_sorted_by<F>(self, f: F) -> FlatSortedBy<Self::Iter, F>
+    fn sort_sorted_by<F>(self, f: F) -> SortSortedBy<Self::Iter, F>
     where
         Self: Sized,
         F: FnMut(&<Self::Iter as Iterator>::Item, &<Self::Iter as Iterator>::Item) -> Ordering;
@@ -39,12 +39,12 @@ where
 {
     type Iter = I;
 
-    fn flat_sorted_by<F>(self, f: F) -> FlatSortedBy<Self::Iter, F>
+    fn sort_sorted_by<F>(self, f: F) -> SortSortedBy<Self::Iter, F>
     where
         Self: Sized,
         F: FnMut(&<Self::Iter as Iterator>::Item, &<Self::Iter as Iterator>::Item) -> Ordering,
     {
-        FlatSortedBy::new(self, f)
+        SortSortedBy::new(self, f)
     }
 }
 
@@ -83,9 +83,11 @@ impl<I: Iterator> Iterator for Peekable<I> {
     }
 }
 
-/// Iterator that flattens an iterator of iterators and sorts the items.
-/// It assumes that each inner iterator is sorted.
-pub struct FlatSortedBy<I, F>
+/// Iterator that produces a sorted sequence of items from an a set of
+/// iterators where each iterator is sorted.
+///
+/// This iterator does not verify that the input iterators are sorted.
+pub struct SortSortedBy<I, F>
 where
     I: Iterator,
 {
@@ -93,7 +95,7 @@ where
     f: F,
 }
 
-impl<I, F> FlatSortedBy<I, F>
+impl<I, F> SortSortedBy<I, F>
 where
     I: Iterator,
 {
@@ -106,7 +108,7 @@ where
     }
 }
 
-impl<I, F> Iterator for FlatSortedBy<I, F>
+impl<I, F> Iterator for SortSortedBy<I, F>
 where
     I: Iterator,
     F: FnMut(&<I as Iterator>::Item, &<I as Iterator>::Item) -> Ordering,
@@ -139,7 +141,7 @@ mod tests {
             vec![4, 5, 6].into_iter(),
             vec![7, 8, 9].into_iter(),
         ];
-        let sorted: Vec<_> = iters.flat_sorted_by(|a, b| a.cmp(b)).collect();
+        let sorted: Vec<_> = iters.sort_sorted_by(|a, b| a.cmp(b)).collect();
         assert_eq!(sorted, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
     }
 }

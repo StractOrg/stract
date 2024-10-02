@@ -100,10 +100,7 @@ pub enum EdgeLimit {
 }
 
 impl EdgeLimit {
-    pub fn apply<'a, T>(
-        &self,
-        it: impl Iterator<Item = T> + 'a,
-    ) -> Box<dyn Iterator<Item = T> + 'a> {
+    fn apply<'a, T>(&self, it: impl Iterator<Item = T> + 'a) -> Box<dyn Iterator<Item = T> + 'a> {
         match self {
             EdgeLimit::Unlimited => Box::new(it),
             EdgeLimit::Limit(limit) => Box::new(it.take(*limit)),
@@ -219,7 +216,7 @@ impl Webgraph {
             .iter()
             .map(|segment| segment.ingoing_edges_with_label(node_id))
             .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .flat_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
+            .sort_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
             .unique_by(|edge| edge.from.node());
 
         limit
@@ -256,7 +253,7 @@ impl Webgraph {
             .iter()
             .map(|segment| segment.ingoing_edges(node))
             .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .flat_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
+            .sort_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
             .unique_by(|edge| edge.from.node());
 
         limit
@@ -280,7 +277,7 @@ impl Webgraph {
             .iter()
             .map(|segment| segment.ingoing_edges_with_label(node))
             .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .flat_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
+            .sort_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
             .unique_by(|edge| edge.from.node());
 
         limit
@@ -304,7 +301,7 @@ impl Webgraph {
             .iter()
             .map(|segment| segment.outgoing_edges_with_label(node))
             .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .flat_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
+            .sort_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
             .unique_by(|edge| edge.to.node());
 
         limit
@@ -339,7 +336,7 @@ impl Webgraph {
             .iter()
             .map(|segment| segment.outgoing_edges_with_label(&id))
             .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .flat_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
+            .sort_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
             .unique_by(|edge| edge.to.node());
 
         limit
@@ -358,7 +355,7 @@ impl Webgraph {
             .iter()
             .map(|segment| segment.outgoing_edges(node))
             .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .flat_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
+            .sort_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
             .unique_by(|edge| edge.to.node());
 
         limit
