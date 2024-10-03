@@ -166,6 +166,12 @@ impl InnerIndex {
         }
 
         self.update_meta();
+        self.re_open();
+    }
+
+    fn re_open(&mut self) {
+        self.index.inverted_index.re_open().unwrap();
+        self.index.prepare_writer().unwrap();
     }
 
     fn update_meta(&mut self) {
@@ -228,7 +234,8 @@ impl InnerIndex {
             .unwrap();
 
         self.meta = Meta::default();
-        self.save_meta()
+        self.save_meta();
+        self.re_open();
     }
 
     pub fn insert(&mut self, pages: &[IndexableWebpage]) {
@@ -254,6 +261,7 @@ impl InnerIndex {
         self.write_ahead_log.clear().unwrap();
         self.update_meta();
         self.has_inserts = false;
+        self.re_open();
     }
 
     pub fn has_inserts(&self) -> bool {
@@ -358,9 +366,9 @@ impl LiveIndex {
         self.inner
             .write()
             .unwrap_or_else(|e| e.into_inner())
-            .index
-            .inverted_index
-            .re_open()
+            .re_open();
+
+        Ok(())
     }
 
     pub fn meta(&self) -> Meta {
