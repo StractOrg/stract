@@ -214,9 +214,8 @@ impl Webgraph {
     }
 }
 
-pub struct LiveIndex;
-
-impl LiveIndex {
+pub struct LiveCrawler;
+impl LiveCrawler {
     pub fn feeds_crawl_interval() -> Duration {
         Duration::from_secs(30 * 60) // 30 minutes
     }
@@ -238,12 +237,9 @@ impl LiveIndex {
     }
 
     pub fn remaining_budget() -> u64 {
-        200_000
+        50_000
     }
-}
 
-pub struct LiveCrawler;
-impl LiveCrawler {
     pub fn init_crawl_db() -> bool {
         true
     }

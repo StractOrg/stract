@@ -399,11 +399,11 @@ pub struct CrawlerConfig {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct DailyLiveIndexCrawlerBudget {
-    #[serde(default = "defaults::LiveIndex::blogs_budget")]
+    #[serde(default = "defaults::LiveCrawler::blogs_budget")]
     pub blogs: u64,
-    #[serde(default = "defaults::LiveIndex::news_budget")]
+    #[serde(default = "defaults::LiveCrawler::news_budget")]
     pub news: u64,
-    #[serde(default = "defaults::LiveIndex::remaining_budget")]
+    #[serde(default = "defaults::LiveCrawler::remaining_budget")]
     pub remaining: u64,
 }
 
@@ -411,17 +411,17 @@ pub struct DailyLiveIndexCrawlerBudget {
 pub struct CheckIntervals {
     #[serde(
         deserialize_with = "parse_duration",
-        default = "defaults::LiveIndex::feeds_crawl_interval"
+        default = "defaults::LiveCrawler::feeds_crawl_interval"
     )]
     pub feeds: Duration,
     #[serde(
         deserialize_with = "parse_duration",
-        default = "defaults::LiveIndex::sitemap_crawl_interval"
+        default = "defaults::LiveCrawler::sitemap_crawl_interval"
     )]
     pub sitemap: Duration,
     #[serde(
         deserialize_with = "parse_duration",
-        default = "defaults::LiveIndex::frontpage_crawl_interval"
+        default = "defaults::LiveCrawler::frontpage_crawl_interval"
     )]
     pub frontpage: Duration,
 }
@@ -429,9 +429,9 @@ pub struct CheckIntervals {
 impl Default for CheckIntervals {
     fn default() -> Self {
         Self {
-            feeds: defaults::LiveIndex::feeds_crawl_interval(),
-            sitemap: defaults::LiveIndex::sitemap_crawl_interval(),
-            frontpage: defaults::LiveIndex::frontpage_crawl_interval(),
+            feeds: defaults::LiveCrawler::feeds_crawl_interval(),
+            sitemap: defaults::LiveCrawler::sitemap_crawl_interval(),
+            frontpage: defaults::LiveCrawler::frontpage_crawl_interval(),
         }
     }
 }
@@ -439,9 +439,9 @@ impl Default for CheckIntervals {
 impl Default for DailyLiveIndexCrawlerBudget {
     fn default() -> Self {
         Self {
-            blogs: defaults::LiveIndex::blogs_budget(),
-            news: defaults::LiveIndex::news_budget(),
-            remaining: defaults::LiveIndex::remaining_budget(),
+            blogs: defaults::LiveCrawler::blogs_budget(),
+            news: defaults::LiveCrawler::news_budget(),
+            remaining: defaults::LiveCrawler::remaining_budget(),
         }
     }
 }
