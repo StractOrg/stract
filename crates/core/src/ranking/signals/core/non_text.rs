@@ -42,8 +42,8 @@ fn score_timestamp(page_timestamp: usize, signal_computer: &SignalComputer) -> f
 }
 
 pub fn time_cache_calculation(hours_since_update: f64) -> f64 {
-    const SMOOTHING_FACTOR: f64 = 24.0 * 3.0; // half life of 3 days
-    SMOOTHING_FACTOR / (hours_since_update + SMOOTHING_FACTOR)
+    const HALF_LIFE: f64 = 24.0 * 3.0; // half life of 3 days
+    HALF_LIFE / (hours_since_update + HALF_LIFE)
 }
 
 #[inline]
@@ -398,7 +398,7 @@ impl CoreSignal for FetchTimeMs {
 pub struct UpdateTimestamp;
 impl CoreSignal for UpdateTimestamp {
     fn default_coefficient(&self) -> f64 {
-        0.001
+        0.5
     }
 
     fn as_field(&self) -> Option<Field> {
