@@ -84,7 +84,7 @@ impl Client {
     }
 
     pub async fn index(&self, pages: Vec<IndexableWebpage>) -> Result<()> {
-        let conn = self.live_conn().await;
+        let mut conn = self.live_conn().await;
 
         let req = live_index::IndexWebpages {
             pages,
@@ -97,6 +97,7 @@ impl Client {
         {
             tracing::error!("Failed to index pages: {e}");
             tokio::time::sleep(Duration::from_millis(1_000)).await;
+            conn = self.live_conn().await;
         }
 
         Ok(())

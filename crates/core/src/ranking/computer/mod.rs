@@ -242,7 +242,9 @@ impl SignalComputer {
             .collect();
 
         let update_time_cache = (0..(3 * 365 * 24))
-            .map(|hours_since_update| 1.0 / ((hours_since_update as f64 + 1.0).log2()))
+            .map(|hours_since_update| {
+                super::signals::time_cache_calculation(hours_since_update as f64)
+            })
             .collect();
 
         let query = query.as_ref().map(|q| QueryData {

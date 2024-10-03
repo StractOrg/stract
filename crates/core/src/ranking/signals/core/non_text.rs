@@ -27,14 +27,23 @@ fn score_timestamp(page_timestamp: usize, signal_computer: &SignalComputer) -> f
         return 0.0;
     }
 
-    let hours_since_update =
-        (signal_computer.current_timestamp().unwrap() - page_timestamp).max(1) / 3600;
+    let hours_since_update = signal_computer
+        .current_timestamp()
+        .unwrap()
+        .saturating_sub(page_timestamp)
+        .max(1)
+        / 3600;
 
     signal_computer
         .update_time_cache()
         .get(hours_since_update)
         .copied()
         .unwrap_or(0.0)
+}
+
+pub fn time_cache_calculation(hours_since_update: f64) -> f64 {
+    const SMOOTHING_FACTOR: f64 = 24.0 * 3.0; // half life of 3 days
+    SMOOTHING_FACTOR / (hours_since_update + SMOOTHING_FACTOR)
 }
 
 #[inline]
