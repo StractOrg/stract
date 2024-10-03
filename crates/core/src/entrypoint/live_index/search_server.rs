@@ -256,7 +256,7 @@ impl LiveIndexService {
 
         let self_id = self_member.id.clone();
         let Service::LiveIndex {
-            host: _,
+            host: self_host,
             shard: self_shard,
             state: _,
         } = self_member.service
@@ -271,7 +271,7 @@ impl LiveIndexService {
             .into_iter()
             .filter_map(|member| {
                 if let Service::LiveIndex { host, shard, state } = member.service {
-                    if member.id != self_id && shard == self_shard {
+                    if member.id != self_id && shard == self_shard && host != self_host {
                         Some(RemoteIndex { host, state })
                     } else {
                         None
@@ -285,6 +285,7 @@ impl LiveIndexService {
         let ready = live_indexes
             .iter()
             .filter(|index| matches!(index.state, LiveIndexState::Ready))
+            .unique_by(|index| index.host)
             .count();
 
         let mut futures = FuturesUnordered::new();
