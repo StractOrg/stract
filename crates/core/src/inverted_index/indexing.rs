@@ -153,7 +153,7 @@ impl InvertedIndex {
         Ok(())
     }
 
-    #[allow(clippy::missing_panics_doc)] // cannot panic as writer is prepared
+    #[allow(clippy::missing_panics_doc)] // should not panic as writer is prepared
     pub fn merge_segments_by_id(&mut self, segments: &[SegmentId]) -> Result<Option<SegmentId>> {
         self.prepare_writer()?;
 

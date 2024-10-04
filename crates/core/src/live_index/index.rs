@@ -142,9 +142,36 @@ impl InnerIndex {
             .unwrap();
 
         self.sync_meta_with_index();
+        self.re_open();
     }
 
     pub fn compact_segments_by_date(&mut self) {
+        let segments_to_compact = self.prepare_segments_for_compaction();
+
+        for (_, segments) in segments_to_compact {
+            if segments.len() <= 1 {
+                continue;
+            }
+
+            let segment_ids: Vec<SegmentId> = segments.iter().map(|s| s.id).collect();
+            let newest_creation_date = segments.iter().map(|s| s.created).max().unwrap();
+
+            let merge_result = self.index.inverted_index.merge_segments_by_id(&segment_ids);
+
+            if let Ok(Some(new_segment_id)) = merge_result {
+                self.update_meta_after_compaction(
+                    segment_ids,
+                    new_segment_id,
+                    newest_creation_date,
+                );
+            }
+        }
+
+        self.save_meta();
+        self.re_open();
+    }
+
+    fn prepare_segments_for_compaction(&self) -> HashMap<NaiveDate, Vec<Segment>> {
         let mut segments_by_date: HashMap<NaiveDate, Vec<Segment>> = HashMap::new();
 
         for segment in self.meta.segments.clone() {
@@ -154,28 +181,22 @@ impl InnerIndex {
                 .push(segment);
         }
 
-        for (_, segments) in segments_by_date {
-            if segments.len() <= 1 {
-                continue;
-            }
+        segments_by_date
+    }
 
-            let segment_ids: Vec<SegmentId> = segments.iter().map(|s| s.id).collect();
-            let newest_creation_date = segments.iter().map(|s| s.created).max().unwrap();
-
-            if let Ok(Some(new_segment_id)) =
-                self.index.inverted_index.merge_segments_by_id(&segment_ids)
-            {
-                // Update meta with the new segment, using the newest creation date
-                self.meta.segments.retain(|s| !segment_ids.contains(&s.id));
-                self.meta.segments.push(Segment {
-                    id: new_segment_id,
-                    created: newest_creation_date,
-                });
-            }
-        }
-
-        self.save_meta();
-        self.re_open();
+    fn update_meta_after_compaction(
+        &mut self,
+        old_segment_ids: Vec<SegmentId>,
+        new_segment_id: SegmentId,
+        newest_creation_date: DateTime<Utc>,
+    ) {
+        self.meta
+            .segments
+            .retain(|s| !old_segment_ids.contains(&s.id));
+        self.meta.segments.push(Segment {
+            id: new_segment_id,
+            created: newest_creation_date,
+        });
     }
 
     fn re_open(&mut self) {

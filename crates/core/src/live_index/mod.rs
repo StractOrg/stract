@@ -25,8 +25,8 @@ mod index_manager;
 pub use self::crawler::Crawler;
 
 const TTL: Duration = Duration::from_secs(60 * 60 * 24 * 60); // 60 days
-const PRUNE_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
-const COMPACT_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
-const AUTO_COMMIT_INTERVAL: Duration = Duration::from_secs(60 * 5); // 5 minutes
+const PRUNE_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60); // 6 hours
+const COMPACT_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60); // 6 hours
+const AUTO_COMMIT_INTERVAL: Duration = Duration::from_secs(10 * 60); // 10 minutes
 const EVENT_LOOP_INTERVAL: Duration = Duration::from_secs(5);
 const BATCH_SIZE: usize = 512;
