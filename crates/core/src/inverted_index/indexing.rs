@@ -154,20 +154,21 @@ impl InvertedIndex {
     }
 
     #[allow(clippy::missing_panics_doc)] // cannot panic as writer is prepared
-    pub fn merge_segments_by_id(&mut self, segments: &[SegmentId]) -> Result<()> {
+    pub fn merge_segments_by_id(&mut self, segments: &[SegmentId]) -> Result<Option<SegmentId>> {
         self.prepare_writer()?;
 
         if segments.is_empty() {
-            return Ok(());
+            return Ok(None);
         }
 
-        self.writer
+        let res = self
+            .writer
             .as_mut()
             .expect("writer has not been prepared")
             .merge(segments)
             .wait()?;
 
-        Ok(())
+        Ok(res.map(|seg| seg.id()))
     }
 
     #[must_use]

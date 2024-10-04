@@ -141,17 +141,17 @@ impl InnerIndex {
             .delete_segments_by_id(&old_segments)
             .unwrap();
 
-        self.update_meta();
+        self.sync_meta_with_index();
     }
 
     pub fn compact_segments_by_date(&mut self) {
-        let mut segments_by_date: HashMap<NaiveDate, Vec<SegmentId>> = HashMap::new();
+        let mut segments_by_date: HashMap<NaiveDate, Vec<Segment>> = HashMap::new();
 
         for segment in self.meta.segments.clone() {
             segments_by_date
                 .entry(segment.created.date_naive())
                 .or_default()
-                .push(segment.id);
+                .push(segment);
         }
 
         for (_, segments) in segments_by_date {
@@ -159,13 +159,22 @@ impl InnerIndex {
                 continue;
             }
 
-            self.index
-                .inverted_index
-                .merge_segments_by_id(&segments)
-                .unwrap();
+            let segment_ids: Vec<SegmentId> = segments.iter().map(|s| s.id).collect();
+            let newest_creation_date = segments.iter().map(|s| s.created).max().unwrap();
+
+            if let Ok(Some(new_segment_id)) =
+                self.index.inverted_index.merge_segments_by_id(&segment_ids)
+            {
+                // Update meta with the new segment, using the newest creation date
+                self.meta.segments.retain(|s| !segment_ids.contains(&s.id));
+                self.meta.segments.push(Segment {
+                    id: new_segment_id,
+                    created: newest_creation_date,
+                });
+            }
         }
 
-        self.update_meta();
+        self.save_meta();
         self.re_open();
     }
 
@@ -174,7 +183,7 @@ impl InnerIndex {
         self.index.prepare_writer().unwrap();
     }
 
-    fn update_meta(&mut self) {
+    fn sync_meta_with_index(&mut self) {
         let segments_in_index: HashSet<_> = self
             .index
             .inverted_index
@@ -259,7 +268,7 @@ impl InnerIndex {
         }
         self.index.commit().unwrap();
         self.write_ahead_log.clear().unwrap();
-        self.update_meta();
+        self.sync_meta_with_index();
         self.has_inserts = false;
         self.re_open();
     }
