@@ -49,4 +49,4 @@ if they take our code without making theirs open source, which would breach the 
 - Install [cargo-watch](https://github.com/watchexec/cargo-watch) by running `cargo install cargo-watch`.
 - (Optional) Install [abeye](https://github.com/oeb25/abeye) by running `cargo install --git https://github.com/oeb25/abeye --locked`. This is used for generating the API client used by the frontend by running `just openapi`.
 
-After the non optional steps you can now run `cargo test` and should see all tests passing. If you have installced `cargo-watch`, you should be able to run `just dev` to start the search server and launch the frontend at `0.0.0.0:8000`.
+After the non optional steps you can now run `cargo test` and should see all tests passing. If you have installed `cargo-watch`, you should be able to run `just dev` to start the search server and launch the frontend at `0.0.0.0:8000`.
