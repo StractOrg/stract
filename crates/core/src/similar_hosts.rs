@@ -79,7 +79,7 @@ impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
 
         let in_edges = self
             .webgraph
-            .batch_raw_ingoing_edges(&nodes, EdgeLimit::Limit(64))
+            .batch_raw_ingoing_edges(&nodes, EdgeLimit::Limit(128))
             .await
             .unwrap_or_default();
 
