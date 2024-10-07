@@ -458,7 +458,7 @@ impl From<LocalSearcher<Index>> for LocalSearchClient {
 
 impl SearchClient for LocalSearchClient {
     async fn search_initial(&self, query: &SearchQuery) -> Vec<InitialSearchResultShard> {
-        let res = self.0.search_initial(query, true).unwrap();
+        let res = self.0.search_initial(query, true).await.unwrap();
 
         vec![InitialSearchResultShard {
             local_result: res,
@@ -479,6 +479,7 @@ impl SearchClient for LocalSearchClient {
         let res = self
             .0
             .retrieve_websites(&pointers, query)
+            .await
             .unwrap()
             .into_iter()
             .zip(top_websites.iter().map(|(i, p)| (*i, p.website.clone())))
@@ -489,7 +490,7 @@ impl SearchClient for LocalSearchClient {
     }
 
     async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        Ok(self.0.get_webpage(url))
+        Ok(self.0.get_webpage(url).await)
     }
 
     async fn get_homepage_descriptions(
@@ -499,7 +500,7 @@ impl SearchClient for LocalSearchClient {
         let mut res = std::collections::HashMap::new();
 
         for url in urls {
-            if let Some(homepage) = self.0.get_homepage(url) {
+            if let Some(homepage) = self.0.get_homepage(url).await {
                 if let Some(desc) = homepage.description() {
                     res.insert(url.clone(), desc.clone());
                 }
@@ -523,6 +524,6 @@ impl SearchClient for LocalSearchClient {
     }
 
     async fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
-        self.0.top_key_phrases(top_n)
+        self.0.top_key_phrases(top_n).await
     }
 }

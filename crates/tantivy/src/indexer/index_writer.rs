@@ -7,7 +7,7 @@ use smallvec::smallvec;
 
 use super::operation::{AddOperation, UserOperation};
 use super::segment_updater::SegmentUpdater;
-use super::{AddBatch, AddBatchReceiver, AddBatchSender, PreparedCommit};
+use super::{AddBatch, AddBatchReceiver, AddBatchSender, MergeOperation, PreparedCommit};
 use crate::directory::GarbageCollectionResult;
 use crate::error::TantivyError;
 use crate::index::{Index, Segment, SegmentId, SegmentMeta};
@@ -331,7 +331,33 @@ impl<D: Document> IndexWriter<D> {
     pub fn merge(&mut self, segment_ids: &[SegmentId]) -> FutureResult<Option<SegmentMeta>> {
         let merge_operation = self.segment_updater.make_merge_operation(segment_ids);
         let segment_updater = self.segment_updater.clone();
-        segment_updater.start_merge(merge_operation)
+        segment_updater.merge(merge_operation)
+    }
+
+    /// Start a merge operation.
+    ///
+    /// Returns a future that resolves to a tuple of the segment entry and the merge operation.
+    /// When the future is resolved, the merged segment has been created and committed.
+    ///
+    /// `end_merge` must be called to complete the merge operation.
+    pub fn start_merge(
+        &self,
+        segment_ids: &[SegmentId],
+    ) -> FutureResult<(Option<SegmentEntry>, MergeOperation)> {
+        let merge_operation = self.segment_updater.make_merge_operation(segment_ids);
+        self.segment_updater.start_merge(merge_operation)
+    }
+
+    /// End a merge operation.
+    ///
+    /// This method must be called to perform the necessary cleanup after a merge operation.
+    pub fn end_merge(
+        &mut self,
+        merge_operation: MergeOperation,
+        segment_entry: Option<SegmentEntry>,
+    ) -> crate::Result<Option<SegmentMeta>> {
+        self.segment_updater
+            .end_merge(merge_operation, segment_entry)
     }
 
     /// Closes the current document channel send.

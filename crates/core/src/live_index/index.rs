@@ -17,19 +17,25 @@
 use std::{
     io::{BufReader, BufWriter},
     path::{Path, PathBuf},
-    sync::{Arc, RwLock, RwLockReadGuard},
+    sync::Arc,
 };
+
+use tokio::sync::{RwLock, RwLockReadGuard};
 
 use chrono::{DateTime, NaiveDate, Utc};
 use itertools::Itertools;
 use simple_wal::Wal;
-use tantivy::index::SegmentId;
+use tantivy::{
+    index::SegmentId,
+    indexer::{MergeOperation, SegmentEntry},
+};
 
 use std::collections::{HashMap, HashSet};
 
 use crate::{
     config::SnippetConfig,
     entrypoint::indexer::{self, IndexableWebpage, IndexingWorker},
+    inverted_index::InvertedIndex,
     live_index::{BATCH_SIZE, TTL},
     searcher::SearchableIndex,
     Result,
@@ -48,6 +54,19 @@ impl Segment {
 
     pub fn created(&self) -> DateTime<Utc> {
         self.created
+    }
+}
+
+pub struct CompactOperation {
+    segments: Vec<Segment>,
+    entry: Option<SegmentEntry>,
+    merge_op: MergeOperation,
+}
+
+impl CompactOperation {
+    pub fn end(self, index: &mut InvertedIndex) -> Result<Option<SegmentId>> {
+        let res = index.end_merge_segments_by_id(self.merge_op, self.entry)?;
+        Ok(res)
     }
 }
 
@@ -145,8 +164,10 @@ impl InnerIndex {
         self.re_open();
     }
 
-    pub fn compact_segments_by_date(&mut self) {
+    pub async fn start_compact_segments_by_date(&self) -> Result<Vec<CompactOperation>> {
         let segments_to_compact = self.prepare_segments_for_compaction();
+
+        let mut operations = Vec::new();
 
         for (_, segments) in segments_to_compact {
             if segments.len() <= 1 {
@@ -154,11 +175,29 @@ impl InnerIndex {
             }
 
             let segment_ids: Vec<SegmentId> = segments.iter().map(|s| s.id).collect();
-            let newest_creation_date = segments.iter().map(|s| s.created).max().unwrap();
 
-            let merge_result = self.index.inverted_index.merge_segments_by_id(&segment_ids);
+            let (entry, merge_op) = self
+                .index
+                .inverted_index
+                .start_merge_segments_by_id(&segment_ids)
+                .await?;
 
-            if let Ok(Some(new_segment_id)) = merge_result {
+            operations.push(CompactOperation {
+                segments,
+                entry,
+                merge_op,
+            });
+        }
+
+        Ok(operations)
+    }
+
+    fn end_compact_segments_by_date(&mut self, operations: Vec<CompactOperation>) -> Result<()> {
+        for op in operations {
+            let newest_creation_date = op.segments.iter().map(|s| s.created).max().unwrap();
+            let segment_ids: Vec<SegmentId> = op.segments.iter().map(|s| s.id).collect();
+
+            if let Ok(Some(new_segment_id)) = op.end(&mut self.index.inverted_index) {
                 self.update_meta_after_compaction(
                     segment_ids,
                     new_segment_id,
@@ -169,6 +208,8 @@ impl InnerIndex {
 
         self.save_meta();
         self.re_open();
+
+        Ok(())
     }
 
     fn prepare_segments_for_compaction(&self) -> HashMap<NaiveDate, Vec<Segment>> {
@@ -323,89 +364,70 @@ impl LiveIndex {
         })
     }
 
-    pub fn commit(&self) {
+    pub async fn commit(&self) {
         tracing::debug!("committing index");
-        futures::executor::block_on(
-            self.inner
-                .write()
-                .unwrap_or_else(|e| e.into_inner())
-                .commit(),
-        );
-        tracing::debug!("index committed");
+        self.inner.write().await.commit().await;
     }
 
-    pub fn prune_segments(&self) {
+    pub async fn prune_segments(&self) {
         tracing::debug!("pruning segments");
-        self.inner
-            .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .prune_segments()
+        self.inner.write().await.prune_segments()
     }
 
-    pub fn has_inserts(&self) -> bool {
-        self.inner
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
-            .has_inserts()
+    pub async fn has_inserts(&self) -> bool {
+        self.inner.read().await.has_inserts()
     }
 
-    pub fn compact_segments_by_date(&self) {
+    pub async fn compact_segments_by_date(&self) -> Result<()> {
         tracing::debug!("compacting segments by date");
-        self.inner
-            .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .compact_segments_by_date()
-    }
-
-    pub fn insert(&self, pages: &[IndexableWebpage]) {
-        tracing::debug!("inserting {} pages into index", pages.len());
-        self.inner
-            .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(pages)
-    }
-
-    pub fn read(&self) -> RwLockReadGuard<'_, InnerIndex> {
-        self.inner.read().unwrap_or_else(|e| e.into_inner())
-    }
-
-    pub fn set_snippet_config(&self, config: SnippetConfig) {
-        self.inner
-            .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .index
-            .set_snippet_config(config)
-    }
-
-    pub fn path(&self) -> PathBuf {
-        self.inner
+        let operations = self
+            .inner
             .read()
-            .unwrap_or_else(|e| e.into_inner())
-            .path
-            .to_path_buf()
-    }
+            .await
+            .start_compact_segments_by_date()
+            .await?;
 
-    pub fn delete_all_pages(&self) {
         self.inner
             .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .delete_all_pages();
-    }
-
-    pub fn re_open(&self) -> Result<()> {
-        self.inner
-            .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .re_open();
+            .await
+            .end_compact_segments_by_date(operations)?;
 
         Ok(())
     }
 
-    pub fn meta(&self) -> Meta {
+    pub async fn insert(&self, pages: &[IndexableWebpage]) {
+        tracing::debug!("inserting {} pages into index", pages.len());
+        self.inner.write().await.insert(pages)
+    }
+
+    pub async fn read(&self) -> RwLockReadGuard<'_, InnerIndex> {
+        self.inner.read().await
+    }
+
+    pub async fn set_snippet_config(&self, config: SnippetConfig) {
         self.inner
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
-            .meta
-            .clone()
+            .write()
+            .await
+            .index
+            .set_snippet_config(config)
+            .await
+    }
+
+    pub async fn path(&self) -> PathBuf {
+        self.inner.read().await.path.to_path_buf()
+    }
+
+    pub async fn delete_all_pages(&self) {
+        self.inner.write().await.delete_all_pages();
+    }
+
+    pub async fn re_open(&self) -> Result<()> {
+        self.inner.write().await.re_open();
+
+        Ok(())
+    }
+
+    pub async fn meta(&self) -> Meta {
+        self.inner.read().await.meta.clone()
     }
 }

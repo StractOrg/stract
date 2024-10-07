@@ -51,17 +51,20 @@ pub async fn main() {
 
     let mut queries: Vec<_> = searcher
         .top_key_phrases(1_000_000)
+        .await
         .into_iter()
         .map(|phrase| phrase.text().to_string())
         .collect();
     queries.shuffle(&mut rand::thread_rng());
 
     searcher.set_collector_config(collector_conf);
-    searcher.set_snippet_config(SnippetConfig {
-        num_words_for_lang_detection: Some(250),
-        max_considered_words: Some(10_000),
-        ..Default::default()
-    });
+    searcher
+        .set_snippet_config(SnippetConfig {
+            num_words_for_lang_detection: Some(250),
+            max_considered_words: Some(10_000),
+            ..Default::default()
+        })
+        .await;
     let bangs = Bangs::from_path(config.bangs_path.as_ref().unwrap());
 
     let searcher = stract::searcher::LocalSearchClient::from(searcher);

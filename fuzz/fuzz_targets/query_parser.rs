@@ -10,7 +10,7 @@ use stract::{
 fuzz_target!(|query: &str| {
     let index = Index::open("/tmp/stract/fuzz-index").unwrap();
 
-    let guard = index.guard();
+    let guard = stract::block_on(index.guard());
     let ctx = guard.inverted_index().local_search_ctx();
 
     let _ = Query::parse(

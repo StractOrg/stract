@@ -15,7 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLockReadGuard};
+use std::future::Future;
+use std::sync::Arc;
+use tokio::sync::RwLockReadGuard;
 
 use itertools::Itertools;
 use url::Url;
@@ -43,8 +45,8 @@ pub trait SearchableIndex {
     where
         Self: 'a;
 
-    fn guard(&self) -> Self::SearchGuard<'_>;
-    fn set_snippet_config(&mut self, config: SnippetConfig);
+    fn guard(&self) -> impl Future<Output = Self::SearchGuard<'_>>;
+    fn set_snippet_config(&mut self, config: SnippetConfig) -> impl Future<Output = ()>;
 }
 
 pub trait SearchGuard<'a> {
@@ -57,11 +59,11 @@ pub trait SearchGuard<'a> {
 impl SearchableIndex for Index {
     type SearchGuard<'a> = NormalIndexSearchGuard<'a>;
 
-    fn guard(&self) -> Self::SearchGuard<'_> {
+    async fn guard(&self) -> Self::SearchGuard<'_> {
         NormalIndexSearchGuard { search_index: self }
     }
 
-    fn set_snippet_config(&mut self, config: SnippetConfig) {
+    async fn set_snippet_config(&mut self, config: SnippetConfig) {
         self.inverted_index.set_snippet_config(config);
     }
 }
@@ -79,14 +81,14 @@ impl<'a> SearchGuard<'a> for NormalIndexSearchGuard<'a> {
 impl SearchableIndex for Arc<live_index::LiveIndex> {
     type SearchGuard<'a> = LiveIndexSearchGuard<'a>;
 
-    fn guard(&self) -> Self::SearchGuard<'_> {
+    async fn guard(&self) -> Self::SearchGuard<'_> {
         LiveIndexSearchGuard {
-            lock_guard: self.read(),
+            lock_guard: self.read().await,
         }
     }
 
-    fn set_snippet_config(&mut self, config: SnippetConfig) {
-        live_index::LiveIndex::set_snippet_config(self, config)
+    async fn set_snippet_config(&mut self, config: SnippetConfig) {
+        live_index::LiveIndex::set_snippet_config(self, config).await
     }
 }
 
@@ -146,8 +148,8 @@ where
         self.collector_config = config;
     }
 
-    pub fn set_snippet_config(&mut self, config: SnippetConfig) {
-        self.index.set_snippet_config(config);
+    pub async fn set_snippet_config(&mut self, config: SnippetConfig) {
+        self.index.set_snippet_config(config).await;
     }
 
     fn parse_query<'a, G: SearchGuard<'a>>(
@@ -234,12 +236,12 @@ where
         &self.index
     }
 
-    pub fn search_initial(
+    pub async fn search_initial(
         &self,
         query: &SearchQuery,
         de_rank_similar: bool,
     ) -> Result<InitialWebsiteResult> {
-        let guard = self.index.guard();
+        let guard = self.index.guard().await;
         let ctx = guard.inverted_index().local_search_ctx();
         let inverted_index_result =
             self.search_inverted_index(&ctx, &guard, query, de_rank_similar)?;
@@ -250,12 +252,12 @@ where
         })
     }
 
-    pub fn retrieve_websites(
+    pub async fn retrieve_websites(
         &self,
         websites: &[inverted_index::WebpagePointer],
         query: &str,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
-        let guard = self.index.guard();
+        let guard = self.index.guard().await;
         let ctx = guard.inverted_index().local_search_ctx();
         let query = SearchQuery {
             query: query.to_string(),
@@ -266,14 +268,13 @@ where
         guard.inverted_index().retrieve_websites(websites, &query)
     }
 
-    /// This function is mainly used for tests and benchmarks
-    pub fn search(&self, query: &SearchQuery) -> Result<WebsitesResult> {
+    pub async fn search(&self, query: &SearchQuery) -> Result<WebsitesResult> {
         use std::time::Instant;
 
         let start = Instant::now();
         let search_query = query.clone();
 
-        let search_result = self.search_initial(&search_query, true)?;
+        let search_result = self.search_initial(&search_query, true).await?;
 
         let pointers: Vec<_> = search_result
             .websites
@@ -282,7 +283,8 @@ where
             .collect();
 
         let websites: Vec<_> = self
-            .retrieve_websites(&pointers, &query.query)?
+            .retrieve_websites(&pointers, &query.query)
+            .await?
             .into_iter()
             .zip_eq(search_result.websites)
             .map(|(webpage, ranking)| {
@@ -296,7 +298,9 @@ where
             .map(|website| website.ranking().pointer().clone())
             .collect();
 
-        let retrieved_sites = self.retrieve_websites(&pointers, &search_query.query)?;
+        let retrieved_sites = self
+            .retrieve_websites(&pointers, &search_query.query)
+            .await?;
 
         let coefficients = query.signal_coefficients();
 
@@ -332,21 +336,31 @@ where
         })
     }
 
-    pub fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
-        self.index.guard().inverted_index().get_webpage(url)
+    /// This function is mainly used for tests and benchmarks
+    pub fn search_sync(&self, query: &SearchQuery) -> Result<WebsitesResult> {
+        crate::block_on(self.search(query))
     }
 
-    pub fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
-        self.index.guard().inverted_index().get_homepage(url)
+    pub async fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
+        self.index.guard().await.inverted_index().get_webpage(url)
     }
 
-    pub fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
-        self.index.guard().inverted_index().top_key_phrases(top_n)
+    pub async fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
+        self.index.guard().await.inverted_index().get_homepage(url)
     }
 
-    pub fn get_site_urls(&self, site: &str, offset: usize, limit: usize) -> Vec<Url> {
+    pub async fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
         self.index
             .guard()
+            .await
+            .inverted_index()
+            .top_key_phrases(top_n)
+    }
+
+    pub async fn get_site_urls(&self, site: &str, offset: usize, limit: usize) -> Vec<Url> {
+        self.index
+            .guard()
+            .await
             .inverted_index()
             .get_site_urls(site, offset, limit)
     }
@@ -398,7 +412,7 @@ mod tests {
 
         for p in 0..NUM_PAGES {
             let urls: Vec<_> = searcher
-                .search(&SearchQuery {
+                .search_sync(&SearchQuery {
                     query: "test".to_string(),
                     page: p,
                     ..Default::default()

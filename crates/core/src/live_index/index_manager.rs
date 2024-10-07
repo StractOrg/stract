@@ -38,17 +38,22 @@ impl IndexManager {
 
         loop {
             if last_prune + PRUNE_INTERVAL < Utc::now() {
-                self.index.prune_segments();
+                crate::block_on(self.index.prune_segments());
                 last_prune = Utc::now();
             }
 
-            if last_commit + AUTO_COMMIT_INTERVAL < Utc::now() && self.index.has_inserts() {
-                self.index.commit();
+            if last_commit + AUTO_COMMIT_INTERVAL < Utc::now()
+                && crate::block_on(self.index.has_inserts())
+            {
+                crate::block_on(self.index.commit());
                 last_commit = Utc::now();
             }
 
             if last_compact + COMPACT_INTERVAL < Utc::now() {
-                self.index.compact_segments_by_date();
+                if let Err(e) = crate::block_on(self.index.compact_segments_by_date()) {
+                    tracing::error!("Failed to compact segments: {}", e);
+                }
+
                 last_compact = Utc::now();
             }
 

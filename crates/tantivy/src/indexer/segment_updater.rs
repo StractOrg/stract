@@ -445,7 +445,7 @@ impl SegmentUpdater {
     pub fn start_merge(
         &self,
         merge_operation: MergeOperation,
-    ) -> FutureResult<Option<SegmentMeta>> {
+    ) -> FutureResult<(Option<SegmentEntry>, MergeOperation)> {
         assert!(
             !merge_operation.segment_ids().is_empty(),
             "Segment_ids cannot be empty."
@@ -478,8 +478,8 @@ impl SegmentUpdater {
             // candidate for another merge.
             match merge(&segment_updater.index, segment_entries) {
                 Ok(after_merge_segment_entry) => {
-                    let res = segment_updater.end_merge(merge_operation, after_merge_segment_entry);
-                    let _send_result = merging_future_send.send(res);
+                    let _send_result =
+                        merging_future_send.send(Ok((after_merge_segment_entry, merge_operation)));
                 }
                 Err(merge_error) => {
                     warn!(
@@ -530,14 +530,21 @@ impl SegmentUpdater {
         merge_candidates.extend(committed_merge_candidates);
 
         for merge_operation in merge_candidates {
-            // If a merge cannot be started this is not a fatal error.
-            // We do log a warning in `start_merge`.
-            drop(self.start_merge(merge_operation));
+            let segment_updater = self.clone();
+            self.merge_thread_pool.spawn(move || {
+                // If a merge cannot be started this is not a fatal error.
+                // We do log a warning in `start_merge`.
+                if let Ok((entry, merge_operation)) =
+                    segment_updater.start_merge(merge_operation).wait()
+                {
+                    let _ = segment_updater.end_merge(merge_operation, entry);
+                }
+            });
         }
     }
 
     /// Queues a `end_merge` in the segment updater and blocks until it is successfully processed.
-    fn end_merge(
+    pub(crate) fn end_merge(
         &self,
         merge_operation: MergeOperation,
         after_merge_segment_entry: Option<SegmentEntry>,
@@ -570,6 +577,23 @@ impl SegmentUpdater {
         })
         .wait()?;
         Ok(after_merge_segment_meta)
+    }
+
+    /// Merge a list of segments.
+    ///
+    /// The future will resolve when the merge is complete and the resulting segment is committed.
+    pub fn merge(&self, merge_operation: MergeOperation) -> FutureResult<Option<SegmentMeta>> {
+        let segment_updater = self.clone();
+        let (scheduled_result, sender) = FutureResult::create("Merge operation failed.");
+        self.merge_thread_pool.spawn(move || {
+            if let Ok((entry, merge_operation)) =
+                segment_updater.start_merge(merge_operation).wait()
+            {
+                let segment_meta = segment_updater.end_merge(merge_operation, entry);
+                let _ = sender.send(segment_meta);
+            }
+        });
+        scheduled_result
     }
 
     /// Wait for current merging threads.

@@ -134,8 +134,8 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
     if let Some(other) = others.pop() {
         let mut conn: sonic::service::Connection<LiveIndexService> =
             sonic::service::Connection::create(other).await?;
-        index.delete_all_pages();
-        let local_path = index.path();
+        index.delete_all_pages().await;
+        let local_path = index.path().await;
         let remote_path = conn.send(GetIndexPath).await?;
 
         remote_cp::Request::download(
@@ -146,7 +146,7 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
             },
         )
         .await;
-        index.re_open().unwrap();
+        index.re_open().await.unwrap();
     }
 
     let mut wal = temp_wal
@@ -157,9 +157,9 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
 
     for pages in wal.iter().unwrap().chunks(512).into_iter() {
         let pages: Vec<_> = pages.into_iter().collect();
-        index.insert(&pages);
+        index.insert(&pages).await;
     }
-    index.commit();
+    index.commit().await;
 
     wal.clear().unwrap();
 
@@ -241,7 +241,9 @@ impl LiveIndexService {
         let temp_wal = self.temp_wal.clone();
         let cluster = self.cluster_handle.clone();
 
-        tokio::task::spawn(async move { setup(index, cluster, temp_wal).await.unwrap() });
+        std::thread::spawn(move || {
+            crate::block_on(setup(index, cluster, temp_wal)).unwrap();
+        });
     }
 
     async fn index_webpages_in_replicas(
@@ -330,6 +332,7 @@ impl sonic::service::Message<LiveIndexService> for RetrieveWebsites {
         server
             .local_searcher
             .retrieve_websites(&self.websites, &self.query)
+            .await
             .ok()
     }
 }
@@ -337,18 +340,21 @@ impl sonic::service::Message<LiveIndexService> for RetrieveWebsites {
 impl sonic::service::Message<LiveIndexService> for Search {
     type Response = Option<InitialWebsiteResult>;
     async fn handle(self, server: &LiveIndexService) -> Self::Response {
-        server.local_searcher.search_initial(&self.query, true).ok()
+        server
+            .local_searcher
+            .search_initial(&self.query, true)
+            .await
+            .ok()
     }
 }
 
 impl sonic::service::Message<LiveIndexService> for GetSiteUrls {
     type Response = SiteUrls;
     async fn handle(self, server: &LiveIndexService) -> Self::Response {
-        let urls = server.local_searcher.get_site_urls(
-            &self.site,
-            self.offset as usize,
-            self.limit as usize,
-        );
+        let urls = server
+            .local_searcher
+            .get_site_urls(&self.site, self.offset as usize, self.limit as usize)
+            .await;
 
         SiteUrls { urls }
     }
@@ -408,7 +414,7 @@ impl sonic::service::Message<LiveIndexService> for IndexWebpages {
         if let Some(wal) = server.temp_wal.lock().await.as_mut() {
             wal.batch_write(self.pages.iter()).unwrap();
         } else {
-            server.index.insert(&self.pages);
+            server.index.insert(&self.pages).await;
 
             if let Some(consistency_fraction) = self.consistency_fraction {
                 server
@@ -428,7 +434,7 @@ impl sonic::service::Message<LiveIndexService> for GetIndexPath {
     type Response = PathBuf;
 
     async fn handle(self, server: &LiveIndexService) -> Self::Response {
-        server.index.path()
+        server.index.path().await
     }
 }
 

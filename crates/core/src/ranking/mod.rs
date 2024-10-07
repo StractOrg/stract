@@ -198,7 +198,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 ..Default::default()
             })
@@ -264,7 +264,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 ..Default::default()
             })
@@ -332,7 +332,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "title".to_string(),
                 return_ranking_signals: true,
                 signal_coefficients: crate::enum_map! {
@@ -405,7 +405,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "test".to_string(),
                 ..Default::default()
             })
@@ -471,7 +471,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "test".to_string(),
                 ..Default::default()
             })
@@ -557,7 +557,7 @@ mod tests {
         let searcher = LocalSearcher::new(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
 
                 signal_coefficients: crate::enum_map! {
@@ -573,7 +573,7 @@ mod tests {
         assert_eq!(&res.webpages[0].url, "https://www.title.com/");
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
 
                 signal_coefficients: crate::enum_map! {
@@ -643,7 +643,7 @@ mod tests {
         let searcher = LocalSearcher::new(index);
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "test".to_string(),
                 signal_coefficients: crate::enum_map! {
                     crate::ranking::SignalEnum::from(crate::ranking::signals::FetchTimeMs) => 100_000.0,
@@ -736,7 +736,7 @@ mod tests {
         let searcher = LocalSearcher::new(index);
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "test".to_string(),
 
                 signal_coefficients: crate::enum_map! {
@@ -859,7 +859,7 @@ mod tests {
             .set_dual_encoder(DualEncoder::open(data_path).expect("failed to open dual encoder"));
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "best chocolate cake".to_string(),
 
                 signal_coefficients: crate::enum_map! {
@@ -947,7 +947,7 @@ mod tests {
             .set_dual_encoder(DualEncoder::open(data_path).expect("failed to open dual encoder"));
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "best chocolate cake".to_string(),
 
                 signal_coefficients: crate::enum_map! {
@@ -994,7 +994,7 @@ mod tests {
         let searcher = LocalSearcher::new(index);
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "test website".to_string(),
                 return_ranking_signals: true,
                 ..Default::default()
@@ -1017,7 +1017,7 @@ mod tests {
         );
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "test example".to_string(),
                 return_ranking_signals: true,
                 ..Default::default()
@@ -1074,7 +1074,7 @@ mod tests {
         let searcher = LocalSearcher::new(index);
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "test website".to_string(),
                 return_ranking_signals: true,
                 ..Default::default()
@@ -1097,7 +1097,7 @@ mod tests {
         );
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "test b".to_string(),
                 return_ranking_signals: true,
                 ..Default::default()

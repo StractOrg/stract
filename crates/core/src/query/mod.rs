@@ -384,7 +384,7 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::from(index);
 
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.second.com/");
     }
@@ -454,7 +454,7 @@ mod tests {
             query: "test site:first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
@@ -462,7 +462,7 @@ mod tests {
             query: "test site:www.first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
@@ -470,7 +470,7 @@ mod tests {
             query: "test -site:first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 2);
 
         assert!(result
@@ -528,7 +528,7 @@ mod tests {
             query: "test linksto:first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.second.com/example/abc");
 
@@ -536,7 +536,7 @@ mod tests {
             query: "test linkto:www.first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.second.com/example/abc");
 
@@ -544,7 +544,7 @@ mod tests {
             query: "test -linkto:first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
@@ -552,7 +552,7 @@ mod tests {
             query: "test linkto:second.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
@@ -560,7 +560,7 @@ mod tests {
             query: "test linkto:www.second.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
@@ -568,7 +568,7 @@ mod tests {
             query: "test linkto:second.com/example".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
@@ -576,7 +576,7 @@ mod tests {
             query: "test linksto:second.com/example/abc".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
     }
@@ -630,7 +630,7 @@ mod tests {
             query: "test linkto:second.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
     }
@@ -682,7 +682,7 @@ mod tests {
             query: "intitle:website".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
     }
@@ -734,7 +734,7 @@ mod tests {
             query: "test inurl:forum".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/forum");
     }
@@ -829,14 +829,14 @@ mod tests {
             query: "test site:first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 0);
 
         let query = SearchQuery {
             query: "test site:the-first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.the-first.com/");
 
@@ -844,7 +844,7 @@ mod tests {
             query: "test site:www.the-first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.the-first.com/");
     }
@@ -902,7 +902,7 @@ mod tests {
             query: "\"Test website\"".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
         assert_eq!(result.webpages[0].url, "https://www.first.com/");
 
@@ -910,7 +910,7 @@ mod tests {
             query: "\"Test website\" site:www.second.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 0);
     }
 
@@ -970,7 +970,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 2);
 
         let query = SearchQuery {
@@ -978,7 +978,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 2);
     }
 
@@ -1053,7 +1053,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 2);
 
         let query = SearchQuery {
@@ -1062,7 +1062,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
 
         assert_eq!(result.webpages[0].url, "https://www.sfw.com/");
@@ -1142,28 +1142,28 @@ mod tests {
             query: "test site:.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 2);
 
         let query = SearchQuery {
             query: "test site:.com/example".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
 
         let query = SearchQuery {
             query: "test site:first.com/example".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
 
         let query = SearchQuery {
             query: "test site:first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
 
         let query = SearchQuery {
@@ -1171,7 +1171,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
     }
 
@@ -1249,14 +1249,14 @@ mod tests {
             query: "test exacturl:https://www.first.com/example".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 1);
 
         let query = SearchQuery {
             query: "test exacturl:https://www.first.com".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 0);
     }
 
@@ -1334,7 +1334,7 @@ mod tests {
             query: "\"test test\" website".to_string(),
             ..Default::default()
         };
-        let result = searcher.search(&query).expect("Search failed");
+        let result = searcher.search_sync(&query).expect("Search failed");
         assert_eq!(result.webpages.len(), 2);
     }
 

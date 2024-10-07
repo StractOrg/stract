@@ -416,7 +416,7 @@ Survey in 2016, 2017, and 2018."#;
         let searcher = LocalSearcher::from(index);
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "rust language".to_string(),
                 ..Default::default()
             })
@@ -455,7 +455,7 @@ Survey in 2016, 2017, and 2018."#;
         let searcher = LocalSearcher::from(index);
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "describe".to_string(),
                 ..Default::default()
             })
@@ -494,7 +494,7 @@ Survey in 2016, 2017, and 2018."#;
         let searcher = LocalSearcher::from(index);
 
         let result = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "paradigms".to_string(),
                 ..Default::default()
             })

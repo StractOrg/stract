@@ -171,7 +171,7 @@ impl RemoteIndex {
     }
 
     async fn commit_underlying(&self) {
-        self.underlying_index.commit();
+        self.underlying_index.commit().await;
     }
 
     async fn kill(self) -> Result<()> {
@@ -415,28 +415,30 @@ async fn test_meta_segments() -> Result<()> {
     };
 
     let index = LiveIndex::new(&config.index_path, indexer_config.clone()).await?;
-    assert!(index.meta().segments().is_empty());
+    assert!(index.meta().await.segments().is_empty());
 
-    index.insert(&[IndexableWebpage {
-        url: "https://a.com/".to_string(),
-        body: "
+    index
+        .insert(&[IndexableWebpage {
+            url: "https://a.com/".to_string(),
+            body: "
             <title>test page</title>
             Example webpage
             "
-        .to_string(),
-        fetch_time_ms: 100,
-    }]);
-    index.commit();
+            .to_string(),
+            fetch_time_ms: 100,
+        }])
+        .await;
+    index.commit().await;
 
-    assert_eq!(index.meta().segments().len(), 1);
+    assert_eq!(index.meta().await.segments().len(), 1);
 
-    index.re_open()?;
+    index.re_open().await?;
 
-    assert_eq!(index.meta().segments().len(), 1);
+    assert_eq!(index.meta().await.segments().len(), 1);
 
     let copy_index = LiveIndex::new(&config.index_path, indexer_config).await?;
 
-    assert_eq!(copy_index.meta().segments().len(), 1);
+    assert_eq!(copy_index.meta().await.segments().len(), 1);
 
     Ok(())
 }
@@ -455,42 +457,48 @@ async fn test_segment_compaction() -> Result<()> {
 
     let index = Arc::new(LiveIndex::new(&config.index_path, indexer_config).await?);
 
-    index.insert(&[IndexableWebpage {
-        url: "https://a.com/".to_string(),
-        body: "
+    index
+        .insert(&[IndexableWebpage {
+            url: "https://a.com/".to_string(),
+            body: "
             <title>test page</title>
             Example webpage
             "
-        .to_string(),
-        fetch_time_ms: 100,
-    }]);
+            .to_string(),
+            fetch_time_ms: 100,
+        }])
+        .await;
 
-    index.commit();
+    index.commit().await;
 
-    index.insert(&[IndexableWebpage {
-        url: "https://b.com/".to_string(),
-        body: "
+    index
+        .insert(&[IndexableWebpage {
+            url: "https://b.com/".to_string(),
+            body: "
             <title>test page</title>
             Example webpage
             "
-        .to_string(),
-        fetch_time_ms: 100,
-    }]);
+            .to_string(),
+            fetch_time_ms: 100,
+        }])
+        .await;
 
-    index.commit();
+    index.commit().await;
 
-    assert_eq!(index.meta().segments().len(), 2);
+    assert_eq!(index.meta().await.segments().len(), 2);
 
-    index.compact_segments_by_date();
+    index.compact_segments_by_date().await?;
 
-    assert_eq!(index.meta().segments().len(), 1);
+    assert_eq!(index.meta().await.segments().len(), 1);
 
     let searcher = LocalSearcher::from(index.clone());
 
-    let res = searcher.search(&SearchQuery {
-        query: "test".to_string(),
-        ..Default::default()
-    })?;
+    let res = searcher
+        .search(&SearchQuery {
+            query: "test".to_string(),
+            ..Default::default()
+        })
+        .await?;
 
     assert_eq!(res.webpages.len(), 2);
 

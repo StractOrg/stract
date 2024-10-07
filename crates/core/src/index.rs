@@ -232,7 +232,7 @@ mod tests {
 
         let searcher = LocalSearcher::from(index);
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "test".to_string(),
                 return_ranking_signals: true,
                 ..Default::default()

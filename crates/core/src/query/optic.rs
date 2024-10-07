@@ -323,7 +323,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 signal_coefficients: enum_map! {
                     crate::ranking::SignalEnum::from(crate::ranking::signals::core::Bm25Title) => 1_000_000.0
@@ -340,7 +340,7 @@ mod tests {
         assert_eq!(res[1].url, "https://www.a.com/");
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -364,7 +364,7 @@ mod tests {
         assert_eq!(res[0].url, "https://www.a.com/");
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -444,7 +444,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let _ = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(include_str!(
@@ -458,7 +458,7 @@ mod tests {
             .webpages;
 
         let _ = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(include_str!(
@@ -472,7 +472,7 @@ mod tests {
             .webpages;
 
         let _ = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(include_str!(
@@ -568,7 +568,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -844,7 +844,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -868,7 +868,7 @@ mod tests {
         assert_eq!(res[0].url, "https://www.b.com/");
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -892,7 +892,7 @@ mod tests {
         assert_eq!(res[0].url, "https://www.b.com/");
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -916,7 +916,7 @@ mod tests {
         assert_eq!(res[0].url, "https://www.a.com/");
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "website".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -973,7 +973,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "site:stackoverflow.com".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -1063,7 +1063,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -1125,7 +1125,7 @@ mod tests {
 
         let searcher = LocalSearcher::from(index);
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 ..Default::default()
             })
@@ -1135,7 +1135,7 @@ mod tests {
         assert_eq!(res[0].url, "https://example.com/");
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"is\") }, Action(Discard) }").unwrap(),
@@ -1147,7 +1147,7 @@ mod tests {
         assert_eq!(res.len(), 0);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"|is\") }, Action(Discard) }").unwrap(),
@@ -1159,7 +1159,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"|This\") }, Action(Discard) }").unwrap(),
@@ -1171,7 +1171,7 @@ mod tests {
         assert_eq!(res.len(), 0);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"|This an\") }, Action(Discard) }")
@@ -1184,7 +1184,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"|This * an\") }, Action(Discard) }")
@@ -1197,7 +1197,7 @@ mod tests {
         assert_eq!(res.len(), 0);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Site(\"example.com\") }, Action(Discard) }")
@@ -1210,7 +1210,7 @@ mod tests {
         assert_eq!(res.len(), 0);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Site(\"|example.com\") }, Action(Discard) }")
@@ -1223,7 +1223,7 @@ mod tests {
         assert_eq!(res.len(), 0);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Site(\"|example.com|\") }, Action(Discard) }")
@@ -1236,7 +1236,7 @@ mod tests {
         assert_eq!(res.len(), 0);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"website.com|\") }, Action(Discard) }")
@@ -1282,7 +1282,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -1297,7 +1297,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -1350,7 +1350,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(Optic::parse("").unwrap()),
                 ..Default::default()
@@ -1360,7 +1360,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"\") }, Action(Discard) }").unwrap(),
@@ -1430,7 +1430,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"*\") }, Action(Discard) }").unwrap(),
@@ -1442,7 +1442,7 @@ mod tests {
         assert_eq!(res.len(), 0);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"* is\") }, Action(Discard) }").unwrap(),
@@ -1454,7 +1454,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"* This is\") }, Action(Discard) }")
@@ -1467,7 +1467,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"example *\") }, Action(Discard) }")
@@ -1480,7 +1480,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -1526,7 +1526,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 ..Default::default()
             })
@@ -1535,7 +1535,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("DiscardNonMatching; Rule { Matches { Content(\"||\") }, Action(Boost(0)) }")
@@ -1548,7 +1548,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -1622,7 +1622,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 ..Default::default()
             })
@@ -1631,7 +1631,7 @@ mod tests {
         assert_eq!(res.len(), 2);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -1701,7 +1701,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 ..Default::default()
             })
@@ -1710,7 +1710,7 @@ mod tests {
         assert_eq!(res.len(), 2);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -1726,7 +1726,7 @@ mod tests {
         assert_eq!(res[0].url, "https://example.com/test");
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Site(\"|example.com|\") }, Action(Discard) }")
@@ -1815,7 +1815,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("Rule { Matches { Title(\"*'s collection\") }, Action(Discard) }")
@@ -1903,7 +1903,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("DiscardNonMatching; Rule { Matches { Title(\"*'s collection\") }, Action(Discard) }; Rule { Matches { Site(\"*.com\") } }")
@@ -1945,7 +1945,7 @@ mod tests {
         let searcher = LocalSearcher::from(index);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -1960,7 +1960,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse(
@@ -1975,7 +1975,7 @@ mod tests {
         assert_eq!(res.len(), 1);
 
         let res = searcher
-            .search(&SearchQuery {
+            .search_sync(&SearchQuery {
                 query: "example".to_string(),
                 optic: Some(
                     Optic::parse("DiscardNonMatching; Rule { Matches { Domain(\"|another.example.com|\") } } ")
