@@ -10,8 +10,8 @@
   import { P, match } from 'ts-pattern';
 
   export let autofocus = false;
-
   export let query = '';
+
   let selected: 'none' | number = 'none';
   let suggestions: HighlightedFragment[][] = [];
 
@@ -110,12 +110,12 @@
     <MagnifyingGlass class="w-5 text-base-content" />
     <!-- svelte-ignore a11y-autofocus -->
     <input
-      type="search"
       id="searchbar"
       name="q"
       {autofocus}
       placeholder="Search"
       autocomplete="off"
+      aria-expanded={suggestions.length > 0 && hasFocus}
       class="border-none bg-transparent text-lg focus:ring-0"
       on:focus={() => {
         hasFocus = true;
