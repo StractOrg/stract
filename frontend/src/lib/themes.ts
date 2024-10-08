@@ -36,7 +36,7 @@ export const getButtonTailwindStyle = (
   _class: string,
 ) => {
   return twMerge(
-    'rounded-full py-2 transition active:scale-[98%]',
+    'rounded-full py-2 transition active:scale-[98%] focus:outline',
     padding ? 'px-4' : 'px-2',
     'border border-transparent',
     pale

@@ -63,7 +63,12 @@
 </script>
 
 {#if modal}
-  <Modal {modal} />
+  <Modal
+    {modal}
+    on:close={() => {
+      modal = void 0;
+    }}
+  />
 {/if}
 
 {#if results._type == 'websites'}
