@@ -26,7 +26,7 @@
   ] as const;
 </script>
 
-<div class="relative grid w-full grid-cols-[2fr_1fr_2fr] px-4 text-sm">
+<nav class="relative grid w-full grid-cols-[2fr_1fr_2fr] px-4 text-sm">
   <div class="flex space-x-4">
     {#each links as [url, name]}
       <a
@@ -49,7 +49,7 @@
     {/if}
   </div>
 
-  <nav class="hidden items-center justify-end space-x-1 sm:flex md:space-x-2 lg:space-x-4">
+  <div class="hidden items-center justify-end space-x-1 sm:flex md:space-x-2 lg:space-x-4">
     {#each nav as [url, name]}
       <Link href={url}>
         {name}
@@ -60,9 +60,9 @@
         <Icon aria-label={label} />
       </Link>
     {/each}
-  </nav>
+  </div>
 
-  <nav class="group relative flex items-center justify-end text-lg sm:hidden">
+  <div class="group relative flex items-center justify-end text-lg sm:hidden">
     <button
       class="mx-1 aspect-square rounded-full bg-transparent px-3 text-neutral transition group-hover:text-neutral-focus"
     >
@@ -88,11 +88,11 @@
         </div>
       </div>
     </div>
-  </nav>
+  </div>
 
   {#if showDivider}
     <div
       class="absolute inset-x-0 -bottom-0 h-px bg-gradient-to-r from-primary via-primary-focus to-primary"
     />
   {/if}
-</div>
+</nav>

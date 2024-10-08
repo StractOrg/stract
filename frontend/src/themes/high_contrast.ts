@@ -12,8 +12,8 @@ export const highContrastTheme = theme({
     secondaryFocus: base.island[400],
     secondaryContent: '#fff',
 
-    accent: base.cocoa[500],
-    accentFocus: base.cocoa[400],
+    accent: base.navy[500],
+    accentFocus: base.navy[400],
     accentContent: '#fff',
 
     neutral: base.zinc[400],
