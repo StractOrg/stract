@@ -7,14 +7,22 @@
   import { twJoin } from 'tailwind-merge';
 
   export let kind: 'info' | 'success' | 'warning' | 'error' | 'neutral';
-  export let icon: null | ComponentType = {
+  export let title: string = kind;
+
+  let icon: null | ComponentType = {
     info: InformationCircle,
     success: CheckCircle,
     warning: ExclamationCircle,
     error: Fire,
     neutral: null,
   }[kind];
-  export let title: string = kind;
+  let iconLabel = {
+    info: 'Information',
+    success: 'Success',
+    warning: 'Warning',
+    error: 'Error',
+    neutral: 'Neutral',
+  }[kind];
 </script>
 
 <div
@@ -30,7 +38,7 @@
   <div>
     <slot name="title">
       <div class="flex items-center space-x-1.5 pb-1 font-bold capitalize tracking-wide">
-        <svelte:component this={icon} />
+        <svelte:component this={icon} aria-label={iconLabel} />
         <span>
           {title}
         </span>

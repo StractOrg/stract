@@ -10,5 +10,11 @@
 </script>
 
 <div class="noscript:hidden">
-  <Select bind:value={$themeStore} class="text-neutral-focus" {options} id="theme" />
+  <Select
+    bind:value={$themeStore}
+    class="text-neutral-focus"
+    {options}
+    id="theme"
+    ariaLabel="Select theme"
+  />
 </div>

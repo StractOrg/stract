@@ -86,7 +86,7 @@
           bind:this={button}
           on:click|stopPropagation={() => dispatch('modal', button)}
         >
-          <AdjustVertical class="text-md" />
+          <AdjustVertical class="text-md" aria-label="3 vertical bars" />
         </button>
       </div>
     </div>

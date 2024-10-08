@@ -118,7 +118,7 @@
         lang="en"
       />
       <input type="url" required placeholder="Url" name="Url" bind:value={url} lang="en" />
-      <Button title="Remove optic">Add</Button>
+      <Button title="Add optic">Add</Button>
       <input
         class="col-span-2"
         type="text"
@@ -148,20 +148,29 @@
             class="group flex w-6 items-start !bg-transparent"
             on:click={removeOptic(optic)}
             disabled={!removable}
-            title={removable ? 'Remove' : ''}
+            title="Remove optic"
           >
             <MinusCircle
               class="text-neutral transition group-enabled:text-error group-enabled:group-hover:text-error"
+              aria-label="Minus with circle around it"
             />
           </button>
           <label class="flex w-6 items-start hover:cursor-pointer" title="Show/hide in UI">
-            <input
-              type="checkbox"
-              bind:checked={$opticsShowStore[opticKey(optic)]}
-              class="peer hidden"
-            />
-            <EyeSlash class="inline-flex text-neutral transition peer-checked:hidden" />
-            <Eye class="hidden text-neutral transition peer-checked:inline-flex" />
+            <button class="m-0 flex w-6 p-0">
+              <input
+                type="checkbox"
+                bind:checked={$opticsShowStore[opticKey(optic)]}
+                class="peer hidden"
+              />
+              <EyeSlash
+                class="inline-flex text-neutral transition peer-checked:hidden"
+                aria-label="Eye slash"
+              />
+              <Eye
+                class="hidden text-neutral transition peer-checked:inline-flex"
+                aria-label="Eye"
+              />
+            </button>
           </label>
           <div class="text-sm">{optic.name}</div>
           <div class="text-sm">

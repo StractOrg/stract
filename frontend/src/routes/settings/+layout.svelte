@@ -19,5 +19,7 @@
       </Link>
     {/each}
   </div>
-  <slot />
+  <div class="flex w-full max-w-2xl flex-col">
+    <slot />
+  </div>
 </div>

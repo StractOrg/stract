@@ -107,7 +107,7 @@
     aria-autocomplete="list"
     aria-expanded={suggestions.length > 0 && hasFocus}
   >
-    <MagnifyingGlass class="w-5 text-base-content" />
+    <MagnifyingGlass class="w-5 text-base-content" aria-label="Magnifying glass" />
     <!-- svelte-ignore a11y-autofocus -->
     <input
       id="searchbar"
@@ -171,7 +171,7 @@
                 }}
                 type="submit"
               >
-                <MagnifyingGlass class="w-4 text-neutral" />
+                <MagnifyingGlass class="w-4 text-neutral" aria-label="Magnifying glass" />
                 <span>
                   {#each s as fragment}
                     {#if fragment.kind == 'highlighted'}

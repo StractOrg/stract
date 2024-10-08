@@ -59,11 +59,10 @@
     <div class="flex flex-col space-y-5">
       {#each settings as setting}
         <fieldset class="flex flex-col pr-1 sm:flex-row sm:justify-between">
+          <legend class="sr-only">{setting.title}</legend>
           <div class="flex flex-col pr-5">
-            <legend class="text-lg">
-              <h2>{setting.title}</h2>
-              <p class="text-sm">{setting.description}</p>
-            </legend>
+            <h2 class="text-lg">{setting.title}</h2>
+            <p class="text-sm">{setting.description}</p>
           </div>
           <div class="flex flex-col pr-5 sm:flex-row sm:justify-between sm:space-y-0">
             <div>

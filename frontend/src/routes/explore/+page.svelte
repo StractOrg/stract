@@ -138,8 +138,8 @@
       {#if errorMessage}
         <div class="my-2" transition:slide>
           <Callout kind="warning" title="Unable to add page">
-            <button slot="top-right" on:click={() => (errorMessage = undefined)}>
-              <XMark />
+            <button slot="top-right" on:click={() => (errorMessage = undefined)} title="Close">
+              <XMark aria-label="X-mark" />
             </button>
 
             {errorMessage}
@@ -178,7 +178,7 @@
         <table class="w-full border-separate border-spacing-y-1">
           <thead>
             <tr class="text-left">
-              <th class="pb-2"></th>
+              <th class="pb-2" aria-label="Add to search"></th>
               <th class="pb-2">Similarity</th>
               <th class="pb-2">Site</th>
             </tr>
@@ -203,6 +203,7 @@
                       class={twJoin(
                         'text-xl text-success group-hover:scale-105 group-active:scale-95',
                       )}
+                      aria-label="Plus-mark"
                     />
                   </button>
                 </td>
@@ -217,7 +218,7 @@
         <div class="noscript:hidden flex w-full justify-center">
           <button
             class="h-6 w-6 cursor-pointer rounded-full text-accent"
-            aria-label="Show more similar sites"
+            title="Show more similar sites"
             on:click={() => {
               if (limit == LIMIT_OPTIONS[LIMIT_OPTIONS.length - 1]) {
                 return;
@@ -225,7 +226,7 @@
               limit = LIMIT_OPTIONS[LIMIT_OPTIONS.indexOf(limit) + 1];
             }}
           >
-            <ChevronDown />
+            <ChevronDown aria-label="Chevron-down" />
           </button>
         </div>
       </div>
