@@ -27,6 +27,16 @@
 </script>
 
 <nav class="relative grid w-full grid-cols-[2fr_1fr_2fr] px-4 text-sm">
+  <div class="absolute left-5 top-2 z-10">
+    <a
+      href="#main"
+      tabindex="0"
+      class="absolute -top-64 left-0 bg-black p-2 text-base-content focus:top-0"
+    >
+      Skip to content
+    </a>
+  </div>
+
   <div class="flex space-x-4">
     {#each links as [url, name]}
       <a

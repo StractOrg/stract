@@ -15,7 +15,9 @@
 <div class="grid min-h-screen grid-rows-[auto_1fr_auto] font-light">
   <Header />
 
-  <slot />
+  <div id="main">
+    <slot />
+  </div>
 
   <Footer />
 </div>
