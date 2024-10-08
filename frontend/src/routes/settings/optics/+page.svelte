@@ -115,8 +115,9 @@
         name="Name"
         autocomplete="off"
         bind:value={name}
+        lang="en"
       />
-      <input type="url" required placeholder="Url" name="Url" bind:value={url} />
+      <input type="url" required placeholder="Url" name="Url" bind:value={url} lang="en" />
       <Button title="Remove optic">Add</Button>
       <input
         class="col-span-2"
@@ -124,6 +125,7 @@
         name="Description"
         placeholder="Description"
         bind:value={description}
+        lang="en"
       />
     </form>
     {#if error}
