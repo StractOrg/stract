@@ -16,14 +16,15 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
+  import { InvalidHostError, UnknownHostError } from '.';
 
   export let data: PageData;
 
   let inputWebsite = '';
 
-  let limit = data.limit;
-  let chosenHosts = data.chosenHosts;
-  let similarHosts = data.similarHosts;
+  let limit = data.limit ?? LIMIT_OPTIONS[0];
+  let chosenHosts = data.chosenHosts ?? [];
+  let similarHosts = data.similarHosts ?? [];
   let errorMessage = data.errorMessage;
 
   $: chosenHostString = chosenHosts.join(',');
@@ -66,21 +67,25 @@
   };
 
   const addWebsite = async (host: string, clear = false) => {
-    errorMessage = false;
+    errorMessage = undefined;
     host = host.trim();
     if (!host) return;
 
-    const result = await api.webgraphHostKnows({ host }).data;
-    match(result)
-      .with({ _type: 'unknown' }, () => {
-        errorMessage = true;
-      })
-      .with({ _type: 'known' }, async ({ host }) => {
-        if (clear) inputWebsite = '';
-        if (!chosenHosts.includes(host)) chosenHosts = [...chosenHosts, host];
-        updateBrowserState();
-      })
-      .exhaustive();
+    try {
+      const result = await api.webgraphHostKnows({ host }).data;
+      match(result)
+        .with({ _type: 'unknown' }, () => {
+          errorMessage = UnknownHostError;
+        })
+        .with({ _type: 'known' }, async ({ host }) => {
+          if (clear) inputWebsite = '';
+          if (!chosenHosts.includes(host)) chosenHosts = [...chosenHosts, host];
+          updateBrowserState();
+        })
+        .exhaustive();
+    } catch (_) {
+      errorMessage = InvalidHostError;
+    }
   };
 
   const exportAsOptic = async () => {
@@ -133,11 +138,11 @@
       {#if errorMessage}
         <div class="my-2" transition:slide>
           <Callout kind="warning" title="Unable to add page">
-            <button slot="top-right" on:click={() => (errorMessage = false)}>
+            <button slot="top-right" on:click={() => (errorMessage = undefined)}>
               <XMark />
             </button>
 
-            Unfortunately, we don't know about that site yet.
+            {errorMessage}
           </Callout>
         </div>
       {/if}

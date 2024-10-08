@@ -57,7 +57,7 @@
     {/each}
     {#each social as [url, label, Icon]}
       <Link href={url} {label} round>
-        <Icon />
+        <Icon aria-label={label} />
       </Link>
     {/each}
   </nav>
@@ -82,7 +82,7 @@
         <div class="flex justify-around border-t pt-2">
           {#each social as [url, label, Icon]}
             <Link href={url} {label} round>
-              <Icon />
+              <Icon aria-label={label} />
             </Link>
           {/each}
         </div>

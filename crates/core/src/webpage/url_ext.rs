@@ -126,8 +126,15 @@ impl UrlExt for url::Url {
 
     fn tld(&self) -> Option<&str> {
         let host = self.host_str()?;
-        let suffix = std::str::from_utf8(ICANN_LIST.suffix(host.as_bytes())?.as_bytes()).ok()?;
-        Some(suffix)
+        let suffix = ICANN_LIST.suffix(host.as_bytes())?;
+
+        match suffix.typ() {
+            Some(_) => {
+                let tld = std::str::from_utf8(suffix.as_bytes()).ok()?;
+                Some(tld)
+            }
+            None => None,
+        }
     }
 }
 
@@ -164,5 +171,20 @@ mod tests {
 
         let url: Url = Url::parse("http://example.com").unwrap();
         assert_eq!(url.tld().unwrap(), "com");
+    }
+
+    #[test]
+    fn tld() {
+        let url: Url = Url::parse("http://example.com").unwrap();
+        assert_eq!(url.tld().unwrap(), "com");
+
+        let url: Url = Url::parse("http://example.co.uk").unwrap();
+        assert_eq!(url.tld().unwrap(), "co.uk");
+
+        let url: Url = Url::parse("http://example.co.uk").unwrap();
+        assert_eq!(url.tld().unwrap(), "co.uk");
+
+        let url: Url = Url::parse("http://asdf").unwrap();
+        assert_eq!(url.tld(), None);
     }
 }

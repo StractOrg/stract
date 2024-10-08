@@ -31,6 +31,7 @@ pub mod host {
     use url::Url;
 
     pub use crate::entrypoint::webgraph_server::ScoredHost;
+    use crate::webpage::url_ext::UrlExt;
 
     use super::*;
 
@@ -88,12 +89,21 @@ pub mod host {
         params(KnowsHostParams),
         responses(
             (status = 200, description = "Whether the host is known", body = KnowsHost),
+            (status = 400, description = "Invalid host", body = String),
         )
     )]
     pub async fn knows(
         extract::State(state): extract::State<Arc<State>>,
         extract::Query(params): extract::Query<KnowsHostParams>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
+        match Url::robust_parse(&params.host) {
+            Ok(url) => match url.tld() {
+                None | Some("") => return Err(StatusCode::BAD_REQUEST),
+                Some(_) => (),
+            },
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        }
+
         match state.host_webgraph.knows(params.host).await {
             Ok(Some(node)) => Ok(Json(KnowsHost::Known {
                 host: node.as_str().to_string(),
