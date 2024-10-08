@@ -5,6 +5,7 @@ import { lightTheme } from './light';
 import { nordLightTheme, nordTheme } from './nord';
 import { pastelTheme } from './pastel';
 import { uglyTheme } from './ugly';
+import { highContrastTheme } from './high_contrast';
 
 export const themes = [
   lightTheme,
@@ -15,4 +16,5 @@ export const themes = [
   ayuMirageTheme,
   primerDarkTheme,
   uglyTheme,
+  highContrastTheme,
 ];

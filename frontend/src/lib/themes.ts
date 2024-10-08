@@ -11,6 +11,7 @@ export const THEMES = [
   theme('Primer Dark', 'theme-primer-dark'),
   theme('Nord', 'theme-nord'),
   theme('Ayu Mirage', 'theme-ayu-mirage'),
+  theme('High Contrast', 'theme-high-contrast'),
 ];
 
 /*
