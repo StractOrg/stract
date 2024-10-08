@@ -169,6 +169,7 @@
               class="cursor-pointer rounded border-none dark:bg-transparent"
               bind:value={limit}
               options={LIMIT_OPTIONS.map((value) => ({ value, label: value.toString() }))}
+              title="Limit number of similar sites shown"
             />
           </div>
           <div />

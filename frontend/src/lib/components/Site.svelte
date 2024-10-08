@@ -15,7 +15,7 @@
       'py-2',
       'text-primary-content',
       'transition hover:bg-secondary-focus',
-      'pl-3 pr-2',
+      'rounded-l-lg pl-3 pr-2',
     )}
   >
     <slot />
@@ -27,9 +27,10 @@
     class={twMerge(
       'cursor-pointer text-sm',
       'text-primary-content',
-      'noscript:hidden transition hover:bg-secondary-focus',
+      'noscript:hidden rounded-r-lg transition hover:bg-secondary-focus',
     )}
     on:click|preventDefault={() => dispatch('delete')}
+    title="Remove site"
   >
     <span class="px-2"> × </span>
   </button>
