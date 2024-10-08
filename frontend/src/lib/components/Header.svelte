@@ -75,6 +75,7 @@
   <div class="group relative flex items-center justify-end text-lg sm:hidden">
     <button
       class="mx-1 aspect-square rounded-full bg-transparent px-3 text-neutral transition group-hover:text-neutral-focus"
+      title="Toggle menu"
     >
       <Bars2 />
     </button>
