@@ -157,30 +157,34 @@
         role="listbox"
         bind:this={suggestionsDiv}
       >
-        {#each suggestions as s, index}
-          <button
-            class={twJoin(
-              'flex space-x-3 py-1.5 pl-5 hover:bg-base-200',
-              selected == index && 'bg-base-200',
-            )}
-            on:click={() => {
-              selectSuggestion(s);
-              hasFocus = false;
-            }}
-            type="submit"
-          >
-            <MagnifyingGlass class="w-4 text-neutral" />
-            <span>
-              {#each s as fragment}
-                {#if fragment.kind == 'highlighted'}
-                  <span class="font-medium">{fragment.text}</span>
-                {:else}
-                  {fragment.text}
-                {/if}
-              {/each}
-            </span></button
-          >
-        {/each}
+        <ul class="w-full">
+          {#each suggestions as s, index}
+            <li>
+              <button
+                class={twJoin(
+                  'flex w-full space-x-3 py-1.5 pl-5 hover:bg-base-200',
+                  selected == index && 'bg-base-200',
+                )}
+                on:click={() => {
+                  selectSuggestion(s);
+                  hasFocus = false;
+                }}
+                type="submit"
+              >
+                <MagnifyingGlass class="w-4 text-neutral" />
+                <span>
+                  {#each s as fragment}
+                    {#if fragment.kind == 'highlighted'}
+                      <span class="font-medium">{fragment.text}</span>
+                    {:else}
+                      {fragment.text}
+                    {/if}
+                  {/each}
+                </span></button
+              >
+            </li>
+          {/each}
+        </ul>
       </div>
     {/if}
   </label>
