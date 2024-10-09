@@ -17,7 +17,6 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use itertools::Itertools;
 use tracing::info;
 use utoipa::ToSchema;
 
@@ -58,7 +57,6 @@ sonic_service!(
         RawOutgoingEdges,
         RawIngoingEdgesWithLabels,
         RawOutgoingEdgesWithLabels,
-        PagesByHosts,
         GetNodeIDs
     ]
 );
@@ -161,23 +159,6 @@ impl Message<WebGraphService> for RawOutgoingEdgesWithLabels {
         server
             .graph
             .raw_outgoing_edges_with_labels(&self.node, self.limit)
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct PagesByHosts {
-    pub hosts: Vec<NodeID>,
-}
-
-impl Message<WebGraphService> for PagesByHosts {
-    type Response = Vec<NodeID>;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        self.hosts
-            .iter()
-            .flat_map(|host| server.graph.pages_by_host(host))
-            .unique()
-            .collect()
     }
 }
 

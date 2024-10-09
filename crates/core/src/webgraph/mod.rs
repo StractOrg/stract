@@ -229,24 +229,6 @@ impl Webgraph {
             .collect()
     }
 
-    pub fn pages_by_host(&self, host_node: &NodeID) -> Vec<NodeID> {
-        let mut pages: Vec<_> = self
-            .executor
-            .map(
-                |segment| segment.pages_by_host(host_node),
-                self.segments.iter(),
-            )
-            .unwrap()
-            .into_iter()
-            .flatten()
-            .collect();
-
-        pages.sort();
-        pages.dedup();
-
-        pages
-    }
-
     pub fn raw_ingoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<Edge<()>> {
         let edges = self
             .segments

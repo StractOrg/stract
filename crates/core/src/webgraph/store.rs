@@ -29,63 +29,12 @@ use file_store::{
     },
     ConstSerializable,
 };
-use fst::Automaton;
 use itertools::Itertools;
 
 use super::{
     merge::{MergeNode, MergeSegmentOrd},
-    Compression, FullNodeID, NodeDatum, NodeID, SegmentEdge, StoredEdge,
+    Compression, NodeDatum, NodeID, SegmentEdge, StoredEdge,
 };
-
-pub struct HostDb {
-    db: speedy_kv::Db<Vec<u8>, ()>,
-}
-
-impl HostDb {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        let db = speedy_kv::Db::open_or_create(path).unwrap();
-
-        Self { db }
-    }
-
-    fn optimize_read(&mut self) {
-        self.db.merge_all_segments().unwrap();
-    }
-
-    pub fn insert(&mut self, node: &FullNodeID) {
-        let key = [
-            node.host.as_u64().to_be_bytes(),
-            node.id.as_u64().to_be_bytes(),
-        ]
-        .concat();
-
-        self.db.insert_raw(key, vec![]);
-    }
-
-    fn get(&self, host: &NodeID) -> Vec<NodeID> {
-        let host = host.as_u64().to_be_bytes().to_vec();
-
-        let query = speedy_kv::automaton::ExactMatch(&host).starts_with();
-
-        self.db
-            .search_raw(query)
-            .map(|(key, _)| {
-                let id = u64::from_be_bytes(
-                    key.as_bytes()[u64::BITS as usize / 8..].try_into().unwrap(),
-                );
-                NodeID::from(id)
-            })
-            .collect()
-    }
-
-    pub fn flush(&mut self) {
-        self.db.commit().unwrap();
-    }
-
-    fn merge(&mut self, other: HostDb) {
-        self.db.merge(other.db).unwrap();
-    }
-}
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct EdgeRange {
@@ -289,7 +238,6 @@ impl CompressedLabelBlock {
 pub struct EdgeStore {
     reversed: bool,
     ranges: RangesDb,
-    hosts: HostDb,
 
     edge_labels: IterableStoreReader<CompressedLabelBlock>,
     edges: ConstIterableStoreReader<StoredEdge>,
@@ -305,7 +253,6 @@ impl EdgeStore {
 
         Self {
             ranges,
-            hosts: HostDb::open(path.as_ref().join("hosts")),
             edge_labels,
             edges,
             reversed,
@@ -314,7 +261,6 @@ impl EdgeStore {
 
     pub fn optimize_read(&mut self) {
         self.ranges.optimize_read();
-        self.hosts.optimize_read();
     }
 
     fn merge_postings_for_node<'a>(
@@ -476,11 +422,6 @@ impl EdgeStore {
         }
 
         let mut res = Self::merge_postings(&stores, label_compression, path)?;
-
-        for store in stores {
-            res.hosts.merge(store.hosts);
-        }
-
         res.optimize_read();
 
         Ok(())
@@ -576,10 +517,6 @@ impl EdgeStore {
         }
     }
 
-    pub fn nodes_by_host(&self, host: &NodeID) -> Vec<NodeID> {
-        self.hosts.get(host)
-    }
-
     pub fn iter_without_label(&self) -> impl Iterator<Item = SegmentEdge<()>> + '_ + Send + Sync {
         self.ranges.edges.iter_raw().flat_map(move |(key, val)| {
             let node = u64::from_be_bytes((key.as_bytes()).try_into().unwrap());
@@ -617,7 +554,7 @@ impl EdgeStore {
 mod tests {
     use std::sync::Arc;
 
-    use crate::webgraph::{store_writer::EdgeStoreWriter, Edge, InsertableEdge};
+    use crate::webgraph::{store_writer::EdgeStoreWriter, Edge, FullNodeID, InsertableEdge};
 
     use super::*;
 

@@ -39,7 +39,7 @@ use file_store::{
 };
 
 use super::{
-    store::{CompressedLabelBlock, EdgeStore, HostDb, LabelBlock, RangesDb},
+    store::{CompressedLabelBlock, EdgeStore, LabelBlock, RangesDb},
     Compression, EdgeLabel, InsertableEdge, NodeDatum, NodeID, StoredEdge,
 };
 
@@ -219,7 +219,6 @@ impl Drop for EdgeStoreWriter {
 
 struct FinalEdgeStoreWriter {
     ranges: RangesDb,
-    hosts: HostDb,
 
     labels: IterableStoreWriter<CompressedLabelBlock, File>,
     edges: ConstIterableStoreWriter<StoredEdge, File>,
@@ -261,7 +260,6 @@ impl FinalEdgeStoreWriter {
 
         Self {
             ranges,
-            hosts: HostDb::open(path.as_ref().join("hosts")),
             labels,
             edges,
             reversed,
@@ -296,7 +294,6 @@ impl FinalEdgeStoreWriter {
             });
         }
 
-        self.hosts.insert(&node);
         let node_bytes = node.id.as_u64().to_be_bytes().to_vec();
 
         debug_assert!(self.ranges.nodes_get_raw(&node_bytes).is_none());
@@ -441,8 +438,6 @@ impl FinalEdgeStoreWriter {
     }
 
     fn flush(&mut self) {
-        self.hosts.flush();
-
         self.ranges.commit();
 
         self.edges.flush().unwrap();

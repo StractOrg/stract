@@ -196,10 +196,6 @@ impl Segment {
         self.reversed_adjacency.degree(node)
     }
 
-    pub fn pages_by_host(&self, host_node: &NodeID) -> Vec<NodeID> {
-        self.reversed_adjacency.nodes_by_host(host_node)
-    }
-
     pub fn id(&self) -> String {
         self.id.clone()
     }
