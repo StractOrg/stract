@@ -58,7 +58,8 @@
     <h1 class="text-2xl font-medium">Preferences</h1>
     <div class="flex flex-col space-y-5">
       {#each settings as setting}
-        <div class="flex flex-col pr-1 sm:flex-row sm:justify-between">
+        <fieldset class="flex flex-col pr-1 sm:flex-row sm:justify-between">
+          <legend class="sr-only">{setting.title}</legend>
           <div class="flex flex-col pr-5">
             <h2 class="text-lg">{setting.title}</h2>
             <p class="text-sm">{setting.description}</p>
@@ -84,7 +85,7 @@
               {/if}
             </div>
           </div>
-        </div>
+        </fieldset>
       {/each}
     </div>
   </div>

@@ -63,10 +63,16 @@
 </script>
 
 {#if modal}
-  <Modal {modal} />
+  <Modal
+    {modal}
+    on:close={() => {
+      modal = void 0;
+    }}
+  />
 {/if}
 
 {#if results._type == 'websites'}
+  <h1 class="sr-only">Search Results</h1>
   <div class="col-start-1 flex min-w-0 max-w-2xl flex-col space-y-5">
     {#if results.spellCorrection}
       <SpellCorrection spellCorrection={results.spellCorrection} bind:this={spellCorrectElem} />
@@ -79,7 +85,7 @@
     {#if results.webpages}
       <div class="grid w-full grid-cols-1 space-y-10 place-self-start">
         {#each results.webpages as webpage, resultIndex (`${query}-${resultIndex}-${webpage.url}`)}
-          <div animate:flip={{ duration: 150 }}>
+          <div animate:flip={{ duration: 150 }} aria-expanded={modal?.site == webpage}>
             <Result
               bind:this={resultElems[resultIndex]}
               {webpage}
@@ -97,19 +103,25 @@
     <div class="flex justify-center">
       <div class="grid grid-cols-[repeat(3,auto)] items-center justify-center gap-2">
         {#if prevPageSearchParams}
-          <a href="/search?{prevPageSearchParams}">
-            <ChevronLeft class="text-xl text-primary hover:text-primary-focus" />
+          <a href="/search?{prevPageSearchParams}" aria-label="Previous page">
+            <ChevronLeft
+              class="text-xl text-primary hover:text-primary-focus"
+              aria-label="Chevron left"
+            />
           </a>
         {:else}
-          <ChevronLeft class="text-xl text-neutral" />
+          <ChevronLeft class="text-xl text-neutral" aria-label="Chevron left" />
         {/if}
         <div>Page {currentPage}</div>
         {#if nextPageSearchParams}
-          <a href="/search?{nextPageSearchParams}">
-            <ChevronRight class="text-xl text-primary hover:text-primary-focus" />
+          <a href="/search?{nextPageSearchParams}" aria-label="Next page">
+            <ChevronRight
+              class="text-xl text-primary hover:text-primary-focus"
+              aria-label="Chevron right"
+            />
           </a>
         {:else}
-          <ChevronRight class="text-xl text-neutral" />
+          <ChevronRight class="text-xl text-neutral" aria-label="Chevron right" />
         {/if}
       </div>
     </div>

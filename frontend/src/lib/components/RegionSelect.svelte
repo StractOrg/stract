@@ -20,5 +20,6 @@
     submitOnChange={searchOnChange}
     bind:value={selected}
     {options}
+    ariaLabel="Region selector"
   />
 </div>

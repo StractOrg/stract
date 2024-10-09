@@ -18,8 +18,8 @@
   class={twMerge(
     'flex justify-center rounded-full transition',
     round ? 'p-2' : 'px-2 py-1',
-    'text-neutral-focus hover:bg-primary/10 hover:text-primary-focus active:bg-primary-focus/10',
-    isActive && 'bg-primary/20 text-primary-focus',
+    'text-neutral-focus hover:bg-primary-focus/5 hover:text-primary-focus active:bg-primary-focus/5',
+    isActive && 'bg-primary-focus/5 text-primary-focus',
   )}
 >
   <slot />

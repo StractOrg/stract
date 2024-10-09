@@ -34,7 +34,7 @@
 {#if shownDiscussions && shownDiscussions.length > 0}
   <div class="row-start-5 flex flex-col space-y-1.5 overflow-hidden">
     <div class="flex items-center space-x-1 text-lg">
-      <ChatBubbleLeftRight class="text-sm text-neutral" />
+      <ChatBubbleLeftRight class="text-sm text-neutral" aria-label="Chat bubble" />
       <span>Discussions</span>
     </div>
     <div class="flex flex-col">
@@ -55,7 +55,10 @@
                 {discussion.title}
               </a>
               <span>
-                <ChevronDown class="text-sm transition group-open:rotate-180" />
+                <ChevronDown
+                  class="text-sm transition group-open:rotate-180"
+                  aria-label="Chevron down"
+                />
               </span>
             </summary>
 

@@ -26,7 +26,17 @@
   ] as const;
 </script>
 
-<div class="relative grid w-full grid-cols-[2fr_1fr_2fr] px-4 text-sm">
+<nav class="relative grid w-full grid-cols-[2fr_1fr_2fr] px-4 text-sm">
+  <div class="absolute left-5 top-2 z-10">
+    <a
+      href="#main"
+      tabindex="0"
+      class="absolute -top-64 left-0 bg-black p-2 text-base-content focus:top-0"
+    >
+      Skip to content
+    </a>
+  </div>
+
   <div class="flex space-x-4">
     {#each links as [url, name]}
       <a
@@ -49,7 +59,7 @@
     {/if}
   </div>
 
-  <nav class="hidden items-center justify-end space-x-1 sm:flex md:space-x-2 lg:space-x-4">
+  <div class="hidden items-center justify-end space-x-1 sm:flex md:space-x-2 lg:space-x-4">
     {#each nav as [url, name]}
       <Link href={url}>
         {name}
@@ -57,14 +67,15 @@
     {/each}
     {#each social as [url, label, Icon]}
       <Link href={url} {label} round>
-        <Icon />
+        <Icon aria-label={label} />
       </Link>
     {/each}
-  </nav>
+  </div>
 
-  <nav class="group relative flex items-center justify-end text-lg sm:hidden">
+  <div class="group relative flex items-center justify-end text-lg sm:hidden">
     <button
       class="mx-1 aspect-square rounded-full bg-transparent px-3 text-neutral transition group-hover:text-neutral-focus"
+      title="Toggle menu"
     >
       <Bars2 />
     </button>
@@ -82,17 +93,17 @@
         <div class="flex justify-around border-t pt-2">
           {#each social as [url, label, Icon]}
             <Link href={url} {label} round>
-              <Icon />
+              <Icon aria-label={label} />
             </Link>
           {/each}
         </div>
       </div>
     </div>
-  </nav>
+  </div>
 
   {#if showDivider}
     <div
       class="absolute inset-x-0 -bottom-0 h-px bg-gradient-to-r from-primary via-primary-focus to-primary"
     />
   {/if}
-</div>
+</nav>

@@ -35,5 +35,6 @@
     submitOnChange={searchOnChange}
     bind:value={selected}
     {options}
+    ariaLabel="Optic selector"
   />
 </div>

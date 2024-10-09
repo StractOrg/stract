@@ -16,14 +16,15 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
+  import { InvalidHostError, UnknownHostError } from '.';
 
   export let data: PageData;
 
   let inputWebsite = '';
 
-  let limit = data.limit;
-  let chosenHosts = data.chosenHosts;
-  let similarHosts = data.similarHosts;
+  let limit = data.limit ?? LIMIT_OPTIONS[0];
+  let chosenHosts = data.chosenHosts ?? [];
+  let similarHosts = data.similarHosts ?? [];
   let errorMessage = data.errorMessage;
 
   $: chosenHostString = chosenHosts.join(',');
@@ -66,21 +67,25 @@
   };
 
   const addWebsite = async (host: string, clear = false) => {
-    errorMessage = false;
+    errorMessage = undefined;
     host = host.trim();
     if (!host) return;
 
-    const result = await api.webgraphHostKnows({ host }).data;
-    match(result)
-      .with({ _type: 'unknown' }, () => {
-        errorMessage = true;
-      })
-      .with({ _type: 'known' }, async ({ host }) => {
-        if (clear) inputWebsite = '';
-        if (!chosenHosts.includes(host)) chosenHosts = [...chosenHosts, host];
-        updateBrowserState();
-      })
-      .exhaustive();
+    try {
+      const result = await api.webgraphHostKnows({ host }).data;
+      match(result)
+        .with({ _type: 'unknown' }, () => {
+          errorMessage = UnknownHostError;
+        })
+        .with({ _type: 'known' }, async ({ host }) => {
+          if (clear) inputWebsite = '';
+          if (!chosenHosts.includes(host)) chosenHosts = [...chosenHosts, host];
+          updateBrowserState();
+        })
+        .exhaustive();
+    } catch (_) {
+      errorMessage = InvalidHostError;
+    }
   };
 
   const exportAsOptic = async () => {
@@ -133,11 +138,11 @@
       {#if errorMessage}
         <div class="my-2" transition:slide>
           <Callout kind="warning" title="Unable to add page">
-            <button slot="top-right" on:click={() => (errorMessage = false)}>
-              <XMark />
+            <button slot="top-right" on:click={() => (errorMessage = undefined)} title="Close">
+              <XMark aria-label="X-mark" />
             </button>
 
-            Unfortunately, we don't know about that site yet.
+            {errorMessage}
           </Callout>
         </div>
       {/if}
@@ -164,6 +169,7 @@
               class="cursor-pointer rounded border-none dark:bg-transparent"
               bind:value={limit}
               options={LIMIT_OPTIONS.map((value) => ({ value, label: value.toString() }))}
+              title="Limit number of similar sites shown"
             />
           </div>
           <div />
@@ -172,7 +178,7 @@
         <table class="w-full border-separate border-spacing-y-1">
           <thead>
             <tr class="text-left">
-              <th class="pb-2"></th>
+              <th class="pb-2" aria-label="Add to search"></th>
               <th class="pb-2">Similarity</th>
               <th class="pb-2">Site</th>
             </tr>
@@ -197,6 +203,7 @@
                       class={twJoin(
                         'text-xl text-success group-hover:scale-105 group-active:scale-95',
                       )}
+                      aria-label="Plus-mark"
                     />
                   </button>
                 </td>
@@ -211,7 +218,7 @@
         <div class="noscript:hidden flex w-full justify-center">
           <button
             class="h-6 w-6 cursor-pointer rounded-full text-accent"
-            aria-label="Show more similar sites"
+            title="Show more similar sites"
             on:click={() => {
               if (limit == LIMIT_OPTIONS[LIMIT_OPTIONS.length - 1]) {
                 return;
@@ -219,7 +226,7 @@
               limit = LIMIT_OPTIONS[LIMIT_OPTIONS.indexOf(limit) + 1];
             }}
           >
-            <ChevronDown />
+            <ChevronDown aria-label="Chevron-down" />
           </button>
         </div>
       </div>

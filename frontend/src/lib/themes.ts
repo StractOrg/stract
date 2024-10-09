@@ -11,6 +11,7 @@ export const THEMES = [
   theme('Primer Dark', 'theme-primer-dark'),
   theme('Nord', 'theme-nord'),
   theme('Ayu Mirage', 'theme-ayu-mirage'),
+  theme('High Contrast', 'theme-high-contrast'),
 ];
 
 /*
@@ -35,7 +36,7 @@ export const getButtonTailwindStyle = (
   _class: string,
 ) => {
   return twMerge(
-    'rounded-full py-2 transition active:scale-[98%]',
+    'rounded-full py-2 transition active:scale-[98%] outline-accent',
     padding ? 'px-4' : 'px-2',
     'border border-transparent',
     pale

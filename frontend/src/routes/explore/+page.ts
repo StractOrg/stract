@@ -2,11 +2,12 @@ import { api, type ScoredHost } from '$lib/api';
 import { match } from 'ts-pattern';
 import type { PageLoad } from './$types';
 import { LIMIT_OPTIONS } from './conf';
+import { InvalidHostError, UnknownHostError } from '.';
 
 export const load: PageLoad = async (req) => {
   const host = req.url.searchParams.get('site');
   let chosenHosts: string[] = req.url.searchParams.get('chosenHosts')?.split(',') || [];
-  let errorMessage = false;
+  let errorMessage: string | undefined = undefined;
 
   let limit = LIMIT_OPTIONS[0];
 
@@ -16,16 +17,20 @@ export const load: PageLoad = async (req) => {
   }
 
   if (host && host.length > 0) {
-    const res = await api.webgraphHostKnows({ host }).data;
+    try {
+      const res = await api.webgraphHostKnows({ host }).data;
 
-    match(res)
-      .with({ _type: 'unknown' }, () => {
-        errorMessage = true;
-      })
-      .with({ _type: 'known' }, async ({ host }) => {
-        if (host.length > 0 && !chosenHosts.includes(host)) chosenHosts = [...chosenHosts, host];
-      })
-      .exhaustive();
+      match(res)
+        .with({ _type: 'unknown' }, () => {
+          errorMessage = UnknownHostError;
+        })
+        .with({ _type: 'known' }, async ({ host }) => {
+          if (host.length > 0 && !chosenHosts.includes(host)) chosenHosts = [...chosenHosts, host];
+        })
+        .exhaustive();
+    } catch (_) {
+      errorMessage = InvalidHostError;
+    }
   }
 
   let similarHosts: ScoredHost[] = [];

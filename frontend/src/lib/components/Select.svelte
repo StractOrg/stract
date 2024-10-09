@@ -10,13 +10,16 @@
     form?: string;
     submitOnChange?: boolean;
     options: Option[];
+    ariaLabel?: string;
+    id?: string;
   }
 
   export let value: T; // eslint-disable-line no-undef
   export let form: string | undefined = void 0;
   export let submitOnChange = false;
   export let options: $$Props['options'];
-
+  export let ariaLabel: string | undefined = undefined;
+  export let id: string | undefined = undefined;
   // eslint-disable-next-line no-undef
   const dispatch = createEventDispatcher<{ change: T }>();
 </script>
@@ -25,6 +28,8 @@
   <select
     {...$$restProps}
     {form}
+    aria-label={ariaLabel}
+    {id}
     on:change={(e) => {
       if (!e?.target || !(e.target instanceof HTMLSelectElement)) return;
 

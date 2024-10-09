@@ -33,6 +33,10 @@
   import { scale } from 'svelte/transition';
   import { match } from 'ts-pattern';
   import SignalInfo from './SignalInfo.svelte';
+  import { onMount } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
+
+  const dispatch = createEventDispatcher();
 
   export let modal: { top: number; left: number; site: DisplayedWebpage };
 
@@ -174,11 +178,52 @@
       [site.site]: $rankings[site.site] == ranking ? void 0 : ranking,
     }));
   };
+
+  let modalElement: HTMLDivElement | undefined;
+
+  // eslint-disable-next-line no-undef
+  let tabableElements: NodeListOf<HTMLElement> | undefined;
+
+  const updateTab = () => {
+    if (modalElement) {
+      tabableElements = modalElement.querySelectorAll('button, input, textarea, select, a');
+      if (tabableElements && tabableElements.length > 0) {
+        tabableElements[0].focus();
+      }
+    }
+  };
+
+  $: {
+    modal.site;
+    updateTab();
+  }
+
+  onMount(() => {
+    updateTab();
+  });
+
+  const onKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (tabableElements && tabableElements.length > 0) {
+        const index = Array.from(tabableElements).indexOf(document.activeElement as HTMLElement);
+        let newIndex = (index + (e.shiftKey ? -1 : 1)) % tabableElements.length;
+        if (newIndex < 0) {
+          newIndex = tabableElements.length - 1;
+        }
+
+        tabableElements[newIndex].focus();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      modalElement?.remove();
+      dispatch('close');
+    }
+  };
 </script>
 
 <svelte:window bind:innerWidth />
 
-<!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div
   class={twJoin(
@@ -188,6 +233,10 @@
   style="top: {top}px; left: calc({left}px); width: {widthPixels}px;"
   transition:scale={{ duration: 150 }}
   on:click|stopPropagation={() => {}}
+  bind:this={modalElement}
+  on:keydown={(e) => {
+    onKeydown(e);
+  }}
 >
   <div>
     <h2 class="w-full text-center">Do you like results from</h2>

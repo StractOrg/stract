@@ -2,7 +2,6 @@
   import { api } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Site from '$lib/components/Site.svelte';
-  import { getButtonTailwindStyle } from '$lib/themes';
   import { Rankings, rankingsToRanked, type RankedSites, type Ranking } from '$lib/rankings';
   import { hostRankingsStore } from '$lib/stores';
   import { flip } from 'svelte/animate';
@@ -121,16 +120,16 @@
     {#each buttons as { text, clear }}
       <Button on:click={clearAndExport({ clear })}>{text}</Button>
     {/each}
-    <input
-      type="file"
-      accept=".optic"
-      id="optic-import"
-      multiple
-      on:change={importOpticFile}
-      hidden
-    />
-    <label for="optic-import" class={getButtonTailwindStyle(false, false, 'primary', '')}>
-      Import from optic
-    </label>
+    <Button>
+      <input
+        type="file"
+        accept=".optic"
+        id="optic-import"
+        multiple
+        on:change={importOpticFile}
+        hidden
+      />
+      <label for="optic-import"> Import from optic </label>
+    </Button>
   </div>
 </div>
