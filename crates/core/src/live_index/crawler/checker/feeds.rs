@@ -55,9 +55,11 @@ impl Checker for Feeds {
             tokio::time::sleep(CRAWL_DELAY).await;
         }
 
-        self.last_check = std::time::Instant::now();
-
         Ok(urls)
+    }
+
+    fn update_last_check(&mut self) {
+        self.last_check = std::time::Instant::now();
     }
 
     fn should_check(&self, interval: &CheckIntervals) -> bool {

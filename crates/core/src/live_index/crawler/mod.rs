@@ -57,6 +57,7 @@ struct Client {
     live_index: Mutex<ReusableShardedClient<live_index::LiveIndexService>>,
     search: Mutex<ReusableShardedClient<search_server::SearchService>>,
     reqwest: reqwest::Client,
+    crawler_config: CrawlerConfig,
 }
 
 impl Client {
@@ -68,11 +69,16 @@ impl Client {
             live_index,
             search,
             reqwest: crawler::reqwest_client(crawler_config)?,
+            crawler_config: crawler_config.clone(),
         })
     }
 
     pub fn reqwest(&self) -> &reqwest::Client {
         &self.reqwest
+    }
+
+    pub fn crawler_config(&self) -> &CrawlerConfig {
+        &self.crawler_config
     }
 
     async fn live_conn(&self) -> Arc<ShardedClient<live_index::LiveIndexService, ShardId>> {

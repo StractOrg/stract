@@ -18,6 +18,8 @@ use std::time::Duration;
 
 use url::Url;
 
+use crate::config::CrawlerConfig;
+use crate::crawler::robots_txt::RobotsTxtManager;
 use crate::dated_url::DatedUrl;
 use crate::sitemap::{parse_sitemap, SitemapEntry};
 use crate::Result;
@@ -26,37 +28,30 @@ use crate::{entrypoint::site_stats, webpage::url_ext::UrlExt};
 use super::{CheckIntervals, Checker, CrawlableUrl};
 
 const MAX_SITEMAP_DEPTH: usize = 10;
-const SITEMAP_DELAY: Duration = Duration::from_secs(10);
+const SITEMAP_DELAY: Duration = Duration::from_secs(60);
 
 pub struct Sitemap {
-    robots_txt: Url,
+    robots_url: Url,
+    robots_manager: RobotsTxtManager,
     last_check: std::time::Instant,
     client: reqwest::Client,
 }
 
 impl Sitemap {
-    pub fn new(site: &site_stats::Site, client: reqwest::Client) -> Result<Self> {
-        let robots_txt = Url::robust_parse(&format!("{}/robots.txt", site.as_str()))?;
+    pub fn new(site: &site_stats::Site, config: &CrawlerConfig) -> Result<Self> {
+        let robots_url = Url::robust_parse(&format!("{}/robots.txt", site.as_str()))?;
+        let robots_manager = RobotsTxtManager::new(config);
 
         Ok(Self {
-            robots_txt,
+            robots_url,
+            robots_manager,
             last_check: std::time::Instant::now(),
-            client,
+            client: crate::crawler::reqwest_client(config)?,
         })
     }
 
-    async fn sitemap_urls(&self) -> Result<Vec<Url>> {
-        let res = self.client.get(self.robots_txt.clone()).send().await?;
-        let body = res.text().await?;
-
-        // wildcard useragent is okay as we only use it to check for sitemap directive
-        let robots = robotstxt::Robots::parse("*", &body)?;
-
-        Ok(robots
-            .sitemaps()
-            .iter()
-            .filter_map(|s| Url::parse(s).ok())
-            .collect())
+    async fn sitemap_urls(&mut self) -> Vec<Url> {
+        self.robots_manager.sitemaps(&self.robots_url).await
     }
 
     async fn urls_from_sitemap(&self, sitemap: Url) -> Vec<DatedUrl> {
@@ -109,7 +104,7 @@ impl Sitemap {
 
 impl Checker for Sitemap {
     async fn get_urls(&mut self) -> Result<Vec<CrawlableUrl>> {
-        let sitemap_urls = self.sitemap_urls().await?;
+        let sitemap_urls = self.sitemap_urls().await;
         let mut urls = vec![];
 
         for sitemap_url in sitemap_urls {
@@ -121,9 +116,11 @@ impl Checker for Sitemap {
             );
         }
 
-        self.last_check = std::time::Instant::now();
-
         Ok(urls)
+    }
+
+    fn update_last_check(&mut self) {
+        self.last_check = std::time::Instant::now();
     }
 
     fn should_check(&self, interval: &CheckIntervals) -> bool {

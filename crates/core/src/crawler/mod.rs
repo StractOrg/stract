@@ -28,7 +28,7 @@ use self::{warc_writer::WarcWriter, worker::WorkerThread};
 pub use worker::JobExecutor;
 
 pub mod coordinator;
-mod robots_txt;
+pub mod robots_txt;
 pub mod router;
 pub use router::Router;
 mod file_queue;

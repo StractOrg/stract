@@ -69,7 +69,7 @@ impl InnerCrawlableSite {
                     .collect(),
                 client.reqwest().clone(),
             ),
-            sitemap: Sitemap::new(site.site(), client.reqwest().clone())?,
+            sitemap: Sitemap::new(site.site(), client.crawler_config())?,
             frontpage: Frontpage::new(site.site(), client.reqwest().clone())?,
             last_drip: Instant::now(),
             drip_rate,
@@ -195,15 +195,30 @@ impl CrawlableSiteGuard {
         let mut urls = Vec::new();
 
         if site.feeds.should_check(interval) {
-            urls.extend(site.feeds.get_urls().await.unwrap_or_default());
+            urls.extend(
+                site.feeds
+                    .get_urls_and_update_last_check()
+                    .await
+                    .unwrap_or_default(),
+            );
         }
 
         if site.sitemap.should_check(interval) {
-            urls.extend(site.sitemap.get_urls().await.unwrap_or_default());
+            urls.extend(
+                site.sitemap
+                    .get_urls_and_update_last_check()
+                    .await
+                    .unwrap_or_default(),
+            );
         }
 
         if site.frontpage.should_check(interval) {
-            urls.extend(site.frontpage.get_urls().await.unwrap_or_default());
+            urls.extend(
+                site.frontpage
+                    .get_urls_and_update_last_check()
+                    .await
+                    .unwrap_or_default(),
+            );
         }
 
         let url = site.site.url()?;

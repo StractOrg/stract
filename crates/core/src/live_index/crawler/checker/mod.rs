@@ -57,4 +57,10 @@ impl From<Url> for CrawlableUrl {
 pub trait Checker {
     async fn get_urls(&mut self) -> Result<Vec<CrawlableUrl>>;
     fn should_check(&self, interval: &CheckIntervals) -> bool;
+    fn update_last_check(&mut self);
+
+    async fn get_urls_and_update_last_check(&mut self) -> Result<Vec<CrawlableUrl>> {
+        self.update_last_check();
+        self.get_urls().await
+    }
 }

@@ -20,7 +20,7 @@ use url::Url;
 
 use crate::{config::CrawlerConfig, crawler};
 
-use super::{encoded_body, Result, Site};
+use super::{encoded_body, Site};
 
 const RETRY_ROBOTSTXT_UNREACHABLE: bool = false;
 
@@ -29,12 +29,35 @@ enum Lookup<T> {
     Found(T),
     /// 404
     Unavailable,
-    /// 5xx
+    /// 5xx (and other network errors)
     Unreachable,
 }
 
+struct CheckedRobotsTxt {
+    robots: Lookup<robotstxt::Robots>,
+    last_check: std::time::Instant,
+}
+
+impl CheckedRobotsTxt {
+    fn new(robots: Lookup<robotstxt::Robots>) -> Self {
+        Self {
+            robots,
+            last_check: std::time::Instant::now(),
+        }
+    }
+}
+
+impl CheckedRobotsTxt {
+    fn is_expired(&self, expiration: &Duration) -> bool {
+        match self.robots {
+            Lookup::Found(_) | Lookup::Unavailable => self.last_check.elapsed() >= *expiration,
+            Lookup::Unreachable => false,
+        }
+    }
+}
+
 pub struct RobotsTxtManager {
-    cache: BTreeMap<Site, Lookup<RobotsTxt>>,
+    cache: BTreeMap<Site, CheckedRobotsTxt>,
     last_prune: std::time::Instant,
     client: reqwest::Client,
     cache_expiration: Duration,
@@ -72,12 +95,23 @@ impl RobotsTxtManager {
 
     pub async fn crawl_delay(&mut self, url: &Url) -> Option<Duration> {
         match self.get_mut(url).await {
-            Lookup::Found(robots_txt) => robots_txt.robots.crawl_delay(),
+            Lookup::Found(robots_txt) => robots_txt.crawl_delay(),
             Lookup::Unavailable | Lookup::Unreachable => None,
         }
     }
 
-    async fn fetch_robots_txt_from_url(&self, url: &str) -> Lookup<RobotsTxt> {
+    pub async fn sitemaps(&mut self, url: &Url) -> Vec<Url> {
+        match self.get_mut(url).await {
+            Lookup::Found(robots_txt) => robots_txt
+                .sitemaps()
+                .iter()
+                .filter_map(|s| Url::parse(s).ok())
+                .collect(),
+            Lookup::Unavailable | Lookup::Unreachable => vec![],
+        }
+    }
+
+    async fn fetch_robots_txt_from_url(&self, url: &str) -> Lookup<robotstxt::Robots> {
         let res = match self
             .client
             .get(url)
@@ -99,7 +133,7 @@ impl RobotsTxtManager {
                 };
 
                 let self_user_agent = self.user_agent.clone();
-                match panic::catch_unwind(|| RobotsTxt::new(&self_user_agent, body)) {
+                match panic::catch_unwind(|| robotstxt::Robots::parse(&self_user_agent, &body)) {
                     Ok(Ok(r)) => Lookup::Found(r),
                     _ => Lookup::Unreachable,
                 }
@@ -112,7 +146,7 @@ impl RobotsTxtManager {
         res
     }
 
-    async fn fetch_robots_txt_without_retry(&self, site: &Site) -> Lookup<RobotsTxt> {
+    async fn fetch_robots_txt_without_retry(&self, site: &Site) -> Lookup<robotstxt::Robots> {
         match self
             .fetch_robots_txt_from_url(&format!("https://{}/robots.txt", site.0))
             .await
@@ -141,11 +175,7 @@ impl RobotsTxtManager {
         }
     }
 
-    async fn fetch_robots_txt(&self, site: &Site) -> Lookup<RobotsTxt> {
-        if !RETRY_ROBOTSTXT_UNREACHABLE {
-            return self.fetch_robots_txt_without_retry(site).await;
-        }
-
+    async fn fetch_robots_txt_with_retry(&self, site: &Site) -> Lookup<robotstxt::Robots> {
         for _ in 0..3 {
             match self.fetch_robots_txt_without_retry(site).await {
                 Lookup::Found(robots_txt) => return Lookup::Found(robots_txt),
@@ -159,74 +189,41 @@ impl RobotsTxtManager {
         Lookup::Unreachable
     }
 
+    async fn fetch_robots_txt(&self, site: &Site) -> CheckedRobotsTxt {
+        if RETRY_ROBOTSTXT_UNREACHABLE {
+            CheckedRobotsTxt::new(self.fetch_robots_txt_with_retry(site).await)
+        } else {
+            CheckedRobotsTxt::new(self.fetch_robots_txt_without_retry(site).await)
+        }
+    }
+
     fn maybe_prune(&mut self) {
         if self.last_prune.elapsed() < Duration::from_secs(60) {
             return;
         }
 
-        self.cache.retain(|_, v| match v {
-            Lookup::Found(robots_txt) => !robots_txt.is_expired(&self.cache_expiration),
-            _ => true,
-        });
+        self.cache
+            .retain(|_, v| !v.is_expired(&self.cache_expiration));
 
         self.last_prune = std::time::Instant::now();
     }
 
-    async fn get_mut(&mut self, url: &Url) -> &mut Lookup<RobotsTxt> {
+    async fn get_mut(&mut self, url: &Url) -> &mut Lookup<robotstxt::Robots> {
         self.maybe_prune();
         let site = Site(url.host_str().unwrap_or_default().to_string());
 
-        let cache_should_update = match self.cache.get_mut(&site) {
-            Some(Lookup::Found(robots_txt)) => robots_txt.is_expired(&self.cache_expiration),
-            Some(Lookup::Unavailable) | Some(Lookup::Unreachable) => false,
-            None => true,
-        };
+        let cache_should_update = self
+            .cache
+            .get_mut(&site)
+            .map(|v| v.is_expired(&self.cache_expiration))
+            .unwrap_or(true);
 
         if cache_should_update {
             self.cache
                 .insert(site.clone(), self.fetch_robots_txt(&site).await);
         }
 
-        self.cache.get_mut(&site).unwrap()
-    }
-
-    pub async fn sitemaps(&mut self, url: &Url) -> Vec<Url> {
-        match self.get_mut(url).await {
-            Lookup::Found(robotstxt) => robotstxt
-                .sitemaps()
-                .iter()
-                .filter_map(|s| Url::parse(s).ok())
-                .collect(),
-            Lookup::Unavailable => vec![],
-            Lookup::Unreachable => vec![],
-        }
-    }
-}
-
-#[derive(Debug)]
-struct RobotsTxt {
-    download_time: std::time::Instant,
-    robots: robotstxt::Robots,
-}
-
-impl RobotsTxt {
-    fn new(user_agent: &str, body: String) -> Result<Self> {
-        Ok(Self {
-            robots: robotstxt::Robots::parse(user_agent, &body)?,
-            download_time: std::time::Instant::now(),
-        })
-    }
-
-    fn is_expired(&self, expiration: &Duration) -> bool {
-        self.download_time.elapsed() > *expiration
-    }
-
-    fn is_allowed(&self, url: &Url) -> bool {
-        self.robots.is_allowed(url)
-    }
-
-    fn sitemaps(&self) -> &[String] {
-        self.robots.sitemaps()
+        &mut self.cache.get_mut(&site).unwrap().robots
     }
 }
 
@@ -234,14 +231,15 @@ impl RobotsTxt {
 mod tests {
     use super::*;
 
+    type RobotsTxt = robotstxt::Robots;
+
     #[test]
     fn simple() {
         let ua_token = "StractBot";
-        let robots_txt = RobotsTxt::new(
+        let robots_txt = RobotsTxt::parse(
             ua_token,
             r#"User-agent: StractBot
-            Disallow: /test"#
-                .to_string(),
+            Disallow: /test"#,
         )
         .unwrap();
 
@@ -252,11 +250,10 @@ mod tests {
     #[test]
     fn lowercase() {
         let ua_token = "StractBot";
-        let robots_txt = RobotsTxt::new(
+        let robots_txt = RobotsTxt::parse(
             ua_token,
             r#"User-agent: stractbot
-            Disallow: /test"#
-                .to_string(),
+            Disallow: /test"#,
         )
         .unwrap();
 
@@ -267,13 +264,12 @@ mod tests {
     #[test]
     fn test_extra_newline() {
         let ua_token = "StractBot";
-        let robots_txt = RobotsTxt::new(
+        let robots_txt = RobotsTxt::parse(
             ua_token,
             r#"User-agent: StractBot
 
 
-            Disallow: /test"#
-                .to_string(),
+            Disallow: /test"#,
         )
         .unwrap();
 
@@ -285,15 +281,14 @@ mod tests {
     fn test_multiple_agents() {
         let ua_token = "StractBot";
 
-        let robots_txt = RobotsTxt::new(
+        let robots_txt = RobotsTxt::parse(
             ua_token,
             r#"User-Agent: GoogleBot
 User-Agent: StractBot
 Disallow: /
 
 User-Agent: *
-Allow: /"#
-                .to_string(),
+Allow: /"#,
         )
         .unwrap();
 
@@ -301,14 +296,13 @@ Allow: /"#
 
         let ua_token = "StractBot";
 
-        let robots_txt = RobotsTxt::new(
+        let robots_txt = RobotsTxt::parse(
             ua_token,
             r#"User-Agent: GoogleBot, StractBot
 Disallow: /
 
 User-Agent: *
-Allow: /"#
-                .to_string(),
+Allow: /"#,
         )
         .unwrap();
 
@@ -318,25 +312,23 @@ Allow: /"#
     #[test]
     fn test_sitemap() {
         let ua_token = "StractBot";
-        let robots_txt = RobotsTxt::new(
+        let robots_txt = RobotsTxt::parse(
             ua_token,
             r#"User-agent: *
 Disallow: /test
 
-Sitemap: http://example.com/sitemap.xml"#
-                .to_string(),
+Sitemap: http://example.com/sitemap.xml"#,
         )
         .unwrap();
 
         assert_eq!(robots_txt.sitemaps(), &["http://example.com/sitemap.xml"]);
 
-        let robots_txt = RobotsTxt::new(
+        let robots_txt = RobotsTxt::parse(
             ua_token,
             r#"User-agent: *
 Disallow: /test
 
-SiTeMaP: http://example.com/sitemap.xml"#
-                .to_string(),
+SiTeMaP: http://example.com/sitemap.xml"#,
         )
         .unwrap();
 
@@ -347,12 +339,11 @@ SiTeMaP: http://example.com/sitemap.xml"#
     fn wildcard() {
         let ua_token = "StractBot";
 
-        let robots_txt = RobotsTxt::new(
+        let robots_txt = RobotsTxt::parse(
             ua_token,
             r#"User-agent: StractBot
 Disallow: /test/*
-"#
-            .to_string(),
+"#,
         )
         .unwrap();
 
@@ -362,12 +353,11 @@ Disallow: /test/*
         assert!(robots_txt.is_allowed(&Url::parse("http://example.com/test").unwrap()));
         assert!(robots_txt.is_allowed(&Url::parse("http://example.com/testfoo").unwrap()));
 
-        let robots_txt = RobotsTxt::new(
+        let robots_txt = RobotsTxt::parse(
             ua_token,
             r#"User-agent: StractBot
     Disallow: /test/*/bar
-    "#
-            .to_string(),
+    "#,
         )
         .unwrap();
 
@@ -377,5 +367,12 @@ Disallow: /test/*
         assert!(!robots_txt.is_allowed(&Url::parse("http://example.com/test/foo/baz/bar").unwrap()));
         assert!(robots_txt.is_allowed(&Url::parse("http://example.com/test").unwrap()));
         assert!(robots_txt.is_allowed(&Url::parse("http://example.com/testfoo").unwrap()));
+    }
+
+    #[test]
+    fn test_unreachable_robots_never_updated() {
+        let checked = CheckedRobotsTxt::new(Lookup::Unreachable);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        assert!(!checked.is_expired(&Duration::from_millis(10)));
     }
 }

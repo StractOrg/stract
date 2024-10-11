@@ -54,9 +54,11 @@ impl Checker for Frontpage {
             .map(|link| CrawlableUrl::from(link.destination))
             .collect::<Vec<_>>();
 
-        self.last_check = std::time::Instant::now();
-
         Ok(urls)
+    }
+
+    fn update_last_check(&mut self) {
+        self.last_check = std::time::Instant::now();
     }
 
     fn should_check(&self, interval: &CheckIntervals) -> bool {
