@@ -19,7 +19,7 @@ use std::time::Duration;
 use url::Url;
 
 use crate::config::CrawlerConfig;
-use crate::crawler::robots_txt::RobotsTxtManager;
+use crate::crawler::robot_client::RobotClient;
 use crate::dated_url::DatedUrl;
 use crate::sitemap::{parse_sitemap, SitemapEntry};
 use crate::Result;
@@ -32,26 +32,26 @@ const SITEMAP_DELAY: Duration = Duration::from_secs(60);
 
 pub struct Sitemap {
     robots_url: Url,
-    robots_manager: RobotsTxtManager,
     last_check: std::time::Instant,
-    client: reqwest::Client,
+    client: RobotClient,
 }
 
 impl Sitemap {
     pub fn new(site: &site_stats::Site, config: &CrawlerConfig) -> Result<Self> {
         let robots_url = Url::robust_parse(&format!("{}/robots.txt", site.as_str()))?;
-        let robots_manager = RobotsTxtManager::new(config);
 
         Ok(Self {
             robots_url,
-            robots_manager,
             last_check: std::time::Instant::now(),
-            client: crate::crawler::reqwest_client(config)?,
+            client: RobotClient::new(config)?,
         })
     }
 
-    async fn sitemap_urls(&mut self) -> Vec<Url> {
-        self.robots_manager.sitemaps(&self.robots_url).await
+    async fn sitemap_urls(&self) -> Vec<Url> {
+        self.client
+            .robots_txt_manager()
+            .sitemaps(&self.robots_url)
+            .await
     }
 
     async fn urls_from_sitemap(&self, sitemap: Url) -> Vec<DatedUrl> {
@@ -63,7 +63,10 @@ impl Sitemap {
                 continue;
             }
 
-            let res = self.client.get(url).send().await;
+            let Ok(req) = self.client.get(url).await else {
+                continue;
+            };
+            let res = req.send().await;
             tokio::time::sleep(SITEMAP_DELAY).await;
 
             if res.is_err() {
@@ -103,7 +106,7 @@ impl Sitemap {
 }
 
 impl Checker for Sitemap {
-    async fn get_urls(&mut self) -> Result<Vec<CrawlableUrl>> {
+    async fn get_urls(&self) -> Result<Vec<CrawlableUrl>> {
         let sitemap_urls = self.sitemap_urls().await;
         let mut urls = vec![];
 

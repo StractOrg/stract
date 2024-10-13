@@ -67,10 +67,10 @@ impl InnerCrawlableSite {
                     .into_iter()
                     .map(|feed| feed.into())
                     .collect(),
-                client.reqwest().clone(),
+                client.reqwest(),
             ),
             sitemap: Sitemap::new(site.site(), client.crawler_config())?,
-            frontpage: Frontpage::new(site.site(), client.reqwest().clone())?,
+            frontpage: Frontpage::new(site.site(), client.reqwest())?,
             last_drip: Instant::now(),
             drip_rate,
             budget: 0,
@@ -277,9 +277,9 @@ impl CrawlableSiteGuard {
                     .collect(),
                 wandering_urls: 0,
             },
-            client.reqwest().clone(),
-            self.config.clone(),
+            Arc::clone(&self.config),
             Arc::clone(&crawl_data),
+            client.reqwest(),
         );
 
         executor.run().await;

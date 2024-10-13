@@ -14,8 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, panic, time::Duration};
+use std::{
+    ops::Deref,
+    panic,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
+use dashmap::DashMap;
 use url::Url;
 
 use crate::{config::CrawlerConfig, crawler};
@@ -56,9 +62,9 @@ impl CheckedRobotsTxt {
     }
 }
 
-pub struct RobotsTxtManager {
-    cache: BTreeMap<Site, CheckedRobotsTxt>,
-    last_prune: std::time::Instant,
+struct InnerRobotsTxtManager {
+    cache: DashMap<Site, CheckedRobotsTxt>,
+    last_prune: Arc<Mutex<std::time::Instant>>,
     client: reqwest::Client,
     cache_expiration: Duration,
     user_agent: String,
@@ -66,9 +72,9 @@ pub struct RobotsTxtManager {
     max_crawl_delay: Duration,
 }
 
-impl RobotsTxtManager {
-    pub fn new(config: &CrawlerConfig) -> Self {
-        let client = crawler::reqwest_client(config).unwrap();
+impl InnerRobotsTxtManager {
+    fn new(config: &CrawlerConfig) -> Self {
+        let client = crawler::robot_client::reqwest_client(config).unwrap();
         let cache_expiration = Duration::from_secs(config.robots_txt_cache_sec);
         let user_agent = config.user_agent.token.clone();
         let min_crawl_delay = Duration::from_millis(config.min_crawl_delay_ms);
@@ -77,31 +83,31 @@ impl RobotsTxtManager {
         Self {
             client,
             cache_expiration,
-            last_prune: std::time::Instant::now(),
-            cache: BTreeMap::new(),
+            last_prune: Arc::new(Mutex::new(std::time::Instant::now())),
+            cache: DashMap::new(),
             user_agent: user_agent.to_string(),
             min_crawl_delay,
             max_crawl_delay,
         }
     }
 
-    pub async fn is_allowed(&mut self, url: &Url) -> bool {
-        match self.get_mut(url).await {
+    async fn is_allowed(&self, url: &Url) -> bool {
+        match &self.get(url).await.robots {
             Lookup::Found(robots_txt) => robots_txt.is_allowed(url),
             Lookup::Unavailable => true,
             Lookup::Unreachable => false,
         }
     }
 
-    pub async fn crawl_delay(&mut self, url: &Url) -> Option<Duration> {
-        match self.get_mut(url).await {
+    async fn crawl_delay(&self, url: &Url) -> Option<Duration> {
+        match &self.get(url).await.robots {
             Lookup::Found(robots_txt) => robots_txt.crawl_delay(),
             Lookup::Unavailable | Lookup::Unreachable => None,
         }
     }
 
-    pub async fn sitemaps(&mut self, url: &Url) -> Vec<Url> {
-        match self.get_mut(url).await {
+    async fn sitemaps(&self, url: &Url) -> Vec<Url> {
+        match &self.get(url).await.robots {
             Lookup::Found(robots_txt) => robots_txt
                 .sitemaps()
                 .iter()
@@ -197,18 +203,18 @@ impl RobotsTxtManager {
         }
     }
 
-    fn maybe_prune(&mut self) {
-        if self.last_prune.elapsed() < Duration::from_secs(60) {
+    fn maybe_prune(&self) {
+        if self.last_prune.lock().unwrap().elapsed() < Duration::from_secs(60) {
             return;
         }
 
         self.cache
             .retain(|_, v| !v.is_expired(&self.cache_expiration));
 
-        self.last_prune = std::time::Instant::now();
+        *self.last_prune.lock().unwrap() = std::time::Instant::now();
     }
 
-    async fn get_mut(&mut self, url: &Url) -> &mut Lookup<robotstxt::Robots> {
+    async fn get(&self, url: &Url) -> impl Deref<Target = CheckedRobotsTxt> + '_ {
         self.maybe_prune();
         let site = Site(url.host_str().unwrap_or_default().to_string());
 
@@ -223,7 +229,51 @@ impl RobotsTxtManager {
                 .insert(site.clone(), self.fetch_robots_txt(&site).await);
         }
 
-        &mut self.cache.get_mut(&site).unwrap().robots
+        self.cache.get(&site).unwrap()
+    }
+
+    #[cfg(test)]
+    fn insert(&self, site: String, robots_txt: robotstxt::Robots) {
+        self.cache
+            .insert(Site(site), CheckedRobotsTxt::new(Lookup::Found(robots_txt)));
+    }
+}
+pub struct RobotsTxtManager {
+    inner: Arc<InnerRobotsTxtManager>,
+}
+
+impl Clone for RobotsTxtManager {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl RobotsTxtManager {
+    pub fn new(config: &CrawlerConfig) -> Self {
+        Self {
+            inner: Arc::new(InnerRobotsTxtManager::new(config)),
+        }
+    }
+}
+
+impl RobotsTxtManager {
+    pub async fn is_allowed(&self, url: &Url) -> bool {
+        self.inner.is_allowed(url).await
+    }
+
+    pub async fn crawl_delay(&self, url: &Url) -> Option<Duration> {
+        self.inner.crawl_delay(url).await
+    }
+
+    pub async fn sitemaps(&self, url: &Url) -> Vec<Url> {
+        self.inner.sitemaps(url).await
+    }
+
+    #[cfg(test)]
+    pub fn insert(&self, site: String, robots_txt: robotstxt::Robots) {
+        self.inner.insert(site, robots_txt);
     }
 }
 

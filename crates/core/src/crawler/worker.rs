@@ -38,10 +38,9 @@ use crate::{
 };
 
 use super::{
-    encoded_body, reqwest_client, robots_txt::RobotsTxtManager,
-    wander_prirotiser::WanderPrioritiser, CrawlDatum, DatumStream, Domain, Error, Result,
-    RetrieableUrl, Site, WarcWriter, WeightedUrl, WorkerJob, MAX_CONTENT_LENGTH,
-    MAX_OUTGOING_URLS_PER_PAGE,
+    encoded_body, robot_client::RobotClient, wander_prirotiser::WanderPrioritiser, CrawlDatum,
+    DatumStream, Domain, Error, Result, RetrieableUrl, Site, WarcWriter, WeightedUrl, WorkerJob,
+    MAX_CONTENT_LENGTH, MAX_OUTGOING_URLS_PER_PAGE,
 };
 
 const IGNORED_EXTENSIONS: [&str; 27] = [
@@ -63,19 +62,18 @@ struct ProcessedUrl {
 
 pub struct WorkerThread {
     writer: Arc<WarcWriter>,
-    client: reqwest::Client,
     config: Arc<CrawlerConfig>,
     router_hosts: Vec<SocketAddr>,
+    client: RobotClient,
 }
 
 impl WorkerThread {
     pub fn new(
         writer: Arc<WarcWriter>,
+        client: RobotClient,
         config: CrawlerConfig,
         router_hosts: Vec<SocketAddr>,
     ) -> Result<Self> {
-        let client = reqwest_client(&config)?;
-
         Ok(Self {
             writer,
             client,
@@ -109,9 +107,9 @@ impl WorkerThread {
                 Ok(Some(job)) => {
                     let executor = JobExecutor::new(
                         job.into(),
-                        self.client.clone(),
                         self.config.clone(),
                         self.writer.clone(),
+                        self.client.clone(),
                     );
                     executor.run().await;
                 }
@@ -129,10 +127,9 @@ impl WorkerThread {
 
 pub struct JobExecutor<S: DatumStream> {
     writer: Arc<S>,
-    client: reqwest::Client,
+    client: RobotClient,
     has_gotten_429_response: bool,
     politeness_factor: u32,
-    robotstxt: RobotsTxtManager,
     crawled_urls: HashSet<Url>,
     crawled_sitemaps: HashSet<Site>,
     sitemap_urls: HashSet<Url>,
@@ -149,15 +146,14 @@ pub struct JobExecutor<S: DatumStream> {
 impl<S: DatumStream> JobExecutor<S> {
     pub fn new(
         job: WorkerJob,
-        client: reqwest::Client,
         config: Arc<CrawlerConfig>,
         writer: Arc<S>,
+        client: RobotClient,
     ) -> Self {
         Self {
             writer,
             politeness_factor: config.start_politeness_factor,
             min_politeness_factor: config.min_politeness_factor,
-            robotstxt: RobotsTxtManager::new(&config),
             client,
             crawled_urls: HashSet::new(),
             crawled_sitemaps: HashSet::new(),
@@ -270,7 +266,12 @@ impl<S: DatumStream> JobExecutor<S> {
             return UrlVisit::Skip;
         }
 
-        if !self.robotstxt.is_allowed(retryable_url.url()).await {
+        if !self
+            .client
+            .robots_txt_manager()
+            .is_allowed(retryable_url.url())
+            .await
+        {
             return UrlVisit::Skip;
         }
 
@@ -284,20 +285,19 @@ impl<S: DatumStream> JobExecutor<S> {
     }
 
     async fn crawl_sitemaps(&mut self) {
-        for url in self.job.urls.iter().map(|url| url.url()) {
+        let urls: Vec<_> = self.job.urls.iter().map(|url| url.url()).cloned().collect();
+
+        for url in urls {
             let site = Site(url.host_str().unwrap_or_default().to_string());
             if !self.crawled_sitemaps.contains(&site) {
                 self.crawled_sitemaps.insert(site.clone());
 
-                let sitemaps = self.robotstxt.sitemaps(url).await;
+                let sitemaps = self.client.robots_txt_manager().sitemaps(&url).await;
 
                 for sitemap in sitemaps {
-                    self.sitemap_urls.extend(
-                        self.urls_from_sitemap(sitemap, 5)
-                            .await
-                            .into_iter()
-                            .map(|dated_url| dated_url.url),
-                    );
+                    let res = self.urls_from_sitemap(sitemap, 5).await;
+                    self.sitemap_urls
+                        .extend(res.into_iter().map(|dated_url| dated_url.url));
                 }
             }
         }
@@ -313,7 +313,12 @@ impl<S: DatumStream> JobExecutor<S> {
                 continue;
             }
 
-            if let Some(delay) = self.robotstxt.crawl_delay(retryable_url.url()).await {
+            if let Some(delay) = self
+                .client
+                .robots_txt_manager()
+                .crawl_delay(retryable_url.url())
+                .await
+            {
                 if delay > self.min_crawl_delay {
                     self.min_crawl_delay = delay.min(self.max_crawl_delay);
                 }
@@ -456,7 +461,8 @@ impl<S: DatumStream> JobExecutor<S> {
 
     async fn fetch(&self, url: Url) -> Result<reqwest::Response> {
         self.client
-            .get(url.to_string())
+            .get(url)
+            .await?
             .send()
             .await
             .map_err(|e| Error::from(anyhow!(e)))
@@ -619,7 +625,7 @@ impl<S: DatumStream> JobExecutor<S> {
         Ok(datum)
     }
 
-    async fn urls_from_sitemap(&self, sitemap: Url, max_depth: usize) -> Vec<DatedUrl> {
+    async fn urls_from_sitemap(&mut self, sitemap: Url, max_depth: usize) -> Vec<DatedUrl> {
         let mut stack = vec![(sitemap, 0)];
         let mut urls = vec![];
 

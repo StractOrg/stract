@@ -17,6 +17,7 @@
 use url::Url;
 
 use crate::config::CheckIntervals;
+use crate::crawler::robot_client::RobotClient;
 use crate::webpage::Html;
 use crate::Result;
 use crate::{entrypoint::site_stats, webpage::url_ext::UrlExt};
@@ -26,11 +27,11 @@ use super::{Checker, CrawlableUrl};
 pub struct Frontpage {
     url: Url,
     last_check: std::time::Instant,
-    client: reqwest::Client,
+    client: RobotClient,
 }
 
 impl Frontpage {
-    pub fn new(site: &site_stats::Site, client: reqwest::Client) -> Result<Self> {
+    pub fn new(site: &site_stats::Site, client: RobotClient) -> Result<Self> {
         let url = Url::robust_parse(&format!("https://{}/", site.as_str()))?;
 
         Ok(Self {
@@ -42,8 +43,8 @@ impl Frontpage {
 }
 
 impl Checker for Frontpage {
-    async fn get_urls(&mut self) -> Result<Vec<CrawlableUrl>> {
-        let res = self.client.get(self.url.clone()).send().await?;
+    async fn get_urls(&self) -> Result<Vec<CrawlableUrl>> {
+        let res = self.client.get(self.url.clone()).await?.send().await?;
         let body = res.text().await?;
 
         let page = Html::parse(&body, self.url.as_str())?;

@@ -397,6 +397,35 @@ pub struct CrawlerConfig {
     pub router_hosts: Vec<String>,
 }
 
+#[cfg(test)]
+impl CrawlerConfig {
+    pub fn for_tests() -> Self {
+        Self {
+            num_worker_threads: 1,
+            user_agent: UserAgent {
+                full: "test".to_string(),
+                token: "test".to_string(),
+            },
+            robots_txt_cache_sec: defaults::Crawler::robots_txt_cache_sec(),
+            min_politeness_factor: defaults::Crawler::min_politeness_factor(),
+            start_politeness_factor: defaults::Crawler::start_politeness_factor(),
+            min_crawl_delay_ms: defaults::Crawler::min_crawl_delay_ms(),
+            max_crawl_delay_ms: defaults::Crawler::max_crawl_delay_ms(),
+            max_politeness_factor: defaults::Crawler::max_politeness_factor(),
+            max_url_slowdown_retry: defaults::Crawler::max_url_slowdown_retry(),
+            timeout_seconds: defaults::Crawler::timeout_seconds(),
+            s3: S3Config {
+                bucket: "".to_string(),
+                folder: "".to_string(),
+                access_key: "".to_string(),
+                secret_key: "".to_string(),
+                endpoint: "".to_string(),
+            },
+            router_hosts: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct DailyLiveIndexCrawlerBudget {
     #[serde(default = "defaults::LiveCrawler::blogs_budget")]

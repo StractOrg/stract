@@ -26,6 +26,7 @@ use std::time::Duration;
 
 use crate::ampc::dht::ShardId;
 use crate::config::{CheckIntervals, CrawlerConfig, LiveCrawlerConfig};
+use crate::crawler::robot_client::RobotClient;
 use crate::distributed::cluster::Cluster;
 use crate::distributed::sonic::replication::{
     RandomReplicaSelector, RandomShardSelector, ShardedClient,
@@ -33,7 +34,7 @@ use crate::distributed::sonic::replication::{
 use crate::distributed::streaming_response::StreamingResponse;
 use crate::entrypoint::search_server;
 use crate::entrypoint::site_stats::FinalSiteStats;
-use crate::{crawler, Result};
+use crate::Result;
 use crate::{
     distributed::sonic::replication::ReusableShardedClient,
     entrypoint::{indexer::IndexableWebpage, live_index},
@@ -56,7 +57,7 @@ const TICK_INTERVAL: Duration = Duration::from_secs(5);
 struct Client {
     live_index: Mutex<ReusableShardedClient<live_index::LiveIndexService>>,
     search: Mutex<ReusableShardedClient<search_server::SearchService>>,
-    reqwest: reqwest::Client,
+    client: RobotClient,
     crawler_config: CrawlerConfig,
 }
 
@@ -64,17 +65,18 @@ impl Client {
     pub async fn new(cluster: Arc<Cluster>, crawler_config: &CrawlerConfig) -> Result<Self> {
         let live_index = Mutex::new(ReusableShardedClient::new(cluster.clone()).await);
         let search = Mutex::new(ReusableShardedClient::new(cluster.clone()).await);
+        let client = RobotClient::new(crawler_config)?;
 
         Ok(Self {
+            client,
             live_index,
             search,
-            reqwest: crawler::reqwest_client(crawler_config)?,
             crawler_config: crawler_config.clone(),
         })
     }
 
-    pub fn reqwest(&self) -> &reqwest::Client {
-        &self.reqwest
+    pub fn reqwest(&self) -> RobotClient {
+        self.client.clone()
     }
 
     pub fn crawler_config(&self) -> &CrawlerConfig {

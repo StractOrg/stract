@@ -20,17 +20,18 @@ use crate::feed::{parse, Feed};
 use crate::Result;
 
 use super::{CheckIntervals, Checker, CrawlableUrl};
+use crate::crawler::robot_client::RobotClient;
 
 const CRAWL_DELAY: Duration = Duration::from_secs(5);
 
 pub struct Feeds {
     feeds: Vec<Feed>,
     last_check: std::time::Instant,
-    client: reqwest::Client,
+    client: RobotClient,
 }
 
 impl Feeds {
-    pub fn new(feeds: Vec<Feed>, client: reqwest::Client) -> Self {
+    pub fn new(feeds: Vec<Feed>, client: RobotClient) -> Self {
         Self {
             feeds,
             last_check: std::time::Instant::now(),
@@ -40,13 +41,21 @@ impl Feeds {
 }
 
 impl Checker for Feeds {
-    async fn get_urls(&mut self) -> Result<Vec<CrawlableUrl>> {
+    async fn get_urls(&self) -> Result<Vec<CrawlableUrl>> {
         let mut urls = Vec::new();
 
         for feed in &self.feeds {
-            let resp = self.client.get(feed.url.clone()).send().await?;
+            let Ok(req) = self.client.get(feed.url.clone()).await else {
+                continue;
+            };
+            let Ok(resp) = req.send().await else {
+                continue;
+            };
+
             let text = resp.text().await?;
-            let parsed_feed = parse(&text, feed.kind)?;
+            let Ok(parsed_feed) = parse(&text, feed.kind) else {
+                continue;
+            };
 
             for link in parsed_feed.links {
                 urls.push(CrawlableUrl::from(link));
