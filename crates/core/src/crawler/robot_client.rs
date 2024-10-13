@@ -63,12 +63,41 @@ impl RobotClient {
         &self.robots_txt_manager
     }
 
-    pub async fn get(&self, url: Url) -> Result<reqwest::RequestBuilder> {
+    pub async fn get(&self, url: Url) -> Result<RequestBuilder> {
         if !self.robots_txt_manager.is_allowed(&url).await {
             return Err(Error::DisallowedPath);
         }
 
-        Ok(self.client.get(url))
+        Ok(RequestBuilder::new(self.client.get(url)))
+    }
+}
+
+#[allow(dead_code)] // not used in tests, but required for public API
+pub struct RequestBuilder(reqwest::RequestBuilder);
+
+impl From<reqwest::RequestBuilder> for RequestBuilder {
+    fn from(builder: reqwest::RequestBuilder) -> Self {
+        Self::new(builder)
+    }
+}
+
+impl RequestBuilder {
+    pub fn new(builder: reqwest::RequestBuilder) -> Self {
+        Self(builder)
+    }
+
+    #[cfg(not(test))]
+    pub async fn send(self) -> Result<reqwest::Response> {
+        self.0.send().await.map_err(|e| Error::from(anyhow!(e)))
+    }
+
+    #[cfg(test)]
+    pub async fn send(&self) -> Result<reqwest::Response> {
+        Err(Error::from(anyhow!("Not allowed in tests")))
+    }
+
+    pub fn timeout(self, timeout: Duration) -> Self {
+        Self(self.0.timeout(timeout))
     }
 }
 

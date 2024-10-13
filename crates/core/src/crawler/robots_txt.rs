@@ -118,9 +118,7 @@ impl InnerRobotsTxtManager {
     }
 
     async fn fetch_robots_txt_from_url(&self, url: &str) -> Lookup<robotstxt::Robots> {
-        let res = match self
-            .client
-            .get(url)
+        let res = match super::robot_client::RequestBuilder::new(self.client.get(url))
             .timeout(Duration::from_secs(60))
             .send()
             .await
