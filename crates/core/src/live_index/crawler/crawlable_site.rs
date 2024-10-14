@@ -69,7 +69,7 @@ impl InnerCrawlableSite {
                     .collect(),
                 client.reqwest(),
             ),
-            sitemap: Sitemap::new(site.site(), client.crawler_config())?,
+            sitemap: Sitemap::new(site.site(), client.reqwest())?,
             frontpage: Frontpage::new(site.site(), client.reqwest())?,
             last_drip: Instant::now(),
             drip_rate,

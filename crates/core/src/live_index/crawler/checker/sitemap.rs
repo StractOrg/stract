@@ -18,7 +18,6 @@ use std::time::Duration;
 
 use url::Url;
 
-use crate::config::CrawlerConfig;
 use crate::crawler::robot_client::RobotClient;
 use crate::dated_url::DatedUrl;
 use crate::sitemap::{parse_sitemap, SitemapEntry};
@@ -37,13 +36,13 @@ pub struct Sitemap {
 }
 
 impl Sitemap {
-    pub fn new(site: &site_stats::Site, config: &CrawlerConfig) -> Result<Self> {
+    pub fn new(site: &site_stats::Site, client: RobotClient) -> Result<Self> {
         let robots_url = Url::robust_parse(&format!("{}/robots.txt", site.as_str()))?;
 
         Ok(Self {
             robots_url,
+            client,
             last_check: std::time::Instant::now(),
-            client: RobotClient::new(config)?,
         })
     }
 
