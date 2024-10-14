@@ -396,7 +396,7 @@ where
         shard_selector: &SSel,
         replica_selector: &RSel,
         timeout: Duration,
-    ) -> Result<Vec<(Id, Vec<(SocketAddr, Req::Response)>)>>
+    ) -> Result<Vec<Result<(Id, Vec<(SocketAddr, Req::Response)>)>>>
     where
         Req: sonic::service::Wrapper<S> + Clone,
         SSel: ShardSelector<S, Id>,
@@ -414,10 +414,10 @@ where
         let mut results = Vec::new();
         for r in join_all(futures).await {
             match r {
-                Ok(r) => results.push(r),
+                Ok(r) => results.push(Ok(r)),
                 Err(e) => {
                     tracing::error!("Failed to send request: {:?}", e);
-                    return Err(e);
+                    results.push(Err(e));
                 }
             }
         }
@@ -430,7 +430,7 @@ where
         req: Req,
         shard_selector: &SSel,
         replica_selector: &RSel,
-    ) -> Result<Vec<(Id, Vec<(SocketAddr, Req::Response)>)>>
+    ) -> Result<Vec<Result<(Id, Vec<(SocketAddr, Req::Response)>)>>>
     where
         Req: sonic::service::Wrapper<S> + Clone,
         SSel: ShardSelector<S, Id>,

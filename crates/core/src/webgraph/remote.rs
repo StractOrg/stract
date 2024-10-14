@@ -184,6 +184,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
 
         Ok(res
             .into_iter()
+            .flatten()
             .flat_map(|(_, res)| res.into_iter().map(|(_, v)| v))
             .find(|n| n.is_some())
             .flatten()
@@ -229,6 +230,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
 
         Ok(res
             .into_iter()
+            .flatten()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
                 reps.into_iter().flat_map(|(_, rep)| rep)
@@ -249,6 +251,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
 
         Ok(res
             .into_iter()
+            .flatten()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
                 reps.into_iter().flat_map(|(_, rep)| rep)
@@ -273,6 +276,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
 
         Ok(res
             .into_iter()
+            .flatten()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
                 reps.into_iter().flat_map(|(_, rep)| rep)
@@ -355,6 +359,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
 
         Ok(res
             .into_iter()
+            .flatten()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
                 reps.into_iter().flat_map(|(_, rep)| rep)
@@ -375,6 +380,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
 
         Ok(res
             .into_iter()
+            .flatten()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
                 reps.into_iter().flat_map(|(_, rep)| rep)
@@ -399,6 +405,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
 
         Ok(res
             .into_iter()
+            .flatten()
             .flat_map(|(_, reps)| {
                 debug_assert!(reps.len() <= 1);
                 reps.into_iter().flat_map(|(_, rep)| rep)
@@ -475,6 +482,7 @@ impl StreamingResponse for StreamNodeIDs {
 
         Ok(res
             .into_iter()
+            .flatten()
             .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v))
             .collect())
     }

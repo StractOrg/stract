@@ -96,6 +96,12 @@ impl Client {
         while let Err(e) = conn
             .send(req.clone(), &RandomShardSelector, &RandomReplicaSelector)
             .await
+            .map_err(|e| anyhow::anyhow!("send failed: {e}"))
+            .and_then(|v| {
+                v.into_iter()
+                    .map(|v| v.map_err(|e| anyhow::anyhow!("shard failed: {e}")))
+                    .collect::<Result<Vec<_>>>()
+            })
         {
             tracing::error!("Failed to index pages: {e}");
             tokio::time::sleep(Duration::from_millis(1_000)).await;

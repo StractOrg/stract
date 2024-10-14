@@ -236,6 +236,7 @@ impl DistributedSearcher {
         {
             Ok(v) => v
                 .into_iter()
+                .flatten()
                 .flat_map(|(_, v)| v.into_iter().map(|(_, v)| v))
                 .flatten()
                 .flatten()
@@ -262,7 +263,7 @@ impl SearchClient for DistributedSearcher {
             )
             .await
         {
-            for (shard_id, mut res) in res {
+            for (shard_id, mut res) in res.into_iter().flatten() {
                 if let Some((_, Some(res))) = res.pop() {
                     results.push(InitialSearchResultShard {
                         local_result: res,
@@ -329,6 +330,7 @@ impl SearchClient for DistributedSearcher {
 
         if let Some(res) = res
             .into_iter()
+            .flatten()
             .flat_map(|(_, v)| v.into_iter().map(|(_, v)| v))
             .flatten()
             .next()
@@ -355,6 +357,7 @@ impl SearchClient for DistributedSearcher {
         match res {
             Ok(v) => v
                 .into_iter()
+                .flatten()
                 .flat_map(|(_, v)| {
                     v.into_iter()
                         .map(|(_, crate::bincode_utils::SerdeCompat(v))| v)
@@ -385,7 +388,9 @@ impl SearchClient for DistributedSearcher {
             )
             .await
             .map_err(|_| Error::SearchFailed)?
-            .pop()
+            .into_iter()
+            .flatten()
+            .next()
             .and_then(|(_, mut v)| v.pop())
             .and_then(|(_, v)| v))
     }
@@ -403,7 +408,9 @@ impl SearchClient for DistributedSearcher {
             )
             .await
             .ok()?
-            .pop()
+            .into_iter()
+            .flatten()
+            .next()
             .and_then(|(_, mut v)| v.pop())
             .and_then(|(_, v)| v)
     }
@@ -424,7 +431,7 @@ impl SearchClient for DistributedSearcher {
             Ok(res) => {
                 let mut phrases = HashMap::new();
 
-                for (_, v) in res {
+                for (_, v) in res.into_iter().flatten() {
                     for (_, v) in v {
                         for phrase in v {
                             *phrases.entry(phrase.text().to_string()).or_default() +=

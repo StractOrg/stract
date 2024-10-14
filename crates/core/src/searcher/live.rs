@@ -103,6 +103,7 @@ impl LiveSearcher {
         {
             Ok(v) => v
                 .into_iter()
+                .flatten()
                 .flat_map(|(_, v)| v.into_iter().map(|(_, v)| v))
                 .flatten()
                 .flatten()
@@ -129,7 +130,7 @@ impl SearchClient for LiveSearcher {
             )
             .await
         {
-            for (shard_id, mut res) in res {
+            for (shard_id, mut res) in res.into_iter().flatten() {
                 if let Some((_, Some(res))) = res.pop() {
                     results.push(InitialSearchResultShard {
                         local_result: res,

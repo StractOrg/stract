@@ -68,6 +68,7 @@ impl StreamingResponse for SiteUrlStream<search_server::SearchService> {
 
         Ok(res
             .into_iter()
+            .flatten()
             .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v.urls))
             .collect())
     }
@@ -90,6 +91,7 @@ impl StreamingResponse for SiteUrlStream<live_index::LiveIndexService> {
 
         Ok(res
             .into_iter()
+            .flatten()
             .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v.urls))
             .collect())
     }
