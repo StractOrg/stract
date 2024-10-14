@@ -398,7 +398,7 @@ impl CoreSignal for FetchTimeMs {
 pub struct UpdateTimestamp;
 impl CoreSignal for UpdateTimestamp {
     fn default_coefficient(&self) -> f64 {
-        0.5
+        0.85
     }
 
     fn as_field(&self) -> Option<Field> {

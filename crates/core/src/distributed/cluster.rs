@@ -17,6 +17,7 @@ use chitchat::{
     spawn_chitchat, transport::UdpTransport, Chitchat, ChitchatConfig, ChitchatHandle,
     ClusterStateSnapshot, FailureDetectorConfig, NodeId,
 };
+use itertools::Itertools;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 
@@ -141,6 +142,9 @@ impl Cluster {
 
     pub async fn members(&self) -> Vec<Member> {
         snapshot_members(self.chitchat.lock().await.state_snapshot())
+            .into_iter()
+            .unique_by(|m| m.service.clone())
+            .collect()
     }
 
     pub async fn await_member<P>(&self, pred: P) -> Member
