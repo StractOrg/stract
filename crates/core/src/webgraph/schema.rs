@@ -16,10 +16,14 @@
 
 use enum_dispatch::enum_dispatch;
 use strum::{EnumDiscriminants, VariantArray};
+use tantivy::schema::OwnedValue;
+use tantivy::schema::Value;
 
 use crate::enum_dispatch_from_discriminant;
+use crate::Result;
 
 use super::document::{Edge, ReferenceValue};
+use super::Node;
 
 #[enum_dispatch]
 pub trait Field:
@@ -27,6 +31,7 @@ pub trait Field:
 {
     fn name(&self) -> &'static str;
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a>;
+    fn set_value<'a>(&self, edge: &'a mut Edge, value: OwnedValue) -> Result<()>;
 }
 
 #[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
@@ -38,6 +43,15 @@ impl Field for FromUrl {
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
         ReferenceValue::Str(edge.from.as_str())
+    }
+
+    fn set_value<'a>(&self, edge: &'a mut Edge, value: OwnedValue) -> Result<()> {
+        let url = value
+            .as_ref()
+            .as_str()
+            .ok_or(anyhow::anyhow!("Invalid URL"))?;
+        edge.from = Node::from_str(url);
+        Ok(())
     }
 }
 
@@ -51,6 +65,15 @@ impl Field for ToUrl {
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
         ReferenceValue::Str(edge.to.as_str())
     }
+
+    fn set_value<'a>(&self, edge: &'a mut Edge, value: OwnedValue) -> Result<()> {
+        let url = value
+            .as_ref()
+            .as_str()
+            .ok_or(anyhow::anyhow!("Invalid URL"))?;
+        edge.to = Node::from_str(url);
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
@@ -62,6 +85,10 @@ impl Field for FromId {
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
         ReferenceValue::U64(edge.from.id().as_u64())
+    }
+
+    fn set_value<'a>(&self, _: &'a mut Edge, _: OwnedValue) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -75,6 +102,10 @@ impl Field for ToId {
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
         ReferenceValue::U64(edge.to.id().as_u64())
     }
+
+    fn set_value<'a>(&self, _: &'a mut Edge, _: OwnedValue) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
@@ -86,6 +117,10 @@ impl Field for FromHostId {
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
         ReferenceValue::U64(edge.from.clone().into_host().id().as_u64())
+    }
+
+    fn set_value<'a>(&self, _: &'a mut Edge, _: OwnedValue) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -99,6 +134,10 @@ impl Field for ToHostId {
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
         ReferenceValue::U64(edge.to.clone().into_host().id().as_u64())
     }
+
+    fn set_value<'a>(&self, _: &'a mut Edge, _: OwnedValue) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
@@ -111,6 +150,10 @@ impl Field for RelFlags {
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
         ReferenceValue::U64(edge.rel_flags.as_u64())
     }
+
+    fn set_value<'a>(&self, _: &'a mut Edge, _: OwnedValue) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
@@ -122,6 +165,15 @@ impl Field for Label {
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
         ReferenceValue::Str(edge.label.as_str())
+    }
+
+    fn set_value<'a>(&self, edge: &'a mut Edge, value: OwnedValue) -> Result<()> {
+        edge.label = value
+            .as_ref()
+            .as_str()
+            .ok_or(anyhow::anyhow!("Invalid label"))?
+            .to_string();
+        Ok(())
     }
 }
 

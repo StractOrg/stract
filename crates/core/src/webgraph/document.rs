@@ -15,7 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
 use strum::VariantArray;
-use tantivy::Document;
+use tantivy::{
+    schema::{document::DocumentDeserialize, OwnedValue},
+    Document,
+};
 
 use crate::webpage::html::links::RelFlags;
 
@@ -31,6 +34,17 @@ pub struct Edge {
     pub label: String,
 }
 
+impl Edge {
+    pub fn empty() -> Self {
+        Self {
+            from: Node::empty(),
+            to: Node::empty(),
+            rel_flags: RelFlags::default(),
+            label: String::default(),
+        }
+    }
+}
+
 impl Document for Edge {
     type Value<'a> = ReferenceValue<'a>;
 
@@ -38,6 +52,28 @@ impl Document for Edge {
 
     fn iter_fields_and_values(&self) -> Self::FieldsValuesIter<'_> {
         FieldsIter::new(self)
+    }
+}
+
+impl DocumentDeserialize for Edge {
+    fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<Self, tantivy::schema::document::DeserializeError>
+    where
+        D: tantivy::schema::document::DocumentDeserializer<'de>,
+    {
+        let mut deserializer = deserializer;
+        let mut edge = Edge::empty();
+
+        while let Some((field, value)) = deserializer.next_field::<OwnedValue>()? {
+            let field =
+                FieldEnum::from(FieldEnumDiscriminants::VARIANTS[field.field_id() as usize]);
+            field
+                .set_value(&mut edge, value)
+                .map_err(|e| tantivy::schema::document::DeserializeError::custom(e.to_string()))?;
+        }
+
+        Ok(edge)
     }
 }
 

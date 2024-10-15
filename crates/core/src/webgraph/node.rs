@@ -126,6 +126,19 @@ impl Node {
         }
     }
 
+    pub fn empty() -> Self {
+        Node {
+            name: String::new(),
+        }
+    }
+
+    /// Dangerous! No validation is done on the input string.
+    pub fn from_str(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+        }
+    }
+
     pub fn into_host(self) -> Node {
         let url = if self.name.contains("://") {
             Url::parse(&self.name)
