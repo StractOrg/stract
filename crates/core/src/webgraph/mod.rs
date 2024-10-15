@@ -44,6 +44,7 @@ mod edge;
 mod id_node_db;
 mod merge;
 mod node;
+mod query;
 pub mod remote;
 mod segment;
 mod shortest_path;

@@ -16,6 +16,7 @@
 
 use std::{fs::File, ops::Range, path::Path};
 
+use super::query::collector::{Collector, TantivyCollector};
 use crate::{
     webgraph::merge::{EdgeMerger, MergeIter},
     webpage::html::links::RelFlags,
@@ -33,6 +34,7 @@ use itertools::Itertools;
 
 use super::{
     merge::{MergeNode, MergeSegmentOrd},
+    query::Query,
     Compression, NodeDatum, NodeID, SegmentEdge, StoredEdge,
 };
 
@@ -241,6 +243,7 @@ pub struct EdgeStore {
 
     edge_labels: IterableStoreReader<CompressedLabelBlock>,
     edges: ConstIterableStoreReader<StoredEdge>,
+    index: tantivy::Index,
 }
 
 impl EdgeStore {
@@ -256,6 +259,7 @@ impl EdgeStore {
             edge_labels,
             edges,
             reversed,
+            index: todo!(),
         }
     }
 
@@ -517,7 +521,40 @@ impl EdgeStore {
         }
     }
 
+    pub fn search<Q: Query>(&self, query: &Q) -> Result<<Q::Collector as Collector>::Fruit> {
+        let searcher = self.index.reader().unwrap().searcher();
+        let res = searcher.search(
+            &query.tantivy_query(),
+            &TantivyCollector::from(&query.collector()),
+        )?;
+
+        Ok(res)
+    }
+
+    pub fn retrieve<Q: Query>(
+        &self,
+        query: &Q,
+        fruit: &<Q::Collector as Collector>::Fruit,
+    ) -> Result<Q::Output> {
+        let searcher = self.index.reader().unwrap().searcher();
+        query.retrieve(&searcher, fruit)
+    }
+
     pub fn iter_without_label(&self) -> impl Iterator<Item = SegmentEdge<()>> + '_ + Send + Sync {
+        // self.index
+        //     .reader()
+        //     .unwrap()
+        //     .searcher()
+        //     .segment_readers()
+        //     .iter()
+        //     .map(|segment| {
+        //         let columns = segment.column_fields();
+
+        //         segment
+        //             .doc_ids()
+        //             .map(|doc| todo!("construct edge from stored columns"))
+        //     })
+
         self.ranges.edges.iter_raw().flat_map(move |(key, val)| {
             let node = u64::from_be_bytes((key.as_bytes()).try_into().unwrap());
             let node = NodeID::from(node);
