@@ -42,6 +42,7 @@ use crate::{
 use crawlable_site::{CrawlableSite, CrawlableSiteGuard};
 use crawled_db::ShardedCrawledDb;
 use futures::StreamExt;
+use rand::seq::SliceRandom;
 use site_url_stream::SiteUrlStream;
 use tokio::sync::Mutex;
 use tokio::sync::Semaphore;
@@ -270,6 +271,7 @@ impl Crawler {
             interval.tick().await;
             tracing::debug!("Tick");
 
+            self.sites.shuffle(&mut rand::thread_rng());
             for site in &mut self.sites {
                 if site.currently_crawling() {
                     tracing::debug!("Site {} is currently crawling", site.site().as_str());
