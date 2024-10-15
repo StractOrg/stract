@@ -47,32 +47,40 @@ pub fn run(config: &config::IndexerConfig) -> Result<()> {
 
     let worker = crate::block_on(IndexingWorker::new(config.clone().into()));
 
-    let indexes = warc_paths
-        .into_par_iter()
-        .skip(config.skip_warc_files.unwrap_or(0))
-        .take(config.limit_warc_files.unwrap_or(usize::MAX))
-        .map(|warc_path| Job {
-            source_config: job_config.clone(),
-            warc_path,
-            base_path: config.output_path.clone(),
-            settings: JobSettings {
-                host_centrality_threshold: config.host_centrality_threshold,
-                minimum_clean_words: config.minimum_clean_words,
-                batch_size: config.batch_size,
-                autocommit_after_num_inserts: config.autocommit_after_num_inserts,
-            },
-        })
-        .map(|job| {
-            IndexPointer(
-                job.process(&worker)
-                    .path()
-                    .as_os_str()
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-            )
-        })
-        .collect();
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(usize::from(std::thread::available_parallelism()?))
+        .stack_size(160_000_000)
+        .thread_name(move |num| format!("indexer-worker-{num}"))
+        .build()?;
+
+    let indexes = thread_pool.install(|| {
+        warc_paths
+            .into_par_iter()
+            .skip(config.skip_warc_files.unwrap_or(0))
+            .take(config.limit_warc_files.unwrap_or(usize::MAX))
+            .map(|warc_path| Job {
+                source_config: job_config.clone(),
+                warc_path,
+                base_path: config.output_path.clone(),
+                settings: JobSettings {
+                    host_centrality_threshold: config.host_centrality_threshold,
+                    minimum_clean_words: config.minimum_clean_words,
+                    batch_size: config.batch_size,
+                    autocommit_after_num_inserts: config.autocommit_after_num_inserts,
+                },
+            })
+            .map(|job| {
+                IndexPointer(
+                    job.process(&worker)
+                        .path()
+                        .as_os_str()
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                )
+            })
+            .collect()
+    });
 
     let index = merge(indexes)?;
     crate::mv(index.path(), &config.output_path)?;
