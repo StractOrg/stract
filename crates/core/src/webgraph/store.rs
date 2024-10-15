@@ -141,11 +141,11 @@ impl ConstSerializable for RelFlags {
     const BYTES: usize = std::mem::size_of::<RelFlags>();
 
     fn serialize(&self, buf: &mut [u8]) {
-        self.as_u32().serialize(buf);
+        self.as_u64().serialize(buf);
     }
 
     fn deserialize(buf: &[u8]) -> Self {
-        u32::deserialize(buf).into()
+        u64::deserialize(buf).into()
     }
 }
 

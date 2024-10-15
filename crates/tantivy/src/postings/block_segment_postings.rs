@@ -290,7 +290,7 @@ impl BlockSegmentPostings {
     /// `.load_block()` needs to be called manually afterwards.
     /// If all docs are smaller than target, the block loaded may be empty,
     /// or be the last an incomplete VInt block.
-    pub(crate) fn shallow_seek(&mut self, target_doc: DocId) {
+    pub fn shallow_seek(&mut self, target_doc: DocId) {
         if self.skip_reader.seek(target_doc) {
             self.block_max_score_cache = None;
             self.block_loaded = false;
@@ -373,7 +373,7 @@ impl BlockSegmentPostings {
         }
     }
 
-    pub(crate) fn skip_reader(&self) -> &SkipReader {
+    pub fn skip_reader(&self) -> &SkipReader {
         &self.skip_reader
     }
 }

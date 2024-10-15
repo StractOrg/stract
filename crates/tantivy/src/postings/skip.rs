@@ -82,7 +82,7 @@ impl SkipSerializer {
 }
 
 #[derive(Clone)]
-pub(crate) struct SkipReader {
+pub struct SkipReader {
     last_doc_in_block: DocId,
     pub(crate) last_doc_in_previous_block: DocId,
     owned_read: OwnedBytes,
@@ -96,7 +96,7 @@ pub(crate) struct SkipReader {
 }
 
 #[derive(Clone, Eq, PartialEq, Copy, Debug)]
-pub(crate) enum BlockInfo {
+pub enum BlockInfo {
     BitPacked {
         doc_num_bits: u8,
         strict_delta_encoded: bool,
@@ -170,7 +170,7 @@ impl SkipReader {
         }
     }
 
-    pub(crate) fn last_doc_in_block(&self) -> DocId {
+    pub fn last_doc_in_block(&self) -> DocId {
         self.last_doc_in_block
     }
 

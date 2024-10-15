@@ -17,4 +17,5 @@
 pub mod dummy;
 pub use dummy::DummyQuery;
 
+pub mod host_links;
 pub mod links;

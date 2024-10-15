@@ -14,65 +14,82 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::webgraph::NodeID;
+use tantivy::{postings::SegmentPostings, query::EmptyScorer, Term};
+
+use crate::webgraph::{
+    schema::{Field, FieldEnum},
+    NodeID,
+};
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct LinksQuery {
     node: NodeID,
-    field_name: String,
+    field: FieldEnum,
 }
 
 impl tantivy::query::Query for LinksQuery {
     fn weight(
         &self,
-        enable_scoring: tantivy::query::EnableScoring<'_>,
+        _: tantivy::query::EnableScoring<'_>,
     ) -> tantivy::Result<Box<dyn tantivy::query::Weight>> {
-        todo!()
+        Ok(Box::new(LinksWeight {
+            node: self.node,
+            field: self.field,
+        }))
     }
 }
 
 struct LinksWeight {
     node: NodeID,
+    field: FieldEnum,
 }
 
 impl tantivy::query::Weight for LinksWeight {
     fn scorer(
         &self,
         reader: &tantivy::SegmentReader,
-        boost: tantivy::Score,
+        _: tantivy::Score,
     ) -> tantivy::Result<Box<dyn tantivy::query::Scorer>> {
-        todo!()
+        let field = reader.schema().get_field(self.field.name())?;
+        let term = Term::from_field_u64(field, self.node.as_u64());
+
+        let index = reader.inverted_index(field)?;
+        match index.read_postings(&term, tantivy::schema::IndexRecordOption::Basic)? {
+            Some(postings) => Ok(Box::new(LinksScorer { postings })),
+            None => Ok(Box::new(EmptyScorer)),
+        }
     }
 
     fn explain(
         &self,
-        reader: &tantivy::SegmentReader,
-        doc: tantivy::DocId,
+        _: &tantivy::SegmentReader,
+        _: tantivy::DocId,
     ) -> tantivy::Result<tantivy::query::Explanation> {
-        todo!()
+        let explanation = tantivy::query::Explanation::new("LinksQuery", 0.0);
+        Ok(explanation)
     }
 }
 
 struct LinksScorer {
-    node: NodeID,
+    postings: SegmentPostings,
 }
 
 impl tantivy::query::Scorer for LinksScorer {
     fn score(&mut self) -> tantivy::Score {
-        todo!()
+        unimplemented!()
     }
 }
 
 impl tantivy::DocSet for LinksScorer {
     fn advance(&mut self) -> tantivy::DocId {
-        todo!()
+        self.postings.advance()
     }
 
     fn doc(&self) -> tantivy::DocId {
-        todo!()
+        self.postings.doc()
     }
 
     fn size_hint(&self) -> u32 {
-        todo!()
+        self.postings.size_hint()
     }
 }

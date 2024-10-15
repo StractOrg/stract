@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::webgraph::NodeID;
+use crate::webgraph::{
+    schema::{Field, ToId},
+    NodeID,
+};
 
 use super::{
     collector::{FastCountCollector, FastCountValue},
@@ -36,7 +39,10 @@ impl Query for InDegreeQuery {
     }
 
     fn collector(&self) -> Self::Collector {
-        FastCountCollector::new("to_id".to_string(), FastCountValue::U64(self.node.as_u64()))
+        FastCountCollector::new(
+            ToId.name().to_string(),
+            FastCountValue::U64(self.node.as_u64()),
+        )
     }
 
     fn retrieve(
