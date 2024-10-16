@@ -15,8 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod fast_count;
+mod top_docs;
 
 pub use fast_count::{FastCountCollector, FastCountValue};
+pub use top_docs::TopDocsCollector;
 
 use tantivy::{
     collector::{Fruit, SegmentCollector},

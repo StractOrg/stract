@@ -534,7 +534,7 @@ impl EdgeStore {
     pub fn retrieve<Q: Query>(
         &self,
         query: &Q,
-        fruit: &<Q::Collector as Collector>::Fruit,
+        fruit: <Q::Collector as Collector>::Fruit,
     ) -> Result<Q::Output> {
         let searcher = self.index.reader().unwrap().searcher();
         query.retrieve(&searcher, fruit)

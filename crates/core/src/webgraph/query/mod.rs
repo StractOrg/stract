@@ -18,9 +18,11 @@ use crate::Result;
 use collector::Collector;
 use tantivy::Searcher;
 
-pub mod backlinks;
+pub mod backlink;
 pub mod collector;
 mod degree;
+mod document_scorer;
+pub mod forwardlink;
 mod raw;
 
 pub trait Query: Send + Sync + bincode::Encode + bincode::Decode + Clone {
@@ -31,9 +33,13 @@ pub trait Query: Send + Sync + bincode::Encode + bincode::Decode + Clone {
     fn tantivy_query(&self) -> Self::TantivyQuery;
     fn collector(&self) -> Self::Collector;
 
+    fn remote_collector(&self) -> Self::Collector {
+        self.collector()
+    }
+
     fn retrieve(
         &self,
         searcher: &Searcher,
-        fruit: &<Self::Collector as Collector>::Fruit,
+        fruit: <Self::Collector as Collector>::Fruit,
     ) -> Result<Self::Output>;
 }

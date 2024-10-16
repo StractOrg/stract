@@ -32,6 +32,7 @@ pub struct Edge {
     pub to: Node,
     pub rel_flags: RelFlags,
     pub label: String,
+    pub combined_centrality: f64,
 }
 
 impl Edge {
@@ -41,6 +42,7 @@ impl Edge {
             to: Node::empty(),
             rel_flags: RelFlags::default(),
             label: String::default(),
+            combined_centrality: 0.0,
         }
     }
 }
@@ -111,11 +113,7 @@ impl<'a> Iterator for FieldsIter<'a> {
 pub enum ReferenceValue<'a> {
     Str(&'a str),
     U64(u64),
-    I64(i64),
     F64(f64),
-    Date(tantivy::DateTime),
-    Bytes(&'a [u8]),
-    Bool(bool),
 }
 
 impl<'a> tantivy::schema::Value<'a> for ReferenceValue<'a> {
@@ -130,20 +128,8 @@ impl<'a> tantivy::schema::Value<'a> for ReferenceValue<'a> {
             ReferenceValue::U64(u) => tantivy::schema::document::ReferenceValue::Leaf(
                 tantivy::schema::document::ReferenceValueLeaf::U64(*u),
             ),
-            ReferenceValue::I64(i) => tantivy::schema::document::ReferenceValue::Leaf(
-                tantivy::schema::document::ReferenceValueLeaf::I64(*i),
-            ),
             ReferenceValue::F64(f) => tantivy::schema::document::ReferenceValue::Leaf(
                 tantivy::schema::document::ReferenceValueLeaf::F64(*f),
-            ),
-            ReferenceValue::Date(d) => tantivy::schema::document::ReferenceValue::Leaf(
-                tantivy::schema::document::ReferenceValueLeaf::Date(*d),
-            ),
-            ReferenceValue::Bytes(b) => tantivy::schema::document::ReferenceValue::Leaf(
-                tantivy::schema::document::ReferenceValueLeaf::Bytes(*b),
-            ),
-            ReferenceValue::Bool(b) => tantivy::schema::document::ReferenceValue::Leaf(
-                tantivy::schema::document::ReferenceValueLeaf::Bool(*b),
             ),
         }
     }

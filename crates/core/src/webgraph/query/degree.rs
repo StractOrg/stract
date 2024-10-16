@@ -48,8 +48,8 @@ impl Query for InDegreeQuery {
     fn retrieve(
         &self,
         _: &tantivy::Searcher,
-        fruit: &<Self::Collector as super::collector::Collector>::Fruit,
+        fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> crate::Result<Self::Output> {
-        Ok(*fruit)
+        Ok(fruit)
     }
 }

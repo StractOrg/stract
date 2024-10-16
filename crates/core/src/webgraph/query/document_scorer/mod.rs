@@ -14,9 +14,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::Query;
-use crate::{webgraph::NodeID, Result};
+use tantivy::{columnar::Column, DocId, Score, SegmentReader};
 
-pub struct BacklinksQuery {
-    node: NodeID,
+use crate::webgraph::schema::{CombinedCentrality, Field};
+
+pub trait DocumentScorer: Send + Sync + Sized {
+    fn for_segment(segment: &SegmentReader) -> tantivy::Result<Self>;
+    fn score(&self, doc: DocId) -> Score;
+}
+
+pub struct DefaultDocumentScorer {
+    column: Column<f64>,
+}
+
+impl DocumentScorer for DefaultDocumentScorer {
+    fn for_segment(segment: &SegmentReader) -> tantivy::Result<Self> {
+        let column = segment.column_fields().f64(CombinedCentrality.name())?;
+        Ok(Self { column })
+    }
+
+    fn score(&self, doc: DocId) -> Score {
+        self.column.first(doc).unwrap_or(0.0) as Score
+    }
 }

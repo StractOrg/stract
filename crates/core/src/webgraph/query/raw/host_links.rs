@@ -18,7 +18,7 @@ use tantivy::{columnar::Column, postings::SegmentPostings};
 
 use crate::webgraph::{
     schema::{Field, FieldEnum},
-    Node, NodeID,
+    NodeID,
 };
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
@@ -28,10 +28,10 @@ pub struct HostLinksQuery {
 }
 
 impl HostLinksQuery {
-    pub fn new(node: Node, field: FieldEnum) -> Self {
+    pub fn new<F: Field>(node: NodeID, field: F) -> Self {
         Self {
-            node: node.into_host().id(),
-            field,
+            node,
+            field: field.into(),
         }
     }
 }

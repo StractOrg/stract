@@ -27,6 +27,15 @@ pub struct LinksQuery {
     field: FieldEnum,
 }
 
+impl LinksQuery {
+    pub fn new<F: Field>(node: NodeID, field: F) -> Self {
+        Self {
+            node,
+            field: field.into(),
+        }
+    }
+}
+
 impl tantivy::query::Query for LinksQuery {
     fn weight(
         &self,

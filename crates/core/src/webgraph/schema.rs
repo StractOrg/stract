@@ -177,6 +177,28 @@ impl Field for Label {
     }
 }
 
+#[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
+pub struct CombinedCentrality;
+impl Field for CombinedCentrality {
+    fn name(&self) -> &'static str {
+        "combined_centrality"
+    }
+
+    fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
+        ReferenceValue::F64(edge.combined_centrality)
+    }
+
+    fn set_value<'a>(&self, edge: &'a mut Edge, value: OwnedValue) -> Result<()> {
+        let centrality = value
+            .as_ref()
+            .as_f64()
+            .ok_or(anyhow::anyhow!("Invalid centrality"))?;
+        edge.combined_centrality = centrality;
+
+        Ok(())
+    }
+}
+
 #[enum_dispatch(Field)]
 #[derive(Clone, Copy, Debug, EnumDiscriminants, bincode::Encode, bincode::Decode)]
 #[strum_discriminants(derive(VariantArray))]
@@ -189,6 +211,7 @@ pub enum FieldEnum {
     ToHostId,
     RelFlags,
     Label,
+    CombinedCentrality,
 }
 
 impl FieldEnum {
@@ -210,4 +233,5 @@ enum_dispatch_from_discriminant!(FieldEnumDiscriminants => FieldEnum,
   ToHostId,
   RelFlags,
   Label,
+  CombinedCentrality,
 ]);

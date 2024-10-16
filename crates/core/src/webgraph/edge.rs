@@ -210,9 +210,4 @@ impl<L> StoredEdge<L> {
     pub fn rel(&self) -> RelFlags {
         self.rel
     }
-
-    #[inline]
-    pub fn other_host_rank(&self) -> u64 {
-        self.other.host_rank()
-    }
 }
