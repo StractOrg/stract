@@ -21,8 +21,8 @@ use std::{
 };
 
 use super::{
-    store::EdgeStore, store_writer::EdgeStoreWriter, Compression, InsertableEdge, NodeID,
-    SegmentEdge,
+    document::SmallEdge, store::EdgeStore, store_writer::EdgeStoreWriter, Compression,
+    InsertableEdge, NodeID, SegmentEdge,
 };
 use crate::Result;
 
@@ -204,8 +204,8 @@ impl Segment {
         Path::new(&self.folder_path).join(&self.id)
     }
 
-    pub fn edges(&self) -> impl Iterator<Item = SegmentEdge<()>> + '_ + Send + Sync {
-        self.adjacency.iter_without_label()
+    pub fn edges(&self) -> impl Iterator<Item = SmallEdge> + '_ {
+        self.adjacency.iter_small()
     }
 
     pub fn optimize_read(&mut self) {

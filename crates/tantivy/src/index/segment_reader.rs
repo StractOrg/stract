@@ -342,8 +342,8 @@ impl SegmentReader {
     }
 
     /// Returns an iterator that will iterate over the document ids
-    pub fn doc_ids(&self) -> Box<dyn Iterator<Item = DocId> + Send + '_> {
-        Box::new(0u32..self.max_doc)
+    pub fn doc_ids(&self) -> impl Iterator<Item = DocId> + Send + '_ {
+        0u32..self.max_doc
     }
 
     /// Summarize total space usage of this segment.

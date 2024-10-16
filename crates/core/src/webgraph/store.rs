@@ -16,7 +16,11 @@
 
 use std::{fs::File, ops::Range, path::Path};
 
-use super::query::collector::{Collector, TantivyCollector};
+use super::{
+    document::SmallEdge,
+    query::collector::{Collector, TantivyCollector},
+    schema::{self, Field, FromId, ToId},
+};
 use crate::{
     webgraph::merge::{EdgeMerger, MergeIter},
     webpage::html::links::RelFlags,
@@ -31,6 +35,7 @@ use file_store::{
     ConstSerializable,
 };
 use itertools::Itertools;
+use tantivy::{columnar::Column, DocId, SegmentReader};
 
 use super::{
     merge::{MergeNode, MergeSegmentOrd},
@@ -540,49 +545,52 @@ impl EdgeStore {
         query.retrieve(&searcher, fruit)
     }
 
-    pub fn iter_without_label(&self) -> impl Iterator<Item = SegmentEdge<()>> + '_ + Send + Sync {
-        // self.index
-        //     .reader()
-        //     .unwrap()
-        //     .searcher()
-        //     .segment_readers()
-        //     .iter()
-        //     .map(|segment| {
-        //         let columns = segment.column_fields();
+    pub fn iter_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
+        let reader = self.index.reader().unwrap();
+        let searcher = reader.searcher();
+        let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
 
-        //         segment
-        //             .doc_ids()
-        //             .map(|doc| todo!("construct edge from stored columns"))
-        //     })
+        segment_readers
+            .into_iter()
+            .flat_map(|segment| SmallSegmentEdges::new(&segment))
+    }
+}
 
-        self.ranges.edges.iter_raw().flat_map(move |(key, val)| {
-            let node = u64::from_be_bytes((key.as_bytes()).try_into().unwrap());
-            let node = NodeID::from(node);
+pub struct SmallSegmentEdges {
+    from_id: Column,
+    to_id: Column,
+    rel_flags: Column,
 
-            let edge_range = EdgeRange::deserialize(val.as_bytes());
+    docs: Box<dyn Iterator<Item = DocId>>,
+}
 
-            let edges = self
-                .edges
-                .slice(usize_range(edge_range.range))
-                .collect::<Vec<_>>();
+impl SmallSegmentEdges {
+    fn new(segment: &SegmentReader) -> Self {
+        let columns = segment.column_fields();
 
-            edges.into_iter().map(move |edge| {
-                if self.reversed {
-                    SegmentEdge {
-                        from: edge.other,
-                        to: NodeDatum::new(node, edge_range.host_rank),
-                        rel: edge.rel,
-                        label: (),
-                    }
-                } else {
-                    SegmentEdge {
-                        from: NodeDatum::new(node, edge_range.host_rank),
-                        to: edge.other,
-                        rel: edge.rel,
-                        label: (),
-                    }
-                }
-            })
+        Self {
+            from_id: columns.u64(FromId.name()).unwrap(),
+            to_id: columns.u64(ToId.name()).unwrap(),
+            rel_flags: columns.u64(schema::RelFlags.name()).unwrap(),
+            docs: Box::new(0..segment.max_doc()),
+        }
+    }
+}
+
+impl Iterator for SmallSegmentEdges {
+    type Item = SmallEdge;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let doc = self.docs.next()?;
+
+        let from = self.from_id.first(doc)?;
+        let to = self.to_id.first(doc)?;
+        let rel_flags = self.rel_flags.first(doc)?;
+
+        Some(SmallEdge {
+            from: NodeID::from(from),
+            to: NodeID::from(to),
+            rel_flags: RelFlags::from(rel_flags),
         })
     }
 }
@@ -627,7 +635,7 @@ mod tests {
 
         assert_eq!(edges.len(), 0);
 
-        let edges = store.iter_without_label().collect::<Vec<_>>();
+        let edges = store.iter_small().collect::<Vec<_>>();
 
         assert_eq!(edges.len(), 1);
     }

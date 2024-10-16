@@ -24,8 +24,15 @@ use crate::webpage::html::links::RelFlags;
 
 use super::{
     schema::{Field, FieldEnum, FieldEnumDiscriminants},
-    Node,
+    Node, NodeID,
 };
+
+#[derive(Debug, Clone, Copy)]
+pub struct SmallEdge {
+    pub from: NodeID,
+    pub to: NodeID,
+    pub rel_flags: RelFlags,
+}
 
 pub struct Edge {
     pub from: Node,

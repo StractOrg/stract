@@ -23,29 +23,79 @@ use super::{
 };
 use crate::{
     webgraph::{
-        schema::{Field, FromId, ToId},
-        EdgeLimit, NodeID,
+        document::Edge,
+        schema::{Field, FromId, RelFlags, ToId},
+        EdgeLimit, Node, NodeID, SmallEdge,
     },
     Result,
 };
 
-pub fn fetch_nodes<F: Field>(
+fn collector(limit: EdgeLimit) -> TopDocsCollector {
+    let mut collector = TopDocsCollector::new().disable_offset();
+
+    match limit {
+        EdgeLimit::Unlimited => {}
+        EdgeLimit::Limit(limit) => collector = collector.with_limit(limit),
+        EdgeLimit::LimitAndOffset { limit, offset } => {
+            collector = collector.with_limit(limit);
+            collector = collector.with_offset(offset);
+        }
+    }
+
+    collector
+}
+
+pub fn fetch_small_edges<F: Field>(
     searcher: &tantivy::Searcher,
     mut doc_ids: Vec<DocAddress>,
-    field: F,
-) -> Result<Vec<NodeID>> {
+    node_id_field: F,
+) -> Result<Vec<(NodeID, crate::webpage::RelFlags)>> {
+    doc_ids.sort_unstable_by_key(|doc| doc.segment_ord);
+    let mut prev_segment_id = None;
+    let mut field_column = None;
+    let mut rel_flags_column = None;
+
+    let mut edges = Vec::with_capacity(doc_ids.len());
+
+    for doc in doc_ids {
+        if Some(doc.segment_ord) != prev_segment_id {
+            prev_segment_id = Some(doc.segment_ord);
+            let segment_reader = searcher.segment_reader(doc.segment_ord);
+            field_column = Some(
+                segment_reader
+                    .column_fields()
+                    .u64(node_id_field.name())
+                    .unwrap(),
+            );
+            rel_flags_column = Some(segment_reader.column_fields().u64(RelFlags.name()).unwrap());
+        }
+
+        let Some(id) = field_column.as_ref().unwrap().first(doc.doc_id) else {
+            continue;
+        };
+        let Some(rel_flags) = rel_flags_column.as_ref().unwrap().first(doc.doc_id) else {
+            continue;
+        };
+
+        edges.push((NodeID::from(id), crate::webpage::RelFlags::from(rel_flags)));
+    }
+
+    Ok(edges)
+}
+
+pub fn fetch_edges(
+    searcher: &tantivy::Searcher,
+    mut doc_ids: Vec<DocAddress>,
+) -> Result<Vec<Edge>> {
     doc_ids.sort_unstable_by_key(|doc| doc.segment_ord);
 
-    Ok(doc_ids
-        .iter()
-        .filter_map(|doc| {
-            let segment_reader = searcher.segment_reader(doc.segment_ord);
-            let from_id = segment_reader.column_fields().u64(field.name()).unwrap();
+    let mut edges = Vec::with_capacity(doc_ids.len());
 
-            from_id.first(doc.doc_id)
-        })
-        .map(|from_id| NodeID::from(from_id))
-        .collect())
+    for doc in doc_ids {
+        edges.push(searcher.doc(doc)?);
+    }
+
+    Ok(edges)
 }
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
@@ -57,25 +107,14 @@ pub struct BacklinksQuery {
 impl Query for BacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = LinksQuery;
-    type Output = Vec<NodeID>;
+    type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
         LinksQuery::new(self.node, ToId)
     }
 
     fn collector(&self) -> Self::Collector {
-        let mut collector = TopDocsCollector::new().disable_offset();
-
-        match self.limit {
-            EdgeLimit::Unlimited => {}
-            EdgeLimit::Limit(limit) => collector = collector.with_limit(limit),
-            EdgeLimit::LimitAndOffset { limit, offset } => {
-                collector = collector.with_limit(limit);
-                collector = collector.with_offset(offset);
-            }
-        }
-
-        collector
+        collector(self.limit)
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -88,8 +127,15 @@ impl Query for BacklinksQuery {
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit = fruit.into_iter().map(|(_, doc)| doc).collect();
-        let nodes = fetch_nodes(searcher, fruit, FromId)?;
-        Ok(nodes)
+        let nodes = fetch_small_edges(searcher, fruit, FromId)?;
+        Ok(nodes
+            .into_iter()
+            .map(|(node, rel_flags)| SmallEdge {
+                from: node,
+                to: self.node,
+                rel_flags,
+            })
+            .collect())
     }
 }
 
@@ -102,25 +148,14 @@ pub struct HostBacklinksQuery {
 impl Query for HostBacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = HostLinksQuery;
-    type Output = Vec<NodeID>;
+    type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
         HostLinksQuery::new(self.node, ToId)
     }
 
     fn collector(&self) -> Self::Collector {
-        let mut collector = TopDocsCollector::new().disable_offset();
-
-        match self.limit {
-            EdgeLimit::Unlimited => {}
-            EdgeLimit::Limit(limit) => collector = collector.with_limit(limit),
-            EdgeLimit::LimitAndOffset { limit, offset } => {
-                collector = collector.with_limit(limit);
-                collector = collector.with_offset(offset);
-            }
-        }
-
-        collector
+        collector(self.limit)
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -133,7 +168,82 @@ impl Query for HostBacklinksQuery {
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit = fruit.into_iter().map(|(_, doc)| doc).collect();
-        let nodes = fetch_nodes(searcher, fruit, FromId)?;
-        Ok(nodes)
+        let nodes = fetch_small_edges(searcher, fruit, FromId)?;
+        Ok(nodes
+            .into_iter()
+            .map(|(node, rel_flags)| SmallEdge {
+                from: node,
+                to: self.node,
+                rel_flags,
+            })
+            .collect())
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct FullBacklinksQuery {
+    node: Node,
+    limit: EdgeLimit,
+}
+
+impl Query for FullBacklinksQuery {
+    type Collector = TopDocsCollector;
+    type TantivyQuery = LinksQuery;
+    type Output = Vec<Edge>;
+
+    fn tantivy_query(&self) -> Self::TantivyQuery {
+        LinksQuery::new(self.node.id(), ToId)
+    }
+
+    fn collector(&self) -> Self::Collector {
+        collector(self.limit)
+    }
+
+    fn remote_collector(&self) -> Self::Collector {
+        self.collector().enable_offset()
+    }
+
+    fn retrieve(
+        &self,
+        searcher: &tantivy::Searcher,
+        fruit: <Self::Collector as super::collector::Collector>::Fruit,
+    ) -> Result<Self::Output> {
+        let fruit: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
+        let edges = fetch_edges(searcher, fruit)?;
+        Ok(edges)
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct FullHostBacklinksQuery {
+    node: Node,
+    limit: EdgeLimit,
+}
+
+impl Query for FullHostBacklinksQuery {
+    type Collector = TopDocsCollector;
+    type TantivyQuery = HostLinksQuery;
+    type Output = Vec<Edge>;
+
+    fn tantivy_query(&self) -> Self::TantivyQuery {
+        HostLinksQuery::new(self.node.clone().into_host().id(), ToId)
+    }
+
+    fn collector(&self) -> Self::Collector {
+        collector(self.limit)
+    }
+
+    fn remote_collector(&self) -> Self::Collector {
+        self.collector().enable_offset()
+    }
+
+    fn retrieve(
+        &self,
+        searcher: &tantivy::Searcher,
+        fruit: <Self::Collector as super::collector::Collector>::Fruit,
+    ) -> Result<Self::Output> {
+        let fruit: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
+        let edges = fetch_edges(searcher, fruit)?;
+        Ok(edges)
     }
 }

@@ -20,7 +20,6 @@
 
 use anyhow::Result;
 use bloom::U64BloomFilter;
-use rayon::prelude::*;
 use std::{collections::BTreeMap, path::Path, sync::Mutex};
 
 use crate::webgraph::{EdgeLimit, NodeID, Webgraph};
@@ -82,8 +81,8 @@ impl DerivedCentrality {
 
         let has_outgoing = BloomMap::new(8, num_nodes as u64, 0.01);
 
-        page_graph.par_edges().for_each(|edge| {
-            has_outgoing.insert(&edge.from.node());
+        page_graph.edges().for_each(|edge| {
+            has_outgoing.insert(&edge.from);
         });
 
         let has_outgoing = has_outgoing.finalize();

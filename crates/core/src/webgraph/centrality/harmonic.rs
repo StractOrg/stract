@@ -127,13 +127,12 @@ fn update_all_counters(
 
     graph
         .edges()
-        .filter(|e| !e.rel_flags().intersects(*SKIPPED_REL))
+        .filter(|e| !e.rel_flags.intersects(*SKIPPED_REL))
         .for_each(|edge| {
-            if changed_nodes.contains(edge.from.node().as_u64()) {
-                if let (Some(counter_to), Some(counter_from)) = (
-                    counters.new.get_mut(&edge.to.node()),
-                    counters.old.get(&edge.from.node()),
-                ) {
+            if changed_nodes.contains(edge.from.as_u64()) {
+                if let (Some(counter_to), Some(counter_from)) =
+                    (counters.new.get_mut(&edge.to), counters.old.get(&edge.from))
+                {
                     if counter_to
                         .registers()
                         .iter()
@@ -141,10 +140,10 @@ fn update_all_counters(
                         .any(|(to, from)| *from > *to)
                     {
                         counter_to.merge(counter_from);
-                        new_changed_nodes.insert(edge.to.node().as_u64());
+                        new_changed_nodes.insert(edge.to.as_u64());
 
                         if let Some(exact_changed_nodes) = &mut exact_changed_nodes {
-                            exact_changed_nodes.insert(edge.to.node());
+                            exact_changed_nodes.insert(edge.to);
                         }
 
                         has_changes.store(true, Ordering::Relaxed);

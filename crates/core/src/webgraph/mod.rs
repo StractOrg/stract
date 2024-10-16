@@ -32,6 +32,7 @@ use crate::iter_ext::VectorExt;
 use crate::Result;
 pub use builder::WebgraphBuilder;
 pub use compression::Compression;
+pub use document::SmallEdge;
 pub use edge::*;
 pub use node::*;
 pub use shortest_path::ShortestPaths;
@@ -366,7 +367,7 @@ impl Webgraph {
         let mut rng = rand::thread_rng();
         let mut nodes = self
             .edges()
-            .map(|e| e.from.node())
+            .map(|e| e.from)
             .unique()
             .choose_multiple(&mut rng, num);
         nodes.shuffle(&mut rng);
@@ -392,16 +393,8 @@ impl Webgraph {
     /// Iterate all edges in the graph at least once.
     /// Some edges may be returned multiple times.
     /// This happens if they are present in more than one segment.
-    pub fn edges(&self) -> impl Iterator<Item = Edge<()>> + '_ {
-        self.segments
-            .iter()
-            .flat_map(|segment| segment.edges().map(|e| e.into()))
-    }
-
-    pub fn par_edges(&self) -> impl ParallelIterator<Item = Edge<()>> + '_ {
-        self.segments
-            .par_iter()
-            .flat_map(|segment| segment.edges().par_bridge().map(|e| e.into()))
+    pub fn edges(&self) -> impl Iterator<Item = SmallEdge> + '_ {
+        self.segments.iter().flat_map(|segment| segment.edges())
     }
 }
 
