@@ -14,15 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::path::Path;
+use std::{ops::Range, path::Path};
 
 use super::{
     document::SmallEdge,
     query::collector::{Collector, TantivyCollector},
-    schema::{self, Field, FromId, ToId},
+    schema::{self, Field, FromHostId, FromId, ToHostId, ToId},
     Edge,
 };
 use crate::{webpage::html::links::RelFlags, Result};
+use itertools::Itertools;
 use tantivy::{columnar::Column, DocId, SegmentReader};
 
 use super::{query::Query, NodeID};
@@ -71,14 +72,59 @@ impl EdgeStore {
         query.retrieve(&searcher, fruit)
     }
 
-    pub fn iter_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
+    pub fn iter_pages_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
+        let reader = self.index.reader().unwrap();
+        let searcher = reader.searcher();
+        let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
+
+        segment_readers.into_iter().flat_map(|segment| {
+            SmallSegmentEdgesIter::new(&segment, FromId, ToId, 0..segment.max_doc())
+        })
+    }
+
+    pub fn iter_hosts_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
         let reader = self.index.reader().unwrap();
         let searcher = reader.searcher();
         let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
 
         segment_readers
             .into_iter()
-            .flat_map(|segment| SmallSegmentEdgesIter::new(&segment))
+            .flat_map(|segment| {
+                SmallSegmentEdgesIter::new(&segment, FromHostId, ToHostId, 0..segment.max_doc())
+            })
+            .unique_by(|e| (e.from, e.to))
+    }
+
+    pub fn iter_page_node_ids(&self, offset: u32, limit: u32) -> impl Iterator<Item = NodeID> + '_ {
+        let reader = self.index.reader().unwrap();
+        let searcher = reader.searcher();
+        let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
+
+        let range = offset..limit;
+
+        segment_readers
+            .into_iter()
+            .flat_map(move |segment| {
+                SmallSegmentEdgesIter::new(&segment, FromId, ToId, range.clone())
+            })
+            .flat_map(|e| [e.from, e.to])
+            .unique()
+    }
+
+    pub fn iter_host_node_ids(&self, offset: u32, limit: u32) -> impl Iterator<Item = NodeID> + '_ {
+        let reader = self.index.reader().unwrap();
+        let searcher = reader.searcher();
+        let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
+
+        let range = offset..limit;
+
+        segment_readers
+            .into_iter()
+            .flat_map(move |segment| {
+                SmallSegmentEdgesIter::new(&segment, FromHostId, ToHostId, range.clone())
+            })
+            .flat_map(|e| [e.from, e.to])
+            .unique()
     }
 }
 
@@ -86,19 +132,33 @@ pub struct SmallSegmentEdgesIter {
     from_id: Column,
     to_id: Column,
     rel_flags: Column,
-
-    docs: Box<dyn Iterator<Item = DocId>>,
+    doc_range: Range<DocId>,
+    current_doc: DocId,
 }
 
 impl SmallSegmentEdgesIter {
-    fn new(segment: &SegmentReader) -> Self {
+    fn new<F1, F2>(
+        segment: &SegmentReader,
+        from_id: F1,
+        to_id: F2,
+        mut doc_range: Range<DocId>,
+    ) -> Self
+    where
+        F1: Field,
+        F2: Field,
+    {
         let columns = segment.column_fields();
 
+        if doc_range.end > segment.max_doc() {
+            doc_range.end = segment.max_doc();
+        }
+
         Self {
-            from_id: columns.u64(FromId.name()).unwrap(),
-            to_id: columns.u64(ToId.name()).unwrap(),
+            from_id: columns.u64(from_id.name()).unwrap(),
+            to_id: columns.u64(to_id.name()).unwrap(),
             rel_flags: columns.u64(schema::RelFlags.name()).unwrap(),
-            docs: Box::new(0..segment.max_doc()),
+            current_doc: doc_range.start,
+            doc_range,
         }
     }
 }
@@ -107,7 +167,12 @@ impl Iterator for SmallSegmentEdgesIter {
     type Item = SmallEdge;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let doc = self.docs.next()?;
+        if self.current_doc >= self.doc_range.end {
+            return None;
+        }
+
+        let doc = self.current_doc;
+        self.current_doc += 1;
 
         let from = self.from_id.first(doc)?;
         let to = self.to_id.first(doc)?;
@@ -158,7 +223,7 @@ mod tests {
 
         assert_eq!(edges.len(), 0);
 
-        let edges = store.iter_small().collect::<Vec<_>>();
+        let edges = store.iter_pages_small().collect::<Vec<_>>();
 
         assert_eq!(edges.len(), 1);
     }

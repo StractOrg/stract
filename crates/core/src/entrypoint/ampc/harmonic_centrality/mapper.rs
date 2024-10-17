@@ -223,7 +223,7 @@ impl CentralityMapper {
             let mut batch = Vec::with_capacity(batch_size);
             let mut changed_nodes = worker.changed_nodes().lock().unwrap();
 
-            for node in worker.graph().nodes() {
+            for node in worker.graph().host_nodes() {
                 changed_nodes.insert(node.as_u64());
                 batch.push(node);
                 if batch.len() >= batch_size {
@@ -268,7 +268,7 @@ impl CentralityMapper {
 
             for edge in worker
                 .graph()
-                .edges()
+                .host_edges()
                 .filter(|e| !e.rel_flags.intersects(*SKIPPED_REL))
                 .filter(|e| changed_nodes.contains(e.from.as_u64()))
             {
@@ -313,7 +313,8 @@ impl CentralityMapper {
             let changed_nodes = worker.changed_nodes().lock().unwrap();
             for node in worker
                 .graph()
-                .nodes()
+                .host_nodes()
+                .into_iter()
                 .filter(|n| changed_nodes.contains(n.as_u64()))
             {
                 batch.push(node);

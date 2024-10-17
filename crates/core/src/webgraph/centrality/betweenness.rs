@@ -31,7 +31,7 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
     let mut n = 0;
     let mut max_dist = 0;
 
-    let nodes: Vec<_> = graph.nodes().take(100_000).collect();
+    let nodes: Vec<_> = graph.host_nodes().into_iter().take(100_000).collect();
 
     let pb =
         if with_progress {
@@ -128,7 +128,7 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
     (
         centrality
             .into_iter()
-            .map(|(id, centrality)| (graph.id2node(&id).unwrap().unwrap(), centrality / norm))
+            .map(|(id, centrality)| (graph.host_id2node(&id).unwrap().unwrap(), centrality / norm))
             .collect(),
         max_dist,
     )
@@ -180,13 +180,15 @@ mod tests {
             .unwrap();
 
         for i in 0..n - 1 {
-            graph.insert(Edge {
-                from: Node::from(i.to_string()),
-                to: Node::from((i + 1).to_string()),
-                label: String::new(),
-                rel_flags: RelFlags::default(),
-                combined_centrality: 0.0,
-            });
+            graph
+                .insert(Edge {
+                    from: Node::from(i.to_string()),
+                    to: Node::from((i + 1).to_string()),
+                    label: String::new(),
+                    rel_flags: RelFlags::default(),
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
         }
         graph.commit().unwrap();
 

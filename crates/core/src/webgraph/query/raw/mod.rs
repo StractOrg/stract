@@ -18,4 +18,9 @@ pub mod dummy;
 pub use dummy::DummyQuery;
 
 pub mod host_links;
+pub mod id2node;
 pub mod links;
+
+pub use host_links::*;
+pub use id2node::*;
+pub use links::*;

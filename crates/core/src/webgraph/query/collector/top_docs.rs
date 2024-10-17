@@ -21,7 +21,10 @@ use tantivy::{
     DocAddress, DocId, SegmentOrdinal,
 };
 
-use crate::webgraph::query::document_scorer::{DefaultDocumentScorer, DocumentScorer};
+use crate::webgraph::{
+    query::document_scorer::{DefaultDocumentScorer, DocumentScorer},
+    EdgeLimit,
+};
 
 use super::Collector;
 
@@ -30,6 +33,23 @@ pub struct TopDocsCollector<S: DocumentScorer = DefaultDocumentScorer> {
     offset: Option<usize>,
     perform_offset: bool,
     _phantom: PhantomData<S>,
+}
+
+impl<S: DocumentScorer> From<EdgeLimit> for TopDocsCollector<S> {
+    fn from(limit: EdgeLimit) -> Self {
+        let mut collector = TopDocsCollector::new().disable_offset();
+
+        match limit {
+            EdgeLimit::Unlimited => {}
+            EdgeLimit::Limit(limit) => collector = collector.with_limit(limit),
+            EdgeLimit::LimitAndOffset { limit, offset } => {
+                collector = collector.with_limit(limit);
+                collector = collector.with_offset(offset);
+            }
+        }
+
+        collector
+    }
 }
 
 impl<S: DocumentScorer> TopDocsCollector<S> {

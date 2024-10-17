@@ -30,21 +30,6 @@ use crate::{
     Result,
 };
 
-fn collector(limit: EdgeLimit) -> TopDocsCollector {
-    let mut collector = TopDocsCollector::new().disable_offset();
-
-    match limit {
-        EdgeLimit::Unlimited => {}
-        EdgeLimit::Limit(limit) => collector = collector.with_limit(limit),
-        EdgeLimit::LimitAndOffset { limit, offset } => {
-            collector = collector.with_limit(limit);
-            collector = collector.with_offset(offset);
-        }
-    }
-
-    collector
-}
-
 pub fn fetch_small_edges<F: Field>(
     searcher: &tantivy::Searcher,
     mut doc_ids: Vec<DocAddress>,
@@ -114,7 +99,7 @@ impl Query for BacklinksQuery {
     }
 
     fn collector(&self) -> Self::Collector {
-        collector(self.limit)
+        self.limit.into()
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -169,7 +154,7 @@ impl Query for HostBacklinksQuery {
     }
 
     fn collector(&self) -> Self::Collector {
-        collector(self.limit)
+        self.limit.into()
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -210,7 +195,7 @@ impl Query for FullBacklinksQuery {
     }
 
     fn collector(&self) -> Self::Collector {
-        collector(self.limit)
+        self.limit.into()
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -244,7 +229,7 @@ impl Query for FullHostBacklinksQuery {
     }
 
     fn collector(&self) -> Self::Collector {
-        collector(self.limit)
+        self.limit.into()
     }
 
     fn remote_collector(&self) -> Self::Collector {

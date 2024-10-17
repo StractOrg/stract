@@ -51,26 +51,40 @@ pub struct WebGraphService {
 sonic_service!(
     WebGraphService,
     [
-        GetNode,
+        PageId2Node,
+        HostId2Node,
         IngoingEdges,
         OutgoingEdges,
         RawIngoingEdges,
         RawOutgoingEdges,
         RawIngoingEdgesWithLabels,
-        GetNodeIDs
+        GetPageNodeIDs
     ]
 );
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct GetNode {
+pub struct PageId2Node {
     pub node: NodeID,
 }
 
-impl Message<WebGraphService> for GetNode {
+impl Message<WebGraphService> for PageId2Node {
     type Response = Option<Node>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.id2node(&self.node).ok().flatten()
+        server.graph.page_id2node(&self.node).ok().flatten()
+    }
+}
+
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct HostId2Node {
+    pub node: NodeID,
+}
+
+impl Message<WebGraphService> for HostId2Node {
+    type Response = Option<Node>;
+
+    async fn handle(self, server: &WebGraphService) -> Self::Response {
+        server.graph.host_id2node(&self.node).ok().flatten()
     }
 }
 
@@ -173,21 +187,18 @@ impl Message<WebGraphService> for OutDegreeUpperBound {
 }
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct GetNodeIDs {
+pub struct GetPageNodeIDs {
     pub offset: u64,
     pub limit: u64,
 }
 
-impl Message<WebGraphService> for GetNodeIDs {
+impl Message<WebGraphService> for GetPageNodeIDs {
     type Response = Vec<NodeID>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
         server
             .graph
-            .iter_nodes_with_offset(self.offset)
-            .take(self.limit as usize)
-            .map(|(id, _)| id)
-            .collect()
+            .page_node_ids_with_offset(self.offset, self.limit)
     }
 }
 

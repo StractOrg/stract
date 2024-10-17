@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -21,9 +22,8 @@ use crate::Result;
 
 use itertools::Itertools;
 use rand::seq::{IteratorRandom, SliceRandom};
+use rustc_hash::FxHashSet;
 use store::EdgeStore;
-
-use self::id_node_db::Id2NodeDb;
 
 pub use builder::WebgraphBuilder;
 pub use document::*;
@@ -33,15 +33,12 @@ pub use shortest_path::ShortestPaths;
 mod builder;
 pub mod centrality;
 mod document;
-mod id_node_db;
 mod node;
 mod query;
 pub mod remote;
 mod schema;
 mod shortest_path;
 mod store;
-
-type SegmentID = String;
 
 pub const MAX_LABEL_LENGTH: usize = 256;
 
@@ -57,7 +54,6 @@ pub enum EdgeLimit {
 pub struct Webgraph {
     path: String,
     store: EdgeStore,
-    id2node: Id2NodeDb,
 }
 
 impl Webgraph {
@@ -73,12 +69,10 @@ impl Webgraph {
         fs::create_dir_all(&path)?;
 
         let store = EdgeStore::open(path.as_ref().join("edges"))?;
-        let id2node = Id2NodeDb::open(path.as_ref().join("id2node"))?;
 
         Ok(Self {
             store,
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
-            id2node,
         })
     }
 
@@ -89,15 +83,12 @@ impl Webgraph {
     }
 
     pub fn commit(&mut self) -> Result<()> {
-        self.id2node.flush()?;
         self.store.commit()?;
         Ok(())
     }
 
     pub fn merge(&mut self, other: Webgraph) -> Result<()> {
         let other_folder = other.path.clone();
-        self.id2node.merge(other.id2node)?;
-        self.id2node.flush()?;
         self.store.merge(other.store)?;
 
         fs::remove_dir_all(other_folder)?;
@@ -107,7 +98,6 @@ impl Webgraph {
 
     pub fn optimize_read(&mut self) -> Result<()> {
         self.store.optimize_read()?;
-        self.id2node.optimize_read()?;
         Ok(())
     }
 
@@ -147,18 +137,26 @@ impl Webgraph {
         todo!()
     }
 
-    pub fn id2node(&self, id: &NodeID) -> Result<Option<Node>> {
-        self.id2node.get(id)
+    pub fn page_id2node(&self, id: &NodeID) -> Result<Option<Node>> {
+        todo!()
     }
 
-    pub fn nodes(&self) -> impl Iterator<Item = NodeID> + '_ {
-        self.id2node.keys()
+    pub fn host_id2node(&self, id: &NodeID) -> Result<Option<Node>> {
+        todo!()
     }
 
-    pub fn random_nodes_with_outgoing(&self, num: usize) -> Vec<NodeID> {
+    pub fn host_nodes(&self) -> FxHashSet<NodeID> {
+        self.store.iter_host_node_ids(0, u32::MAX).collect()
+    }
+
+    pub fn page_nodes(&self) -> FxHashSet<NodeID> {
+        self.store.iter_page_node_ids(0, u32::MAX).collect()
+    }
+
+    pub fn random_page_nodes_with_outgoing(&self, num: usize) -> Vec<NodeID> {
         let mut rng = rand::thread_rng();
         let mut nodes = self
-            .edges()
+            .page_edges()
             .map(|e| e.from)
             .unique()
             .choose_multiple(&mut rng, num);
@@ -166,23 +164,24 @@ impl Webgraph {
         nodes
     }
 
-    pub fn node_ids(&self) -> impl Iterator<Item = (Node, NodeID)> + '_ {
-        self.id2node.iter().map(|(id, node)| (node, id))
-    }
-
-    pub fn estimate_num_nodes(&self) -> usize {
-        self.id2node.estimate_num_keys()
-    }
-
-    pub fn iter_nodes_with_offset(&self, offset: u64) -> impl Iterator<Item = (NodeID, Node)> + '_ {
-        self.id2node.iter_with_offset(offset)
+    pub fn page_node_ids_with_offset(&self, offset: u64, limit: u64) -> Vec<NodeID> {
+        self.store
+            .iter_page_node_ids(offset as u32, limit as u32)
+            .collect()
     }
 
     /// Iterate all edges in the graph at least once.
     /// Some edges may be returned multiple times.
     /// This happens if they are present in more than one segment.
-    pub fn edges(&self) -> impl Iterator<Item = SmallEdge> + '_ {
-        self.store.iter_small()
+    pub fn page_edges(&self) -> impl Iterator<Item = SmallEdge> + '_ {
+        self.store.iter_pages_small()
+    }
+
+    /// Iterate all host edges in the graph at least once.
+    /// Some edges may be returned multiple times.
+    /// This happens if they are present in more than one segment.
+    pub fn host_edges(&self) -> impl Iterator<Item = SmallEdge> + '_ {
+        self.store.iter_hosts_small()
     }
 }
 
@@ -348,7 +347,7 @@ pub mod tests {
             graph.merge(other).unwrap();
         }
 
-        graph.optimize_read();
+        graph.optimize_read().unwrap();
 
         let mut res = graph.outgoing_edges(Node::from("A"), EdgeLimit::Unlimited);
         res.sort_by(|a, b| a.to.cmp(&b.to));
@@ -433,7 +432,7 @@ pub mod tests {
             Some(&2)
         );
 
-        graph.optimize_read();
+        graph.optimize_read().unwrap();
 
         assert_eq!(
             graph.distances(Node::from("A")).get(&Node::from("C")),
@@ -492,7 +491,7 @@ pub mod tests {
             graph.merge(other).unwrap();
         }
 
-        graph.optimize_read();
+        graph.optimize_read().unwrap();
 
         assert_eq!(
             graph
@@ -555,7 +554,7 @@ pub mod tests {
             graph.merge(other).unwrap();
         }
 
-        graph.optimize_read();
+        graph.optimize_read().unwrap();
 
         assert_eq!(
             graph
@@ -826,7 +825,7 @@ pub mod tests {
             1
         );
 
-        graph.optimize_read();
+        graph.optimize_read().unwrap();
 
         assert_eq!(
             graph

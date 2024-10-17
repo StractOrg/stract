@@ -46,7 +46,7 @@ pub struct CentralityWorker {
 
 impl CentralityWorker {
     pub fn new(shard: ShardId, graph: Webgraph) -> Self {
-        let num_nodes = graph.estimate_num_nodes() as u64;
+        let num_nodes = graph.host_nodes().len() as u64;
         let mut changed_nodes = U64BloomFilter::new(num_nodes, 0.05);
 
         changed_nodes.fill();
@@ -107,7 +107,7 @@ impl Message<CentralityWorker> for NumNodes {
     type Response = u64;
 
     fn handle(self, worker: &CentralityWorker) -> Self::Response {
-        worker.graph.estimate_num_nodes() as u64
+        worker.graph.host_nodes().len() as u64
     }
 }
 
@@ -123,7 +123,7 @@ impl Message<CentralityWorker> for BatchId2Node {
             .filter_map(|id| {
                 worker
                     .graph
-                    .id2node(id)
+                    .host_id2node(id)
                     .ok()
                     .flatten()
                     .map(|node| (*id, node))

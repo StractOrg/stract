@@ -34,13 +34,16 @@ use crate::{
         streaming_response::StreamingResponse,
     },
     entrypoint::webgraph_server::{
-        GetNode, GetNodeIDs, IngoingEdges, OutgoingEdges, RawIngoingEdges,
-        RawIngoingEdgesWithLabels, RawOutgoingEdges, WebGraphService,
+        GetPageNodeIDs, IngoingEdges, OutgoingEdges, RawIngoingEdges, RawIngoingEdgesWithLabels,
+        RawOutgoingEdges, WebGraphService,
     },
     Result,
 };
 
-use super::{Edge, EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel};
+use super::{
+    query::{id2node::Id2NodeQuery, Query},
+    Edge, EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
+};
 
 struct WebgraphClientManager<G: WebgraphGranularity>(std::marker::PhantomData<G>);
 
@@ -151,6 +154,14 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         self.client.lock().await.conn().await
     }
 
+    pub async fn search<Q: Query>(&self, query: Q) -> Result<Q::Output> {
+        todo!()
+    }
+
+    pub async fn batch_search<Q: Query>(&self, queries: Vec<Q>) -> Result<Vec<Q::Output>> {
+        todo!()
+    }
+
     pub async fn knows(&self, mut host: String) -> Result<Option<Node>> {
         if let Some(suf) = host.strip_prefix("http://") {
             host = suf.to_string();
@@ -171,50 +182,22 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         }
     }
 
-    pub async fn get_node(&self, id: NodeID) -> Result<Option<Node>> {
-        let res = self
-            .conn()
-            .await
-            .send(
-                GetNode { node: id },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await?;
-
-        Ok(res
-            .into_iter()
-            .flatten()
-            .flat_map(|(_, res)| res.into_iter().map(|(_, v)| v))
-            .find(|n| n.is_some())
-            .flatten()
-            .clone())
+    pub async fn get_page_node(&self, id: NodeID) -> Result<Option<Node>> {
+        self.search(Id2NodeQuery::Page(id)).await
     }
 
-    pub async fn batch_get_node(&self, ids: &[NodeID]) -> Result<Vec<Option<Node>>> {
-        let reqs = ids.iter().map(|&id| GetNode { node: id }).collect_vec();
-
-        let res = self
-            .conn()
+    pub async fn batch_get_page_node(&self, ids: &[NodeID]) -> Result<Vec<Option<Node>>> {
+        self.batch_search(ids.iter().map(|id| Id2NodeQuery::Page(*id)).collect())
             .await
-            .batch_send(&reqs, &AllShardsSelector, &RandomReplicaSelector)
-            .await?;
+    }
 
-        let mut nodes = vec![None; ids.len()];
+    pub async fn get_host_node(&self, id: NodeID) -> Result<Option<Node>> {
+        self.search(Id2NodeQuery::Host(id)).await
+    }
 
-        for (_, rep) in res {
-            debug_assert!(rep.len() <= 1);
-
-            for (_, rep_nodes) in rep {
-                for (i, node) in rep_nodes.into_iter().enumerate() {
-                    if let Some(node) = node {
-                        nodes[i] = Some(node);
-                    }
-                }
-            }
-        }
-
-        Ok(nodes)
+    pub async fn batch_get_host_node(&self, ids: &[NodeID]) -> Result<Vec<Option<Node>>> {
+        self.batch_search(ids.iter().map(|id| Id2NodeQuery::Host(*id)).collect())
+            .await
     }
 
     pub async fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<Edge>> {
@@ -419,7 +402,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         Ok(edges)
     }
 
-    pub async fn stream_node_ids(&self) -> impl futures::Stream<Item = NodeID> {
+    pub async fn stream_page_node_ids(&self) -> impl futures::Stream<Item = NodeID> {
         StreamNodeIDs::new(self.conn().await).stream()
     }
 }
@@ -444,7 +427,7 @@ impl StreamingResponse for StreamNodeIDs {
     type Item = NodeID;
 
     async fn next_batch(&mut self) -> Result<Vec<Self::Item>> {
-        let req = GetNodeIDs {
+        let req = GetPageNodeIDs {
             offset: self.offset,
             limit: self.limit,
         };

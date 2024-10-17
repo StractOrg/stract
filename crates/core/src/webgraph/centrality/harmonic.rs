@@ -56,7 +56,7 @@ fn initialize(
 ) -> u64 {
     let mut num_nodes = 0;
 
-    for node in graph.nodes() {
+    for node in graph.host_nodes() {
         let mut counter = HyperLogLog::default();
         counter.add(node.as_u64());
 
@@ -125,7 +125,7 @@ fn update_all_counters(
     }
 
     graph
-        .edges()
+        .host_edges()
         .filter(|e| !e.rel_flags.intersects(*SKIPPED_REL))
         .for_each(|edge| {
             if changed_nodes.contains(edge.from.as_u64()) {
@@ -218,7 +218,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
 
     let mut changed_nodes = U64BloomFilter::new(num_nodes, 0.05);
 
-    for node in graph.nodes() {
+    for node in graph.host_nodes() {
         changed_nodes.insert(node.as_u64());
     }
 
@@ -345,13 +345,15 @@ mod tests {
             .unwrap();
 
         for (from, to, label) in test_edges() {
-            graph.insert(Edge {
-                from,
-                to,
-                rel_flags: RelFlags::default(),
-                label,
-                combined_centrality: 0.0,
-            });
+            graph
+                .insert(Edge {
+                    from,
+                    to,
+                    rel_flags: RelFlags::default(),
+                    label,
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
         }
 
         graph.commit().unwrap();
@@ -366,104 +368,132 @@ mod tests {
             .open()
             .unwrap();
 
-        graph.insert(Edge {
-            from: Node::from("A.com/1").into_host(),
-            to: Node::from("A.com/2").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/1").into_host(),
-            to: Node::from("A.com/3").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/1").into_host(),
-            to: Node::from("A.com/4").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/2").into_host(),
-            to: Node::from("A.com/1").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/2").into_host(),
-            to: Node::from("A.com/3").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/2").into_host(),
-            to: Node::from("A.com/4").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/3").into_host(),
-            to: Node::from("A.com/1").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/3").into_host(),
-            to: Node::from("A.com/2").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/3").into_host(),
-            to: Node::from("A.com/4").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/4").into_host(),
-            to: Node::from("A.com/1").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/4").into_host(),
-            to: Node::from("A.com/2").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("A.com/4").into_host(),
-            to: Node::from("A.com/3").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("C.com").into_host(),
-            to: Node::from("B.com").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
-        graph.insert(Edge {
-            from: Node::from("D.com").into_host(),
-            to: Node::from("B.com").into_host(),
-            rel_flags: RelFlags::default(),
-            label: String::new(),
-            combined_centrality: 0.0,
-        });
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/1").into_host(),
+                to: Node::from("A.com/2").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/1").into_host(),
+                to: Node::from("A.com/3").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/1").into_host(),
+                to: Node::from("A.com/4").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/2").into_host(),
+                to: Node::from("A.com/1").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/2").into_host(),
+                to: Node::from("A.com/3").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/2").into_host(),
+                to: Node::from("A.com/4").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/3").into_host(),
+                to: Node::from("A.com/1").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/3").into_host(),
+                to: Node::from("A.com/2").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/3").into_host(),
+                to: Node::from("A.com/4").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/4").into_host(),
+                to: Node::from("A.com/1").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/4").into_host(),
+                to: Node::from("A.com/2").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("A.com/4").into_host(),
+                to: Node::from("A.com/3").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("C.com").into_host(),
+                to: Node::from("B.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("D.com").into_host(),
+                to: Node::from("B.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
 
         graph.commit().unwrap();
 
@@ -507,7 +537,7 @@ mod tests {
                     from,
                     to,
                     rel_flags: RelFlags::default(),
-                    label: String::new(),
+                    label,
                     combined_centrality: 0.0,
                 })
                 .unwrap();
@@ -584,7 +614,7 @@ mod tests {
             .unwrap();
         graph.commit().unwrap();
 
-        graph.optimize_read();
+        graph.optimize_read().unwrap();
 
         let centrality_extra = HarmonicCentrality::calculate(&graph);
 
@@ -599,13 +629,15 @@ mod tests {
             .unwrap();
 
         for (from, to, label) in test_edges() {
-            graph.insert(Edge {
-                from,
-                to,
-                rel_flags: RelFlags::TAG,
-                label,
-                combined_centrality: 0.0,
-            });
+            graph
+                .insert(Edge {
+                    from,
+                    to,
+                    rel_flags: RelFlags::TAG,
+                    label,
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
         }
 
         graph.commit().unwrap();
@@ -623,13 +655,15 @@ mod tests {
             .unwrap();
 
         for (from, to, label) in test_edges() {
-            graph.insert(Edge {
-                from,
-                to,
-                rel_flags: RelFlags::SAME_ICANN_DOMAIN,
-                label,
-                combined_centrality: 0.0,
-            });
+            graph
+                .insert(Edge {
+                    from,
+                    to,
+                    rel_flags: RelFlags::SAME_ICANN_DOMAIN,
+                    label,
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
         }
 
         graph.commit().unwrap();

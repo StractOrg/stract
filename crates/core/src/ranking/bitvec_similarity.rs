@@ -187,7 +187,6 @@ impl BitVec {
 #[cfg(test)]
 mod tests {
     use crate::{
-        executor::Executor,
         webgraph::{Edge, Node, Webgraph},
         webpage::html::links::RelFlags,
     };

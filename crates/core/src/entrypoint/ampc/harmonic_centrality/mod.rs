@@ -84,7 +84,7 @@ mod tests {
     use webgraph::{Edge, Webgraph};
 
     use crate::{
-        executor::Executor, free_socket_addr, webgraph::centrality::harmonic::HarmonicCentrality,
+        free_socket_addr, webgraph::centrality::harmonic::HarmonicCentrality,
         webpage::html::links::RelFlags,
     };
 
@@ -114,12 +114,12 @@ mod tests {
                 rel_flags: RelFlags::default(),
                 combined_centrality: 0.0,
             };
-            combined.insert(e.clone());
+            combined.insert(e.clone()).unwrap();
 
             if i % 2 == 0 {
-                a.insert(e);
+                a.insert(e).unwrap();
             } else {
-                b.insert(e);
+                b.insert(e).unwrap();
             }
         }
 
@@ -128,7 +128,7 @@ mod tests {
         b.commit().unwrap();
 
         let expected = HarmonicCentrality::calculate(&combined);
-        let num_nodes = combined.nodes().count();
+        let num_nodes = combined.host_nodes().len();
         let worker = CentralityWorker::new(1.into(), a);
 
         let worker_addr = free_socket_addr();

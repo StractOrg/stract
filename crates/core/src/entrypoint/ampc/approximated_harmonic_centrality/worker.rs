@@ -58,7 +58,7 @@ impl Message<ApproxCentralityWorker> for NumNodes {
     type Response = u64;
 
     fn handle(self, worker: &ApproxCentralityWorker) -> Self::Response {
-        worker.graph.estimate_num_nodes() as u64
+        worker.graph.page_nodes().len() as u64
     }
 }
 
@@ -74,7 +74,7 @@ impl Message<ApproxCentralityWorker> for BatchId2Node {
             .filter_map(|id| {
                 worker
                     .graph
-                    .id2node(id)
+                    .page_id2node(id)
                     .ok()
                     .flatten()
                     .map(|node| (*id, node))

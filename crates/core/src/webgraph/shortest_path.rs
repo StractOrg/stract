@@ -83,7 +83,7 @@ impl ShortestPaths for Webgraph {
     fn distances(&self, source: Node) -> BTreeMap<Node, u8> {
         self.raw_distances(source.id())
             .into_iter()
-            .filter_map(|(id, dist)| self.id2node(&id).unwrap().map(|node| (node, dist)))
+            .filter_map(|(id, dist)| self.host_id2node(&id).unwrap().map(|node| (node, dist)))
             .collect()
     }
 
@@ -130,7 +130,7 @@ impl ShortestPaths for Webgraph {
     fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8> {
         self.raw_reversed_distances(source.id())
             .into_iter()
-            .filter_map(|(id, dist)| self.id2node(&id).unwrap().map(|node| (node, dist)))
+            .filter_map(|(id, dist)| self.host_id2node(&id).unwrap().map(|node| (node, dist)))
             .collect()
     }
 }

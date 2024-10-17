@@ -406,7 +406,7 @@ impl CrawlPlanner {
             let nodes = chunk.collect::<Vec<_>>();
             let page_graph = self.page_graph.clone();
 
-            futures.push_back(async move { page_graph.batch_get_node(&nodes).await.unwrap() });
+            futures.push_back(async move { page_graph.batch_get_page_node(&nodes).await.unwrap() });
         }
 
         while let Some(nodes) = futures.next().await {
@@ -443,7 +443,7 @@ impl CrawlPlanner {
             let nodes = chunk.collect::<Vec<_>>();
             let host_graph = self.host_graph.clone();
 
-            futures.push_back(async move { host_graph.batch_get_node(&nodes).await.unwrap() });
+            futures.push_back(async move { host_graph.batch_get_host_node(&nodes).await.unwrap() });
         }
 
         while let Some(nodes) = futures.next().await {

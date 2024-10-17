@@ -34,7 +34,7 @@ pub struct ApproxHarmonic {
 
 impl ApproxHarmonic {
     pub fn build<P: AsRef<Path>>(graph: &Webgraph, output: P) -> Self {
-        let num_nodes = graph.estimate_num_nodes();
+        let num_nodes = graph.page_nodes().len();
 
         tracing::info!("found approximately {} nodes in graph", num_nodes);
 
@@ -42,7 +42,7 @@ impl ApproxHarmonic {
 
         tracing::info!("sampling {} nodes", num_samples);
 
-        let sampled = graph.random_nodes_with_outgoing(num_samples);
+        let sampled = graph.random_page_nodes_with_outgoing(num_samples);
 
         let centralities: DashMap<NodeID, f32> = DashMap::new();
 

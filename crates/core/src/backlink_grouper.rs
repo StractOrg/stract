@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    log_group::HarmonicRankGroup,
-    webgraph::{Edge, SmallEdgeWithLabel},
-};
+use crate::{log_group::HarmonicRankGroup, webgraph::SmallEdgeWithLabel};
 
 /// Number of groups to divide the backlinks into.
 /// If this is changed, also change the grouped backlink fields in the schema.

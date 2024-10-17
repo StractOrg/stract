@@ -54,7 +54,7 @@ impl Centrality {
         let top_harmonics =
             crate::webgraph::centrality::top_nodes(&store, TopNodes::Top(1_000_000))
                 .into_iter()
-                .map(|(n, c)| (graph.id2node(&n).unwrap().unwrap(), c))
+                .map(|(n, c)| (graph.host_id2node(&n).unwrap().unwrap(), c))
                 .collect();
 
         store_csv(top_harmonics, base_output.as_ref().join("harmonic.csv"));
@@ -94,7 +94,7 @@ impl Centrality {
             }
 
             if top_nodes.len() < 1_000_000 {
-                top_nodes.push((graph.id2node(&node).unwrap().unwrap(), centrality));
+                top_nodes.push((graph.page_id2node(&node).unwrap().unwrap(), centrality));
             }
         }
 
@@ -123,7 +123,7 @@ impl Centrality {
         let original_centrality: speedy_kv::Db<NodeID, f64> =
             speedy_kv::Db::open_or_create(&config.original_centrality_path)?;
 
-        let mut node_ids = graph.stream_node_ids().await;
+        let mut node_ids = graph.stream_page_node_ids().await;
 
         while let Some(node_id) = node_ids.next().await {
             match original_centrality.get(&node_id)? {
@@ -168,7 +168,7 @@ impl Centrality {
         {
             let (ids, centrality): (Vec<_>, Vec<_>) = chunk.into_iter().unzip();
 
-            let nodes = graph.batch_get_node(&ids).await?;
+            let nodes = graph.batch_get_page_node(&ids).await?;
 
             for (node, centrality) in nodes.into_iter().zip(centrality) {
                 if let Some(node) = node {

@@ -19,10 +19,12 @@ use collector::Collector;
 use tantivy::Searcher;
 
 pub mod backlink;
+pub mod forwardlink;
+pub mod id2node;
+
 pub mod collector;
 mod degree;
 mod document_scorer;
-pub mod forwardlink;
 mod raw;
 
 pub trait Query: Send + Sync + bincode::Encode + bincode::Decode + Clone {

@@ -111,8 +111,8 @@ impl Mapper for ApproxCentralityMapper {
 
         pool.install(|| match self {
             ApproxCentralityMapper::InitCentrality => {
-                let num_nodes = worker.graph().estimate_num_nodes();
-                let nodes = worker.graph().nodes().collect::<Vec<_>>();
+                let num_nodes = worker.graph().page_nodes().len();
+                let nodes: Vec<_> = worker.graph().page_nodes().into_iter().collect();
                 nodes
                     .par_chunks(BATCH_SIZE)
                     .progress_count(num_nodes as u64 / BATCH_SIZE as u64)
@@ -133,7 +133,7 @@ impl Mapper for ApproxCentralityMapper {
 
                 let sampled = worker
                     .graph()
-                    .random_nodes_with_outgoing(num_samples as usize);
+                    .random_page_nodes_with_outgoing(num_samples as usize);
 
                 let pb = indicatif::ProgressBar::new(sampled.len() as u64);
 

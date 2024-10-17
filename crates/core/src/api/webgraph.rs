@@ -22,7 +22,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     config::WebgraphGranularity,
-    webgraph::{Edge, EdgeLimit, Node, SmallEdge},
+    webgraph::{Edge, EdgeLimit, Node},
 };
 
 use super::State;

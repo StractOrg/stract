@@ -29,21 +29,6 @@ use crate::{
     Result,
 };
 
-fn collector(limit: EdgeLimit) -> TopDocsCollector {
-    let mut collector = TopDocsCollector::new().disable_offset();
-
-    match limit {
-        EdgeLimit::Unlimited => {}
-        EdgeLimit::Limit(limit) => collector = collector.with_limit(limit),
-        EdgeLimit::LimitAndOffset { limit, offset } => {
-            collector = collector.with_limit(limit);
-            collector = collector.with_offset(offset);
-        }
-    }
-
-    collector
-}
-
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct ForwardlinksQuery {
     node: NodeID,
@@ -60,7 +45,7 @@ impl Query for ForwardlinksQuery {
     }
 
     fn collector(&self) -> Self::Collector {
-        collector(self.limit)
+        self.limit.into()
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -101,7 +86,7 @@ impl Query for HostForwardlinksQuery {
     }
 
     fn collector(&self) -> Self::Collector {
-        collector(self.limit)
+        self.limit.into()
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -142,7 +127,7 @@ impl Query for FullForwardlinksQuery {
     }
 
     fn collector(&self) -> Self::Collector {
-        collector(self.limit)
+        self.limit.into()
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -176,7 +161,7 @@ impl Query for FullHostForwardlinksQuery {
     }
 
     fn collector(&self) -> Self::Collector {
-        collector(self.limit)
+        self.limit.into()
     }
 
     fn remote_collector(&self) -> Self::Collector {

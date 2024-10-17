@@ -231,7 +231,7 @@ impl Webgraph {
         }
 
         if config.merge_all_segments {
-            graph.optimize_read();
+            graph.optimize_read().unwrap();
         }
         crate::mv(graph.path(), &config.graph_base_path)?;
 

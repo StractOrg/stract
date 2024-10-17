@@ -143,7 +143,7 @@ impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
 
         let nodes = self
             .webgraph
-            .batch_get_node(&potential_nodes)
+            .batch_get_host_node(&potential_nodes)
             .await
             .unwrap_or_default();
 

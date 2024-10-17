@@ -18,7 +18,7 @@ use crate::{
     backlink_grouper::GroupedBacklinks,
     inverted_index::InvertedIndex,
     schema::{numerical_field::NumericalField, text_field::TextField, Field},
-    webgraph::{Edge, NodeID, SmallEdgeWithLabel},
+    webgraph::{NodeID, SmallEdgeWithLabel},
     Result,
 };
 use candle_core::Tensor;
