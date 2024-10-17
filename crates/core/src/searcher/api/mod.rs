@@ -175,7 +175,7 @@ pub trait Graph {
         &self,
         nodes: &[webgraph::NodeID],
         limit: EdgeLimit,
-    ) -> impl Future<Output = Vec<Vec<webgraph::Edge<()>>>>;
+    ) -> impl Future<Output = Vec<Vec<webgraph::SmallEdge>>>;
 }
 
 impl<G: WebgraphGranularity> Graph for RemoteWebgraph<G> {
@@ -183,7 +183,7 @@ impl<G: WebgraphGranularity> Graph for RemoteWebgraph<G> {
         &self,
         nodes: &[webgraph::NodeID],
         limit: EdgeLimit,
-    ) -> Vec<Vec<webgraph::Edge<()>>> {
+    ) -> Vec<Vec<webgraph::SmallEdge>> {
         self.batch_raw_ingoing_edges(nodes, limit)
             .await
             .unwrap_or_default()
@@ -195,7 +195,7 @@ impl Graph for webgraph::Webgraph {
         &self,
         nodes: &[webgraph::NodeID],
         limit: EdgeLimit,
-    ) -> Vec<Vec<webgraph::Edge<()>>> {
+    ) -> Vec<Vec<webgraph::SmallEdge>> {
         nodes
             .iter()
             .map(|n| self.raw_ingoing_edges(n, limit))
@@ -211,7 +211,7 @@ where
         &self,
         nodes: &[webgraph::NodeID],
         limit: EdgeLimit,
-    ) -> impl Future<Output = Vec<Vec<webgraph::Edge<()>>>> {
+    ) -> impl Future<Output = Vec<Vec<webgraph::SmallEdge>>> {
         self.as_ref().batch_raw_ingoing(nodes, limit)
     }
 }
@@ -227,8 +227,8 @@ where
             .map(|edges| {
                 edges
                     .into_iter()
-                    .filter(|edge| !edge.rel.contains(RelFlags::NOFOLLOW))
-                    .map(|edge| edge.from.node())
+                    .filter(|edge| !edge.rel_flags.contains(RelFlags::NOFOLLOW))
+                    .map(|edge| edge.from)
                     .collect()
             })
             .collect()

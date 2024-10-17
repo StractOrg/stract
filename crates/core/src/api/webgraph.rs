@@ -22,7 +22,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     config::WebgraphGranularity,
-    webgraph::{EdgeLimit, FullEdge, Node},
+    webgraph::{Edge, EdgeLimit, Node, SmallEdge},
 };
 
 use super::State;
@@ -120,7 +120,7 @@ pub mod host {
         path = "/beta/api/webgraph/host/ingoing",
         params(HostLinksParams),
         responses(
-            (status = 200, description = "Incoming links for a particular host", body = Vec<FullEdge>),
+            (status = 200, description = "Incoming links for a particular host", body = Vec<Edge>),
         )
     )]
     pub async fn ingoing_hosts(
@@ -144,7 +144,7 @@ pub mod host {
         path = "/beta/api/webgraph/host/outgoing",
         params(HostLinksParams),
         responses(
-            (status = 200, description = "Outgoing links for a particular host", body = Vec<FullEdge>),
+            (status = 200, description = "Outgoing links for a particular host", body = Vec<Edge>),
         )
     )]
     pub async fn outgoing_hosts(
@@ -182,7 +182,7 @@ pub mod page {
         path = "/beta/api/webgraph/page/ingoing",
         params(PageLinksParams),
         responses(
-            (status = 200, description = "Incoming links for a particular page", body = Vec<FullEdge>),
+            (status = 200, description = "Incoming links for a particular page", body = Vec<Edge>),
         )
     )]
     pub async fn ingoing_pages(
@@ -205,7 +205,7 @@ pub mod page {
         path = "/beta/api/webgraph/page/outgoing",
         params(PageLinksParams),
         responses(
-            (status = 200, description = "Outgoing links for a particular page", body = Vec<FullEdge>),
+            (status = 200, description = "Outgoing links for a particular page", body = Vec<Edge>),
         )
     )]
     pub async fn outgoing_pages(
@@ -229,7 +229,7 @@ async fn ingoing_links(
     state: Arc<State>,
     node: Node,
     level: WebgraphGranularity,
-) -> anyhow::Result<Vec<FullEdge>> {
+) -> anyhow::Result<Vec<Edge>> {
     match level {
         WebgraphGranularity::Host => {
             state
@@ -250,7 +250,7 @@ async fn outgoing_links(
     state: Arc<State>,
     node: Node,
     level: WebgraphGranularity,
-) -> anyhow::Result<Vec<FullEdge>> {
+) -> anyhow::Result<Vec<Edge>> {
     match level {
         WebgraphGranularity::Host => {
             state

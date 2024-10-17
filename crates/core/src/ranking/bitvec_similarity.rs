@@ -188,7 +188,7 @@ impl BitVec {
 mod tests {
     use crate::{
         executor::Executor,
-        webgraph::{Compression, Node, WebgraphWriter},
+        webgraph::{Edge, Node, Webgraph},
         webpage::html::links::RelFlags,
     };
 
@@ -295,22 +295,33 @@ mod tests {
     async fn test_ignores_no_follow() {
         let temp_dir = crate::gen_temp_dir().unwrap();
 
-        let mut writer = WebgraphWriter::new(
-            &temp_dir,
-            Executor::single_thread(),
-            Compression::default(),
-            None,
-        );
+        let mut graph = Webgraph::open(&temp_dir).unwrap();
 
         let a = Node::from("A");
         let b = Node::from("B");
         let c = Node::from("C");
 
-        writer.insert(a.clone(), b.clone(), String::new(), RelFlags::NOFOLLOW);
+        graph
+            .insert(Edge {
+                from: a.clone(),
+                to: b.clone(),
+                rel_flags: RelFlags::NOFOLLOW,
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
 
-        writer.insert(a.clone(), c.clone(), String::new(), RelFlags::default());
+        graph
+            .insert(Edge {
+                from: a.clone(),
+                to: c.clone(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
 
-        let graph = writer.finalize();
+        graph.commit().unwrap();
 
         let bitvecs = BitVec::batch_new_for(&[b.id(), c.id()], &graph).await;
 

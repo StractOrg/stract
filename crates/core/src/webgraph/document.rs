@@ -27,13 +27,30 @@ use super::{
     Node, NodeID,
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, bincode::Encode, bincode::Decode)]
 pub struct SmallEdge {
     pub from: NodeID,
     pub to: NodeID,
     pub rel_flags: RelFlags,
 }
 
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct SmallEdgeWithLabel {
+    pub from: NodeID,
+    pub to: NodeID,
+    pub rel_flags: RelFlags,
+    pub label: String,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    utoipa::ToSchema,
+)]
 pub struct Edge {
     pub from: Node,
     pub to: Node,

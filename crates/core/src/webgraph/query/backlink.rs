@@ -145,6 +145,20 @@ pub struct HostBacklinksQuery {
     limit: EdgeLimit,
 }
 
+impl HostBacklinksQuery {
+    pub fn new(node: NodeID) -> Self {
+        Self {
+            node,
+            limit: EdgeLimit::Unlimited,
+        }
+    }
+
+    pub fn limit(mut self, limit: EdgeLimit) -> Self {
+        self.limit = limit;
+        self
+    }
+}
+
 impl Query for HostBacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = HostLinksQuery;

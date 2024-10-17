@@ -120,7 +120,14 @@ impl Message<CentralityWorker> for BatchId2Node {
     fn handle(self, worker: &CentralityWorker) -> Self::Response {
         self.0
             .iter()
-            .filter_map(|id| worker.graph.id2node(id).map(|node| (*id, node)))
+            .filter_map(|id| {
+                worker
+                    .graph
+                    .id2node(id)
+                    .ok()
+                    .flatten()
+                    .map(|node| (*id, node))
+            })
             .collect()
     }
 }
@@ -168,9 +175,7 @@ impl RemoteWorker for RemoteCentralityWorker {
 pub fn run(config: HarmonicWorkerConfig) -> Result<()> {
     let tokio_conf = config.clone();
 
-    let graph = Webgraph::builder(config.graph_path)
-        .single_threaded()
-        .open();
+    let graph = Webgraph::builder(config.graph_path).open()?;
     let worker = CentralityWorker::new(config.shard, graph);
     let service = Service::HarmonicWorker {
         host: tokio_conf.host,

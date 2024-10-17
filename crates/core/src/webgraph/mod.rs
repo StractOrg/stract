@@ -13,86 +13,37 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::{fs, io};
+
+use crate::Result;
 
 use itertools::Itertools;
 use rand::seq::{IteratorRandom, SliceRandom};
-use rayon::prelude::*;
-use uuid::Uuid;
+use store::EdgeStore;
 
 use self::id_node_db::Id2NodeDb;
-use self::segment::Segment;
-use crate::executor::Executor;
 
-use crate::iter_ext::VectorExt;
-use crate::Result;
 pub use builder::WebgraphBuilder;
-pub use compression::Compression;
-pub use document::SmallEdge;
-pub use edge::*;
+pub use document::*;
 pub use node::*;
 pub use shortest_path::ShortestPaths;
-pub use writer::WebgraphWriter;
 
 mod builder;
 pub mod centrality;
-mod compression;
 mod document;
-mod edge;
 mod id_node_db;
-mod merge;
 mod node;
 mod query;
 pub mod remote;
 mod schema;
-mod segment;
 mod shortest_path;
 mod store;
-mod store_writer;
-mod writer;
 
 type SegmentID = String;
 
-#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Default)]
-struct Meta {
-    comitted_segments: Vec<SegmentID>,
-}
-
-impl Meta {
-    fn open<P: AsRef<Path>>(path: P) -> Self {
-        let mut reader = BufReader::new(
-            File::options()
-                .create(true)
-                .truncate(false)
-                .write(true)
-                .read(true)
-                .open(path)
-                .unwrap(),
-        );
-        let mut buf = String::new();
-        reader.read_to_string(&mut buf).unwrap();
-        serde_json::from_str(&buf).unwrap_or_default()
-    }
-
-    fn save<P: AsRef<Path>>(&self, path: P) {
-        let mut writer = BufWriter::new(
-            File::options()
-                .create(true)
-                .write(true)
-                .read(true)
-                .truncate(true)
-                .open(path)
-                .unwrap(),
-        );
-
-        let json = serde_json::to_string_pretty(&self).unwrap();
-        writer.write_all(json.as_bytes()).unwrap();
-    }
-}
+pub const MAX_LABEL_LENGTH: usize = 256;
 
 #[derive(
     Debug, Clone, Copy, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode,
@@ -103,22 +54,10 @@ pub enum EdgeLimit {
     LimitAndOffset { limit: usize, offset: usize },
 }
 
-impl EdgeLimit {
-    fn apply<'a, T>(&self, it: impl Iterator<Item = T> + 'a) -> Box<dyn Iterator<Item = T> + 'a> {
-        match self {
-            EdgeLimit::Unlimited => Box::new(it),
-            EdgeLimit::Limit(limit) => Box::new(it.take(*limit)),
-            EdgeLimit::LimitAndOffset { limit, offset } => Box::new(it.skip(*offset).take(*limit)),
-        }
-    }
-}
-
 pub struct Webgraph {
     path: String,
-    segments: Vec<Segment>,
-    executor: Arc<Executor>,
+    store: EdgeStore,
     id2node: Id2NodeDb,
-    meta: Meta,
 }
 
 impl Webgraph {
@@ -130,232 +69,85 @@ impl Webgraph {
         PathBuf::from(&self.path)
     }
 
-    fn meta<P: AsRef<Path>>(path: P) -> Meta {
-        let meta_path = path.as_ref().join("metadata.json");
-        Meta::open(meta_path)
-    }
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        fs::create_dir_all(&path)?;
 
-    fn save_metadata(&mut self) {
-        let path = Path::new(&self.path).join("metadata.json");
-        self.meta.save(path);
-    }
+        let store = EdgeStore::open(path.as_ref().join("edges"))?;
+        let id2node = Id2NodeDb::open(path.as_ref().join("id2node"))?;
 
-    fn open<P: AsRef<Path>>(path: P, executor: Executor) -> Self {
-        fs::create_dir_all(&path).unwrap();
-        let meta = Self::meta(&path);
-
-        fs::create_dir_all(path.as_ref().join("segments")).unwrap();
-
-        let mut segments = Vec::new();
-        for segment in &meta.comitted_segments {
-            segments.push(Segment::open(
-                path.as_ref().join("segments"),
-                segment.clone(),
-            ));
-        }
-
-        Self {
+        Ok(Self {
+            store,
             path: path.as_ref().as_os_str().to_str().unwrap().to_string(),
-            segments,
-            executor: Arc::new(executor),
-            id2node: Id2NodeDb::open(path.as_ref().join("id2node")),
-            meta,
-        }
+            id2node,
+        })
     }
 
-    pub fn merge(&mut self, other: Webgraph) -> io::Result<()> {
+    pub fn insert(&mut self, edge: Edge) -> Result<()> {
+        todo!("insert into id2node (host and page)");
+        self.store.insert(edge)?;
+        Ok(())
+    }
+
+    pub fn commit(&mut self) -> Result<()> {
+        self.id2node.flush()?;
+        self.store.commit()?;
+        Ok(())
+    }
+
+    pub fn merge(&mut self, other: Webgraph) -> Result<()> {
         let other_folder = other.path.clone();
-        self.id2node.merge(other.id2node);
-        self.id2node.flush();
-
-        for segment in other.segments {
-            let id = segment.id();
-            let new_path = Path::new(&self.path).join("segments");
-            std::fs::rename(segment.path(), new_path.join(segment.id())).unwrap();
-
-            self.meta.comitted_segments.push(segment.id());
-            drop(segment);
-            self.segments.push(Segment::open(new_path, id));
-        }
+        self.id2node.merge(other.id2node)?;
+        self.id2node.flush()?;
+        self.store.merge(other.store)?;
 
         fs::remove_dir_all(other_folder)?;
 
-        self.save_metadata();
-
         Ok(())
     }
 
-    pub fn merge_all_segments(&mut self, compression: Compression) -> Result<()> {
-        let segments = std::mem::take(&mut self.segments);
-
-        let id = Uuid::new_v4().to_string();
-        let path = Path::new(&self.path).join("segments");
-
-        Segment::merge(segments, compression, &path, id.clone())?;
-        let new_segment = Segment::open(path, id.clone());
-
-        self.segments.push(new_segment);
-        self.meta.comitted_segments = vec![id];
-
-        self.save_metadata();
-
+    pub fn optimize_read(&mut self) -> Result<()> {
+        self.store.optimize_read()?;
+        self.id2node.optimize_read()?;
         Ok(())
     }
 
-    pub fn optimize_read(&mut self) {
-        self.executor
-            .map(|s| s.optimize_read(), self.segments.iter_mut())
-            .unwrap();
-
-        self.id2node.optimize_read();
+    pub fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<Edge> {
+        todo!()
     }
 
-    pub fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<FullEdge> {
-        self.ingoing_edges_by_id(&node.id(), limit)
+    pub fn ingoing_edges_by_id(&self, node_id: &NodeID, limit: EdgeLimit) -> Vec<Edge> {
+        todo!()
     }
 
-    pub fn ingoing_edges_by_id(&self, node_id: &NodeID, limit: EdgeLimit) -> Vec<FullEdge> {
-        let edges = self
-            .segments
-            .iter()
-            .map(|segment| segment.ingoing_edges_with_label(node_id))
-            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .sort_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
-            .unique_by(|edge| edge.from.node());
-
-        limit
-            .apply(edges)
-            .map(|e| FullEdge {
-                from: self.id2node(&e.from.node()).unwrap(),
-                to: self.id2node(&e.to.node()).unwrap(),
-                label: e.label,
-            })
-            .collect()
-    }
-
-    pub fn raw_ingoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<Edge<()>> {
-        let edges = self
-            .segments
-            .iter()
-            .map(|segment| segment.ingoing_edges(node))
-            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .sort_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
-            .unique_by(|edge| edge.from.node());
-
-        limit
-            .apply(edges)
-            .map(|e| Edge {
-                from: e.from,
-                to: e.to,
-                label: e.label,
-                rel: e.rel,
-            })
-            .collect()
+    pub fn raw_ingoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<SmallEdge> {
+        todo!()
     }
 
     pub fn raw_ingoing_edges_with_labels(
         &self,
         node: &NodeID,
         limit: EdgeLimit,
-    ) -> Vec<Edge<String>> {
-        let edges = self
-            .segments
-            .iter()
-            .map(|segment| segment.ingoing_edges_with_label(node))
-            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .sort_sorted_by(|a, b| a.from.host_rank().cmp(&b.from.host_rank()))
-            .unique_by(|edge| edge.from.node());
-
-        limit
-            .apply(edges)
-            .map(|e| Edge {
-                from: e.from,
-                to: e.to,
-                label: e.label,
-                rel: e.rel,
-            })
-            .collect()
-    }
-
-    pub fn raw_outgoing_edges_with_labels(
-        &self,
-        node: &NodeID,
-        limit: EdgeLimit,
-    ) -> Vec<Edge<String>> {
-        let edges = self
-            .segments
-            .iter()
-            .map(|segment| segment.outgoing_edges_with_label(node))
-            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .sort_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
-            .unique_by(|edge| edge.to.node());
-
-        limit
-            .apply(edges)
-            .map(|e| Edge {
-                from: e.from,
-                to: e.to,
-                label: e.label,
-                rel: e.rel,
-            })
-            .collect()
+    ) -> Vec<SmallEdgeWithLabel> {
+        todo!()
     }
 
     pub fn out_degree_upper_bound(&self, node: &NodeID) -> u64 {
-        self.segments
-            .iter()
-            .map(|segment| segment.out_degree(node))
-            .sum()
+        todo!()
     }
 
     pub fn in_degree_upper_bound(&self, node: &NodeID) -> u64 {
-        self.segments
-            .iter()
-            .map(|segment| segment.in_degree(node))
-            .sum()
+        todo!()
     }
 
-    pub fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<FullEdge> {
-        let id = node.id();
-        let edges = self
-            .segments
-            .iter()
-            .map(|segment| segment.outgoing_edges_with_label(&id))
-            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .sort_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
-            .unique_by(|edge| edge.to.node());
-
-        limit
-            .apply(edges)
-            .map(|e| FullEdge {
-                from: self.id2node(&e.from.node()).unwrap(),
-                to: self.id2node(&e.to.node()).unwrap(),
-                label: e.label,
-            })
-            .collect()
+    pub fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<Edge> {
+        todo!()
     }
 
-    pub fn raw_outgoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<Edge<()>> {
-        let edges = self
-            .segments
-            .iter()
-            .map(|segment| segment.outgoing_edges(node))
-            .collect::<Vec<_>>() // collects the iterators from each segment, not the edges
-            .sort_sorted_by(|a, b| a.to.host_rank().cmp(&b.to.host_rank()))
-            .unique_by(|edge| edge.to.node());
-
-        limit
-            .apply(edges)
-            .map(|e| Edge {
-                from: e.from,
-                to: e.to,
-                label: e.label,
-                rel: e.rel,
-            })
-            .collect()
+    pub fn raw_outgoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<SmallEdge> {
+        todo!()
     }
 
-    pub fn id2node(&self, id: &NodeID) -> Option<Node> {
+    pub fn id2node(&self, id: &NodeID) -> Result<Option<Node>> {
         self.id2node.get(id)
     }
 
@@ -374,10 +166,6 @@ impl Webgraph {
         nodes
     }
 
-    pub fn par_nodes(&self) -> impl ParallelIterator<Item = NodeID> + '_ {
-        self.id2node.keys().par_bridge()
-    }
-
     pub fn node_ids(&self) -> impl Iterator<Item = (Node, NodeID)> + '_ {
         self.id2node.iter().map(|(id, node)| (node, id))
     }
@@ -394,7 +182,7 @@ impl Webgraph {
     /// Some edges may be returned multiple times.
     /// This happens if they are present in more than one segment.
     pub fn edges(&self) -> impl Iterator<Item = SmallEdge> + '_ {
-        self.segments.iter().flat_map(|segment| segment.edges())
+        self.store.iter_small()
     }
 }
 
@@ -429,20 +217,23 @@ pub mod tests {
         //        D
 
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut graph = WebgraphWriter::new(
-            &temp_dir,
-            Executor::single_thread(),
-            Compression::default(),
-            None,
-        );
+        let mut graph = Webgraph::builder(&temp_dir).open().unwrap();
 
         for (from, to, label) in test_edges() {
-            graph.insert(from, to, label, RelFlags::default());
+            graph
+                .insert(Edge {
+                    from,
+                    to,
+                    rel_flags: RelFlags::default(),
+                    label,
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
         }
 
         graph.commit();
 
-        (graph.finalize(), temp_dir)
+        (graph, temp_dir)
     }
 
     #[test]
@@ -484,7 +275,7 @@ pub mod tests {
     fn merge_path() {
         let mut graphs = Vec::new();
         let temp_dir = crate::gen_temp_dir().unwrap();
-        for (i, (from, to, label)) in (0..).zip(&[
+        for (i, (from, to, label)) in (0..).zip([
             (Node::from("A"), Node::from("B"), String::new()),
             (Node::from("B"), Node::from("C"), String::new()),
             (Node::from("C"), Node::from("D"), String::new()),
@@ -493,14 +284,20 @@ pub mod tests {
             (Node::from("F"), Node::from("G"), String::new()),
             (Node::from("G"), Node::from("H"), String::new()),
         ]) {
-            let mut wrt = WebgraphWriter::new(
-                &temp_dir.as_ref().join(format!("test_{}", i)),
-                Executor::single_thread(),
-                Compression::default(),
-                None,
-            );
-            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
-            graphs.push(wrt.finalize());
+            let mut graph = Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)))
+                .open()
+                .unwrap();
+            graph
+                .insert(Edge {
+                    from,
+                    to,
+                    rel_flags: RelFlags::default(),
+                    label,
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
+            graph.commit().unwrap();
+            graphs.push(graph);
         }
 
         let mut graph = graphs.pop().unwrap();
@@ -509,8 +306,7 @@ pub mod tests {
             graph.merge(other).unwrap();
         }
 
-        graph.merge_all_segments(Compression::default()).unwrap();
-        graph.optimize_read();
+        graph.optimize_read().unwrap();
 
         assert_eq!(
             graph.distances(Node::from("A")).get(&Node::from("H")),
@@ -529,15 +325,21 @@ pub mod tests {
     fn merge_simple() {
         let mut graphs = Vec::new();
         let temp_dir = crate::gen_temp_dir().unwrap();
-        for (i, (from, to, label)) in (0..).zip(&test_edges()) {
-            let mut wrt = WebgraphWriter::new(
-                &temp_dir.as_ref().join(format!("test_{}", i)),
-                Executor::single_thread(),
-                Compression::default(),
-                None,
-            );
-            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
-            graphs.push(wrt.finalize());
+        for (i, (from, to, label)) in (0..).zip(test_edges()) {
+            let mut graph = Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)))
+                .open()
+                .unwrap();
+            graph
+                .insert(Edge {
+                    from,
+                    to,
+                    rel_flags: RelFlags::default(),
+                    label,
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
+            graph.commit().unwrap();
+            graphs.push(graph);
         }
 
         let mut graph = graphs.pop().unwrap();
@@ -546,7 +348,6 @@ pub mod tests {
             graph.merge(other).unwrap();
         }
 
-        graph.merge_all_segments(Compression::default()).unwrap();
         graph.optimize_read();
 
         let mut res = graph.outgoing_edges(Node::from("A"), EdgeLimit::Unlimited);
@@ -599,20 +400,26 @@ pub mod tests {
     fn merge_cycle() {
         let mut graphs = Vec::new();
         let temp_dir = crate::gen_temp_dir().unwrap();
-        for (i, (from, to, label)) in (0..).zip(&[
+        for (i, (from, to, label)) in (0..).zip([
             (Node::from("A"), Node::from("B"), String::new()),
             (Node::from("B"), Node::from("B"), String::new()),
             (Node::from("B"), Node::from("C"), String::new()),
             (Node::from("C"), Node::from("A"), String::new()),
         ]) {
-            let mut wrt = WebgraphWriter::new(
-                &temp_dir.as_ref().join(format!("test_{}", i)),
-                Executor::single_thread(),
-                Compression::default(),
-                None,
-            );
-            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
-            graphs.push(wrt.finalize());
+            let mut graph = Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)))
+                .open()
+                .unwrap();
+            graph
+                .insert(Edge {
+                    from,
+                    to,
+                    rel_flags: RelFlags::default(),
+                    label,
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
+            graph.commit().unwrap();
+            graphs.push(graph);
         }
 
         let mut graph = graphs.pop().unwrap();
@@ -626,7 +433,7 @@ pub mod tests {
             Some(&2)
         );
 
-        graph.merge_all_segments(Compression::default()).unwrap();
+        graph.optimize_read();
 
         assert_eq!(
             graph.distances(Node::from("A")).get(&Node::from("C")),
@@ -657,20 +464,26 @@ pub mod tests {
     fn merge_star() {
         let mut graphs = Vec::new();
         let temp_dir = crate::gen_temp_dir().unwrap();
-        for (i, (from, to, label)) in (0..).zip(&[
+        for (i, (from, to, label)) in (0..).zip([
             (Node::from("A"), Node::from("B"), String::new()),
             (Node::from("A"), Node::from("C"), String::new()),
             (Node::from("A"), Node::from("D"), String::new()),
             (Node::from("A"), Node::from("E"), String::new()),
         ]) {
-            let mut wrt = WebgraphWriter::new(
-                &temp_dir.as_ref().join(format!("test_{}", i)),
-                Executor::single_thread(),
-                Compression::default(),
-                None,
-            );
-            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
-            graphs.push(wrt.finalize());
+            let mut graph = Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)))
+                .open()
+                .unwrap();
+            graph
+                .insert(Edge {
+                    from,
+                    to,
+                    rel_flags: RelFlags::default(),
+                    label,
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
+            graph.commit().unwrap();
+            graphs.push(graph);
         }
 
         let mut graph = graphs.pop().unwrap();
@@ -679,7 +492,6 @@ pub mod tests {
             graph.merge(other).unwrap();
         }
 
-        graph.merge_all_segments(Compression::default()).unwrap();
         graph.optimize_read();
 
         assert_eq!(
@@ -715,20 +527,26 @@ pub mod tests {
     fn merge_reverse_star() {
         let mut graphs = Vec::new();
         let temp_dir = crate::gen_temp_dir().unwrap();
-        for (i, (from, to, label)) in (0..).zip(&[
+        for (i, (from, to, label)) in (0..).zip([
             (Node::from("B"), Node::from("A"), String::new()),
             (Node::from("C"), Node::from("A"), String::new()),
             (Node::from("D"), Node::from("A"), String::new()),
             (Node::from("E"), Node::from("A"), String::new()),
         ]) {
-            let mut wrt = WebgraphWriter::new(
-                &temp_dir.as_ref().join(format!("test_{}", i)),
-                Executor::single_thread(),
-                Compression::default(),
-                None,
-            );
-            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
-            graphs.push(wrt.finalize());
+            let mut graph = Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)))
+                .open()
+                .unwrap();
+            graph
+                .insert(Edge {
+                    from,
+                    to,
+                    rel_flags: RelFlags::default(),
+                    label,
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
+            graph.commit().unwrap();
+            graphs.push(graph);
         }
 
         let mut graph = graphs.pop().unwrap();
@@ -737,7 +555,6 @@ pub mod tests {
             graph.merge(other).unwrap();
         }
 
-        graph.merge_all_segments(Compression::default()).unwrap();
         graph.optimize_read();
 
         assert_eq!(
@@ -779,23 +596,24 @@ pub mod tests {
         ) {
             let mut graphs = Vec::new();
             let temp_dir = crate::gen_temp_dir().unwrap();
-            let mut wrt = WebgraphWriter::new(
-                temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
-                Executor::single_thread(),
-                Compression::default(),
-                None,
-            );
+            let mut graph = Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
+                .open()
+                .unwrap();
             for (from, to) in nodes.clone() {
-                wrt.insert(Node::new_for_test(from.as_str()), Node::new_for_test(to.as_str()), String::new(), RelFlags::default());
+                graph.insert(Edge {
+                    from: Node::new_for_test(from.as_str()),
+                    to: Node::new_for_test(to.as_str()),
+                    rel_flags: RelFlags::default(),
+                    label: String::new(),
+                    combined_centrality: 0.0,
+                }).unwrap();
 
                 if rand::random::<usize>() % 10 == 0 {
-                    graphs.push(wrt.finalize());
-                    wrt = WebgraphWriter::new(
-                        temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
-                        Executor::single_thread(),
-                        Compression::default(),
-                        None,
-                    );
+                    graph.commit().unwrap();
+                    graphs.push(graph);
+                    graph = Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
+                        .open()
+                        .unwrap();
                 }
             }
 
@@ -803,7 +621,7 @@ pub mod tests {
                 return Ok(());
             }
 
-            graphs.push(wrt.finalize());
+            graphs.push(graph);
 
             let mut graph = graphs.pop().unwrap();
 
@@ -812,7 +630,6 @@ pub mod tests {
                 graph.merge(other).unwrap();
             }
 
-            graph.merge_all_segments(Compression::default()).unwrap();
 
             for (from, to) in nodes {
                 if from == to {
@@ -834,41 +651,39 @@ pub mod tests {
     fn proptest_case(nodes: &[(&str, &str)]) {
         let mut graphs = Vec::new();
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut wrt = WebgraphWriter::new(
-            temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
-            Executor::single_thread(),
-            Compression::default(),
-            None,
-        );
+        let mut graph =
+            Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
+                .open()
+                .unwrap();
 
         for (i, (from, to)) in nodes.iter().enumerate() {
-            wrt.insert(
-                Node::new_for_test(from),
-                Node::new_for_test(to),
-                String::new(),
-                RelFlags::default(),
-            );
+            graph
+                .insert(Edge {
+                    from: Node::new_for_test(from),
+                    to: Node::new_for_test(to),
+                    rel_flags: RelFlags::default(),
+                    label: String::new(),
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
 
             if i % 2 == 0 {
-                graphs.push(wrt.finalize());
-                wrt = WebgraphWriter::new(
-                    temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
-                    Executor::single_thread(),
-                    Compression::default(),
-                    None,
-                );
+                graph.commit().unwrap();
+                graphs.push(graph);
+                graph =
+                    Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
+                        .open()
+                        .unwrap();
             }
         }
 
-        graphs.push(wrt.finalize());
+        graphs.push(graph);
 
         let mut graph = graphs.pop().unwrap();
 
         for other in graphs {
             graph.merge(other).unwrap();
         }
-
-        graph.merge_all_segments(Compression::default()).unwrap();
 
         for (from, to) in nodes {
             if from == to {
@@ -928,23 +743,23 @@ pub mod tests {
     #[test]
     fn cap_label_length() {
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut writer = WebgraphWriter::new(
-            temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
-            Executor::single_thread(),
-            Compression::default(),
-            None,
-        );
+        let mut graph =
+            Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
+                .open()
+                .unwrap();
 
-        writer.insert(
-            Node::from("A"),
-            Node::from("B"),
-            "a".repeat(MAX_LABEL_LENGTH + 1),
-            RelFlags::default(),
-        );
+        graph
+            .insert(Edge {
+                from: Node::from("A"),
+                to: Node::from("B"),
+                rel_flags: RelFlags::default(),
+                label: "a".repeat(MAX_LABEL_LENGTH + 1),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
 
-        let graph = writer.finalize();
+        graph.commit().unwrap();
 
-        assert_eq!(graph.segments.len(), 1);
         assert_eq!(
             graph.outgoing_edges(Node::from("A"), EdgeLimit::Unlimited)[0].label,
             "a".repeat(MAX_LABEL_LENGTH)
@@ -974,14 +789,21 @@ pub mod tests {
             (Node::from("A"), Node::from("B"), String::new()),
             (Node::from("A"), Node::from("C"), String::new()),
         ] {
-            let mut wrt = WebgraphWriter::new(
-                temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
-                Executor::single_thread(),
-                Compression::default(),
-                None,
-            );
-            wrt.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
-            graphs.push(wrt.finalize());
+            let mut graph =
+                Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
+                    .open()
+                    .unwrap();
+            graph
+                .insert(Edge {
+                    from: from.clone(),
+                    to: to.clone(),
+                    rel_flags: RelFlags::default(),
+                    label: label.clone(),
+                    combined_centrality: 0.0,
+                })
+                .unwrap();
+            graph.commit().unwrap();
+            graphs.push(graph);
         }
 
         let mut graph = graphs.pop().unwrap();
@@ -1033,24 +855,25 @@ pub mod tests {
     #[test]
     fn test_rel_flags() {
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut writer = WebgraphWriter::new(
-            &temp_dir,
-            Executor::single_thread(),
-            Compression::default(),
-            None,
-        );
+        let mut graph =
+            Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
+                .open()
+                .unwrap();
 
-        writer.insert(
-            Node::from("A"),
-            Node::from("B"),
-            String::new(),
-            RelFlags::IS_IN_FOOTER | RelFlags::TAG,
-        );
+        graph
+            .insert(Edge {
+                from: Node::from("A"),
+                to: Node::from("B"),
+                rel_flags: RelFlags::IS_IN_FOOTER | RelFlags::TAG,
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
 
-        let graph = writer.finalize();
+        graph.commit().unwrap();
 
         assert_eq!(
-            graph.raw_outgoing_edges(&Node::from("A").id(), EdgeLimit::Unlimited)[0].rel,
+            graph.raw_outgoing_edges(&Node::from("A").id(), EdgeLimit::Unlimited)[0].rel_flags,
             RelFlags::IS_IN_FOOTER | RelFlags::TAG,
         );
     }

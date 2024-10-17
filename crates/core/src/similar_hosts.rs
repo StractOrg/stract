@@ -86,8 +86,8 @@ impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
         let backlink_nodes = in_edges
             .iter()
             .flatten()
-            .filter(|e| !e.rel.contains(RelFlags::NOFOLLOW))
-            .map(|e| e.from.node())
+            .filter(|e| !e.rel_flags.contains(RelFlags::NOFOLLOW))
+            .map(|e| e.from)
             .unique()
             .collect::<Vec<_>>();
 
@@ -100,8 +100,8 @@ impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
         let potential_nodes: Vec<_> = outgoing_edges
             .iter()
             .flatten()
-            .filter(|e| !e.rel.contains(RelFlags::NOFOLLOW))
-            .map(|e| e.to.node())
+            .filter(|e| !e.rel_flags.contains(RelFlags::NOFOLLOW))
+            .map(|e| e.to)
             .unique()
             .filter(|n| !nodes.contains(n))
             .collect();

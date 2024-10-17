@@ -71,7 +71,7 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
         while let Some(v) = q.pop_front() {
             stack.push(v);
             for edge in graph.raw_outgoing_edges(&v, EdgeLimit::Unlimited) {
-                let w = edge.to.node();
+                let w = edge.to;
 
                 if !distances.contains_key(&w) {
                     let dist_v = distances.get(&v).unwrap();
@@ -128,7 +128,7 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
     (
         centrality
             .into_iter()
-            .map(|(id, centrality)| (graph.id2node(&id).unwrap(), centrality / norm))
+            .map(|(id, centrality)| (graph.id2node(&id).unwrap().unwrap(), centrality / norm))
             .collect(),
         max_dist,
     )
@@ -166,29 +166,30 @@ mod tests {
     use file_store::temp::TempDir;
     use maplit::hashmap;
 
-    use crate::{webgraph::WebgraphWriter, webpage::html::links::RelFlags};
+    use crate::{
+        webgraph::{Edge, Webgraph},
+        webpage::html::links::RelFlags,
+    };
 
     use super::*;
 
     fn create_path_graph(n: usize) -> (Webgraph, TempDir) {
         let temp_dir = file_store::gen_temp_dir().unwrap();
-        let mut writer = WebgraphWriter::new(
-            temp_dir.as_ref().join("test-webgraph"),
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
-            None,
-        );
+        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test-webgraph"))
+            .open()
+            .unwrap();
 
         for i in 0..n - 1 {
-            writer.insert(
-                Node::from(i.to_string()),
-                Node::from((i + 1).to_string()),
-                String::new(),
-                RelFlags::default(),
-            );
+            graph.insert(Edge {
+                from: Node::from(i.to_string()),
+                to: Node::from((i + 1).to_string()),
+                label: String::new(),
+                rel_flags: RelFlags::default(),
+                combined_centrality: 0.0,
+            });
         }
+        graph.commit().unwrap();
 
-        let graph = writer.finalize();
         (graph, temp_dir)
     }
 

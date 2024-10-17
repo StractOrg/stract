@@ -17,24 +17,26 @@
 use std::path::Path;
 
 use super::{Node, NodeID};
+use crate::Result;
 
 pub struct Id2NodeDb {
     db: speedy_kv::Db<NodeID, Node>,
 }
 
 impl Id2NodeDb {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
-        Self {
-            db: speedy_kv::Db::open_or_create(path).unwrap(),
-        }
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Ok(Self {
+            db: speedy_kv::Db::open_or_create(path)?,
+        })
     }
 
-    pub fn put(&mut self, id: &NodeID, node: &Node) {
-        self.db.insert(*id, node.clone()).unwrap();
+    pub fn put(&mut self, id: &NodeID, node: &Node) -> Result<()> {
+        self.db.insert(*id, node.clone())?;
+        Ok(())
     }
 
-    pub fn get(&self, id: &NodeID) -> Option<Node> {
-        self.db.get(id).unwrap()
+    pub fn get(&self, id: &NodeID) -> Result<Option<Node>> {
+        self.db.get(id)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = NodeID> + '_ {
@@ -53,16 +55,19 @@ impl Id2NodeDb {
         self.db.iter()
     }
 
-    pub fn merge(&mut self, other: Self) {
-        self.db.merge(other.db).unwrap();
+    pub fn merge(&mut self, other: Self) -> Result<()> {
+        self.db.merge(other.db)?;
+        Ok(())
     }
 
-    pub fn flush(&mut self) {
-        self.db.commit().unwrap();
+    pub fn flush(&mut self) -> Result<()> {
+        self.db.commit()?;
+        Ok(())
     }
 
-    pub fn optimize_read(&mut self) {
-        self.db.merge_all_segments().unwrap();
+    pub fn optimize_read(&mut self) -> Result<()> {
+        self.db.merge_all_segments()?;
+        Ok(())
     }
 }
 
@@ -73,25 +78,25 @@ mod tests {
     #[test]
     fn test_id2node_db() {
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut db = Id2NodeDb::open(&temp_dir);
+        let mut db = Id2NodeDb::open(&temp_dir).unwrap();
 
         let a_node = Node::from("a".to_string());
         let a_id = NodeID::from(0_u64);
 
-        db.put(&a_id, &a_node);
-        db.flush();
+        db.put(&a_id, &a_node).unwrap();
+        db.flush().unwrap();
 
-        assert_eq!(db.get(&a_id), Some(a_node.clone()));
+        assert_eq!(db.get(&a_id).unwrap(), Some(a_node.clone()));
 
         let b_node = Node::from("b".to_string());
         let b_id = NodeID::from(1_u64);
 
-        assert_eq!(db.get(&b_id), None);
+        assert_eq!(db.get(&b_id).unwrap(), None);
 
-        db.put(&b_id, &b_node);
-        db.flush();
+        db.put(&b_id, &b_node).unwrap();
+        db.flush().unwrap();
 
-        assert_eq!(db.get(&b_id), Some(b_node));
-        assert_eq!(db.get(&a_id), Some(a_node));
+        assert_eq!(db.get(&b_id).unwrap(), Some(b_node));
+        assert_eq!(db.get(&a_id).unwrap(), Some(a_node));
     }
 }

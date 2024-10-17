@@ -35,12 +35,12 @@ use crate::{
     },
     entrypoint::webgraph_server::{
         GetNode, GetNodeIDs, IngoingEdges, OutgoingEdges, RawIngoingEdges,
-        RawIngoingEdgesWithLabels, RawOutgoingEdges, RawOutgoingEdgesWithLabels, WebGraphService,
+        RawIngoingEdgesWithLabels, RawOutgoingEdges, WebGraphService,
     },
     Result,
 };
 
-use super::{Edge, EdgeLimit, FullEdge, Node, NodeID};
+use super::{Edge, EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel};
 
 struct WebgraphClientManager<G: WebgraphGranularity>(std::marker::PhantomData<G>);
 
@@ -217,7 +217,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         Ok(nodes)
     }
 
-    pub async fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<FullEdge>> {
+    pub async fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<Edge>> {
         let res = self
             .conn()
             .await
@@ -238,7 +238,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
             .collect())
     }
 
-    pub async fn raw_ingoing_edges(&self, id: NodeID, limit: EdgeLimit) -> Result<Vec<Edge<()>>> {
+    pub async fn raw_ingoing_edges(&self, id: NodeID, limit: EdgeLimit) -> Result<Vec<SmallEdge>> {
         let res = self
             .conn()
             .await
@@ -263,7 +263,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         &self,
         id: NodeID,
         limit: EdgeLimit,
-    ) -> Result<Vec<Edge<String>>> {
+    ) -> Result<Vec<SmallEdgeWithLabel>> {
         let res = self
             .conn()
             .await
@@ -288,7 +288,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         &self,
         ids: &[NodeID],
         limit: EdgeLimit,
-    ) -> Result<Vec<Vec<Edge<String>>>> {
+    ) -> Result<Vec<Vec<SmallEdgeWithLabel>>> {
         let reqs: Vec<_> = ids
             .iter()
             .map(|id| RawIngoingEdgesWithLabels { node: *id, limit })
@@ -319,7 +319,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         &self,
         ids: &[NodeID],
         limit: EdgeLimit,
-    ) -> Result<Vec<Vec<Edge<()>>>> {
+    ) -> Result<Vec<Vec<SmallEdge>>> {
         let reqs: Vec<_> = ids
             .iter()
             .map(|id| RawIngoingEdges { node: *id, limit })
@@ -346,7 +346,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         Ok(edges)
     }
 
-    pub async fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<FullEdge>> {
+    pub async fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<Edge>> {
         let res = self
             .conn()
             .await
@@ -367,7 +367,7 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
             .collect())
     }
 
-    pub async fn raw_outgoing_edges(&self, id: NodeID, limit: EdgeLimit) -> Result<Vec<Edge<()>>> {
+    pub async fn raw_outgoing_edges(&self, id: NodeID, limit: EdgeLimit) -> Result<Vec<SmallEdge>> {
         let res = self
             .conn()
             .await
@@ -388,36 +388,11 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
             .collect())
     }
 
-    pub async fn raw_outgoing_edges_with_labels(
-        &self,
-        id: NodeID,
-        limit: EdgeLimit,
-    ) -> Result<Vec<Edge<String>>> {
-        let res = self
-            .conn()
-            .await
-            .send(
-                RawOutgoingEdgesWithLabels { node: id, limit },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await?;
-
-        Ok(res
-            .into_iter()
-            .flatten()
-            .flat_map(|(_, reps)| {
-                debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|(_, rep)| rep)
-            })
-            .collect())
-    }
-
     pub async fn batch_raw_outgoing_edges(
         &self,
         ids: &[NodeID],
         limit: EdgeLimit,
-    ) -> Result<Vec<Vec<Edge<()>>>> {
+    ) -> Result<Vec<Vec<SmallEdge>>> {
         let reqs: Vec<_> = ids
             .iter()
             .map(|id| RawOutgoingEdges { node: *id, limit })

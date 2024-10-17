@@ -259,7 +259,7 @@ mod tests {
             live::LiveSearcher,
             LocalSearchClient, LocalSearcher, SearchQuery,
         },
-        webgraph::{Node, WebgraphWriter},
+        webgraph::{Edge, Node, Webgraph},
         webpage::{html::links::RelFlags, Html, Webpage},
     };
 
@@ -605,47 +605,55 @@ mod tests {
         let dir = crate::gen_temp_dir().unwrap();
         let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
-        let mut writer = WebgraphWriter::new(
-            &dir,
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
-            None,
-        );
+        let mut graph = Webgraph::open(&dir).unwrap();
 
-        writer.insert(
-            Node::from("https://www.e.com").into_host(),
-            Node::from("https://www.a.com").into_host(),
-            String::new(),
-            RelFlags::default(),
-        );
-        writer.insert(
-            Node::from("https://www.a.com").into_host(),
-            Node::from("https://www.e.com").into_host(),
-            String::new(),
-            RelFlags::default(),
-        );
+        graph
+            .insert(Edge {
+                from: Node::from("https://www.e.com").into_host(),
+                to: Node::from("https://www.a.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("https://www.a.com").into_host(),
+                to: Node::from("https://www.e.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("https://www.c.com").into_host(),
+                to: Node::from("https://www.c.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("https://www.b.com").into_host(),
+                to: Node::from("https://www.e.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("https://www.e.com").into_host(),
+                to: Node::from("https://www.b.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
 
-        writer.insert(
-            Node::from("https://www.c.com").into_host(),
-            Node::from("https://www.c.com").into_host(),
-            String::new(),
-            RelFlags::default(),
-        );
-
-        writer.insert(
-            Node::from("https://www.b.com").into_host(),
-            Node::from("https://www.e.com").into_host(),
-            String::new(),
-            RelFlags::default(),
-        );
-        writer.insert(
-            Node::from("https://www.e.com").into_host(),
-            Node::from("https://www.b.com").into_host(),
-            String::new(),
-            RelFlags::default(),
-        );
-
-        let graph = writer.finalize();
+        graph.commit().unwrap();
 
         index
             .insert(&Webpage {

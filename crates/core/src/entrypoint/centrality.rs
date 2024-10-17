@@ -42,7 +42,9 @@ impl Centrality {
             "Building harmonic centrality for {}",
             webgraph_path.as_ref().to_str().unwrap()
         );
-        let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
+        let graph = WebgraphBuilder::new(webgraph_path)
+            .open()
+            .expect("webgraph should open");
         let harmonic_centrality = HarmonicCentrality::calculate(&graph);
         let store = store_harmonic(
             harmonic_centrality.iter().map(|(n, c)| (*n, c)),
@@ -52,7 +54,7 @@ impl Centrality {
         let top_harmonics =
             crate::webgraph::centrality::top_nodes(&store, TopNodes::Top(1_000_000))
                 .into_iter()
-                .map(|(n, c)| (graph.id2node(&n).unwrap(), c))
+                .map(|(n, c)| (graph.id2node(&n).unwrap().unwrap(), c))
                 .collect();
 
         store_csv(top_harmonics, base_output.as_ref().join("harmonic.csv"));
@@ -65,7 +67,7 @@ impl Centrality {
             webgraph_path.as_ref().to_str().unwrap()
         );
 
-        let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
+        let graph = WebgraphBuilder::new(webgraph_path).open()?;
 
         let approx = ApproxHarmonic::build(&graph, base_output.as_ref().join("harmonic"));
         let mut approx_rank: speedy_kv::Db<crate::webgraph::NodeID, u64> =
@@ -92,7 +94,7 @@ impl Centrality {
             }
 
             if top_nodes.len() < 1_000_000 {
-                top_nodes.push((graph.id2node(&node).unwrap(), centrality));
+                top_nodes.push((graph.id2node(&node).unwrap().unwrap(), centrality));
             }
         }
 
@@ -133,7 +135,7 @@ impl Centrality {
                         .raw_ingoing_edges(node_id, EdgeLimit::Limit(1))
                         .await?
                         .pop()
-                        .map(|edge| edge.from.node())
+                        .map(|edge| edge.from)
                     {
                         if let Some(seed_centrality) = original_centrality.get(&seed)? {
                             harmonic.insert(node_id, seed_centrality * config.discount_factor)?;

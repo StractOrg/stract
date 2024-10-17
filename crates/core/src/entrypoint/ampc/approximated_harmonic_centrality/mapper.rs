@@ -72,18 +72,18 @@ impl Workers {
                 .graph()
                 .raw_outgoing_edges(&node, webgraph::EdgeLimit::Limit(MAX_OUTGOING_EDGES))
                 .into_iter()
-                .filter(|e| !e.rel_flags().intersects(*SKIPPED_REL))
+                .filter(|e| !e.rel_flags.intersects(*SKIPPED_REL))
                 .map(|e| e.to)
             {
                 let d = dist + 1;
 
-                let current_dist = distances.entry(outgoing.node()).or_insert(u8::MAX);
+                let current_dist = distances.entry(outgoing).or_insert(u8::MAX);
 
                 if d < *current_dist {
                     *current_dist = d;
 
                     if d < max_dist {
-                        queue.push(cmp::Reverse((d, outgoing.node())));
+                        queue.push(cmp::Reverse((d, outgoing)));
                     }
                 }
             }

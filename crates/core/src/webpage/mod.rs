@@ -18,7 +18,7 @@ use crate::{
     backlink_grouper::GroupedBacklinks,
     inverted_index::InvertedIndex,
     schema::{numerical_field::NumericalField, text_field::TextField, Field},
-    webgraph::{Edge, NodeID},
+    webgraph::{Edge, NodeID, SmallEdgeWithLabel},
     Result,
 };
 use candle_core::Tensor;
@@ -45,10 +45,10 @@ pub struct Webpage {
     pub html: Html,
 
     #[cfg(test)]
-    pub backlinks: Vec<Edge<String>>,
+    pub backlinks: Vec<SmallEdgeWithLabel>,
 
     #[cfg(not(test))]
-    backlinks: Vec<Edge<String>>,
+    backlinks: Vec<SmallEdgeWithLabel>,
 
     #[cfg(test)]
     pub grouped_backlinks: GroupedBacklinks,
@@ -145,11 +145,16 @@ impl Webpage {
         })
     }
 
-    pub fn backlinks(&self) -> &[Edge<String>] {
+    pub fn backlinks(&self) -> &[SmallEdgeWithLabel] {
         &self.backlinks
     }
 
-    pub fn set_backlinks(&mut self, backlinks: Vec<Edge<String>>) {
+    pub fn set_backlinks(&mut self, backlinks: Vec<SmallEdgeWithLabel>) {
+        let backlinks = backlinks
+            .into_iter()
+            .filter(|e| !e.rel_flags.contains(RelFlags::NOFOLLOW))
+            .collect();
+
         self.backlinks = backlinks;
     }
 

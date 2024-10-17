@@ -16,29 +16,21 @@
 
 use std::path::Path;
 
-use crate::executor::Executor;
-
 use super::Webgraph;
+use crate::Result;
 
 pub struct WebgraphBuilder {
     path: Box<Path>,
-    executor: Executor,
 }
 
 impl WebgraphBuilder {
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
         Self {
             path: path.as_ref().into(),
-            executor: Executor::multi_thread("webgraph").unwrap(),
         }
     }
 
-    pub fn single_threaded(mut self) -> Self {
-        self.executor = Executor::single_thread();
-        self
-    }
-
-    pub fn open(self) -> Webgraph {
-        Webgraph::open(self.path, self.executor)
+    pub fn open(self) -> Result<Webgraph> {
+        Webgraph::open(self.path)
     }
 }

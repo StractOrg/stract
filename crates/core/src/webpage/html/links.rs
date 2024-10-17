@@ -39,7 +39,20 @@ pub struct ImageLink {
 
 /// Flags for the `rel` attribute of the `a` element.
 /// See https://html.spec.whatwg.org/multipage/links.html#linkTypes
-#[derive(Default, Debug, Clone, Copy, bincode::Encode, bincode::Decode, PartialEq, Eq, Hash)]
+#[derive(
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    bincode::Encode,
+    bincode::Decode,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    Hash,
+    utoipa::ToSchema,
+)]
 pub struct RelFlags(u64);
 
 impl RelFlags {

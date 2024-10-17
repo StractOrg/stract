@@ -148,7 +148,7 @@ mod tests {
         searcher::{
             api::ApiSearcher, live::LiveSearcher, LocalSearchClient, LocalSearcher, SearchQuery,
         },
-        webgraph::{EdgeLimit, Node, Webgraph, WebgraphWriter},
+        webgraph::{Edge, EdgeLimit, Node, Webgraph},
         webpage::{html::links::RelFlags, Html, Webpage},
     };
 
@@ -159,7 +159,7 @@ mod tests {
             graph
                 .raw_ingoing_edges(node, EdgeLimit::Unlimited)
                 .into_iter()
-                .map(|e| e.from.node().as_u64())
+                .map(|e| e.from.as_u64())
                 .collect(),
         )
     }
@@ -167,64 +167,92 @@ mod tests {
     #[tokio::test]
     async fn it_favors_liked_hosts() {
         let dir = crate::gen_temp_dir().unwrap();
-        let mut wrt = WebgraphWriter::new(
-            &dir,
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
-            None,
-        );
+        let mut graph = Webgraph::open(&dir).unwrap();
 
-        wrt.insert(
-            Node::from("a.com"),
-            Node::from("b.com"),
-            String::new(),
-            RelFlags::default(),
-        );
-        wrt.insert(
-            Node::from("c.com"),
-            Node::from("d.com"),
-            String::new(),
-            RelFlags::default(),
-        );
-        wrt.insert(
-            Node::from("a.com"),
-            Node::from("e.com"),
-            String::new(),
-            RelFlags::default(),
-        );
+        graph
+            .insert(Edge {
+                from: Node::from("a.com").into_host(),
+                to: Node::from("b.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("c.com").into_host(),
+                to: Node::from("d.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("a.com").into_host(),
+                to: Node::from("e.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
 
-        wrt.insert(
-            Node::from("z.com"),
-            Node::from("a.com"),
-            String::new(),
-            RelFlags::default(),
-        );
-        wrt.insert(
-            Node::from("z.com"),
-            Node::from("b.com"),
-            String::new(),
-            RelFlags::default(),
-        );
-        wrt.insert(
-            Node::from("z.com"),
-            Node::from("c.com"),
-            String::new(),
-            RelFlags::default(),
-        );
-        wrt.insert(
-            Node::from("z.com"),
-            Node::from("d.com"),
-            String::new(),
-            RelFlags::default(),
-        );
-        wrt.insert(
-            Node::from("z.com"),
-            Node::from("e.com"),
-            String::new(),
-            RelFlags::default(),
-        );
+        graph
+            .insert(Edge {
+                from: Node::from("z.com").into_host(),
+                to: Node::from("a.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("z.com").into_host(),
+                to: Node::from("b.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("z.com").into_host(),
+                to: Node::from("c.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("z.com").into_host(),
+                to: Node::from("d.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("z.com").into_host(),
+                to: Node::from("d.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("z.com").into_host(),
+                to: Node::from("e.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
 
-        let graph = wrt.finalize();
+        graph.commit().unwrap();
 
         let mut scorer = Scorer::new(&graph, &[Node::from("b.com").id()], &[], false).await;
         let e = Node::from("e.com").id();
@@ -237,39 +265,46 @@ mod tests {
     #[allow(clippy::too_many_lines)]
     async fn it_ranks_search_results() {
         let dir = crate::gen_temp_dir().unwrap();
-        let mut wrt = WebgraphWriter::new(
-            &dir,
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
-            None,
-        );
+        let mut graph = Webgraph::open(&dir).unwrap();
 
-        wrt.insert(
-            Node::from("b.com"),
-            Node::from("a.com"),
-            String::new(),
-            RelFlags::default(),
-        );
-        wrt.insert(
-            Node::from("c.com"),
-            Node::from("d.com"),
-            String::new(),
-            RelFlags::default(),
-        );
-        wrt.insert(
-            Node::from("b.com"),
-            Node::from("e.com"),
-            String::new(),
-            RelFlags::default(),
-        );
-        wrt.insert(
-            Node::from("c.com"),
-            Node::from("b.com"),
-            String::new(),
-            RelFlags::default(),
-        );
+        graph
+            .insert(Edge {
+                from: Node::from("b.com").into_host(),
+                to: Node::from("a.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("c.com").into_host(),
+                to: Node::from("d.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("b.com").into_host(),
+                to: Node::from("e.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("c.com").into_host(),
+                to: Node::from("b.com").into_host(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                combined_centrality: 0.0,
+            })
+            .unwrap();
 
-        let graph = wrt.finalize();
+        graph.commit().unwrap();
 
         let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 

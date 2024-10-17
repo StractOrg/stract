@@ -81,11 +81,10 @@ impl Job for CentralityJob {
 #[cfg(test)]
 mod tests {
     use tracing_test::traced_test;
+    use webgraph::{Edge, Webgraph};
 
     use crate::{
-        executor::Executor,
-        free_socket_addr,
-        webgraph::{centrality::harmonic::HarmonicCentrality, Compression, WebgraphWriter},
+        executor::Executor, free_socket_addr, webgraph::centrality::harmonic::HarmonicCentrality,
         webpage::html::links::RelFlags,
     };
 
@@ -95,44 +94,38 @@ mod tests {
     #[traced_test]
     fn test_simple_graph() {
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut combined = WebgraphWriter::new(
-            temp_dir.as_ref().join("combined"),
-            Executor::single_thread(),
-            Compression::default(),
-            None,
-        );
-        let mut a = WebgraphWriter::new(
-            temp_dir.as_ref().join("a"),
-            Executor::single_thread(),
-            Compression::default(),
-            None,
-        );
-        let mut b = WebgraphWriter::new(
-            temp_dir.as_ref().join("b"),
-            Executor::single_thread(),
-            Compression::default(),
-            None,
-        );
+        let mut combined = Webgraph::builder(temp_dir.as_ref().join("combined"))
+            .open()
+            .unwrap();
+        let mut a = Webgraph::builder(temp_dir.as_ref().join("a"))
+            .open()
+            .unwrap();
+        let mut b = Webgraph::builder(temp_dir.as_ref().join("b"))
+            .open()
+            .unwrap();
 
         let edges = crate::webgraph::tests::test_edges();
 
         for (i, (from, to, label)) in edges.into_iter().enumerate() {
-            combined.insert(from.clone(), to.clone(), label.clone(), RelFlags::default());
+            let e = Edge {
+                from: from.clone(),
+                to: to.clone(),
+                label: label.clone(),
+                rel_flags: RelFlags::default(),
+                combined_centrality: 0.0,
+            };
+            combined.insert(e.clone());
 
             if i % 2 == 0 {
-                a.insert(from, to, label, RelFlags::default());
+                a.insert(e);
             } else {
-                b.insert(from, to, label, RelFlags::default());
+                b.insert(e);
             }
         }
 
-        combined.commit();
-        a.commit();
-        b.commit();
-
-        let combined = combined.finalize();
-        let a = a.finalize();
-        let b = b.finalize();
+        combined.commit().unwrap();
+        a.commit().unwrap();
+        b.commit().unwrap();
 
         let expected = HarmonicCentrality::calculate(&combined);
         let num_nodes = combined.nodes().count();

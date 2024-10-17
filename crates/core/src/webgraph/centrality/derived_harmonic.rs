@@ -102,7 +102,7 @@ impl DerivedCentrality {
                     let mut ingoing: Vec<_> = page_graph
                         .raw_ingoing_edges(&id, EdgeLimit::Limit(128))
                         .into_iter()
-                        .filter_map(|e| page_graph.id2node(&e.from.node()))
+                        .filter_map(|e| page_graph.id2node(&e.from).unwrap())
                         .map(|n| n.into_host())
                         .collect();
                     ingoing.sort();
@@ -136,7 +136,7 @@ impl DerivedCentrality {
 
         let mut db = speedy_kv::Db::open_or_create(output.as_ref()).unwrap();
         for (id, score) in non_normalized.iter() {
-            let node = page_graph.id2node(&id).unwrap().into_host().id();
+            let node = page_graph.id2node(&id).unwrap().unwrap().into_host().id();
             let norm = norms.get(&node).unwrap();
             let normalized = score / *norm;
             db.insert(id, normalized).unwrap();

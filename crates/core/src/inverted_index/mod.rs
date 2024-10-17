@@ -251,7 +251,7 @@ mod tests {
         ranking::{LocalRanker, SignalComputer},
         search_ctx::Ctx,
         searcher::SearchQuery,
-        webgraph::{Edge, NodeDatum},
+        webgraph::{NodeID, SmallEdgeWithLabel},
         webpage::{schema_org, Html, Webpage},
         OneOrMany,
     };
@@ -526,11 +526,11 @@ mod tests {
             ..Default::default()
         };
 
-        webpage.set_backlinks(vec![Edge {
-            from: NodeDatum::new(0u64, 0),
-            to: NodeDatum::new(1u64, 0),
+        webpage.set_backlinks(vec![SmallEdgeWithLabel {
+            from: NodeID::from(0u64),
+            to: NodeID::from(1u64),
             label: "B site is great".to_string(),
-            rel: Default::default(),
+            rel_flags: Default::default(),
         }]);
 
         index.insert(&webpage).expect("failed to insert webpage");

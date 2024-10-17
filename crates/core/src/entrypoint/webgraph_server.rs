@@ -28,9 +28,10 @@ use crate::distributed::sonic::service::sonic_service;
 use crate::distributed::sonic::service::Message;
 use crate::webgraph::Edge;
 use crate::webgraph::EdgeLimit;
-use crate::webgraph::FullEdge;
 use crate::webgraph::Node;
 use crate::webgraph::NodeID;
+use crate::webgraph::SmallEdge;
+use crate::webgraph::SmallEdgeWithLabel;
 use crate::webgraph::Webgraph;
 use crate::webgraph::WebgraphBuilder;
 use crate::Result;
@@ -56,7 +57,6 @@ sonic_service!(
         RawIngoingEdges,
         RawOutgoingEdges,
         RawIngoingEdgesWithLabels,
-        RawOutgoingEdgesWithLabels,
         GetNodeIDs
     ]
 );
@@ -70,7 +70,7 @@ impl Message<WebGraphService> for GetNode {
     type Response = Option<Node>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.id2node(&self.node)
+        server.graph.id2node(&self.node).ok().flatten()
     }
 }
 
@@ -81,7 +81,7 @@ pub struct IngoingEdges {
 }
 
 impl Message<WebGraphService> for IngoingEdges {
-    type Response = Vec<FullEdge>;
+    type Response = Vec<Edge>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
         server.graph.ingoing_edges(self.node, self.limit)
@@ -95,7 +95,7 @@ pub struct OutgoingEdges {
 }
 
 impl Message<WebGraphService> for OutgoingEdges {
-    type Response = Vec<FullEdge>;
+    type Response = Vec<Edge>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
         server.graph.outgoing_edges(self.node, self.limit)
@@ -109,7 +109,7 @@ pub struct RawIngoingEdges {
 }
 
 impl Message<WebGraphService> for RawIngoingEdges {
-    type Response = Vec<Edge<()>>;
+    type Response = Vec<SmallEdge>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
         server.graph.raw_ingoing_edges(&self.node, self.limit)
@@ -123,7 +123,7 @@ pub struct RawOutgoingEdges {
 }
 
 impl Message<WebGraphService> for RawOutgoingEdges {
-    type Response = Vec<Edge<()>>;
+    type Response = Vec<SmallEdge>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
         server.graph.raw_outgoing_edges(&self.node, self.limit)
@@ -137,28 +137,12 @@ pub struct RawIngoingEdgesWithLabels {
 }
 
 impl Message<WebGraphService> for RawIngoingEdgesWithLabels {
-    type Response = Vec<Edge<String>>;
+    type Response = Vec<SmallEdgeWithLabel>;
 
     async fn handle(self, server: &WebGraphService) -> Self::Response {
         server
             .graph
             .raw_ingoing_edges_with_labels(&self.node, self.limit)
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct RawOutgoingEdgesWithLabels {
-    pub node: NodeID,
-    pub limit: EdgeLimit,
-}
-
-impl Message<WebGraphService> for RawOutgoingEdgesWithLabels {
-    type Response = Vec<Edge<String>>;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server
-            .graph
-            .raw_outgoing_edges_with_labels(&self.node, self.limit)
     }
 }
 
@@ -210,7 +194,7 @@ impl Message<WebGraphService> for GetNodeIDs {
 pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
 
-    let graph = Arc::new(WebgraphBuilder::new(config.graph_path).open());
+    let graph = Arc::new(WebgraphBuilder::new(config.graph_path).open()?);
 
     let server = WebGraphService { graph }.bind(addr).await.unwrap();
 

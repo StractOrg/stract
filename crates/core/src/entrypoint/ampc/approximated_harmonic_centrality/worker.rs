@@ -71,7 +71,14 @@ impl Message<ApproxCentralityWorker> for BatchId2Node {
     fn handle(self, worker: &ApproxCentralityWorker) -> Self::Response {
         self.0
             .iter()
-            .filter_map(|id| worker.graph.id2node(id).map(|node| (*id, node)))
+            .filter_map(|id| {
+                worker
+                    .graph
+                    .id2node(id)
+                    .ok()
+                    .flatten()
+                    .map(|node| (*id, node))
+            })
             .collect()
     }
 }
@@ -123,9 +130,7 @@ impl RemoteWorker for RemoteApproxCentralityWorker {
 pub fn run(config: ApproxHarmonicWorkerConfig) -> Result<()> {
     let tokio_conf = config.clone();
 
-    let graph = Webgraph::builder(config.graph_path)
-        .single_threaded()
-        .open();
+    let graph = Webgraph::builder(config.graph_path).open()?;
     let worker = ApproxCentralityWorker::new(graph, config.shard);
     let service = Service::ApproxHarmonicWorker {
         host: tokio_conf.host,

@@ -17,11 +17,10 @@ use crate::{
     canon_index::CanonicalIndex,
     config::{self, WarcSource, WebgraphConstructConfig},
     entrypoint::download_all_warc_files,
-    webgraph::{self, Node, NodeID, WebgraphWriter},
-    webpage::{url_ext::UrlExt, Html},
+    webgraph::{self, Edge, Node, NodeID},
+    webpage::Html,
     Result,
 };
-use anyhow::bail;
 use itertools::Itertools;
 use url::Url;
 
@@ -62,30 +61,6 @@ pub struct Job {
     pub warc_paths: Vec<String>,
 }
 
-pub fn open_host_graph_writer<P: AsRef<Path>>(
-    path: P,
-    host_centrality_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
-) -> webgraph::WebgraphWriter {
-    WebgraphWriter::new(
-        path,
-        crate::executor::Executor::single_thread(),
-        webgraph::Compression::Lz4,
-        host_centrality_store,
-    )
-}
-
-pub fn open_page_graph_writer<P: AsRef<Path>>(
-    path: P,
-    host_centrality_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
-) -> webgraph::WebgraphWriter {
-    WebgraphWriter::new(
-        path,
-        crate::executor::Executor::single_thread(),
-        webgraph::Compression::Lz4,
-        host_centrality_store,
-    )
-}
-
 fn canonical_or_self(index: &CanonicalIndex, url: Url) -> Url {
     if let Some(url) = index.get(&url).unwrap() {
         url
@@ -95,8 +70,8 @@ fn canonical_or_self(index: &CanonicalIndex, url: Url) -> Url {
 }
 
 pub struct WebgraphWorker {
-    pub host_graph: Option<webgraph::WebgraphWriter>,
-    pub page_graph: Option<webgraph::WebgraphWriter>,
+    pub host_centrality_store: Option<Arc<speedy_kv::Db<NodeID, f64>>>,
+    pub graph: webgraph::Webgraph,
     pub canonical_index: Option<Arc<CanonicalIndex>>,
 }
 
@@ -122,57 +97,53 @@ impl WebgraphWorker {
                         }
                     };
 
+                let mut source = webpage.url().clone();
+                if let Some(index) = &self.canonical_index {
+                    source = canonical_or_self(index, source);
+                }
+
+                let source = Node::from(source);
+                let source_centrality = self
+                    .host_centrality_store
+                    .as_ref()
+                    .and_then(|store| store.get(&source.clone().into_host().id()).unwrap())
+                    .unwrap_or(0.0);
+
                 for mut link in webpage
                     .anchor_links()
                     .into_iter()
                     .filter(|link| matches!(link.destination.scheme(), "http" | "https"))
                 {
-                    let mut source = link.source.clone();
                     let mut destination = link.destination.clone();
 
                     if let Some(index) = &self.canonical_index {
-                        source = canonical_or_self(index, source);
                         destination = canonical_or_self(index, destination);
                     }
 
                     link.text = link.text.chars().take(128).collect();
 
-                    let mut source = Node::from(source);
+                    let destination = Node::from(destination);
 
-                    let mut destination = Node::from(destination);
+                    let destination_centrality = self
+                        .host_centrality_store
+                        .as_ref()
+                        .and_then(|store| store.get(&destination.clone().into_host().id()).unwrap())
+                        .unwrap_or(0.0);
 
                     trace!("inserting link {:?}", link);
-                    if let Some(graph) = self.page_graph.as_mut() {
-                        graph.insert(
-                            source.clone(),
-                            destination.clone(),
-                            link.text.clone(),
-                            link.rel,
-                        )
-                    }
-
-                    let dest_domain = link.destination.root_domain();
-                    let source_domain = link.source.root_domain();
-                    if dest_domain.is_some()
-                        && source_domain.is_some()
-                        && dest_domain != source_domain
-                    {
-                        source = source.into_host();
-                        destination = destination.into_host();
-
-                        if let Some(graph) = self.host_graph.as_mut() {
-                            graph.insert(source, destination, link.text, link.rel)
-                        }
-                    }
+                    self.graph
+                        .insert(Edge {
+                            from: source.clone(),
+                            to: destination,
+                            rel_flags: link.rel,
+                            label: link.text,
+                            combined_centrality: source_centrality + destination_centrality,
+                        })
+                        .unwrap();
                 }
             }
 
-            if let Some(graph) = self.host_graph.as_mut() {
-                graph.commit()
-            }
-            if let Some(graph) = self.page_graph.as_mut() {
-                graph.commit()
-            }
+            self.graph.commit().unwrap();
         }
 
         info!("{} done", name);
@@ -183,10 +154,6 @@ pub struct Webgraph {}
 
 impl Webgraph {
     pub fn run(config: &WebgraphConstructConfig) -> Result<()> {
-        if config.page_graph_base_path.is_none() && config.host_graph_base_path.is_none() {
-            bail!("either page_graph_base_path or host_graph_base_path must be set");
-        }
-
         let warc_paths = config.warc_source.paths()?;
 
         let job_config = JobConfig::from(config.warc_source.clone());
@@ -209,18 +176,14 @@ impl Webgraph {
             None
         };
 
-        let host_centrality_rank_store = if let Some(path) = &config.host_centrality_rank_store_path
-        {
-            Some(Arc::new(speedy_kv::Db::open_or_create(path)?))
-        } else {
-            None
-        };
+        let host_centrality_rank_store = Arc::new(speedy_kv::Db::open_or_create(
+            &config.host_centrality_rank_store_path,
+        )?);
 
         let num_workers = usize::from(std::thread::available_parallelism()?);
 
         let mut handlers = Vec::new();
-        let host_path = &config.host_graph_base_path;
-        let page_path = &config.page_graph_base_path;
+        let graph_path = &config.graph_base_path;
 
         const MAX_FINALIZE_CONCURRENT: usize = 8;
         let (s, r) = crossbeam_channel::bounded(MAX_FINALIZE_CONCURRENT);
@@ -230,23 +193,12 @@ impl Webgraph {
         }
 
         for i in 0..num_workers {
-            let host_path = host_path.clone();
-            let host_path = host_path
-                .as_ref()
-                .map(|p| Path::new(p).join(format!("worker_{i}")));
-
-            let page_path = page_path.clone();
-            let page_path = page_path
-                .as_ref()
-                .map(|p| Path::new(p).join(format!("worker_{i}")));
+            let graph_path = graph_path.clone();
+            let graph_path = Path::new(&graph_path).join(format!("worker_{i}"));
 
             let mut worker = WebgraphWorker {
-                host_graph: host_path
-                    .as_ref()
-                    .map(|p| open_host_graph_writer(p, host_centrality_rank_store.clone())),
-                page_graph: page_path
-                    .as_ref()
-                    .map(|p| open_page_graph_writer(p, host_centrality_rank_store.clone())),
+                graph: webgraph::Webgraph::open(graph_path)?,
+                host_centrality_store: Some(host_centrality_rank_store.clone()),
                 canonical_index: canonical_index.clone(),
             };
 
@@ -259,11 +211,11 @@ impl Webgraph {
 
                 r.recv().unwrap();
 
-                let host = worker.host_graph.map(|graph| graph.finalize());
-                let page = worker.page_graph.map(|graph| graph.finalize());
+                worker.graph.commit().unwrap();
+                worker.graph.optimize_read().unwrap();
 
                 s.send(()).unwrap();
-                (host, page)
+                worker.graph
             }));
         }
 
@@ -272,39 +224,16 @@ impl Webgraph {
             graphs.push(handler.join().unwrap());
         }
 
-        let (mut host_graph, mut page_graph) = graphs.pop().unwrap();
+        let mut graph = graphs.pop().unwrap();
 
-        for (other_host, other_page) in graphs {
-            if let (Some(graph), Some(other)) = (host_graph.as_mut(), other_host) {
-                graph.merge(other)?;
-            }
-
-            if let (Some(graph), Some(other)) = (page_graph.as_mut(), other_page) {
-                graph.merge(other)?;
-            }
+        for other in graphs {
+            graph.merge(other)?;
         }
 
         if config.merge_all_segments {
-            if let Some(host) = host_graph.as_mut() {
-                host.optimize_read(); // save space in id2node db
-                host.merge_all_segments(Default::default())?;
-            }
-
-            if let Some(page) = page_graph.as_mut() {
-                page.optimize_read(); // save space in id2node db
-                page.merge_all_segments(Default::default())?;
-            }
+            graph.optimize_read();
         }
-
-        if let Some(host) = host_graph.as_mut() {
-            host.optimize_read();
-            crate::mv(host.path(), config.host_graph_base_path.as_ref().unwrap())?;
-        }
-
-        if let Some(page) = page_graph.as_mut() {
-            page.optimize_read();
-            crate::mv(page.path(), config.page_graph_base_path.as_ref().unwrap())?;
-        }
+        crate::mv(graph.path(), &config.graph_base_path)?;
 
         Ok(())
     }

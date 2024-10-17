@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{log_group::HarmonicRankGroup, webgraph::Edge};
+use crate::{
+    log_group::HarmonicRankGroup,
+    webgraph::{Edge, SmallEdgeWithLabel},
+};
 
 /// Number of groups to divide the backlinks into.
 /// If this is changed, also change the grouped backlink fields in the schema.
@@ -23,7 +26,7 @@ const NUM_GROUPS: u64 = 10;
 #[derive(Debug)]
 pub struct Group {
     group: u64,
-    backlinks: Vec<Edge<String>>,
+    backlinks: Vec<SmallEdgeWithLabel>,
 }
 
 impl Group {
@@ -34,7 +37,7 @@ impl Group {
         }
     }
 
-    fn insert(&mut self, backlink: Edge<String>) {
+    fn insert(&mut self, backlink: SmallEdgeWithLabel) {
         self.backlinks.push(backlink);
     }
 
@@ -42,7 +45,7 @@ impl Group {
         self.group
     }
 
-    pub fn backlinks(&self) -> &[Edge<String>] {
+    pub fn backlinks(&self) -> &[SmallEdgeWithLabel] {
         &self.backlinks
     }
 }
@@ -66,7 +69,7 @@ impl GroupedBacklinks {
         self.groups.get(group as usize)
     }
 
-    fn add(&mut self, group: u64, backlink: Edge<String>) {
+    fn add(&mut self, group: u64, backlink: SmallEdgeWithLabel) {
         if let Some(group) = self.groups.get_mut(group as usize) {
             group.insert(backlink)
         }
@@ -93,10 +96,8 @@ impl BacklinkGrouper {
         }
     }
 
-    pub fn add(&mut self, backlink: Edge<String>) {
-        let rank = backlink.from.host_rank();
-
-        let group = self.grouper.group(rank);
+    pub fn add(&mut self, backlink: SmallEdgeWithLabel, host_rank: u64) {
+        let group = self.grouper.group(host_rank);
         self.groups.add(group, backlink);
     }
 
@@ -107,73 +108,103 @@ impl BacklinkGrouper {
 
 #[cfg(test)]
 mod tests {
-    use crate::webgraph::NodeDatum;
+    use crate::webgraph::NodeID;
 
     use super::*;
 
     #[test]
     fn test_grouped_backlinks() {
         let mut grouper = BacklinkGrouper::new(10);
-        grouper.add(Edge {
-            from: NodeDatum::new(0u64, 0u64),
-            to: NodeDatum::new(1u64, 0u64),
-            label: String::new(),
-            rel: Default::default(),
-        });
-        grouper.add(Edge {
-            from: NodeDatum::new(0u64, 1u64),
-            to: NodeDatum::new(1u64, 0u64),
-            label: String::new(),
-            rel: Default::default(),
-        });
-        grouper.add(Edge {
-            from: NodeDatum::new(0u64, 2u64),
-            to: NodeDatum::new(1u64, 0u64),
-            label: String::new(),
-            rel: Default::default(),
-        });
-        grouper.add(Edge {
-            from: NodeDatum::new(0u64, 3u64),
-            to: NodeDatum::new(1u64, 0u64),
-            label: String::new(),
-            rel: Default::default(),
-        });
-        grouper.add(Edge {
-            from: NodeDatum::new(0u64, 4u64),
-            to: NodeDatum::new(1u64, 0u64),
-            label: String::new(),
-            rel: Default::default(),
-        });
-        grouper.add(Edge {
-            from: NodeDatum::new(0u64, 5u64),
-            to: NodeDatum::new(1u64, 0u64),
-            label: String::new(),
-            rel: Default::default(),
-        });
-        grouper.add(Edge {
-            from: NodeDatum::new(0u64, 6u64),
-            to: NodeDatum::new(1u64, 0u64),
-            label: String::new(),
-            rel: Default::default(),
-        });
-        grouper.add(Edge {
-            from: NodeDatum::new(0u64, 7u64),
-            to: NodeDatum::new(1u64, 0u64),
-            label: String::new(),
-            rel: Default::default(),
-        });
-        grouper.add(Edge {
-            from: NodeDatum::new(0u64, 8u64),
-            to: NodeDatum::new(1u64, 0u64),
-            label: String::new(),
-            rel: Default::default(),
-        });
-        grouper.add(Edge {
-            from: NodeDatum::new(0u64, 9u64),
-            to: NodeDatum::new(1u64, 0u64),
-            label: String::new(),
-            rel: Default::default(),
-        });
+        grouper.add(
+            SmallEdgeWithLabel {
+                from: NodeID::from(10u64),
+                to: NodeID::from(1u64),
+                label: String::new(),
+                rel_flags: Default::default(),
+            },
+            0,
+        );
+        grouper.add(
+            SmallEdgeWithLabel {
+                from: NodeID::from(9u64),
+                to: NodeID::from(1u64),
+                label: String::new(),
+                rel_flags: Default::default(),
+            },
+            1,
+        );
+        grouper.add(
+            SmallEdgeWithLabel {
+                from: NodeID::from(8u64),
+                to: NodeID::from(1u64),
+                label: String::new(),
+                rel_flags: Default::default(),
+            },
+            2,
+        );
+        grouper.add(
+            SmallEdgeWithLabel {
+                from: NodeID::from(7u64),
+                to: NodeID::from(1u64),
+                label: String::new(),
+                rel_flags: Default::default(),
+            },
+            3,
+        );
+        grouper.add(
+            SmallEdgeWithLabel {
+                from: NodeID::from(6u64),
+                to: NodeID::from(1u64),
+                label: String::new(),
+                rel_flags: Default::default(),
+            },
+            4,
+        );
+        grouper.add(
+            SmallEdgeWithLabel {
+                from: NodeID::from(5u64),
+                to: NodeID::from(1u64),
+                label: String::new(),
+                rel_flags: Default::default(),
+            },
+            5,
+        );
+        grouper.add(
+            SmallEdgeWithLabel {
+                from: NodeID::from(4u64),
+                to: NodeID::from(1u64),
+                label: String::new(),
+                rel_flags: Default::default(),
+            },
+            6,
+        );
+        grouper.add(
+            SmallEdgeWithLabel {
+                from: NodeID::from(3u64),
+                to: NodeID::from(1u64),
+                label: String::new(),
+                rel_flags: Default::default(),
+            },
+            7,
+        );
+        grouper.add(
+            SmallEdgeWithLabel {
+                from: NodeID::from(2u64),
+                to: NodeID::from(1u64),
+                label: String::new(),
+                rel_flags: Default::default(),
+            },
+            8,
+        );
+        grouper.add(
+            SmallEdgeWithLabel {
+                from: NodeID::from(1u64),
+                to: NodeID::from(1u64),
+                label: String::new(),
+                rel_flags: Default::default(),
+            },
+            9,
+        );
 
         {
             let groups = grouper.groups();
