@@ -29,7 +29,6 @@ use crate::collector::{approx_count, MainCollector};
 
 use crate::highlighted::HighlightedFragment;
 use crate::numericalfield_reader::NumericalFieldReader;
-use crate::query::shortcircuit::ShortCircuitQuery;
 use crate::query::Query;
 use crate::ranking::pipeline::LocalRecallRankingWebpage;
 use crate::ranking::SignalComputer;
@@ -38,6 +37,7 @@ use crate::search_ctx::Ctx;
 use crate::snippet;
 use crate::snippet::TextSnippet;
 use crate::webgraph::NodeID;
+use tantivy::query::ShortCircuitQuery;
 
 use crate::schema::text_field::TextField;
 use crate::webpage::url_ext::UrlExt;
@@ -61,7 +61,7 @@ impl InvertedIndex {
         }
 
         let simple_terms = query.simple_terms().to_vec();
-        let mut query: Box<dyn tantivy::query::Query> = Box::new(query.clone());
+        let query: Box<dyn tantivy::query::Query> = Box::new(query.clone());
 
         if let Some(limit) = collector.top_docs().max_docs().cloned() {
             if limit.segments == 0 {
@@ -72,7 +72,8 @@ impl InvertedIndex {
             }
 
             let docs_per_segment = (limit.total_docs / limit.segments) as u64;
-            query = Box::new(ShortCircuitQuery::new(query, docs_per_segment));
+            let query: Box<dyn tantivy::query::Query> =
+                Box::new(ShortCircuitQuery::new(query, docs_per_segment));
 
             let (count, pointers) = ctx.tv_searcher.search(
                 &query,

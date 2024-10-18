@@ -29,6 +29,8 @@ use crate::{
     Result,
 };
 
+use tantivy::query::ShortCircuitQuery;
+
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct ForwardlinksQuery {
     node: NodeID,
@@ -37,11 +39,16 @@ pub struct ForwardlinksQuery {
 
 impl Query for ForwardlinksQuery {
     type Collector = TopDocsCollector;
-    type TantivyQuery = LinksQuery;
+    type TantivyQuery = Box<dyn tantivy::query::Query>;
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
-        LinksQuery::new(self.node, FromId)
+        match self.limit {
+            EdgeLimit::Unlimited => Box::new(LinksQuery::new(self.node, FromId)),
+            EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => Box::new(
+                ShortCircuitQuery::new(Box::new(LinksQuery::new(self.node, FromId)), limit as u64),
+            ),
+        }
     }
 
     fn collector(&self) -> Self::Collector {
@@ -78,11 +85,19 @@ pub struct HostForwardlinksQuery {
 
 impl Query for HostForwardlinksQuery {
     type Collector = TopDocsCollector;
-    type TantivyQuery = HostLinksQuery;
+    type TantivyQuery = Box<dyn tantivy::query::Query>;
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
-        HostLinksQuery::new(self.node, FromId)
+        match self.limit {
+            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(self.node, FromId)),
+            EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
+                Box::new(ShortCircuitQuery::new(
+                    Box::new(HostLinksQuery::new(self.node, FromId)),
+                    limit as u64,
+                ))
+            }
+        }
     }
 
     fn collector(&self) -> Self::Collector {
@@ -119,11 +134,19 @@ pub struct FullForwardlinksQuery {
 
 impl Query for FullForwardlinksQuery {
     type Collector = TopDocsCollector;
-    type TantivyQuery = LinksQuery;
+    type TantivyQuery = Box<dyn tantivy::query::Query>;
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
-        LinksQuery::new(self.node.id(), FromId)
+        match self.limit {
+            EdgeLimit::Unlimited => Box::new(LinksQuery::new(self.node.id(), FromId)),
+            EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
+                Box::new(ShortCircuitQuery::new(
+                    Box::new(LinksQuery::new(self.node.id(), FromId)),
+                    limit as u64,
+                ))
+            }
+        }
     }
 
     fn collector(&self) -> Self::Collector {
@@ -153,11 +176,25 @@ pub struct FullHostForwardlinksQuery {
 
 impl Query for FullHostForwardlinksQuery {
     type Collector = TopDocsCollector;
-    type TantivyQuery = HostLinksQuery;
+    type TantivyQuery = Box<dyn tantivy::query::Query>;
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
-        HostLinksQuery::new(self.node.clone().into_host().id(), FromId)
+        match self.limit {
+            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(
+                self.node.clone().into_host().id(),
+                FromId,
+            )),
+            EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
+                Box::new(ShortCircuitQuery::new(
+                    Box::new(HostLinksQuery::new(
+                        self.node.clone().into_host().id(),
+                        FromId,
+                    )),
+                    limit as u64,
+                ))
+            }
+        }
     }
 
     fn collector(&self) -> Self::Collector {

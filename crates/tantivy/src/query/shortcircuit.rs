@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -13,7 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use tantivy::{
+use crate::{
     query::{Explanation, Query, Scorer, Weight},
     DocSet, Score,
 };
@@ -45,26 +45,10 @@ impl Clone for ShortCircuitQuery {
 impl Query for ShortCircuitQuery {
     fn weight(
         &self,
-        enable_scoring: tantivy::query::EnableScoring,
-    ) -> tantivy::Result<Box<dyn Weight>> {
-        let schema = match enable_scoring {
-            tantivy::query::EnableScoring::Enabled {
-                searcher,
-                statistics_provider: _,
-            } => searcher.schema(),
-            tantivy::query::EnableScoring::Disabled {
-                schema,
-                searcher_opt: _,
-            } => schema,
-        };
-
+        enable_scoring: crate::query::EnableScoring,
+    ) -> crate::Result<Box<dyn Weight>> {
         Ok(Box::new(ShortCircuitWeight {
-            subweight: self
-                .subquery
-                .weight(tantivy::query::EnableScoring::Disabled {
-                    schema,
-                    searcher_opt: None,
-                })?,
+            subweight: self.subquery.weight(enable_scoring)?,
             max_docs_per_segment: self.max_docs_per_segment,
         }))
     }
@@ -78,9 +62,9 @@ struct ShortCircuitWeight {
 impl Weight for ShortCircuitWeight {
     fn scorer(
         &self,
-        reader: &tantivy::SegmentReader,
+        reader: &crate::SegmentReader,
         boost: Score,
-    ) -> tantivy::Result<Box<dyn Scorer>> {
+    ) -> crate::Result<Box<dyn Scorer>> {
         let subscorer = self.subweight.scorer(reader, boost)?;
         Ok(Box::new(ShortCircuitScorer {
             subscorer,
@@ -91,12 +75,12 @@ impl Weight for ShortCircuitWeight {
 
     fn explain(
         &self,
-        reader: &tantivy::SegmentReader,
-        doc: tantivy::DocId,
-    ) -> tantivy::Result<tantivy::query::Explanation> {
+        reader: &crate::SegmentReader,
+        doc: crate::DocId,
+    ) -> crate::Result<crate::query::Explanation> {
         let mut scorer = self.scorer(reader, 1.0)?;
         if scorer.seek(doc) != doc {
-            return Err(tantivy::TantivyError::InvalidArgument(format!(
+            return Err(crate::TantivyError::InvalidArgument(format!(
                 "Document #({doc}) does not match"
             )));
         }
@@ -125,18 +109,18 @@ impl Scorer for ShortCircuitScorer {
 }
 
 impl DocSet for ShortCircuitScorer {
-    fn advance(&mut self) -> tantivy::DocId {
+    fn advance(&mut self) -> crate::DocId {
         if self.num_docs >= self.max_docs_per_segment {
-            return tantivy::TERMINATED;
+            return crate::TERMINATED;
         }
 
         self.num_docs += 1;
         self.subscorer.advance()
     }
 
-    fn doc(&self) -> tantivy::DocId {
+    fn doc(&self) -> crate::DocId {
         if self.num_docs >= self.max_docs_per_segment {
-            return tantivy::TERMINATED;
+            return crate::TERMINATED;
         }
 
         self.subscorer.doc()

@@ -41,7 +41,7 @@ use crate::{
 };
 
 use super::{
-    query::{id2node::Id2NodeQuery, Query},
+    query::{collector::Collector, id2node::Id2NodeQuery, Query},
     Edge, EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
 };
 
@@ -154,7 +154,38 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         self.client.lock().await.conn().await
     }
 
+    pub async fn search_initial<Q: Query>(
+        &self,
+        query: &Q,
+    ) -> Result<<Q::Collector as Collector>::Fruit> {
+        let collector = query.remote_collector();
+        todo!()
+    }
+
+    pub async fn retrieve<Q: Query>(
+        &self,
+        query: Q,
+        fruit: <Q::Collector as Collector>::Fruit,
+    ) -> Result<Q::Output> {
+        todo!()
+    }
+
     pub async fn search<Q: Query>(&self, query: Q) -> Result<Q::Output> {
+        let fruit = self.search_initial(&query).await?;
+        self.retrieve(query, fruit).await
+    }
+
+    pub async fn batch_search_initial<Q: Query>(
+        &self,
+        queries: &[Q],
+    ) -> Result<Vec<<Q::Collector as Collector>::Fruit>> {
+        todo!()
+    }
+
+    pub async fn batch_retrieve<Q: Query>(
+        &self,
+        queries: Vec<(Q, <Q::Collector as Collector>::Fruit)>,
+    ) -> Result<Vec<Q::Output>> {
         todo!()
     }
 

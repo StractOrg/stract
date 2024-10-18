@@ -21,6 +21,6 @@ pub mod host_links;
 pub mod id2node;
 pub mod links;
 
-pub use host_links::*;
-pub use id2node::*;
-pub use links::*;
+pub use host_links::HostLinksQuery;
+pub use id2node::Id2NodeQuery;
+pub use links::LinksQuery;
