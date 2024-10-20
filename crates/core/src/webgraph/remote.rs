@@ -160,7 +160,13 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
     ) -> Result<<Q::Collector as webgraph::Collector>::Fruit> {
         let collector = query.remote_collector();
 
-        todo!()
+        let res = self
+            .conn()
+            .await
+            .send(query.clone(), &AllShardsSelector, &RandomReplicaSelector)
+            .await?;
+
+        todo!("ensure that the fruit knows about which shard it came from")
     }
 
     pub async fn retrieve<Q: Query>(
@@ -168,13 +174,15 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         query: Q,
         fruit: <Q::Collector as webgraph::Collector>::Fruit,
     ) -> Result<Q::Output> {
-        let req = RetrieveReq::new(query, fruit);
-        let res = self
-            .conn()
-            .await
-            .send(req, &AllShardsSelector, &RandomReplicaSelector)
-            .await?;
-        todo!()
+        // iterate shards, send fruit to the correct shard
+
+        let req = Q::RetrieveReq::new(query, query.filter_fruit_shards(shard, fruit));
+        todo!("send fruit to the correct shard")
+        // let res = self
+        //     .conn()
+        //     .await
+        //     .send(req, &AllShardsSelector, &RandomReplicaSelector)
+        //     .await?;
     }
 
     pub async fn search<Q: Query>(&self, query: Q) -> Result<Q::Output> {

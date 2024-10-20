@@ -24,6 +24,7 @@ use crate::config;
 use crate::distributed::cluster::Cluster;
 use crate::distributed::member::Member;
 use crate::distributed::member::Service;
+use crate::distributed::sonic;
 use crate::distributed::sonic::service::sonic_service;
 use crate::distributed::sonic::service::Message;
 use crate::webgraph;
@@ -57,7 +58,7 @@ macro_rules! search {
             fn new(query: Self::Query, fruit: <<Self::Query as webgraph::Query>::Collector as webgraph::Collector>::Fruit) -> Self;
         }
 
-        pub trait Query: webgraph::Query + bincode::Encode + bincode::Decode {
+        pub trait Query: webgraph::Query + bincode::Encode + bincode::Decode + sonic::service::Wrapper<WebGraphService> {
             type RetrieveReq: RetrieveReq<Query = Self>;
         }
 

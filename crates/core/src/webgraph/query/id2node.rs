@@ -16,6 +16,7 @@
 
 use super::collector::FirstDocCollector;
 use super::Query;
+use crate::ampc::dht::ShardId;
 use crate::webgraph::query::raw;
 use crate::webgraph::schema::{ToHostId, ToId};
 use crate::webgraph::{Edge, Node, NodeID};
@@ -38,8 +39,8 @@ impl Query for Id2NodeQuery {
         }
     }
 
-    fn collector(&self) -> Self::Collector {
-        FirstDocCollector
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        FirstDocCollector::with_shard_id(shard_id)
     }
 
     fn retrieve(
@@ -53,5 +54,20 @@ impl Query for Id2NodeQuery {
                 Self::Host(_) => e.to.into_host(),
             })
         }))
+    }
+
+    fn remote_collector(&self) -> Self::Collector {
+        FirstDocCollector::without_shard_id()
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard_id: crate::ampc::dht::ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        match fruit {
+            Some(doc) if doc.shard_id == shard_id => fruit,
+            _ => None,
+        }
     }
 }

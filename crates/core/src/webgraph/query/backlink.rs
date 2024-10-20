@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use tantivy::query::ShortCircuitQuery;
-use tantivy::DocAddress;
 
 use super::{
     collector::TopDocsCollector,
@@ -23,16 +22,19 @@ use super::{
     Query,
 };
 use crate::{
+    ampc::dht::ShardId,
     webgraph::{
+        doc_address::DocAddress,
         document::Edge,
         schema::{Field, FromId, RelFlags, ToId},
+        searcher::Searcher,
         EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
     },
     Result,
 };
 
 pub fn fetch_small_edges<F: Field>(
-    searcher: &tantivy::Searcher,
+    searcher: &Searcher,
     mut doc_ids: Vec<DocAddress>,
     node_id_field: F,
 ) -> Result<Vec<(NodeID, crate::webpage::RelFlags)>> {
@@ -46,7 +48,7 @@ pub fn fetch_small_edges<F: Field>(
     for doc in doc_ids {
         if Some(doc.segment_ord) != prev_segment_id {
             prev_segment_id = Some(doc.segment_ord);
-            let segment_reader = searcher.segment_reader(doc.segment_ord);
+            let segment_reader = searcher.tantivy_searcher().segment_reader(doc.segment_ord);
             field_column = Some(
                 segment_reader
                     .column_fields()
@@ -69,16 +71,13 @@ pub fn fetch_small_edges<F: Field>(
     Ok(edges)
 }
 
-pub fn fetch_edges(
-    searcher: &tantivy::Searcher,
-    mut doc_ids: Vec<DocAddress>,
-) -> Result<Vec<Edge>> {
+pub fn fetch_edges(searcher: &Searcher, mut doc_ids: Vec<DocAddress>) -> Result<Vec<Edge>> {
     doc_ids.sort_unstable_by_key(|doc| doc.segment_ord);
 
     let mut edges = Vec::with_capacity(doc_ids.len());
 
     for doc in doc_ids {
-        edges.push(searcher.doc(doc)?);
+        edges.push(searcher.tantivy_searcher().doc(doc.into())?);
     }
 
     Ok(edges)
@@ -120,17 +119,19 @@ impl Query for BacklinksQuery {
         }
     }
 
-    fn collector(&self) -> Self::Collector {
-        self.limit.into()
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        TopDocsCollector::from(self.limit)
+            .with_shard_id(shard_id)
+            .disable_offset()
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        self.collector().enable_offset()
+        TopDocsCollector::from(self.limit).enable_offset()
     }
 
     fn retrieve(
         &self,
-        searcher: &tantivy::Searcher,
+        searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit = fruit.into_iter().map(|(_, doc)| doc).collect();
@@ -193,7 +194,7 @@ impl Query for HostBacklinksQuery {
 
     fn retrieve(
         &self,
-        searcher: &tantivy::Searcher,
+        searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit = fruit.into_iter().map(|(_, doc)| doc).collect();
@@ -258,7 +259,7 @@ impl Query for FullBacklinksQuery {
 
     fn retrieve(
         &self,
-        searcher: &tantivy::Searcher,
+        searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
@@ -322,7 +323,7 @@ impl Query for FullHostBacklinksQuery {
 
     fn retrieve(
         &self,
-        searcher: &tantivy::Searcher,
+        searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
@@ -367,7 +368,7 @@ impl Query for BacklinksWithLabelsQuery {
 
     fn retrieve(
         &self,
-        searcher: &tantivy::Searcher,
+        searcher: &Searcher,
         fruit: <Self::Collector as super::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();

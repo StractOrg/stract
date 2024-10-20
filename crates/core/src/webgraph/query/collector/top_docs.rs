@@ -18,10 +18,12 @@ use std::marker::PhantomData;
 
 use tantivy::{
     collector::{SegmentCollector, TopNComputer},
-    DocAddress, DocId, SegmentOrdinal,
+    DocId, SegmentOrdinal,
 };
 
+use crate::distributed::member::ShardId;
 use crate::webgraph::{
+    doc_address::DocAddress,
     query::document_scorer::{DefaultDocumentScorer, DocumentScorer},
     EdgeLimit,
 };
@@ -29,6 +31,7 @@ use crate::webgraph::{
 use super::Collector;
 
 pub struct TopDocsCollector<S: DocumentScorer = DefaultDocumentScorer> {
+    shard_id: Option<ShardId>,
     limit: Option<usize>,
     offset: Option<usize>,
     perform_offset: bool,
@@ -55,10 +58,18 @@ impl<S: DocumentScorer> From<EdgeLimit> for TopDocsCollector<S> {
 impl<S: DocumentScorer> TopDocsCollector<S> {
     pub fn new() -> Self {
         Self {
+            shard_id: None,
             limit: None,
             offset: None,
             perform_offset: true,
             _phantom: PhantomData,
+        }
+    }
+
+    pub fn with_shard_id(self, shard_id: ShardId) -> Self {
+        Self {
+            shard_id: Some(shard_id),
+            ..self
         }
     }
 
@@ -113,6 +124,7 @@ impl<S: DocumentScorer + 'static> Collector for TopDocsCollector<S> {
         let scorer = S::for_segment(segment)?;
 
         Ok(TopDocsSegmentCollector {
+            shard_id: self.shard_id.unwrap(),
             computer: self.computer(),
             segment_ord,
             scorer,
@@ -185,6 +197,7 @@ impl AllComputer {
 }
 
 pub struct TopDocsSegmentCollector<S: DocumentScorer> {
+    shard_id: ShardId,
     computer: Computer,
     segment_ord: SegmentOrdinal,
     scorer: S,
@@ -196,7 +209,7 @@ impl<S: DocumentScorer + 'static> SegmentCollector for TopDocsSegmentCollector<S
     fn collect(&mut self, doc: DocId, _: tantivy::Score) {
         let score = self.scorer.score(doc);
         self.computer
-            .push(score, DocAddress::new(self.segment_ord, doc));
+            .push(score, DocAddress::new(self.shard_id, self.segment_ord, doc));
     }
 
     fn harvest(self) -> Self::Fruit {

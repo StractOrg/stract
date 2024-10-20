@@ -31,13 +31,17 @@ pub use document::*;
 pub use node::*;
 pub use shortest_path::ShortestPaths;
 
+use searcher::Searcher;
+
 mod builder;
 pub mod centrality;
+mod doc_address;
 mod document;
 mod node;
 pub mod query;
 pub mod remote;
 mod schema;
+mod searcher;
 mod shortest_path;
 mod store;
 
@@ -53,6 +57,23 @@ pub enum EdgeLimit {
     Unlimited,
     Limit(usize),
     LimitAndOffset { limit: usize, offset: usize },
+}
+
+impl EdgeLimit {
+    pub fn limit(&self) -> Option<usize> {
+        match self {
+            EdgeLimit::Unlimited => None,
+            EdgeLimit::Limit(limit) => Some(*limit),
+            EdgeLimit::LimitAndOffset { limit, .. } => Some(*limit),
+        }
+    }
+
+    pub fn offset(&self) -> Option<usize> {
+        match self {
+            EdgeLimit::LimitAndOffset { offset, .. } => Some(*offset),
+            _ => None,
+        }
+    }
 }
 
 pub struct Webgraph {

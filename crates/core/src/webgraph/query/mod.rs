@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Result;
+use super::searcher::Searcher;
+use crate::{ampc::dht::ShardId, Result};
 pub use collector::Collector;
-use tantivy::Searcher;
 
 pub mod backlink;
 pub use backlink::*;
@@ -38,11 +38,14 @@ pub trait Query: Send + Sync + bincode::Encode + bincode::Decode + Clone {
     type Output;
 
     fn tantivy_query(&self) -> Self::TantivyQuery;
-    fn collector(&self) -> Self::Collector;
+    fn collector(&self, shard_id: ShardId) -> Self::Collector;
+    fn remote_collector(&self) -> Self::Collector;
 
-    fn remote_collector(&self) -> Self::Collector {
-        self.collector()
-    }
+    fn filter_fruit_shards(
+        &self,
+        shard_id: ShardId,
+        fruit: <Self::Collector as Collector>::Fruit,
+    ) -> <Self::Collector as Collector>::Fruit;
 
     fn retrieve(
         &self,

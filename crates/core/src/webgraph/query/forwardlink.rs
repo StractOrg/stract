@@ -21,10 +21,11 @@ use super::{
     Query,
 };
 use crate::{
+    ampc::dht::ShardId,
     webgraph::{
         document::Edge,
         schema::{FromId, ToId},
-        EdgeLimit, Node, NodeID, SmallEdge,
+        EdgeLimit, Node, NodeID, Searcher, SmallEdge,
     },
     Result,
 };
@@ -67,17 +68,30 @@ impl Query for ForwardlinksQuery {
         }
     }
 
-    fn collector(&self) -> Self::Collector {
-        self.limit.into()
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        TopDocsCollector::from(self.limit)
+            .with_shard_id(shard_id)
+            .disable_offset()
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        self.collector().enable_offset()
+        TopDocsCollector::from(self.limit).enable_offset()
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard: crate::ampc::dht::ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+            .into_iter()
+            .filter(|(_, doc)| doc.shard_id == shard)
+            .collect()
     }
 
     fn retrieve(
         &self,
-        searcher: &tantivy::Searcher,
+        searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit = fruit.into_iter().map(|(_, doc)| doc).collect();
@@ -132,17 +146,30 @@ impl Query for HostForwardlinksQuery {
         }
     }
 
-    fn collector(&self) -> Self::Collector {
-        self.limit.into()
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        TopDocsCollector::from(self.limit)
+            .with_shard_id(shard_id)
+            .disable_offset()
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        self.collector().enable_offset()
+        TopDocsCollector::from(self.limit).enable_offset()
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard: crate::ampc::dht::ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+            .into_iter()
+            .filter(|(_, doc)| doc.shard_id == shard)
+            .collect()
     }
 
     fn retrieve(
         &self,
-        searcher: &tantivy::Searcher,
+        searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit = fruit.into_iter().map(|(_, doc)| doc).collect();
@@ -197,17 +224,30 @@ impl Query for FullForwardlinksQuery {
         }
     }
 
-    fn collector(&self) -> Self::Collector {
-        self.limit.into()
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        TopDocsCollector::from(self.limit)
+            .with_shard_id(shard_id)
+            .disable_offset()
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        self.collector().enable_offset()
+        TopDocsCollector::from(self.limit).enable_offset()
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard: crate::ampc::dht::ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+            .into_iter()
+            .filter(|(_, doc)| doc.shard_id == shard)
+            .collect()
     }
 
     fn retrieve(
         &self,
-        searcher: &tantivy::Searcher,
+        searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit = fruit.into_iter().map(|(_, doc)| doc).collect();
@@ -261,17 +301,30 @@ impl Query for FullHostForwardlinksQuery {
         }
     }
 
-    fn collector(&self) -> Self::Collector {
-        self.limit.into()
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        TopDocsCollector::from(self.limit)
+            .with_shard_id(shard_id)
+            .disable_offset()
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        self.collector().enable_offset()
+        TopDocsCollector::from(self.limit).enable_offset()
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard: crate::ampc::dht::ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+            .into_iter()
+            .filter(|(_, doc)| doc.shard_id == shard)
+            .collect()
     }
 
     fn retrieve(
         &self,
-        searcher: &tantivy::Searcher,
+        searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::Output> {
         let fruit = fruit.into_iter().map(|(_, doc)| doc).collect();
