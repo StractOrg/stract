@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::collector::TopDocsCollector;
+use super::collector::FirstDocCollector;
 use super::Query;
 use crate::webgraph::query::raw;
 use crate::webgraph::schema::{ToHostId, ToId};
@@ -27,7 +27,7 @@ pub enum Id2NodeQuery {
 }
 
 impl Query for Id2NodeQuery {
-    type Collector = TopDocsCollector;
+    type Collector = FirstDocCollector;
     type TantivyQuery = raw::Id2NodeQuery;
     type Output = Option<Node>;
 
@@ -39,7 +39,7 @@ impl Query for Id2NodeQuery {
     }
 
     fn collector(&self) -> Self::Collector {
-        todo!()
+        FirstDocCollector
     }
 
     fn retrieve(
@@ -47,14 +47,11 @@ impl Query for Id2NodeQuery {
         searcher: &tantivy::Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> crate::Result<Self::Output> {
-        Ok(fruit
-            .into_iter()
-            .filter_map(|(_, doc)| {
-                searcher.doc::<Edge>(doc).ok().map(|e| match self {
-                    Self::Page(_) => e.to,
-                    Self::Host(_) => e.to.into_host(),
-                })
+        Ok(fruit.and_then(|doc| {
+            searcher.doc::<Edge>(doc).ok().map(|e| match self {
+                Self::Page(_) => e.to,
+                Self::Host(_) => e.to.into_host(),
             })
-            .next())
+        }))
     }
 }

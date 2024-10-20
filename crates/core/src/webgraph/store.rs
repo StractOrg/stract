@@ -53,7 +53,10 @@ impl EdgeStore {
         todo!()
     }
 
-    pub fn search<Q: Query>(&self, query: &Q) -> Result<<Q::Collector as Collector>::Fruit> {
+    pub fn search_initial<Q: Query>(
+        &self,
+        query: &Q,
+    ) -> Result<<Q::Collector as Collector>::Fruit> {
         let searcher = self.index.reader().unwrap().searcher();
         let res = searcher.search(
             &query.tantivy_query(),
@@ -70,6 +73,11 @@ impl EdgeStore {
     ) -> Result<Q::Output> {
         let searcher = self.index.reader().unwrap().searcher();
         query.retrieve(&searcher, fruit)
+    }
+
+    pub fn search<Q: Query>(&self, query: &Q) -> Result<Q::Output> {
+        let fruit = self.search_initial(query)?;
+        self.retrieve(query, fruit)
     }
 
     pub fn iter_pages_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
@@ -211,14 +219,14 @@ mod tests {
         store.commit().unwrap();
 
         let query = HostBacklinksQuery::new(from_node_id);
-        let res = store.search(&query).unwrap();
+        let res = store.search_initial(&query).unwrap();
         let edges = store.retrieve(&query, res).unwrap();
 
         assert_eq!(edges.len(), 1);
         assert_eq!(edges[0].to, to_node_id);
 
         let query = HostBacklinksQuery::new(to_node_id);
-        let res = store.search(&query).unwrap();
+        let res = store.search_initial(&query).unwrap();
         let edges = store.retrieve(&query, res).unwrap();
 
         assert_eq!(edges.len(), 0);
@@ -272,7 +280,7 @@ mod tests {
         store.insert(e3.clone()).unwrap();
 
         let query = HostBacklinksQuery::new(a.id());
-        let res = store.search(&query).unwrap();
+        let res = store.search_initial(&query).unwrap();
         let edges = store.retrieve(&query, res).unwrap();
 
         assert_eq!(edges.len(), 3);

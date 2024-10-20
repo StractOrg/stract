@@ -123,7 +123,7 @@ impl Message<CentralityWorker> for BatchId2Node {
             .filter_map(|id| {
                 worker
                     .graph
-                    .host_id2node(id)
+                    .search(&webgraph::query::Id2NodeQuery::Host(*id))
                     .ok()
                     .flatten()
                     .map(|node| (*id, node))

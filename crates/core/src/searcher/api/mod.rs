@@ -198,7 +198,10 @@ impl Graph for webgraph::Webgraph {
     ) -> Vec<Vec<webgraph::SmallEdge>> {
         nodes
             .iter()
-            .map(|n| self.raw_ingoing_edges(n, limit))
+            .map(|n| {
+                self.search(&webgraph::query::HostBacklinksQuery::new(*n).with_limit(limit))
+                    .unwrap_or_default()
+            })
             .collect()
     }
 }

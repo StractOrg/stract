@@ -15,9 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod fast_count;
+mod first_doc;
 mod top_docs;
 
 pub use fast_count::{FastCountCollector, FastCountValue};
+pub use first_doc::FirstDocCollector;
 pub use top_docs::TopDocsCollector;
 
 use tantivy::{

@@ -37,6 +37,22 @@ pub struct ForwardlinksQuery {
     limit: EdgeLimit,
 }
 
+impl ForwardlinksQuery {
+    pub fn new(node: NodeID) -> Self {
+        Self {
+            node,
+            limit: EdgeLimit::Unlimited,
+        }
+    }
+
+    pub fn with_limit(self, limit: EdgeLimit) -> Self {
+        Self {
+            node: self.node,
+            limit,
+        }
+    }
+}
+
 impl Query for ForwardlinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
@@ -81,6 +97,22 @@ impl Query for ForwardlinksQuery {
 pub struct HostForwardlinksQuery {
     node: NodeID,
     limit: EdgeLimit,
+}
+
+impl HostForwardlinksQuery {
+    pub fn new(node: NodeID) -> Self {
+        Self {
+            node,
+            limit: EdgeLimit::Unlimited,
+        }
+    }
+
+    pub fn with_limit(self, limit: EdgeLimit) -> Self {
+        Self {
+            node: self.node,
+            limit,
+        }
+    }
 }
 
 impl Query for HostForwardlinksQuery {
@@ -132,6 +164,22 @@ pub struct FullForwardlinksQuery {
     limit: EdgeLimit,
 }
 
+impl FullForwardlinksQuery {
+    pub fn new(node: Node) -> Self {
+        Self {
+            node,
+            limit: EdgeLimit::Unlimited,
+        }
+    }
+
+    pub fn with_limit(self, limit: EdgeLimit) -> Self {
+        Self {
+            node: self.node,
+            limit,
+        }
+    }
+}
+
 impl Query for FullForwardlinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
@@ -172,6 +220,22 @@ impl Query for FullForwardlinksQuery {
 pub struct FullHostForwardlinksQuery {
     node: Node,
     limit: EdgeLimit,
+}
+
+impl FullHostForwardlinksQuery {
+    pub fn new(node: Node) -> Self {
+        Self {
+            node,
+            limit: EdgeLimit::Unlimited,
+        }
+    }
+
+    pub fn with_limit(self, limit: EdgeLimit) -> Self {
+        Self {
+            node: self.node,
+            limit,
+        }
+    }
 }
 
 impl Query for FullHostForwardlinksQuery {

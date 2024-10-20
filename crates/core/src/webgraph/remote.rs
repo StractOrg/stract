@@ -34,16 +34,16 @@ use crate::{
         streaming_response::StreamingResponse,
     },
     entrypoint::webgraph_server::{
-        GetPageNodeIDs, IngoingEdges, OutgoingEdges, RawIngoingEdges, RawIngoingEdgesWithLabels,
-        RawOutgoingEdges, WebGraphService,
+        GetPageNodeIDs, IngoingEdges, OutgoingEdges, Query, RawIngoingEdges,
+        RawIngoingEdgesWithLabels, RawOutgoingEdges, RetrieveReq, WebGraphService,
     },
     Result,
 };
 
 use super::{
-    query::{collector::Collector, id2node::Id2NodeQuery, Query},
-    Edge, EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
+    query::id2node::Id2NodeQuery, Edge, EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
 };
+use crate::webgraph;
 
 struct WebgraphClientManager<G: WebgraphGranularity>(std::marker::PhantomData<G>);
 
@@ -157,16 +157,23 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
     pub async fn search_initial<Q: Query>(
         &self,
         query: &Q,
-    ) -> Result<<Q::Collector as Collector>::Fruit> {
+    ) -> Result<<Q::Collector as webgraph::Collector>::Fruit> {
         let collector = query.remote_collector();
+
         todo!()
     }
 
     pub async fn retrieve<Q: Query>(
         &self,
         query: Q,
-        fruit: <Q::Collector as Collector>::Fruit,
+        fruit: <Q::Collector as webgraph::Collector>::Fruit,
     ) -> Result<Q::Output> {
+        let req = RetrieveReq::new(query, fruit);
+        let res = self
+            .conn()
+            .await
+            .send(req, &AllShardsSelector, &RandomReplicaSelector)
+            .await?;
         todo!()
     }
 
@@ -178,13 +185,13 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
     pub async fn batch_search_initial<Q: Query>(
         &self,
         queries: &[Q],
-    ) -> Result<Vec<<Q::Collector as Collector>::Fruit>> {
+    ) -> Result<Vec<<Q::Collector as webgraph::Collector>::Fruit>> {
         todo!()
     }
 
     pub async fn batch_retrieve<Q: Query>(
         &self,
-        queries: Vec<(Q, <Q::Collector as Collector>::Fruit)>,
+        queries: Vec<(Q, <Q::Collector as webgraph::Collector>::Fruit)>,
     ) -> Result<Vec<Q::Output>> {
         todo!()
     }

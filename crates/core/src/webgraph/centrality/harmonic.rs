@@ -27,7 +27,7 @@ use tracing::info;
 use crate::{
     hyperloglog::HyperLogLog,
     kahan_sum::KahanSum,
-    webgraph::{EdgeLimit, NodeID, Webgraph},
+    webgraph::{query, EdgeLimit, NodeID, Webgraph},
     webpage::html::links::RelFlags,
 };
 
@@ -82,7 +82,8 @@ fn update_changed_counters(
 
     exact_changed_nodes.iter().for_each(|changed_node| {
         for edge in graph
-            .raw_outgoing_edges(changed_node, EdgeLimit::Unlimited)
+            .search(&query::ForwardlinksQuery::new(*changed_node).with_limit(EdgeLimit::Unlimited))
+            .unwrap_or_default()
             .into_iter()
             .filter(|e| !e.rel_flags.intersects(*SKIPPED_REL))
         {

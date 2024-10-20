@@ -73,6 +73,7 @@ num-bigint.workspace = true
 num-rational.workspace = true
 openraft.workspace = true
 optics = { path = "../optics" }
+paste.workspace = true
 percent-encoding.workspace = true
 postcard.workspace = true
 publicsuffix.workspace = true

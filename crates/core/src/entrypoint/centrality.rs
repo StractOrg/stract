@@ -54,7 +54,15 @@ impl Centrality {
         let top_harmonics =
             crate::webgraph::centrality::top_nodes(&store, TopNodes::Top(1_000_000))
                 .into_iter()
-                .map(|(n, c)| (graph.host_id2node(&n).unwrap().unwrap(), c))
+                .map(|(n, c)| {
+                    (
+                        graph
+                            .search(&crate::webgraph::query::Id2NodeQuery::Host(n))
+                            .unwrap()
+                            .unwrap(),
+                        c,
+                    )
+                })
                 .collect();
 
         store_csv(top_harmonics, base_output.as_ref().join("harmonic.csv"));
@@ -94,7 +102,13 @@ impl Centrality {
             }
 
             if top_nodes.len() < 1_000_000 {
-                top_nodes.push((graph.page_id2node(&node).unwrap().unwrap(), centrality));
+                top_nodes.push((
+                    graph
+                        .search(&crate::webgraph::query::Id2NodeQuery::Page(node))
+                        .unwrap()
+                        .unwrap(),
+                    centrality,
+                ));
             }
         }
 

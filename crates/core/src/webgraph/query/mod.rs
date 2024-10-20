@@ -15,12 +15,17 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Result;
-use collector::Collector;
+pub use collector::Collector;
 use tantivy::Searcher;
 
 pub mod backlink;
+pub use backlink::*;
+
 pub mod forwardlink;
+pub use forwardlink::*;
+
 pub mod id2node;
+pub use id2node::*;
 
 pub mod collector;
 mod degree;

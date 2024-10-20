@@ -74,7 +74,7 @@ impl Message<ApproxCentralityWorker> for BatchId2Node {
             .filter_map(|id| {
                 worker
                     .graph
-                    .page_id2node(id)
+                    .search(&webgraph::query::Id2NodeQuery::Page(*id))
                     .ok()
                     .flatten()
                     .map(|node| (*id, node))

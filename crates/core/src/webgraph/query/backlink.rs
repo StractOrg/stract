@@ -26,7 +26,7 @@ use crate::{
     webgraph::{
         document::Edge,
         schema::{Field, FromId, RelFlags, ToId},
-        EdgeLimit, Node, NodeID, SmallEdge,
+        EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
     },
     Result,
 };
@@ -90,6 +90,22 @@ pub struct BacklinksQuery {
     limit: EdgeLimit,
 }
 
+impl BacklinksQuery {
+    pub fn new(node: NodeID) -> Self {
+        Self {
+            node,
+            limit: EdgeLimit::Unlimited,
+        }
+    }
+
+    pub fn with_limit(self, limit: EdgeLimit) -> Self {
+        Self {
+            node: self.node,
+            limit,
+        }
+    }
+}
+
 impl Query for BacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
@@ -144,7 +160,7 @@ impl HostBacklinksQuery {
         }
     }
 
-    pub fn limit(mut self, limit: EdgeLimit) -> Self {
+    pub fn with_limit(mut self, limit: EdgeLimit) -> Self {
         self.limit = limit;
         self
     }
@@ -199,6 +215,22 @@ pub struct FullBacklinksQuery {
     limit: EdgeLimit,
 }
 
+impl FullBacklinksQuery {
+    pub fn new(node: Node) -> Self {
+        Self {
+            node,
+            limit: EdgeLimit::Unlimited,
+        }
+    }
+
+    pub fn with_limit(self, limit: EdgeLimit) -> Self {
+        Self {
+            node: self.node,
+            limit,
+        }
+    }
+}
+
 impl Query for FullBacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
@@ -241,6 +273,22 @@ pub struct FullHostBacklinksQuery {
     limit: EdgeLimit,
 }
 
+impl FullHostBacklinksQuery {
+    pub fn new(node: Node) -> Self {
+        Self {
+            node,
+            limit: EdgeLimit::Unlimited,
+        }
+    }
+
+    pub fn with_limit(self, limit: EdgeLimit) -> Self {
+        Self {
+            node: self.node,
+            limit,
+        }
+    }
+}
+
 impl Query for FullHostBacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
@@ -280,5 +328,58 @@ impl Query for FullHostBacklinksQuery {
         let fruit: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
         let edges = fetch_edges(searcher, fruit)?;
         Ok(edges)
+    }
+}
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct BacklinksWithLabelsQuery {
+    node: NodeID,
+    limit: EdgeLimit,
+}
+
+impl BacklinksWithLabelsQuery {
+    pub fn new(node: NodeID) -> Self {
+        Self {
+            node,
+            limit: EdgeLimit::Unlimited,
+        }
+    }
+
+    pub fn with_limit(self, limit: EdgeLimit) -> Self {
+        Self {
+            node: self.node,
+            limit,
+        }
+    }
+}
+
+impl Query for BacklinksWithLabelsQuery {
+    type Collector = TopDocsCollector;
+    type TantivyQuery = Box<dyn tantivy::query::Query>;
+    type Output = Vec<SmallEdgeWithLabel>;
+
+    fn tantivy_query(&self) -> Self::TantivyQuery {
+        Box::new(LinksQuery::new(self.node, ToId))
+    }
+
+    fn collector(&self) -> Self::Collector {
+        self.limit.into()
+    }
+
+    fn retrieve(
+        &self,
+        searcher: &tantivy::Searcher,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> Result<Self::Output> {
+        let fruit: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
+        let edges = fetch_edges(searcher, fruit)?;
+        Ok(edges
+            .into_iter()
+            .map(|e| SmallEdgeWithLabel {
+                from: e.from.id(),
+                to: e.to.id(),
+                rel_flags: e.rel_flags,
+                label: e.label,
+            })
+            .collect())
     }
 }

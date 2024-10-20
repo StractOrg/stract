@@ -26,6 +26,8 @@ use crate::distributed::member::Member;
 use crate::distributed::member::Service;
 use crate::distributed::sonic::service::sonic_service;
 use crate::distributed::sonic::service::Message;
+use crate::webgraph;
+use crate::webgraph::query::BacklinksQuery;
 use crate::webgraph::Edge;
 use crate::webgraph::EdgeLimit;
 use crate::webgraph::Node;
@@ -48,143 +50,76 @@ pub struct WebGraphService {
     graph: Arc<Webgraph>,
 }
 
-sonic_service!(
-    WebGraphService,
-    [
-        PageId2Node,
-        HostId2Node,
-        IngoingEdges,
-        OutgoingEdges,
-        RawIngoingEdges,
-        RawOutgoingEdges,
-        RawIngoingEdgesWithLabels,
-        GetPageNodeIDs
-    ]
-);
+macro_rules! search {
+    ([$($q:ident),*$(,)?]) => {
+        pub trait RetrieveReq: bincode::Encode + bincode::Decode {
+            type Query: webgraph::Query + bincode::Encode + bincode::Decode;
+            fn new(query: Self::Query, fruit: <<Self::Query as webgraph::Query>::Collector as webgraph::Collector>::Fruit) -> Self;
+        }
 
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct PageId2Node {
-    pub node: NodeID,
-}
+        pub trait Query: webgraph::Query + bincode::Encode + bincode::Decode {
+            type RetrieveReq: RetrieveReq<Query = Self>;
+        }
 
-impl Message<WebGraphService> for PageId2Node {
-    type Response = Option<Node>;
+        #[derive(bincode::Encode, bincode::Decode, Clone)]
+        pub struct EncodedError {
+            pub msg: String,
+        }
 
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.page_id2node(&self.node).ok().flatten()
+        impl std::fmt::Display for EncodedError {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.msg)
+            }
+        }
+
+        $(
+            impl Message<WebGraphService> for $q {
+                type Response = Result<<<$q as webgraph::Query>::Collector as webgraph::Collector>::Fruit, EncodedError>;
+
+                async fn handle(self, server: &WebGraphService) -> Self::Response {
+                    server.graph.search_initial(&self).map_err(|e| EncodedError { msg: e.to_string() })
+                }
+            }
+
+            paste::item! {
+                #[derive(bincode::Encode, bincode::Decode, Clone)]
+                pub struct [<$q Retrieve>] {
+                    pub query: $q,
+                    #[bincode(with_serde)]
+                    pub fruit: <<$q as webgraph::Query>::Collector as webgraph::Collector>::Fruit,
+                }
+
+                impl Message<WebGraphService> for [<$q Retrieve>] {
+                    type Response = Result<<$q as webgraph::Query>::Output, EncodedError>;
+                    async fn handle(self, server: &WebGraphService) -> Self::Response {
+                        server.graph.retrieve(&self.query, self.fruit).map_err(|e| EncodedError { msg: e.to_string() })
+                    }
+                }
+
+                impl Query for $q {
+                    type RetrieveReq = [<$q Retrieve>];
+                }
+
+                impl RetrieveReq for [<$q Retrieve>] {
+                    type Query = $q;
+                    fn new(query: Self::Query, fruit: <<Self::Query as webgraph::Query>::Collector as webgraph::Collector>::Fruit) -> Self {
+                        Self { query, fruit }
+                    }
+                }
+            }
+        )*
+
+        paste::item! {
+            sonic_service!(WebGraphService, [GetPageNodeIDs, $(
+                $q,
+                [<$q Retrieve>],
+            )*]);
+        }
+
     }
 }
 
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct HostId2Node {
-    pub node: NodeID,
-}
-
-impl Message<WebGraphService> for HostId2Node {
-    type Response = Option<Node>;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.host_id2node(&self.node).ok().flatten()
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct IngoingEdges {
-    pub node: Node,
-    pub limit: EdgeLimit,
-}
-
-impl Message<WebGraphService> for IngoingEdges {
-    type Response = Vec<Edge>;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.ingoing_edges(self.node, self.limit)
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct OutgoingEdges {
-    pub node: Node,
-    pub limit: EdgeLimit,
-}
-
-impl Message<WebGraphService> for OutgoingEdges {
-    type Response = Vec<Edge>;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.outgoing_edges(self.node, self.limit)
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct RawIngoingEdges {
-    pub node: NodeID,
-    pub limit: EdgeLimit,
-}
-
-impl Message<WebGraphService> for RawIngoingEdges {
-    type Response = Vec<SmallEdge>;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.raw_ingoing_edges(&self.node, self.limit)
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct RawOutgoingEdges {
-    pub node: NodeID,
-    pub limit: EdgeLimit,
-}
-
-impl Message<WebGraphService> for RawOutgoingEdges {
-    type Response = Vec<SmallEdge>;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.raw_outgoing_edges(&self.node, self.limit)
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct RawIngoingEdgesWithLabels {
-    pub node: NodeID,
-    pub limit: EdgeLimit,
-}
-
-impl Message<WebGraphService> for RawIngoingEdgesWithLabels {
-    type Response = Vec<SmallEdgeWithLabel>;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server
-            .graph
-            .raw_ingoing_edges_with_labels(&self.node, self.limit)
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct InDegreeUpperBound {
-    pub node: NodeID,
-}
-
-impl Message<WebGraphService> for InDegreeUpperBound {
-    type Response = u64;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.in_degree_upper_bound(&self.node)
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct OutDegreeUpperBound {
-    pub node: NodeID,
-}
-
-impl Message<WebGraphService> for OutDegreeUpperBound {
-    type Response = u64;
-
-    async fn handle(self, server: &WebGraphService) -> Self::Response {
-        server.graph.out_degree_upper_bound(&self.node)
-    }
-}
+search!([BacklinksQuery]);
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct GetPageNodeIDs {

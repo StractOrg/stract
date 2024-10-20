@@ -102,7 +102,14 @@ impl Webgraph {
                 let mut res = Vec::new();
 
                 for id in ids {
-                    res.push(webgraph.raw_ingoing_edges_with_labels(&id, limit));
+                    res.push(
+                        webgraph
+                            .search(
+                                &webgraph::query::BacklinksWithLabelsQuery::new(id)
+                                    .with_limit(limit),
+                            )
+                            .unwrap_or_default(),
+                    );
                 }
 
                 res

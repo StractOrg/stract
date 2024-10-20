@@ -23,7 +23,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::{
     intmap::IntMap,
-    webgraph::{EdgeLimit, Node, NodeID, Webgraph},
+    webgraph::{query, EdgeLimit, Node, NodeID, Webgraph},
 };
 
 fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32) {
@@ -70,7 +70,10 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
 
         while let Some(v) = q.pop_front() {
             stack.push(v);
-            for edge in graph.raw_outgoing_edges(&v, EdgeLimit::Unlimited) {
+            for edge in graph
+                .search(&query::ForwardlinksQuery::new(v).with_limit(EdgeLimit::Unlimited))
+                .unwrap_or_default()
+            {
                 let w = edge.to;
 
                 if !distances.contains_key(&w) {
@@ -128,7 +131,15 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
     (
         centrality
             .into_iter()
-            .map(|(id, centrality)| (graph.host_id2node(&id).unwrap().unwrap(), centrality / norm))
+            .map(|(id, centrality)| {
+                (
+                    graph
+                        .search(&query::Id2NodeQuery::Host(id))
+                        .unwrap()
+                        .unwrap(),
+                    centrality / norm,
+                )
+            })
             .collect(),
         max_dist,
     )
