@@ -15,6 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashSet,
+    fs,
     ops::Range,
     path::{Path, PathBuf},
 };
@@ -34,7 +36,7 @@ use super::{query::Query, NodeID};
 
 pub struct EdgeStore {
     index: tantivy::Index,
-    writer: tantivy::IndexWriter<Edge>,
+    writer: Option<tantivy::IndexWriter<Edge>>,
     reader: tantivy::IndexReader,
     shard_id: ShardId,
     path: PathBuf,
@@ -46,34 +48,103 @@ impl EdgeStore {
 
         Ok(Self {
             path: path.as_ref().to_path_buf(),
-            writer: index.writer_with_num_threads(1, 1_000_000_000)?,
+            writer: None,
             reader: index.reader()?,
             index,
             shard_id,
         })
     }
 
+    fn prepare_writer(&mut self) -> Result<()> {
+        self.writer = Some(self.index.writer_with_num_threads(1, 1_000_000_000)?);
+        Ok(())
+    }
+
     pub fn optimize_read(&mut self) -> Result<()> {
+        self.prepare_writer()?;
         let base_path = Path::new(&self.path);
         let segments: Vec<_> = self.index.load_metas()?.segments.into_iter().collect();
 
-        tantivy::merge_segments(&mut self.writer, segments, base_path, 1)?;
+        tantivy::merge_segments(
+            self.writer
+                .as_mut()
+                .expect("writer should have been prepared"),
+            segments,
+            base_path,
+            1,
+        )?;
 
         Ok(())
     }
 
     pub fn insert(&mut self, edge: Edge) -> Result<()> {
-        self.writer.add_document(edge)?;
+        self.prepare_writer()?;
+        self.writer
+            .as_mut()
+            .expect("writer should have been prepared")
+            .add_document(edge)?;
         Ok(())
     }
 
     pub fn commit(&mut self) -> Result<()> {
-        self.writer.commit()?;
+        self.prepare_writer()?;
+        self.writer
+            .as_mut()
+            .expect("writer should have been prepared")
+            .commit()?;
         Ok(())
     }
 
-    pub fn merge(&self, other: Self) -> Result<()> {
-        todo!()
+    pub fn merge(&mut self, mut other: Self) -> Result<()> {
+        self.prepare_writer()?;
+        other.prepare_writer()?;
+
+        other.commit()?;
+        self.commit()?;
+
+        let other_meta = other.index.load_metas()?;
+
+        let mut meta = self.index.load_metas()?;
+
+        let other_path = Path::new(&other.path);
+        let other_writer = other.writer.take().unwrap();
+        other_writer.wait_merging_threads().unwrap();
+
+        let self_path = Path::new(&self.path);
+        let self_writer = self.writer.take().unwrap();
+        self_writer.wait_merging_threads().unwrap();
+
+        let ids: HashSet<_> = meta.segments.iter().map(|segment| segment.id()).collect();
+
+        for segment in other_meta.segments {
+            if ids.contains(&segment.id()) {
+                continue;
+            }
+
+            // TODO: handle case where current index has segment with same name
+            for file in segment.list_files() {
+                let p = other_path.join(&file);
+                if p.exists() {
+                    fs::rename(p, self_path.join(&file)).unwrap();
+                }
+            }
+            meta.segments.push(segment);
+        }
+
+        meta.segments
+            .sort_by_key(|a| std::cmp::Reverse(a.max_doc()));
+
+        fs::remove_dir_all(other_path).ok();
+
+        let self_path = Path::new(&self.path);
+
+        std::fs::write(
+            self_path.join("meta.json"),
+            serde_json::to_string_pretty(&meta).unwrap(),
+        )
+        .unwrap();
+
+        Ok(())
     }
 
     fn searcher(&self) -> Searcher {
