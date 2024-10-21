@@ -30,63 +30,6 @@ use std::path::Path;
 
 use super::InvertedIndex;
 
-struct SegmentMergeCandidate {
-    num_docs: u32,
-    segments: Vec<SegmentMeta>,
-}
-
-pub fn merge_tantivy_segments<P: AsRef<Path>>(
-    writer: &mut IndexWriter,
-    mut segments: Vec<SegmentMeta>,
-    base_path: P,
-    max_num_segments: u64,
-) -> Result<()> {
-    assert!(max_num_segments > 0);
-
-    if segments.len() <= max_num_segments as usize {
-        return Ok(());
-    }
-
-    let num_segments = (max_num_segments + 1) / 2; // ceil(num_segments/2)
-
-    let mut merge_segments = Vec::new();
-
-    for _ in 0..num_segments {
-        merge_segments.push(SegmentMergeCandidate {
-            num_docs: 0,
-            segments: Vec::new(),
-        });
-    }
-
-    segments.sort_by_key(|b| std::cmp::Reverse(b.num_docs()));
-
-    for segment in segments {
-        let best_candidate = merge_segments
-            .iter_mut()
-            .min_by(|a, b| a.num_docs.cmp(&b.num_docs))
-            .unwrap();
-
-        best_candidate.num_docs += segment.num_docs();
-        best_candidate.segments.push(segment);
-    }
-
-    for merge in merge_segments
-        .into_iter()
-        .filter(|merge| !merge.segments.is_empty())
-    {
-        let segment_ids: Vec<_> = merge.segments.iter().map(|segment| segment.id()).collect();
-        writer.merge(&segment_ids[..]).wait()?;
-
-        for segment in merge.segments {
-            for file in segment.list_files() {
-                std::fs::remove_file(base_path.as_ref().join(file)).ok();
-            }
-        }
-    }
-
-    Ok(())
-}
-
 impl InvertedIndex {
     pub fn prepare_writer(&mut self) -> Result<()> {
         if self.writer.is_some() {
@@ -144,8 +87,10 @@ impl InvertedIndex {
             .into_iter()
             .collect();
 
-        merge_tantivy_segments(
-            self.writer.as_mut().expect("writer has not been prepared"),
+        tantivy::merge_segments(
+            self.writer
+                .as_mut()
+                .expect("writer should have been prepared"),
             segments,
             base_path,
             max_num_segments,

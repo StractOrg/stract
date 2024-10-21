@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{ops::Range, path::Path};
+use std::{
+    ops::Range,
+    path::{Path, PathBuf},
+};
 
 use super::{
     document::SmallEdge,
@@ -30,9 +33,11 @@ use tantivy::{columnar::Column, DocId, SegmentReader};
 use super::{query::Query, NodeID};
 
 pub struct EdgeStore {
+    index: tantivy::Index,
     writer: tantivy::IndexWriter<Edge>,
     reader: tantivy::IndexReader,
     shard_id: ShardId,
+    path: PathBuf,
 }
 
 impl EdgeStore {
@@ -40,14 +45,21 @@ impl EdgeStore {
         let index: tantivy::Index = todo!();
 
         Ok(Self {
-            writer: index.writer(100_000_000)?,
+            path: path.as_ref().to_path_buf(),
+            writer: index.writer_with_num_threads(1, 1_000_000_000)?,
             reader: index.reader()?,
+            index,
             shard_id,
         })
     }
 
     pub fn optimize_read(&mut self) -> Result<()> {
-        todo!()
+        let base_path = Path::new(&self.path);
+        let segments: Vec<_> = self.index.load_metas()?.segments.into_iter().collect();
+
+        tantivy::merge_segments(&mut self.writer, segments, base_path, 1)?;
+
+        Ok(())
     }
 
     pub fn insert(&mut self, edge: Edge) -> Result<()> {

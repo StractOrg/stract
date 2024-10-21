@@ -34,7 +34,6 @@ use tantivy::{
 
 use crate::{
     image_store::{EntityImageStore, Image, ImageStore},
-    inverted_index::merge_tantivy_segments,
     tokenizer::fields::DefaultTokenizer,
     Result,
 };
@@ -418,7 +417,7 @@ impl EntityIndex {
         let base_path = Path::new(&self.path);
         let segments: Vec<_> = self.tv_index.load_metas()?.segments.into_iter().collect();
 
-        merge_tantivy_segments(
+        tantivy::merge_segments(
             self.writer.as_mut().expect("writer has not been prepared"),
             segments,
             base_path,

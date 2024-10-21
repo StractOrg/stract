@@ -32,7 +32,6 @@ mod key_phrase;
 mod retrieved_webpage;
 mod search;
 
-pub use indexing::merge_tantivy_segments;
 pub use key_phrase::KeyPhrase;
 pub use retrieved_webpage::RetrievedWebpage;
 
