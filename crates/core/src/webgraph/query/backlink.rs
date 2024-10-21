@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use itertools::Itertools;
 use tantivy::query::ShortCircuitQuery;
 
 use super::{
@@ -26,7 +27,7 @@ use crate::{
     webgraph::{
         doc_address::DocAddress,
         document::Edge,
-        schema::{Field, FromId, RelFlags, ToId},
+        schema::{Field, FromHostId, FromId, RelFlags, ToHostId, ToId},
         searcher::Searcher,
         EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
     },
@@ -108,6 +109,7 @@ impl BacklinksQuery {
 impl Query for BacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
+    type IntermediateOutput = Vec<(f32, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
@@ -133,17 +135,34 @@ impl Query for BacklinksQuery {
         &self,
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
-    ) -> Result<Self::Output> {
-        let fruit = fruit.into_iter().map(|(_, doc)| doc).collect();
-        let nodes = fetch_small_edges(searcher, fruit, FromId)?;
-        Ok(nodes
+    ) -> Result<Self::IntermediateOutput> {
+        let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
+        let nodes = fetch_small_edges(searcher, docs, FromId)?;
+        Ok(scores
             .into_iter()
-            .map(|(node, rel_flags)| SmallEdge {
+            .zip_eq(nodes.into_iter().map(|(node, rel_flags)| SmallEdge {
                 from: node,
                 to: self.node,
                 rel_flags,
-            })
+            }))
             .collect())
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard_id: ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+            .into_iter()
+            .filter(|(_, doc)| doc.shard_id == shard_id)
+            .collect()
+    }
+
+    fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
+        let mut edges: Vec<_> = results.into_iter().flatten().collect();
+        edges.sort_by(|(a, _), (b, _)| b.total_cmp(a));
+        edges.into_iter().map(|(_, e)| e).collect()
     }
 }
 
@@ -170,43 +189,63 @@ impl HostBacklinksQuery {
 impl Query for HostBacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
+    type IntermediateOutput = Vec<(f32, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
         match self.limit {
-            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(self.node, ToId)),
+            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(self.node, ToHostId)),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
                 Box::new(ShortCircuitQuery::new(
-                    Box::new(HostLinksQuery::new(self.node, ToId)),
+                    Box::new(HostLinksQuery::new(self.node, ToHostId)),
                     limit as u64,
                 ))
             }
         }
     }
 
-    fn collector(&self) -> Self::Collector {
-        self.limit.into()
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        TopDocsCollector::from(self.limit)
+            .with_shard_id(shard_id)
+            .disable_offset()
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        self.collector().enable_offset()
+        TopDocsCollector::from(self.limit).enable_offset()
     }
 
     fn retrieve(
         &self,
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
-    ) -> Result<Self::Output> {
-        let fruit = fruit.into_iter().map(|(_, doc)| doc).collect();
-        let nodes = fetch_small_edges(searcher, fruit, FromId)?;
-        Ok(nodes
+    ) -> Result<Self::IntermediateOutput> {
+        let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
+        let nodes = fetch_small_edges(searcher, docs, FromHostId)?;
+        Ok(scores
             .into_iter()
-            .map(|(node, rel_flags)| SmallEdge {
+            .zip_eq(nodes.into_iter().map(|(node, rel_flags)| SmallEdge {
                 from: node,
                 to: self.node,
                 rel_flags,
-            })
+            }))
             .collect())
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard_id: ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+            .into_iter()
+            .filter(|(_, doc)| doc.shard_id == shard_id)
+            .collect()
+    }
+
+    fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
+        let mut edges: Vec<_> = results.into_iter().flatten().collect();
+        edges.sort_by(|(a, _), (b, _)| b.total_cmp(a));
+        edges.into_iter().map(|(_, e)| e).collect()
     }
 }
 
@@ -235,6 +274,7 @@ impl FullBacklinksQuery {
 impl Query for FullBacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
+    type IntermediateOutput = Vec<(f32, Edge)>;
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
@@ -249,22 +289,41 @@ impl Query for FullBacklinksQuery {
         }
     }
 
-    fn collector(&self) -> Self::Collector {
-        self.limit.into()
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        TopDocsCollector::from(self.limit)
+            .with_shard_id(shard_id)
+            .disable_offset()
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        self.collector().enable_offset()
+        TopDocsCollector::from(self.limit).enable_offset()
     }
 
     fn retrieve(
         &self,
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
-    ) -> Result<Self::Output> {
-        let fruit: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
-        let edges = fetch_edges(searcher, fruit)?;
-        Ok(edges)
+    ) -> Result<Self::IntermediateOutput> {
+        let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
+        let edges = fetch_edges(searcher, docs)?;
+        Ok(scores.into_iter().zip_eq(edges.into_iter()).collect())
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard_id: ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+            .into_iter()
+            .filter(|(_, doc)| doc.shard_id == shard_id)
+            .collect()
+    }
+
+    fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
+        let mut edges: Vec<_> = results.into_iter().flatten().collect();
+        edges.sort_by(|(a, _), (b, _)| b.total_cmp(a));
+        edges.into_iter().map(|(_, e)| e).collect()
     }
 }
 
@@ -293,19 +352,20 @@ impl FullHostBacklinksQuery {
 impl Query for FullHostBacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
+    type IntermediateOutput = Vec<(f32, Edge)>;
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
         match self.limit {
             EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(
                 self.node.clone().into_host().id(),
-                ToId,
+                ToHostId,
             )),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
                 Box::new(ShortCircuitQuery::new(
                     Box::new(HostLinksQuery::new(
                         self.node.clone().into_host().id(),
-                        ToId,
+                        ToHostId,
                     )),
                     limit as u64,
                 ))
@@ -313,22 +373,41 @@ impl Query for FullHostBacklinksQuery {
         }
     }
 
-    fn collector(&self) -> Self::Collector {
-        self.limit.into()
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        TopDocsCollector::from(self.limit)
+            .with_shard_id(shard_id)
+            .disable_offset()
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        self.collector().enable_offset()
+        TopDocsCollector::from(self.limit).enable_offset()
     }
 
     fn retrieve(
         &self,
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
-    ) -> Result<Self::Output> {
-        let fruit: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
-        let edges = fetch_edges(searcher, fruit)?;
-        Ok(edges)
+    ) -> Result<Self::IntermediateOutput> {
+        let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
+        let edges = fetch_edges(searcher, docs)?;
+        Ok(scores.into_iter().zip_eq(edges.into_iter()).collect())
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard_id: ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+            .into_iter()
+            .filter(|(_, doc)| doc.shard_id == shard_id)
+            .collect()
+    }
+
+    fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
+        let mut edges: Vec<_> = results.into_iter().flatten().collect();
+        edges.sort_by(|(a, _), (b, _)| b.total_cmp(a));
+        edges.into_iter().map(|(_, e)| e).collect()
     }
 }
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
@@ -356,31 +435,56 @@ impl BacklinksWithLabelsQuery {
 impl Query for BacklinksWithLabelsQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
+    type IntermediateOutput = Vec<(f32, SmallEdgeWithLabel)>;
     type Output = Vec<SmallEdgeWithLabel>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
         Box::new(LinksQuery::new(self.node, ToId))
     }
 
-    fn collector(&self) -> Self::Collector {
-        self.limit.into()
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        TopDocsCollector::from(self.limit)
+            .with_shard_id(shard_id)
+            .disable_offset()
+    }
+
+    fn remote_collector(&self) -> Self::Collector {
+        TopDocsCollector::from(self.limit).enable_offset()
     }
 
     fn retrieve(
         &self,
         searcher: &Searcher,
         fruit: <Self::Collector as super::Collector>::Fruit,
-    ) -> Result<Self::Output> {
-        let fruit: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
-        let edges = fetch_edges(searcher, fruit)?;
-        Ok(edges
+    ) -> Result<Self::IntermediateOutput> {
+        let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
+        let edges = fetch_edges(searcher, docs)?;
+        Ok(scores
             .into_iter()
-            .map(|e| SmallEdgeWithLabel {
+            .zip_eq(edges.into_iter().map(|e| SmallEdgeWithLabel {
                 from: e.from.id(),
                 to: e.to.id(),
                 rel_flags: e.rel_flags,
                 label: e.label,
-            })
+            }))
+            .into_iter()
             .collect())
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard_id: ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+            .into_iter()
+            .filter(|(_, doc)| doc.shard_id == shard_id)
+            .collect()
+    }
+
+    fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
+        let mut edges: Vec<_> = results.into_iter().flatten().collect();
+        edges.sort_by(|(a, _), (b, _)| b.total_cmp(a));
+        edges.into_iter().map(|(_, e)| e).collect()
     }
 }

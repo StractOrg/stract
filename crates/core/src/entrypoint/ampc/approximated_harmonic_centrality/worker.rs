@@ -130,7 +130,7 @@ impl RemoteWorker for RemoteApproxCentralityWorker {
 pub fn run(config: ApproxHarmonicWorkerConfig) -> Result<()> {
     let tokio_conf = config.clone();
 
-    let graph = Webgraph::builder(config.graph_path).open()?;
+    let graph = Webgraph::builder(config.graph_path, config.shard).open()?;
     let worker = ApproxCentralityWorker::new(graph, config.shard);
     let service = Service::ApproxHarmonicWorker {
         host: tokio_conf.host,

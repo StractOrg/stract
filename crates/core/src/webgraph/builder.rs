@@ -17,20 +17,22 @@
 use std::path::Path;
 
 use super::Webgraph;
-use crate::Result;
+use crate::{ampc::dht::ShardId, Result};
 
 pub struct WebgraphBuilder {
     path: Box<Path>,
+    shard_id: ShardId,
 }
 
 impl WebgraphBuilder {
-    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+    pub fn new<P: AsRef<Path>>(path: P, shard_id: ShardId) -> Self {
         Self {
             path: path.as_ref().into(),
+            shard_id,
         }
     }
 
     pub fn open(self) -> Result<Webgraph> {
-        Webgraph::open(self.path)
+        Webgraph::open(self.path, self.shard_id)
     }
 }

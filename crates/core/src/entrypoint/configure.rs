@@ -120,7 +120,7 @@ fn create_webgraph() -> Result<()> {
     };
 
     let mut worker = webgraph::WebgraphWorker {
-        graph: crate::webgraph::Webgraph::open(&out_path_host).unwrap(),
+        graph: crate::webgraph::Webgraph::open(&out_path_host, 0u64.into()).unwrap(),
         host_centrality_store: None,
         canonical_index: None,
     };

@@ -98,6 +98,7 @@ pub struct IndexerDualEncoderConfig {
 #[derive(Debug, serde::Deserialize, Clone)]
 pub struct WebgraphConstructConfig {
     pub graph_base_path: String,
+    pub shard: ShardId,
     pub host_centrality_rank_store_path: String,
     pub warc_source: WarcSource,
     pub limit_warc_files: Option<usize>,

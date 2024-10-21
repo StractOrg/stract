@@ -192,7 +192,9 @@ impl AllComputer {
     }
 
     fn harvest(self) -> Vec<(tantivy::Score, DocAddress)> {
-        self.docs
+        let mut docs = self.docs;
+        docs.sort_by(|(score1, _), (score2, _)| score2.total_cmp(score1));
+        docs
     }
 }
 

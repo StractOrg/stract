@@ -42,7 +42,7 @@ impl Centrality {
             "Building harmonic centrality for {}",
             webgraph_path.as_ref().to_str().unwrap()
         );
-        let graph = WebgraphBuilder::new(webgraph_path)
+        let graph = WebgraphBuilder::new(webgraph_path, 0u64.into())
             .open()
             .expect("webgraph should open");
         let harmonic_centrality = HarmonicCentrality::calculate(&graph);
@@ -75,7 +75,7 @@ impl Centrality {
             webgraph_path.as_ref().to_str().unwrap()
         );
 
-        let graph = WebgraphBuilder::new(webgraph_path).open()?;
+        let graph = WebgraphBuilder::new(webgraph_path, 0u64.into()).open()?;
 
         let approx = ApproxHarmonic::build(&graph, base_output.as_ref().join("harmonic"));
         let mut approx_rank: speedy_kv::Db<crate::webgraph::NodeID, u64> =

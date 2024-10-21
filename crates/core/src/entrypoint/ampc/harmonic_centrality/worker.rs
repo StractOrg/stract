@@ -175,7 +175,7 @@ impl RemoteWorker for RemoteCentralityWorker {
 pub fn run(config: HarmonicWorkerConfig) -> Result<()> {
     let tokio_conf = config.clone();
 
-    let graph = Webgraph::builder(config.graph_path).open()?;
+    let graph = Webgraph::builder(config.graph_path, config.shard).open()?;
     let worker = CentralityWorker::new(config.shard, graph);
     let service = Service::HarmonicWorker {
         host: tokio_conf.host,

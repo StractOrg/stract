@@ -35,6 +35,7 @@ mod raw;
 pub trait Query: Send + Sync + bincode::Encode + bincode::Decode + Clone {
     type Collector: Collector;
     type TantivyQuery: tantivy::query::Query;
+    type IntermediateOutput;
     type Output;
 
     fn tantivy_query(&self) -> Self::TantivyQuery;
@@ -51,5 +52,7 @@ pub trait Query: Send + Sync + bincode::Encode + bincode::Decode + Clone {
         &self,
         searcher: &Searcher,
         fruit: <Self::Collector as Collector>::Fruit,
-    ) -> Result<Self::Output>;
+    ) -> Result<Self::IntermediateOutput>;
+
+    fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output;
 }

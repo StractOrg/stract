@@ -186,7 +186,7 @@ mod tests {
 
     fn create_path_graph(n: usize) -> (Webgraph, TempDir) {
         let temp_dir = file_store::gen_temp_dir().unwrap();
-        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test-webgraph"))
+        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test-webgraph"), 0u64.into())
             .open()
             .unwrap();
 

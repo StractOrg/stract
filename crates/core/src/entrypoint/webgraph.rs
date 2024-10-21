@@ -197,7 +197,7 @@ impl Webgraph {
             let graph_path = Path::new(&graph_path).join(format!("worker_{i}"));
 
             let mut worker = WebgraphWorker {
-                graph: webgraph::Webgraph::open(graph_path)?,
+                graph: webgraph::Webgraph::open(graph_path, config.shard)?,
                 host_centrality_store: Some(host_centrality_rank_store.clone()),
                 canonical_index: canonical_index.clone(),
             };

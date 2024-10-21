@@ -29,6 +29,13 @@ use crate::distributed::sonic::service::sonic_service;
 use crate::distributed::sonic::service::Message;
 use crate::webgraph;
 use crate::webgraph::query::BacklinksQuery;
+use crate::webgraph::query::BacklinksWithLabelsQuery;
+use crate::webgraph::query::ForwardlinksQuery;
+use crate::webgraph::query::FullBacklinksQuery;
+use crate::webgraph::query::FullForwardlinksQuery;
+use crate::webgraph::query::FullHostBacklinksQuery;
+use crate::webgraph::query::HostBacklinksQuery;
+use crate::webgraph::query::Id2NodeQuery;
 use crate::webgraph::Edge;
 use crate::webgraph::EdgeLimit;
 use crate::webgraph::Node;
@@ -51,28 +58,37 @@ pub struct WebGraphService {
     graph: Arc<Webgraph>,
 }
 
-macro_rules! search {
+pub trait RetrieveReq: bincode::Encode + bincode::Decode + Clone {
+    type Query: webgraph::Query + bincode::Encode + bincode::Decode;
+    fn new(
+        query: Self::Query,
+        fruit: <<Self::Query as webgraph::Query>::Collector as webgraph::Collector>::Fruit,
+    ) -> Self;
+}
+
+pub trait Query
+where
+    Self: webgraph::Query
+        + bincode::Encode
+        + bincode::Decode
+        + sonic::service::Wrapper<WebGraphService>,
+{
+    type RetrieveReq: RetrieveReq<Query = Self>;
+}
+
+#[derive(bincode::Encode, bincode::Decode, Clone)]
+pub struct EncodedError {
+    pub msg: String,
+}
+
+impl std::fmt::Display for EncodedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+macro_rules! impl_search {
     ([$($q:ident),*$(,)?]) => {
-        pub trait RetrieveReq: bincode::Encode + bincode::Decode {
-            type Query: webgraph::Query + bincode::Encode + bincode::Decode;
-            fn new(query: Self::Query, fruit: <<Self::Query as webgraph::Query>::Collector as webgraph::Collector>::Fruit) -> Self;
-        }
-
-        pub trait Query: webgraph::Query + bincode::Encode + bincode::Decode + sonic::service::Wrapper<WebGraphService> {
-            type RetrieveReq: RetrieveReq<Query = Self>;
-        }
-
-        #[derive(bincode::Encode, bincode::Decode, Clone)]
-        pub struct EncodedError {
-            pub msg: String,
-        }
-
-        impl std::fmt::Display for EncodedError {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}", self.msg)
-            }
-        }
-
         $(
             impl Message<WebGraphService> for $q {
                 type Response = Result<<<$q as webgraph::Query>::Collector as webgraph::Collector>::Fruit, EncodedError>;
@@ -91,7 +107,7 @@ macro_rules! search {
                 }
 
                 impl Message<WebGraphService> for [<$q Retrieve>] {
-                    type Response = Result<<$q as webgraph::Query>::Output, EncodedError>;
+                    type Response = Result<<$q as webgraph::Query>::IntermediateOutput, EncodedError>;
                     async fn handle(self, server: &WebGraphService) -> Self::Response {
                         server.graph.retrieve(&self.query, self.fruit).map_err(|e| EncodedError { msg: e.to_string() })
                     }
@@ -120,7 +136,16 @@ macro_rules! search {
     }
 }
 
-search!([BacklinksQuery]);
+impl_search!([
+    BacklinksQuery,
+    HostBacklinksQuery,
+    FullBacklinksQuery,
+    FullHostBacklinksQuery,
+    BacklinksWithLabelsQuery,
+    Id2NodeQuery,
+    ForwardlinksQuery,
+    FullForwardlinksQuery,
+]);
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct GetPageNodeIDs {
@@ -141,7 +166,7 @@ impl Message<WebGraphService> for GetPageNodeIDs {
 pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
     let addr: SocketAddr = config.host;
 
-    let graph = Arc::new(WebgraphBuilder::new(config.graph_path).open()?);
+    let graph = Arc::new(WebgraphBuilder::new(config.graph_path, config.shard).open()?);
 
     let server = WebGraphService { graph }.bind(addr).await.unwrap();
 

@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use rustc_hash::FxHashMap;
+
+use crate::ampc::dht::ShardId;
+
 use super::Collector;
 
 pub enum FastCountValue {
@@ -31,16 +35,26 @@ impl FastCountValue {
 pub struct FastCountCollector {
     field_name: String,
     value: FastCountValue,
+    shard_id: Option<ShardId>,
 }
 
 impl FastCountCollector {
     pub fn new(field_name: String, value: FastCountValue) -> Self {
-        Self { field_name, value }
+        Self {
+            field_name,
+            value,
+            shard_id: None,
+        }
+    }
+
+    pub fn with_shard_id(mut self, shard_id: ShardId) -> Self {
+        self.shard_id = Some(shard_id);
+        self
     }
 }
 
 impl Collector for FastCountCollector {
-    type Fruit = u64;
+    type Fruit = FxHashMap<ShardId, u64>;
 
     type Child = FastSegmentCountCollector;
 
@@ -58,25 +72,37 @@ impl Collector for FastCountCollector {
             .map(|postings| postings.doc_freq() as u64)
             .unwrap_or(0);
 
-        Ok(FastSegmentCountCollector(num_docs))
+        Ok(FastSegmentCountCollector {
+            shard_id: self.shard_id.unwrap(),
+            count: num_docs,
+        })
     }
 
     fn merge_fruits(
         &self,
         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
     ) -> crate::Result<Self::Fruit> {
-        Ok(segment_fruits.into_iter().sum())
+        let mut map = FxHashMap::default();
+        for result in segment_fruits {
+            for (shard_id, count) in result {
+                *map.entry(shard_id).or_insert(0) += count;
+            }
+        }
+        Ok(map)
     }
 }
 
-pub struct FastSegmentCountCollector(u64);
+pub struct FastSegmentCountCollector {
+    shard_id: ShardId,
+    count: u64,
+}
 
 impl tantivy::collector::SegmentCollector for FastSegmentCountCollector {
-    type Fruit = u64;
+    type Fruit = FxHashMap<ShardId, u64>;
 
     fn collect(&mut self, _: tantivy::DocId, _: tantivy::Score) {}
 
     fn harvest(self) -> Self::Fruit {
-        self.0
+        FxHashMap::from_iter(vec![(self.shard_id, self.count)])
     }
 }

@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use super::query;
-use std::collections::BTreeMap;
 
 use super::*;
 
@@ -35,23 +34,18 @@ impl Webgraph {
         node: &NodeID,
         limit: EdgeLimit,
     ) -> Vec<SmallEdgeWithLabel> {
-        todo!()
-    }
-
-    pub fn out_degree_upper_bound(&self, node: &NodeID) -> u64 {
-        todo!()
-    }
-
-    pub fn in_degree_upper_bound(&self, node: &NodeID) -> u64 {
-        todo!()
+        self.search(&query::BacklinksWithLabelsQuery::new(*node).with_limit(limit))
+            .unwrap_or_default()
     }
 
     pub fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Vec<Edge> {
-        todo!()
+        self.search(&query::FullForwardlinksQuery::new(node).with_limit(limit))
+            .unwrap_or_default()
     }
 
     pub fn raw_outgoing_edges(&self, node: &NodeID, limit: EdgeLimit) -> Vec<SmallEdge> {
-        todo!()
+        self.search(&query::ForwardlinksQuery::new(*node).with_limit(limit))
+            .unwrap_or_default()
     }
 }
 
@@ -83,7 +77,7 @@ pub fn test_graph() -> (Webgraph, TempDir) {
     //        D
 
     let temp_dir = crate::gen_temp_dir().unwrap();
-    let mut graph = Webgraph::builder(&temp_dir).open().unwrap();
+    let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
 
     for (from, to, label) in test_edges() {
         graph
@@ -150,9 +144,10 @@ fn merge_path() {
         (Node::from("F"), Node::from("G"), String::new()),
         (Node::from("G"), Node::from("H"), String::new()),
     ]) {
-        let mut graph = Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)))
-            .open()
-            .unwrap();
+        let mut graph =
+            Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)), 0u64.into())
+                .open()
+                .unwrap();
         graph
             .insert(Edge {
                 from,
@@ -192,9 +187,10 @@ fn merge_simple() {
     let mut graphs = Vec::new();
     let temp_dir = crate::gen_temp_dir().unwrap();
     for (i, (from, to, label)) in (0..).zip(test_edges()) {
-        let mut graph = Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)))
-            .open()
-            .unwrap();
+        let mut graph =
+            Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)), 0u64.into())
+                .open()
+                .unwrap();
         graph
             .insert(Edge {
                 from,
@@ -272,9 +268,10 @@ fn merge_cycle() {
         (Node::from("B"), Node::from("C"), String::new()),
         (Node::from("C"), Node::from("A"), String::new()),
     ]) {
-        let mut graph = Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)))
-            .open()
-            .unwrap();
+        let mut graph =
+            Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)), 0u64.into())
+                .open()
+                .unwrap();
         graph
             .insert(Edge {
                 from,
@@ -336,9 +333,10 @@ fn merge_star() {
         (Node::from("A"), Node::from("D"), String::new()),
         (Node::from("A"), Node::from("E"), String::new()),
     ]) {
-        let mut graph = Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)))
-            .open()
-            .unwrap();
+        let mut graph =
+            Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)), 0u64.into())
+                .open()
+                .unwrap();
         graph
             .insert(Edge {
                 from,
@@ -399,9 +397,10 @@ fn merge_reverse_star() {
         (Node::from("D"), Node::from("A"), String::new()),
         (Node::from("E"), Node::from("A"), String::new()),
     ]) {
-        let mut graph = Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)))
-            .open()
-            .unwrap();
+        let mut graph =
+            Webgraph::builder(&temp_dir.as_ref().join(format!("test_{}", i)), 0u64.into())
+                .open()
+                .unwrap();
         graph
             .insert(Edge {
                 from,
@@ -462,7 +461,7 @@ proptest! {
     ) {
         let mut graphs = Vec::new();
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut graph = Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
+        let mut graph = Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()), 0u64.into())
             .open()
             .unwrap();
         for (from, to) in nodes.clone() {
@@ -477,7 +476,7 @@ proptest! {
             if rand::random::<usize>() % 10 == 0 {
                 graph.commit().unwrap();
                 graphs.push(graph);
-                graph = Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
+                graph = Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()), 0u64.into())
                     .open()
                     .unwrap();
             }
@@ -517,9 +516,12 @@ proptest! {
 fn proptest_case(nodes: &[(&str, &str)]) {
     let mut graphs = Vec::new();
     let temp_dir = crate::gen_temp_dir().unwrap();
-    let mut graph = Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
-        .open()
-        .unwrap();
+    let mut graph = Webgraph::builder(
+        &temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
+        0u64.into(),
+    )
+    .open()
+    .unwrap();
 
     for (i, (from, to)) in nodes.iter().enumerate() {
         graph
@@ -535,9 +537,12 @@ fn proptest_case(nodes: &[(&str, &str)]) {
         if i % 2 == 0 {
             graph.commit().unwrap();
             graphs.push(graph);
-            graph = Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
-                .open()
-                .unwrap();
+            graph = Webgraph::builder(
+                &temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
+                0u64.into(),
+            )
+            .open()
+            .unwrap();
         }
     }
 
@@ -607,9 +612,12 @@ fn remove_protocol() {
 #[test]
 fn cap_label_length() {
     let temp_dir = crate::gen_temp_dir().unwrap();
-    let mut graph = Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
-        .open()
-        .unwrap();
+    let mut graph = Webgraph::builder(
+        &temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
+        0u64.into(),
+    )
+    .open()
+    .unwrap();
 
     graph
         .insert(Edge {
@@ -652,10 +660,12 @@ fn test_edge_limits() {
         (Node::from("A"), Node::from("B"), String::new()),
         (Node::from("A"), Node::from("C"), String::new()),
     ] {
-        let mut graph =
-            Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
-                .open()
-                .unwrap();
+        let mut graph = Webgraph::builder(
+            &temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
+            0u64.into(),
+        )
+        .open()
+        .unwrap();
         graph
             .insert(Edge {
                 from: from.clone(),
@@ -718,9 +728,12 @@ fn test_node_normalized() {
 #[test]
 fn test_rel_flags() {
     let temp_dir = crate::gen_temp_dir().unwrap();
-    let mut graph = Webgraph::builder(&temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()))
-        .open()
-        .unwrap();
+    let mut graph = Webgraph::builder(
+        &temp_dir.as_ref().join(uuid::Uuid::new_v4().to_string()),
+        0u64.into(),
+    )
+    .open()
+    .unwrap();
 
     graph
         .insert(Edge {

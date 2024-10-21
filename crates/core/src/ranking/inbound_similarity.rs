@@ -167,7 +167,7 @@ mod tests {
     #[tokio::test]
     async fn it_favors_liked_hosts() {
         let dir = crate::gen_temp_dir().unwrap();
-        let mut graph = Webgraph::open(&dir).unwrap();
+        let mut graph = Webgraph::open(&dir, 0u64.into()).unwrap();
 
         graph
             .insert(Edge {
@@ -265,7 +265,7 @@ mod tests {
     #[allow(clippy::too_many_lines)]
     async fn it_ranks_search_results() {
         let dir = crate::gen_temp_dir().unwrap();
-        let mut graph = Webgraph::open(&dir).unwrap();
+        let mut graph = Webgraph::open(&dir, 0u64.into()).unwrap();
 
         graph
             .insert(Edge {

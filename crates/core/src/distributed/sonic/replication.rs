@@ -347,6 +347,10 @@ where
     pub fn id(&self) -> &Id {
         &self.id
     }
+
+    pub fn replicas(&self) -> &ReplicatedClient<S> {
+        &self.replicas
+    }
 }
 
 pub struct ShardedClient<S: sonic::service::Service, Id: ShardIdentifier> {

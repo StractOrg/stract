@@ -155,7 +155,7 @@ impl Webgraph {
     async fn new(config: &IndexerGraphConfig) -> Self {
         match config {
             IndexerGraphConfig::Local { path } => Self::Local(
-                webgraph::WebgraphBuilder::new(path)
+                webgraph::WebgraphBuilder::new(path, 0u64.into())
                     .open()
                     .expect("webgraph should open"),
             ),

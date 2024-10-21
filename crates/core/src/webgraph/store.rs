@@ -20,21 +20,30 @@ use super::{
     document::SmallEdge,
     query::collector::{Collector, TantivyCollector},
     schema::{self, Field, FromHostId, FromId, ToHostId, ToId},
+    searcher::Searcher,
     Edge,
 };
-use crate::{webpage::html::links::RelFlags, Result};
+use crate::{ampc::dht::ShardId, webpage::html::links::RelFlags, Result};
 use itertools::Itertools;
 use tantivy::{columnar::Column, DocId, SegmentReader};
 
 use super::{query::Query, NodeID};
 
 pub struct EdgeStore {
-    index: tantivy::Index,
+    writer: tantivy::IndexWriter<Edge>,
+    reader: tantivy::IndexReader,
+    shard_id: ShardId,
 }
 
 impl EdgeStore {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Ok(Self { index: todo!() })
+    pub fn open<P: AsRef<Path>>(path: P, shard_id: ShardId) -> Result<Self> {
+        let index: tantivy::Index = todo!();
+
+        Ok(Self {
+            writer: index.writer(100_000_000)?,
+            reader: index.reader()?,
+            shard_id,
+        })
     }
 
     pub fn optimize_read(&mut self) -> Result<()> {
@@ -42,25 +51,30 @@ impl EdgeStore {
     }
 
     pub fn insert(&mut self, edge: Edge) -> Result<()> {
-        todo!()
+        self.writer.add_document(edge)?;
+        Ok(())
     }
 
     pub fn commit(&mut self) -> Result<()> {
-        todo!()
+        self.writer.commit()?;
+        Ok(())
     }
 
     pub fn merge(&self, other: Self) -> Result<()> {
         todo!()
     }
 
+    fn searcher(&self) -> Searcher {
+        Searcher::new(self.reader.searcher(), self.shard_id)
+    }
+
     pub fn search_initial<Q: Query>(
         &self,
         query: &Q,
     ) -> Result<<Q::Collector as Collector>::Fruit> {
-        let searcher = self.index.reader().unwrap().searcher();
-        let res = searcher.search(
+        let res = self.searcher().tantivy_searcher().search(
             &query.tantivy_query(),
-            &TantivyCollector::from(&query.collector()),
+            &TantivyCollector::from(&query.collector(self.shard_id)),
         )?;
 
         Ok(res)
@@ -70,19 +84,18 @@ impl EdgeStore {
         &self,
         query: &Q,
         fruit: <Q::Collector as Collector>::Fruit,
-    ) -> Result<Q::Output> {
-        let searcher = self.index.reader().unwrap().searcher();
-        query.retrieve(&searcher, fruit)
+    ) -> Result<Q::IntermediateOutput> {
+        query.retrieve(&self.searcher(), fruit)
     }
 
     pub fn search<Q: Query>(&self, query: &Q) -> Result<Q::Output> {
         let fruit = self.search_initial(query)?;
-        self.retrieve(query, fruit)
+        let res = self.retrieve(query, fruit)?;
+        Ok(Q::merge_results(vec![res]))
     }
 
     pub fn iter_pages_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
-        let reader = self.index.reader().unwrap();
-        let searcher = reader.searcher();
+        let searcher = self.reader.searcher();
         let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
 
         segment_readers.into_iter().flat_map(|segment| {
@@ -91,8 +104,7 @@ impl EdgeStore {
     }
 
     pub fn iter_hosts_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
-        let reader = self.index.reader().unwrap();
-        let searcher = reader.searcher();
+        let searcher = self.reader.searcher();
         let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
 
         segment_readers
@@ -104,8 +116,7 @@ impl EdgeStore {
     }
 
     pub fn iter_page_node_ids(&self, offset: u32, limit: u32) -> impl Iterator<Item = NodeID> + '_ {
-        let reader = self.index.reader().unwrap();
-        let searcher = reader.searcher();
+        let searcher = self.reader.searcher();
         let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
 
         let range = offset..limit;
@@ -120,8 +131,7 @@ impl EdgeStore {
     }
 
     pub fn iter_host_node_ids(&self, offset: u32, limit: u32) -> impl Iterator<Item = NodeID> + '_ {
-        let reader = self.index.reader().unwrap();
-        let searcher = reader.searcher();
+        let searcher = self.reader.searcher();
         let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
 
         let range = offset..limit;
@@ -203,7 +213,7 @@ mod tests {
     #[test]
     fn test_insert() {
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut store = EdgeStore::open(&temp_dir).unwrap();
+        let mut store = EdgeStore::open(&temp_dir, ShardId::new(0)).unwrap();
 
         let e = Edge {
             from: Node::from("https://www.first.com").into_host(),
@@ -219,15 +229,13 @@ mod tests {
         store.commit().unwrap();
 
         let query = HostBacklinksQuery::new(from_node_id);
-        let res = store.search_initial(&query).unwrap();
-        let edges = store.retrieve(&query, res).unwrap();
+        let edges = store.search(&query).unwrap();
 
         assert_eq!(edges.len(), 1);
         assert_eq!(edges[0].to, to_node_id);
 
         let query = HostBacklinksQuery::new(to_node_id);
-        let res = store.search_initial(&query).unwrap();
-        let edges = store.retrieve(&query, res).unwrap();
+        let edges = store.search(&query).unwrap();
 
         assert_eq!(edges.len(), 0);
 
@@ -249,7 +257,8 @@ mod tests {
         let b_centrality = 2.0;
         let c_centrality = 3.0;
         let d_centrality = 4.0;
-        let mut store = EdgeStore::open(&temp_dir.as_ref().join("test-segment")).unwrap();
+        let mut store =
+            EdgeStore::open(&temp_dir.as_ref().join("test-segment"), ShardId::new(0)).unwrap();
 
         let e1 = Edge {
             from: b.clone(),
@@ -280,8 +289,7 @@ mod tests {
         store.insert(e3.clone()).unwrap();
 
         let query = HostBacklinksQuery::new(a.id());
-        let res = store.search_initial(&query).unwrap();
-        let edges = store.retrieve(&query, res).unwrap();
+        let edges = store.search(&query).unwrap();
 
         assert_eq!(edges.len(), 3);
 

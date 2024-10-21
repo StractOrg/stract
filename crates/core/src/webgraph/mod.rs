@@ -18,6 +18,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
+use crate::ampc::dht::ShardId;
 use crate::Result;
 
 use itertools::Itertools;
@@ -82,18 +83,18 @@ pub struct Webgraph {
 }
 
 impl Webgraph {
-    pub fn builder<P: AsRef<Path>>(path: P) -> WebgraphBuilder {
-        WebgraphBuilder::new(path)
+    pub fn builder<P: AsRef<Path>>(path: P, shard_id: ShardId) -> WebgraphBuilder {
+        WebgraphBuilder::new(path, shard_id)
     }
 
     pub fn path(&self) -> PathBuf {
         PathBuf::from(&self.path)
     }
 
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open<P: AsRef<Path>>(path: P, shard_id: ShardId) -> Result<Self> {
         fs::create_dir_all(&path)?;
 
-        let store = EdgeStore::open(path.as_ref().join("edges"))?;
+        let store = EdgeStore::open(path.as_ref().join("edges"), shard_id)?;
 
         Ok(Self {
             store,
@@ -102,7 +103,6 @@ impl Webgraph {
     }
 
     pub fn insert(&mut self, edge: Edge) -> Result<()> {
-        todo!("insert into id2node (host and page)");
         self.store.insert(edge)?;
         Ok(())
     }
@@ -137,7 +137,7 @@ impl Webgraph {
         &self,
         query: &Q,
         fruit: <Q::Collector as Collector>::Fruit,
-    ) -> Result<Q::Output> {
+    ) -> Result<Q::IntermediateOutput> {
         self.store.retrieve(query, fruit)
     }
 

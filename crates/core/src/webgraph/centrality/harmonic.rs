@@ -341,7 +341,7 @@ mod tests {
 
     fn test_graph() -> (Webgraph, TempDir) {
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test"))
+        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test"), 0u64.into())
             .open()
             .unwrap();
 
@@ -365,7 +365,7 @@ mod tests {
     #[test]
     fn host_harmonic_centrality() {
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test"))
+        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test"), 0u64.into())
             .open()
             .unwrap();
 
@@ -528,7 +528,7 @@ mod tests {
         let centrality = HarmonicCentrality::calculate(&graph);
 
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test"))
+        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test"), 0u64.into())
             .open()
             .unwrap();
 
@@ -625,7 +625,7 @@ mod tests {
     #[test]
     fn test_rel_flag_ignored() {
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test"))
+        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test"), 0u64.into())
             .open()
             .unwrap();
 
@@ -651,7 +651,7 @@ mod tests {
     #[test]
     fn test_same_icann_domain_ignored() {
         let temp_dir = crate::gen_temp_dir().unwrap();
-        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test"))
+        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test"), 0u64.into())
             .open()
             .unwrap();
 

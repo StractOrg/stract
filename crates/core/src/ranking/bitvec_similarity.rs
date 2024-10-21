@@ -294,7 +294,7 @@ mod tests {
     async fn test_ignores_no_follow() {
         let temp_dir = crate::gen_temp_dir().unwrap();
 
-        let mut graph = Webgraph::open(&temp_dir).unwrap();
+        let mut graph = Webgraph::open(&temp_dir, 0u64.into()).unwrap();
 
         let a = Node::from("A");
         let b = Node::from("B");

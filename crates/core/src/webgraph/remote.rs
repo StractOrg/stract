@@ -16,7 +16,9 @@
 
 use std::sync::Arc;
 
+use futures::{stream::FuturesUnordered, StreamExt};
 use itertools::Itertools;
+use ring::rand::Random;
 use tokio::sync::Mutex;
 use url::Url;
 
@@ -33,15 +35,17 @@ use crate::{
         },
         streaming_response::StreamingResponse,
     },
-    entrypoint::webgraph_server::{
-        GetPageNodeIDs, IngoingEdges, OutgoingEdges, Query, RawIngoingEdges,
-        RawIngoingEdgesWithLabels, RawOutgoingEdges, RetrieveReq, WebGraphService,
-    },
+    entrypoint::webgraph_server::{self, GetPageNodeIDs, Query, RetrieveReq, WebGraphService},
+    webgraph::Collector,
     Result,
 };
 
 use super::{
-    query::id2node::Id2NodeQuery, Edge, EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
+    query::{
+        id2node::Id2NodeQuery, BacklinksQuery, BacklinksWithLabelsQuery, ForwardlinksQuery,
+        FullBacklinksQuery, FullForwardlinksQuery,
+    },
+    Edge, EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
 };
 use crate::webgraph;
 
@@ -154,10 +158,19 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         self.client.lock().await.conn().await
     }
 
-    pub async fn search_initial<Q: Query>(
+    pub async fn search_initial<Q>(
         &self,
         query: &Q,
-    ) -> Result<<Q::Collector as webgraph::Collector>::Fruit> {
+    ) -> Result<<Q::Collector as webgraph::Collector>::Fruit>
+    where
+        Q: Query,
+        Result<
+            <Q::Collector as webgraph::Collector>::Fruit,
+            webgraph_server::EncodedError,
+        >: From<<Q as sonic::service::Message<WebGraphService>>::Response>,
+        <<Q::Collector as webgraph::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit:
+            From<<Q::Collector as webgraph::Collector>::Fruit>,
+    {
         let collector = query.remote_collector();
 
         let res = self
@@ -166,46 +179,197 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
             .send(query.clone(), &AllShardsSelector, &RandomReplicaSelector)
             .await?;
 
-        todo!("ensure that the fruit knows about which shard it came from")
+        let fruits: Vec<<<Q::Collector as webgraph::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit> = res
+            .into_iter()
+            .flatten()
+            .flat_map(|(_, reps)| reps)
+            .filter_map(|(_, rep)| {
+                Result::<
+                    <Q::Collector as webgraph::Collector>::Fruit,
+                    webgraph_server::EncodedError,
+                >::from(rep)
+                .ok()
+            })
+            .map(|fruit| {
+                <<Q::Collector as webgraph::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit::from(fruit)
+            })
+            .collect();
+
+        collector
+            .merge_fruits(fruits)
+            .map_err(|_| anyhow::anyhow!("failed to merge fruits"))
     }
 
-    pub async fn retrieve<Q: Query>(
+    pub async fn retrieve<Q>(
         &self,
         query: Q,
         fruit: <Q::Collector as webgraph::Collector>::Fruit,
-    ) -> Result<Q::Output> {
-        // iterate shards, send fruit to the correct shard
+    ) -> Result<Vec<Q::IntermediateOutput>>
+    where
+        Q: Query,
+        <Q::Collector as webgraph::Collector>::Fruit: Clone,
+        <Q as webgraph_server::Query>::RetrieveReq: sonic::service::Wrapper<WebGraphService>,
+        Result<Q::IntermediateOutput, webgraph_server::EncodedError>: From<
+            <<Q as webgraph_server::Query>::RetrieveReq as sonic::service::Message<
+                WebGraphService,
+            >>::Response,
+        >,
+    {
+        let conn = self.conn().await;
+        let mut results = FuturesUnordered::new();
+        for shard in conn.shards() {
+            let fruit = query.filter_fruit_shards(*shard.id(), fruit.clone());
+            let req = Q::RetrieveReq::new(query.clone(), fruit);
+            results.push(shard.replicas().send(req, &RandomReplicaSelector));
+        }
+        let mut res = Vec::new();
 
-        let req = Q::RetrieveReq::new(query, query.filter_fruit_shards(shard, fruit));
-        todo!("send fruit to the correct shard")
-        // let res = self
-        //     .conn()
-        //     .await
-        //     .send(req, &AllShardsSelector, &RandomReplicaSelector)
-        //     .await?;
+        while let Some(shard_res) = results.next().await {
+            if let Ok(shard_res) = shard_res {
+                res.push(shard_res);
+            }
+        }
+
+        Ok(res
+            .into_iter()
+            .flatten()
+            .filter_map(|(_, res)| {
+                Result::<Q::IntermediateOutput, webgraph_server::EncodedError>::from(res).ok()
+            })
+            .collect())
     }
 
-    pub async fn search<Q: Query>(&self, query: Q) -> Result<Q::Output> {
+    pub async fn search<Q>(&self, query: Q) -> Result<Q::Output>
+    where
+        Q: Query,
+        <Q::Collector as webgraph::Collector>::Fruit: Clone,
+        Result<
+            <Q::Collector as webgraph::Collector>::Fruit,
+            webgraph_server::EncodedError,
+        >: From<<Q as sonic::service::Message<WebGraphService>>::Response>,
+        <<Q::Collector as webgraph::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit:
+            From<<Q::Collector as webgraph::Collector>::Fruit>,
+        <Q as webgraph_server::Query>::RetrieveReq: sonic::service::Wrapper<WebGraphService>,
+        Result<Q::IntermediateOutput, webgraph_server::EncodedError>: From<
+            <<Q as webgraph_server::Query>::RetrieveReq as sonic::service::Message<
+                WebGraphService,
+            >>::Response,
+        >,
+    {
         let fruit = self.search_initial(&query).await?;
-        self.retrieve(query, fruit).await
+        let res = self.retrieve(query, fruit).await?;
+        let output = Q::merge_results(res);
+        Ok(output)
     }
 
-    pub async fn batch_search_initial<Q: Query>(
+    pub async fn batch_search_initial<Q>(
         &self,
         queries: &[Q],
-    ) -> Result<Vec<<Q::Collector as webgraph::Collector>::Fruit>> {
-        todo!()
+    ) -> Result<Vec<<Q::Collector as webgraph::Collector>::Fruit>>
+    where
+        Q: Query,
+        <Q::Collector as webgraph::Collector>::Fruit: Clone,
+        Result<<<Q::Collector as webgraph::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit, webgraph_server::EncodedError>:
+            From<<Q as sonic::service::Message<WebGraphService>>::Response>,
+    {
+        let res = self
+            .conn()
+            .await
+            .batch_send(queries, &AllShardsSelector, &RandomReplicaSelector)
+            .await?;
+
+        let mut fruits = Vec::with_capacity(queries.len());
+
+        for (query, (_, shard_results)) in queries.iter().zip(res.into_iter()) {
+            let merged_fruit = query.remote_collector().merge_fruits(
+                shard_results
+                    .into_iter()
+                    .flat_map(|(_, reps)| reps)
+                    .filter_map(|res| Result::<_, webgraph_server::EncodedError>::from(res).ok())
+                    .collect(),
+            )?;
+
+            fruits.push(merged_fruit);
+        }
+
+        Ok(fruits)
     }
 
-    pub async fn batch_retrieve<Q: Query>(
+    pub async fn batch_retrieve<Q>(
         &self,
         queries: Vec<(Q, <Q::Collector as webgraph::Collector>::Fruit)>,
-    ) -> Result<Vec<Q::Output>> {
-        todo!()
+    ) -> Result<Vec<Vec<Q::IntermediateOutput>>>
+    where
+        Q: Query,
+        <Q as webgraph_server::Query>::RetrieveReq: sonic::service::Wrapper<WebGraphService>,
+        Result<Q::IntermediateOutput, webgraph_server::EncodedError>: From<
+            <<Q as webgraph_server::Query>::RetrieveReq as sonic::service::Message<
+                WebGraphService,
+            >>::Response,
+        >,
+        <Q::Collector as webgraph::Collector>::Fruit: Clone,
+    {
+        let conn = self.conn().await;
+        let mut results = FuturesUnordered::new();
+
+        for shard in conn.shards() {
+            let retrieve_requests: Vec<_> = queries
+                .iter()
+                .map(|(query, fruit)| {
+                    let fruit = query.filter_fruit_shards(*shard.id(), fruit.clone());
+                    Q::RetrieveReq::new(query.clone(), fruit)
+                })
+                .collect();
+
+            results.push(async move {
+                let retrieve_requests = retrieve_requests; // move lifetime
+                shard
+                    .replicas()
+                    .batch_send(&retrieve_requests, &RandomReplicaSelector)
+                    .await
+            });
+        }
+
+        let mut res = Vec::new();
+
+        for _ in 0..queries.len() {
+            res.push(Vec::new());
+        }
+
+        while let Some(shard_res) = results.next().await {
+            for (_, shard_res) in shard_res? {
+                for (i, query_res) in shard_res.into_iter().enumerate() {
+                    res[i].push(
+                        <Result<Q::IntermediateOutput, webgraph_server::EncodedError>>::from(
+                            query_res,
+                        )
+                        .map_err(|e| anyhow::anyhow!("{e}"))?,
+                    );
+                }
+            }
+        }
+
+        Ok(res)
     }
 
-    pub async fn batch_search<Q: Query>(&self, queries: Vec<Q>) -> Result<Vec<Q::Output>> {
-        todo!()
+    pub async fn batch_search<Q>(&self, queries: Vec<Q>) -> Result<Vec<Q::Output>>
+    where
+        Q: Query,
+        <Q::Collector as webgraph::Collector>::Fruit: Clone,
+        Result<<<Q::Collector as webgraph::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit, webgraph_server::EncodedError>:
+            From<<Q as sonic::service::Message<WebGraphService>>::Response>,
+            <Q as webgraph_server::Query>::RetrieveReq: sonic::service::Wrapper<WebGraphService>,
+        Result<Q::IntermediateOutput, webgraph_server::EncodedError>: From<
+            <<Q as webgraph_server::Query>::RetrieveReq as sonic::service::Message<
+                WebGraphService,
+            >>::Response,
+        >,
+    {
+        let res = self.batch_search_initial(&queries).await?;
+        let res = self
+            .batch_retrieve(queries.into_iter().zip(res).collect())
+            .await?;
+        Ok(res.into_iter().map(|v| Q::merge_results(v)).collect())
     }
 
     pub async fn knows(&self, mut host: String) -> Result<Option<Node>> {
@@ -247,45 +411,12 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
     }
 
     pub async fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<Edge>> {
-        let res = self
-            .conn()
+        self.search(FullBacklinksQuery::new(node).with_limit(limit))
             .await
-            .send(
-                IngoingEdges { node, limit },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await?;
-
-        Ok(res
-            .into_iter()
-            .flatten()
-            .flat_map(|(_, reps)| {
-                debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|(_, rep)| rep)
-            })
-            .collect())
     }
 
     pub async fn raw_ingoing_edges(&self, id: NodeID, limit: EdgeLimit) -> Result<Vec<SmallEdge>> {
-        let res = self
-            .conn()
-            .await
-            .send(
-                RawIngoingEdges { node: id, limit },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await?;
-
-        Ok(res
-            .into_iter()
-            .flatten()
-            .flat_map(|(_, reps)| {
-                debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|(_, rep)| rep)
-            })
-            .collect())
+        self.search(BacklinksQuery::new(id).with_limit(limit)).await
     }
 
     pub async fn raw_ingoing_edges_with_labels(
@@ -293,24 +424,8 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         id: NodeID,
         limit: EdgeLimit,
     ) -> Result<Vec<SmallEdgeWithLabel>> {
-        let res = self
-            .conn()
+        self.search(BacklinksWithLabelsQuery::new(id).with_limit(limit))
             .await
-            .send(
-                RawIngoingEdgesWithLabels { node: id, limit },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await?;
-
-        Ok(res
-            .into_iter()
-            .flatten()
-            .flat_map(|(_, reps)| {
-                debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|(_, rep)| rep)
-            })
-            .collect())
     }
 
     pub async fn batch_raw_ingoing_edges_with_labels(
@@ -318,30 +433,12 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         ids: &[NodeID],
         limit: EdgeLimit,
     ) -> Result<Vec<Vec<SmallEdgeWithLabel>>> {
-        let reqs: Vec<_> = ids
-            .iter()
-            .map(|id| RawIngoingEdgesWithLabels { node: *id, limit })
-            .collect();
-
-        let res = self
-            .conn()
-            .await
-            .batch_send(&reqs, &AllShardsSelector, &RandomReplicaSelector)
-            .await?;
-
-        let mut edges = vec![vec![]; ids.len()];
-
-        for (_, res) in res {
-            debug_assert!(res.len() <= 1);
-
-            for (_, res) in res {
-                for (i, rep) in res.into_iter().enumerate() {
-                    edges[i].extend(rep);
-                }
-            }
-        }
-
-        Ok(edges)
+        self.batch_search(
+            ids.iter()
+                .map(|id| BacklinksWithLabelsQuery::new(*id).with_limit(limit))
+                .collect(),
+        )
+        .await
     }
 
     pub async fn batch_raw_ingoing_edges(
@@ -349,72 +446,22 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         ids: &[NodeID],
         limit: EdgeLimit,
     ) -> Result<Vec<Vec<SmallEdge>>> {
-        let reqs: Vec<_> = ids
-            .iter()
-            .map(|id| RawIngoingEdges { node: *id, limit })
-            .collect();
-
-        let res = self
-            .conn()
-            .await
-            .batch_send(&reqs, &AllShardsSelector, &RandomReplicaSelector)
-            .await?;
-
-        let mut edges = vec![vec![]; ids.len()];
-
-        for (_, res) in res {
-            debug_assert!(res.len() <= 1);
-
-            for (_, res) in res {
-                for (i, rep) in res.into_iter().enumerate() {
-                    edges[i].extend(rep);
-                }
-            }
-        }
-
-        Ok(edges)
+        self.batch_search(
+            ids.iter()
+                .map(|id| BacklinksQuery::new(*id).with_limit(limit))
+                .collect(),
+        )
+        .await
     }
 
     pub async fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<Edge>> {
-        let res = self
-            .conn()
+        self.search(FullForwardlinksQuery::new(node).with_limit(limit))
             .await
-            .send(
-                OutgoingEdges { node, limit },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await?;
-
-        Ok(res
-            .into_iter()
-            .flatten()
-            .flat_map(|(_, reps)| {
-                debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|(_, rep)| rep)
-            })
-            .collect())
     }
 
     pub async fn raw_outgoing_edges(&self, id: NodeID, limit: EdgeLimit) -> Result<Vec<SmallEdge>> {
-        let res = self
-            .conn()
+        self.search(ForwardlinksQuery::new(id).with_limit(limit))
             .await
-            .send(
-                RawOutgoingEdges { node: id, limit },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await?;
-
-        Ok(res
-            .into_iter()
-            .flatten()
-            .flat_map(|(_, reps)| {
-                debug_assert!(reps.len() <= 1);
-                reps.into_iter().flat_map(|(_, rep)| rep)
-            })
-            .collect())
     }
 
     pub async fn batch_raw_outgoing_edges(
@@ -422,30 +469,12 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         ids: &[NodeID],
         limit: EdgeLimit,
     ) -> Result<Vec<Vec<SmallEdge>>> {
-        let reqs: Vec<_> = ids
-            .iter()
-            .map(|id| RawOutgoingEdges { node: *id, limit })
-            .collect();
-
-        let res = self
-            .conn()
-            .await
-            .batch_send(&reqs, &AllShardsSelector, &RandomReplicaSelector)
-            .await?;
-
-        let mut edges = vec![vec![]; ids.len()];
-
-        for (_, res) in res {
-            debug_assert!(res.len() <= 1);
-
-            for (_, res) in res {
-                for (i, rep) in res.into_iter().enumerate() {
-                    edges[i].extend(rep);
-                }
-            }
-        }
-
-        Ok(edges)
+        self.batch_search(
+            ids.iter()
+                .map(|id| ForwardlinksQuery::new(*id).with_limit(limit))
+                .collect(),
+        )
+        .await
     }
 
     pub async fn stream_page_node_ids(&self) -> impl futures::Stream<Item = NodeID> {

@@ -19,6 +19,7 @@ use super::Query;
 use crate::ampc::dht::ShardId;
 use crate::webgraph::query::raw;
 use crate::webgraph::schema::{ToHostId, ToId};
+use crate::webgraph::searcher::Searcher;
 use crate::webgraph::{Edge, Node, NodeID};
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
@@ -30,6 +31,7 @@ pub enum Id2NodeQuery {
 impl Query for Id2NodeQuery {
     type Collector = FirstDocCollector;
     type TantivyQuery = raw::Id2NodeQuery;
+    type IntermediateOutput = Option<Node>;
     type Output = Option<Node>;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
@@ -45,14 +47,18 @@ impl Query for Id2NodeQuery {
 
     fn retrieve(
         &self,
-        searcher: &tantivy::Searcher,
+        searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> crate::Result<Self::Output> {
         Ok(fruit.and_then(|doc| {
-            searcher.doc::<Edge>(doc).ok().map(|e| match self {
-                Self::Page(_) => e.to,
-                Self::Host(_) => e.to.into_host(),
-            })
+            searcher
+                .tantivy_searcher()
+                .doc::<Edge>(doc.into())
+                .ok()
+                .map(|e| match self {
+                    Self::Page(_) => e.to,
+                    Self::Host(_) => e.to.into_host(),
+                })
         }))
     }
 
@@ -69,5 +75,9 @@ impl Query for Id2NodeQuery {
             Some(doc) if doc.shard_id == shard_id => fruit,
             _ => None,
         }
+    }
+
+    fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
+        results.into_iter().flatten().next()
     }
 }

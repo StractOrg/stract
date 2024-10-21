@@ -605,7 +605,7 @@ mod tests {
         let dir = crate::gen_temp_dir().unwrap();
         let (mut index, _dir) = Index::temporary().expect("Unable to open index");
 
-        let mut graph = Webgraph::open(&dir).unwrap();
+        let mut graph = Webgraph::open(&dir, 0u64.into()).unwrap();
 
         graph
             .insert(Edge {

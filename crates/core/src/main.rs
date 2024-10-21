@@ -352,10 +352,10 @@ fn main() -> Result<()> {
                 mut paths,
                 merge_all_segments,
             } => {
-                let mut webgraph = WebgraphBuilder::new(paths.remove(0)).open()?;
+                let mut webgraph = WebgraphBuilder::new(paths.remove(0), 0u64.into()).open()?;
 
                 for other_path in paths {
-                    let other = WebgraphBuilder::new(&other_path).open()?;
+                    let other = WebgraphBuilder::new(&other_path, 0u64.into()).open()?;
                     webgraph.merge(other)?;
                 }
 

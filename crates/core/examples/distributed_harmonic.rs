@@ -70,9 +70,9 @@ fn build_graphs_if_not_exist(warc_path: &str, graph_path: &str) -> anyhow::Resul
     let a_path = path.join("graph_a");
     let b_path = path.join("graph_b");
 
-    let mut a = stract::webgraph::WebgraphBuilder::new(a_path).open()?;
+    let mut a = stract::webgraph::WebgraphBuilder::new(a_path, 0u64.into()).open()?;
 
-    let mut b = stract::webgraph::WebgraphBuilder::new(b_path).open()?;
+    let mut b = stract::webgraph::WebgraphBuilder::new(b_path, 0u64.into()).open()?;
 
     for (i, record) in warc.records().flatten().enumerate() {
         let webpage = match stract::webpage::Html::parse_without_text(

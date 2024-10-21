@@ -14,9 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::webgraph::{
-    schema::{Field, ToId},
-    NodeID,
+use rustc_hash::FxHashMap;
+
+use crate::{
+    ampc::dht::ShardId,
+    webgraph::{
+        schema::{Field, ToId},
+        searcher::Searcher,
+        NodeID,
+    },
 };
 
 use super::{
@@ -32,13 +38,22 @@ pub struct InDegreeQuery {
 impl Query for InDegreeQuery {
     type Collector = FastCountCollector;
     type TantivyQuery = raw::DummyQuery;
+    type IntermediateOutput = FxHashMap<ShardId, u64>;
     type Output = u64;
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
         raw::DummyQuery
     }
 
-    fn collector(&self) -> Self::Collector {
+    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+        FastCountCollector::new(
+            ToId.name().to_string(),
+            FastCountValue::U64(self.node.as_u64()),
+        )
+        .with_shard_id(shard_id)
+    }
+
+    fn remote_collector(&self) -> Self::Collector {
         FastCountCollector::new(
             ToId.name().to_string(),
             FastCountValue::U64(self.node.as_u64()),
@@ -47,9 +62,30 @@ impl Query for InDegreeQuery {
 
     fn retrieve(
         &self,
-        _: &tantivy::Searcher,
+        _: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
-    ) -> crate::Result<Self::Output> {
+    ) -> crate::Result<Self::IntermediateOutput> {
         Ok(fruit)
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        shard_id: crate::ampc::dht::ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+            .into_iter()
+            .filter(|(fruit_shard_id, _)| shard_id == *fruit_shard_id)
+            .collect()
+    }
+
+    fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
+        let mut map = FxHashMap::default();
+        for result in results {
+            for (shard_id, count) in result {
+                *map.entry(shard_id).or_insert(0) += count;
+            }
+        }
+        map.into_values().sum()
     }
 }
