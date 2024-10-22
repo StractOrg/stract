@@ -27,7 +27,7 @@ use crate::backlink_grouper::BacklinkGrouper;
 use crate::config::{GossipConfig, IndexerConfig, IndexerDualEncoderConfig};
 use crate::distributed::cluster::Cluster;
 use crate::models::dual_encoder::DualEncoder as DualEncoderModel;
-use crate::webgraph::remote::{Page, RemoteWebgraph};
+use crate::webgraph::remote::RemoteWebgraph;
 use crate::Result;
 
 use crate::index::Index;
@@ -83,7 +83,7 @@ struct DualEncoder {
 }
 
 pub(super) enum Webgraph {
-    Remote(RemoteWebgraph<Page>),
+    Remote(RemoteWebgraph),
     Local(webgraph::Webgraph),
 }
 
@@ -95,7 +95,13 @@ impl Webgraph {
     ) -> Vec<Vec<SmallEdgeWithLabel>> {
         let edges = match self {
             Self::Remote(webgraph) => webgraph
-                .batch_raw_ingoing_edges_with_labels(&ids, limit)
+                .batch_search(
+                    ids.into_iter()
+                        .map(|id| {
+                            webgraph::query::BacklinksWithLabelsQuery::new(id).with_limit(limit)
+                        })
+                        .collect(),
+                )
                 .await
                 .unwrap_or_default(),
             Self::Local(webgraph) => {

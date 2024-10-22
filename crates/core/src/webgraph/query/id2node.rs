@@ -18,7 +18,7 @@ use super::collector::FirstDocCollector;
 use super::Query;
 use crate::ampc::dht::ShardId;
 use crate::webgraph::query::raw;
-use crate::webgraph::schema::{ToHostId, ToId};
+use crate::webgraph::schema::{FromHostId, FromId, ToHostId, ToId};
 use crate::webgraph::searcher::Searcher;
 use crate::webgraph::{Edge, Node, NodeID};
 
@@ -36,8 +36,10 @@ impl Query for Id2NodeQuery {
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
         match self {
-            Self::Page(node) => raw::Id2NodeQuery::new(*node, ToId),
-            Self::Host(node) => raw::Id2NodeQuery::new(*node, ToHostId),
+            Self::Page(node) => raw::Id2NodeQuery::new(*node, vec![ToId.into(), FromId.into()]),
+            Self::Host(node) => {
+                raw::Id2NodeQuery::new(*node, vec![ToHostId.into(), FromHostId.into()])
+            }
         }
     }
 
@@ -55,9 +57,28 @@ impl Query for Id2NodeQuery {
                 .tantivy_searcher()
                 .doc::<Edge>(doc.into())
                 .ok()
-                .map(|e| match self {
-                    Self::Page(_) => e.to,
-                    Self::Host(_) => e.to.into_host(),
+                .and_then(|e| match self {
+                    Self::Page(node) => {
+                        if e.to.id() == *node {
+                            Some(e.to)
+                        } else if e.from.id() == *node {
+                            Some(e.from)
+                        } else {
+                            None
+                        }
+                    }
+                    Self::Host(node) => {
+                        let to = e.to.into_host();
+                        let from = e.from.into_host();
+
+                        if to.id() == *node {
+                            Some(to)
+                        } else if from.id() == *node {
+                            Some(from)
+                        } else {
+                            None
+                        }
+                    }
                 })
         }))
     }

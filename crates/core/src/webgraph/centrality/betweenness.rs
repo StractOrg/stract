@@ -197,7 +197,7 @@ mod tests {
                     to: Node::from((i + 1).to_string()),
                     label: String::new(),
                     rel_flags: RelFlags::default(),
-                    combined_centrality: 0.0,
+                    sort_score: 0.0,
                 })
                 .unwrap();
         }

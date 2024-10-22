@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use itertools::Itertools;
 use tantivy::{
     postings::SegmentPostings,
     query::{EmptyScorer, EnableScoring, Explanation, Query, Scorer, Weight},
@@ -28,18 +29,12 @@ use crate::webgraph::{
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct Id2NodeQuery {
     node: NodeID,
-    id_field: FieldEnum,
+    fields: Vec<FieldEnum>,
 }
 
 impl Id2NodeQuery {
-    pub fn new<F>(node: NodeID, id_field: F) -> Self
-    where
-        F: Field,
-    {
-        Self {
-            node,
-            id_field: id_field.into(),
-        }
+    pub fn new(node: NodeID, fields: Vec<FieldEnum>) -> Self {
+        Self { node, fields }
     }
 }
 
@@ -47,32 +42,40 @@ impl Query for Id2NodeQuery {
     fn weight(&self, _: EnableScoring<'_>) -> tantivy::Result<Box<dyn Weight>> {
         Ok(Box::new(Id2NodeWeight {
             node: self.node,
-            id_field: self.id_field,
+            fields: self.fields.clone(),
         }))
     }
 }
 
 struct Id2NodeWeight {
     node: NodeID,
-    id_field: FieldEnum,
+    fields: Vec<FieldEnum>,
 }
 
 impl Weight for Id2NodeWeight {
     fn scorer(&self, reader: &SegmentReader, _: Score) -> tantivy::Result<Box<dyn Scorer>> {
-        let field = reader.schema().get_field(&self.id_field.name())?;
-        let inverted_index = reader.inverted_index(field)?;
+        for field in self.fields.iter() {
+            let field = reader.schema().get_field(field.name())?;
+            let inverted_index = reader.inverted_index(field)?;
 
-        let term = Term::from_field_u64(field, self.node.as_u64());
+            let term = Term::from_field_u64(field, self.node.as_u64());
 
-        match inverted_index.read_postings(&term, tantivy::schema::IndexRecordOption::Basic)? {
-            Some(postings) => Ok(Box::new(Id2NodeScorer { postings })),
-            None => return Ok(Box::new(EmptyScorer)),
+            if let Some(postings) =
+                inverted_index.read_postings(&term, tantivy::schema::IndexRecordOption::Basic)?
+            {
+                return Ok(Box::new(Id2NodeScorer { postings }));
+            }
         }
+
+        Ok(Box::new(EmptyScorer))
     }
 
     fn explain(&self, _: &SegmentReader, _: DocId) -> tantivy::Result<Explanation> {
         Ok(Explanation::new_with_string(
-            format!("Id2Node on {}", self.id_field.name()),
+            format!(
+                "Id2Node on [{}]",
+                self.fields.iter().map(|f| f.name()).join(", ")
+            ),
             0.0,
         ))
     }

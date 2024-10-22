@@ -24,13 +24,15 @@ use std::{
 use super::{
     document::SmallEdge,
     query::collector::{Collector, TantivyCollector},
-    schema::{self, Field, FromHostId, FromId, ToHostId, ToId},
+    schema::{self, create_schema, Field, FromHostId, FromId, ToHostId, ToId},
     searcher::Searcher,
     Edge,
 };
 use crate::{ampc::dht::ShardId, webpage::html::links::RelFlags, Result};
 use itertools::Itertools;
-use tantivy::{columnar::Column, DocId, SegmentReader};
+use tantivy::{
+    columnar::Column, directory::MmapDirectory, indexer::NoMergePolicy, DocId, SegmentReader,
+};
 
 use super::{query::Query, NodeID};
 
@@ -44,7 +46,20 @@ pub struct EdgeStore {
 
 impl EdgeStore {
     pub fn open<P: AsRef<Path>>(path: P, shard_id: ShardId) -> Result<Self> {
-        let index: tantivy::Index = todo!();
+        if !path.as_ref().exists() {
+            fs::create_dir_all(&path)?;
+        }
+
+        let index: tantivy::Index = tantivy::IndexBuilder::new()
+            .schema(create_schema())
+            .settings(tantivy::IndexSettings {
+                sort_by_field: Some(tantivy::IndexSortByField {
+                    field: schema::SortScore.name().to_string(),
+                    order: tantivy::Order::Desc,
+                }),
+                ..Default::default()
+            })
+            .open_or_create(MmapDirectory::open(&path)?)?;
 
         Ok(Self {
             path: path.as_ref().to_path_buf(),
@@ -56,7 +71,17 @@ impl EdgeStore {
     }
 
     fn prepare_writer(&mut self) -> Result<()> {
-        self.writer = Some(self.index.writer_with_num_threads(1, 1_000_000_000)?);
+        if self.writer.is_some() {
+            return Ok(());
+        }
+
+        let writer = self.index.writer_with_num_threads(1, 1_000_000_000)?;
+
+        let merge_policy = NoMergePolicy;
+        writer.set_merge_policy(Box::new(merge_policy));
+
+        self.writer = Some(writer);
+
         Ok(())
     }
 
@@ -92,6 +117,7 @@ impl EdgeStore {
             .as_mut()
             .expect("writer should have been prepared")
             .commit()?;
+        self.reader.reload()?;
         Ok(())
     }
 
@@ -144,6 +170,13 @@ impl EdgeStore {
         )
         .unwrap();
 
+        self.re_open()?;
+
+        Ok(())
+    }
+
+    fn re_open(&mut self) -> Result<()> {
+        *self = Self::open(self.path.clone(), self.shard_id)?;
         Ok(())
     }
 
@@ -171,15 +204,21 @@ impl EdgeStore {
         query.retrieve(&self.searcher(), fruit)
     }
 
-    pub fn search<Q: Query>(&self, query: &Q) -> Result<Q::Output> {
+    pub fn search<Q>(&self, query: &Q) -> Result<Q::Output>
+    where
+        Q: Query,
+        <<Q::Collector as Collector>::Child as tantivy::collector::SegmentCollector>::Fruit:
+            From<<Q::Collector as Collector>::Fruit>,
+    {
         let fruit = self.search_initial(query)?;
+        let fruit = query.remote_collector().merge_fruits(vec![fruit.into()])?;
         let res = self.retrieve(query, fruit)?;
         Ok(Q::merge_results(vec![res]))
     }
 
     pub fn iter_pages_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
         let searcher = self.reader.searcher();
-        let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
+        let segment_readers: Vec<_> = searcher.segment_readers().to_vec();
 
         segment_readers.into_iter().flat_map(|segment| {
             SmallSegmentEdgesIter::new(&segment, FromId, ToId, 0..segment.max_doc())
@@ -188,7 +227,7 @@ impl EdgeStore {
 
     pub fn iter_hosts_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
         let searcher = self.reader.searcher();
-        let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
+        let segment_readers: Vec<_> = searcher.segment_readers().to_vec();
 
         segment_readers
             .into_iter()
@@ -200,7 +239,7 @@ impl EdgeStore {
 
     pub fn iter_page_node_ids(&self, offset: u32, limit: u32) -> impl Iterator<Item = NodeID> + '_ {
         let searcher = self.reader.searcher();
-        let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
+        let segment_readers: Vec<_> = searcher.segment_readers().to_vec();
 
         let range = offset..limit;
 
@@ -215,7 +254,7 @@ impl EdgeStore {
 
     pub fn iter_host_node_ids(&self, offset: u32, limit: u32) -> impl Iterator<Item = NodeID> + '_ {
         let searcher = self.reader.searcher();
-        let segment_readers: Vec<_> = searcher.segment_readers().iter().cloned().collect();
+        let segment_readers: Vec<_> = searcher.segment_readers().to_vec();
 
         let range = offset..limit;
 
@@ -303,7 +342,7 @@ mod tests {
             to: Node::from("https://www.second.com").into_host(),
             label: "test".to_string(),
             rel_flags: RelFlags::default(),
-            combined_centrality: 0.0,
+            sort_score: 0.0,
         };
         let from_node_id = e.from.id();
         let to_node_id = e.to.id();
@@ -311,13 +350,14 @@ mod tests {
         store.insert(e.clone()).unwrap();
         store.commit().unwrap();
 
-        let query = HostBacklinksQuery::new(from_node_id);
+        let query = HostBacklinksQuery::new(to_node_id);
         let edges = store.search(&query).unwrap();
 
         assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].from, from_node_id);
         assert_eq!(edges[0].to, to_node_id);
 
-        let query = HostBacklinksQuery::new(to_node_id);
+        let query = HostBacklinksQuery::new(from_node_id);
         let edges = store.search(&query).unwrap();
 
         assert_eq!(edges.len(), 0);
@@ -338,8 +378,8 @@ mod tests {
 
         let a_centrality = 1.0;
         let b_centrality = 2.0;
-        let c_centrality = 3.0;
-        let d_centrality = 4.0;
+        let c_centrality = 4.0;
+        let d_centrality = 3.0;
         let mut store =
             EdgeStore::open(&temp_dir.as_ref().join("test-segment"), ShardId::new(0)).unwrap();
 
@@ -348,7 +388,7 @@ mod tests {
             to: a.clone(),
             label: "test".to_string(),
             rel_flags: RelFlags::default(),
-            combined_centrality: a_centrality + b_centrality,
+            sort_score: a_centrality + b_centrality,
         };
 
         let e2 = Edge {
@@ -356,7 +396,7 @@ mod tests {
             to: a.clone(),
             label: "2".to_string(),
             rel_flags: RelFlags::default(),
-            combined_centrality: a_centrality + c_centrality,
+            sort_score: a_centrality + c_centrality,
         };
 
         let e3 = Edge {
@@ -364,12 +404,14 @@ mod tests {
             to: a.clone(),
             label: "3".to_string(),
             rel_flags: RelFlags::default(),
-            combined_centrality: a_centrality + d_centrality,
+            sort_score: a_centrality + d_centrality,
         };
 
         store.insert(e1.clone()).unwrap();
         store.insert(e2.clone()).unwrap();
         store.insert(e3.clone()).unwrap();
+
+        store.commit().unwrap();
 
         let query = HostBacklinksQuery::new(a.id());
         let edges = store.search(&query).unwrap();

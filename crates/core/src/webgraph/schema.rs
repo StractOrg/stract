@@ -16,7 +16,10 @@
 
 use enum_dispatch::enum_dispatch;
 use strum::{EnumDiscriminants, VariantArray};
+use tantivy::schema::FieldType;
+use tantivy::schema::NumericOptions;
 use tantivy::schema::OwnedValue;
+use tantivy::schema::TextOptions;
 use tantivy::schema::Value;
 
 use crate::enum_dispatch_from_discriminant;
@@ -25,13 +28,27 @@ use crate::Result;
 use super::document::{Edge, ReferenceValue};
 use super::Node;
 
+pub fn create_schema() -> tantivy::schema::Schema {
+    let mut schema_builder = tantivy::schema::Schema::builder();
+
+    for field in FieldEnum::iter() {
+        schema_builder.add_field(tantivy::schema::FieldEntry::new(
+            field.name().to_string(),
+            field.field_type(),
+        ));
+    }
+
+    schema_builder.build()
+}
+
 #[enum_dispatch]
 pub trait Field:
     Into<FieldEnum> + Clone + Copy + std::fmt::Debug + bincode::Encode + bincode::Decode
 {
     fn name(&self) -> &'static str;
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a>;
-    fn set_value<'a>(&self, edge: &'a mut Edge, value: OwnedValue) -> Result<()>;
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()>;
+    fn field_type(&self) -> tantivy::schema::FieldType;
 }
 
 #[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
@@ -45,13 +62,17 @@ impl Field for FromUrl {
         ReferenceValue::Str(edge.from.as_str())
     }
 
-    fn set_value<'a>(&self, edge: &'a mut Edge, value: OwnedValue) -> Result<()> {
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
         let url = value
             .as_ref()
             .as_str()
             .ok_or(anyhow::anyhow!("Invalid URL"))?;
-        edge.from = Node::from_str(url);
+        edge.from = Node::from_str_not_validated(url);
         Ok(())
+    }
+
+    fn field_type(&self) -> FieldType {
+        FieldType::Str(TextOptions::default().set_stored())
     }
 }
 
@@ -66,13 +87,17 @@ impl Field for ToUrl {
         ReferenceValue::Str(edge.to.as_str())
     }
 
-    fn set_value<'a>(&self, edge: &'a mut Edge, value: OwnedValue) -> Result<()> {
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
         let url = value
             .as_ref()
             .as_str()
             .ok_or(anyhow::anyhow!("Invalid URL"))?;
-        edge.to = Node::from_str(url);
+        edge.to = Node::from_str_not_validated(url);
         Ok(())
+    }
+
+    fn field_type(&self) -> FieldType {
+        FieldType::Str(TextOptions::default().set_stored())
     }
 }
 
@@ -87,8 +112,17 @@ impl Field for FromId {
         ReferenceValue::U64(edge.from.id().as_u64())
     }
 
-    fn set_value<'a>(&self, _: &'a mut Edge, _: OwnedValue) -> Result<()> {
+    fn set_value(&self, _: &mut Edge, _: OwnedValue) -> Result<()> {
         Ok(())
+    }
+
+    fn field_type(&self) -> FieldType {
+        FieldType::U64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
     }
 }
 
@@ -103,8 +137,17 @@ impl Field for ToId {
         ReferenceValue::U64(edge.to.id().as_u64())
     }
 
-    fn set_value<'a>(&self, _: &'a mut Edge, _: OwnedValue) -> Result<()> {
+    fn set_value(&self, _: &mut Edge, _: OwnedValue) -> Result<()> {
         Ok(())
+    }
+
+    fn field_type(&self) -> FieldType {
+        FieldType::U64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
     }
 }
 
@@ -119,8 +162,17 @@ impl Field for FromHostId {
         ReferenceValue::U64(edge.from.clone().into_host().id().as_u64())
     }
 
-    fn set_value<'a>(&self, _: &'a mut Edge, _: OwnedValue) -> Result<()> {
+    fn set_value(&self, _: &mut Edge, _: OwnedValue) -> Result<()> {
         Ok(())
+    }
+
+    fn field_type(&self) -> FieldType {
+        FieldType::U64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
     }
 }
 
@@ -135,8 +187,17 @@ impl Field for ToHostId {
         ReferenceValue::U64(edge.to.clone().into_host().id().as_u64())
     }
 
-    fn set_value<'a>(&self, _: &'a mut Edge, _: OwnedValue) -> Result<()> {
+    fn set_value(&self, _: &mut Edge, _: OwnedValue) -> Result<()> {
         Ok(())
+    }
+
+    fn field_type(&self) -> FieldType {
+        FieldType::U64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
     }
 }
 
@@ -151,8 +212,17 @@ impl Field for RelFlags {
         ReferenceValue::U64(edge.rel_flags.as_u64())
     }
 
-    fn set_value<'a>(&self, _: &'a mut Edge, _: OwnedValue) -> Result<()> {
+    fn set_value(&self, _: &mut Edge, _: OwnedValue) -> Result<()> {
         Ok(())
+    }
+
+    fn field_type(&self) -> FieldType {
+        FieldType::U64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
     }
 }
 
@@ -167,7 +237,7 @@ impl Field for Label {
         ReferenceValue::Str(edge.label.as_str())
     }
 
-    fn set_value<'a>(&self, edge: &'a mut Edge, value: OwnedValue) -> Result<()> {
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
         edge.label = value
             .as_ref()
             .as_str()
@@ -175,27 +245,40 @@ impl Field for Label {
             .to_string();
         Ok(())
     }
+
+    fn field_type(&self) -> FieldType {
+        FieldType::Str(TextOptions::default().set_stored())
+    }
 }
 
 #[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
-pub struct CombinedCentrality;
-impl Field for CombinedCentrality {
+pub struct SortScore;
+impl Field for SortScore {
     fn name(&self) -> &'static str {
-        "combined_centrality"
+        "sort_score"
     }
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
-        ReferenceValue::F64(edge.combined_centrality)
+        ReferenceValue::F64(edge.sort_score)
     }
 
-    fn set_value<'a>(&self, edge: &'a mut Edge, value: OwnedValue) -> Result<()> {
-        let centrality = value
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
+        let sort_score = value
             .as_ref()
             .as_f64()
-            .ok_or(anyhow::anyhow!("Invalid centrality"))?;
-        edge.combined_centrality = centrality;
+            .ok_or(anyhow::anyhow!("Invalid sort score"))?;
+        edge.sort_score = sort_score;
 
         Ok(())
+    }
+
+    fn field_type(&self) -> FieldType {
+        FieldType::F64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
     }
 }
 
@@ -211,7 +294,7 @@ pub enum FieldEnum {
     ToHostId,
     RelFlags,
     Label,
-    CombinedCentrality,
+    SortScore,
 }
 
 impl FieldEnum {
@@ -233,5 +316,5 @@ enum_dispatch_from_discriminant!(FieldEnumDiscriminants => FieldEnum,
   ToHostId,
   RelFlags,
   Label,
-  CombinedCentrality,
+  SortScore,
 ]);

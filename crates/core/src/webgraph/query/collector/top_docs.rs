@@ -55,6 +55,12 @@ impl<S: DocumentScorer> From<EdgeLimit> for TopDocsCollector<S> {
     }
 }
 
+impl<S: DocumentScorer> Default for TopDocsCollector<S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<S: DocumentScorer> TopDocsCollector<S> {
     pub fn new() -> Self {
         Self {

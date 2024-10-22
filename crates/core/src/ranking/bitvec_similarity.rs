@@ -306,7 +306,7 @@ mod tests {
                 to: b.clone(),
                 rel_flags: RelFlags::NOFOLLOW,
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
 
@@ -316,7 +316,7 @@ mod tests {
                 to: c.clone(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
 

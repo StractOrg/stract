@@ -290,6 +290,8 @@ impl SignalComputer {
 
         if let Some(query) = &self.query_data {
             if !query.simple_terms.is_empty() {
+                let mut bm25f_weight_cache = super::bm25f::WeightCache::new();
+
                 for signal in CoreSignalEnum::all() {
                     if let Some((text_field, tv_field)) = signal
                         .as_textfield()
@@ -308,13 +310,18 @@ impl SignalComputer {
                         .collect::<String>();
 
                         let mut terms = Vec::new();
+                        let mut bm25f_terms = Vec::new();
                         let mut tokenizer = text_field.query_tokenizer(query.lang.as_ref());
                         let mut stream = tokenizer.token_stream(&simple_query);
                         let mut it = tantivy::tokenizer::TokenStream::iter(&mut stream);
 
                         while let Some(token) = it.next() {
                             let term = tantivy::Term::from_field_text(tv_field, &token.text);
-                            terms.push(term);
+                            terms.push(term.clone());
+                            bm25f_terms.push(super::bm25f::PreparedTerm::new(
+                                term,
+                                bm25f_weight_cache.get(&token.text, tv_searcher),
+                            ));
                         }
 
                         if terms.is_empty() {
@@ -341,7 +348,7 @@ impl SignalComputer {
                         )?;
                         let bm25f = MultiBm25FWeight::for_terms(
                             tv_searcher,
-                            &terms,
+                            &bm25f_terms,
                             text_field.bm25_constants(),
                         );
 

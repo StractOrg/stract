@@ -104,7 +104,7 @@ fn build_graphs_if_not_exist(warc_path: &str, graph_path: &str) -> anyhow::Resul
                         to: destination,
                         rel_flags: link.rel,
                         label: link.text,
-                        combined_centrality: 0.0,
+                        sort_score: 0.0,
                     })?;
                 } else {
                     b.insert(Edge {
@@ -112,7 +112,7 @@ fn build_graphs_if_not_exist(warc_path: &str, graph_path: &str) -> anyhow::Resul
                         to: destination,
                         rel_flags: link.rel,
                         label: link.text,
-                        combined_centrality: 0.0,
+                        sort_score: 0.0,
                     })?;
                 }
             }

@@ -95,8 +95,10 @@ impl ShortestPaths for Webgraph {
         dijkstra_multi(
             &[source],
             |node| {
-                self.search(&query::ForwardlinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
-                    .unwrap_or_default()
+                self.search(
+                    &query::HostForwardlinksQuery::new(node).with_limit(EdgeLimit::Unlimited),
+                )
+                .unwrap_or_default()
             },
             |edge| edge.to,
             Some(max_dist),
@@ -107,8 +109,10 @@ impl ShortestPaths for Webgraph {
         dijkstra_multi(
             &[source],
             |node| {
-                self.search(&query::ForwardlinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
-                    .unwrap_or_default()
+                self.search(
+                    &query::HostForwardlinksQuery::new(node).with_limit(EdgeLimit::Unlimited),
+                )
+                .unwrap_or_default()
             },
             |edge| edge.to,
             None,
@@ -119,7 +123,7 @@ impl ShortestPaths for Webgraph {
         dijkstra_multi(
             &[source],
             |node| {
-                self.search(&query::BacklinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
+                self.search(&query::HostBacklinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
                     .unwrap_or_default()
             },
             |edge| edge.from,
@@ -135,7 +139,7 @@ impl ShortestPaths for Webgraph {
         dijkstra_multi(
             &[source],
             |node| {
-                self.search(&query::BacklinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
+                self.search(&query::HostBacklinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
                     .unwrap_or_default()
             },
             |edge| edge.from,

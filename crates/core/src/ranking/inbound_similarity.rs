@@ -175,7 +175,7 @@ mod tests {
                 to: Node::from("b.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -184,7 +184,7 @@ mod tests {
                 to: Node::from("d.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -193,7 +193,7 @@ mod tests {
                 to: Node::from("e.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
 
@@ -203,7 +203,7 @@ mod tests {
                 to: Node::from("a.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -212,7 +212,7 @@ mod tests {
                 to: Node::from("b.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -221,7 +221,7 @@ mod tests {
                 to: Node::from("c.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -230,7 +230,7 @@ mod tests {
                 to: Node::from("d.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -239,7 +239,7 @@ mod tests {
                 to: Node::from("d.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -248,7 +248,7 @@ mod tests {
                 to: Node::from("e.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
 
@@ -273,7 +273,7 @@ mod tests {
                 to: Node::from("a.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -282,7 +282,7 @@ mod tests {
                 to: Node::from("d.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -291,7 +291,7 @@ mod tests {
                 to: Node::from("e.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -300,7 +300,7 @@ mod tests {
                 to: Node::from("b.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
 

@@ -18,8 +18,6 @@ use tantivy::index::SegmentId;
 use tantivy::indexer::{MergeOperation, SegmentEntry};
 use tantivy::merge_policy::NoMergePolicy;
 
-use tantivy::{IndexWriter, SegmentMeta};
-
 use crate::numericalfield_reader::NumericalFieldReader;
 
 use crate::webpage::Webpage;

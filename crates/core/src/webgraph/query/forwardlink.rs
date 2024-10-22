@@ -145,10 +145,10 @@ impl Query for HostForwardlinksQuery {
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
         match self.limit {
-            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(self.node, FromHostId)),
+            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(self.node, FromHostId, ToHostId)),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
                 Box::new(ShortCircuitQuery::new(
-                    Box::new(HostLinksQuery::new(self.node, FromHostId)),
+                    Box::new(HostLinksQuery::new(self.node, FromHostId, ToHostId)),
                     limit as u64,
                 ))
             }
@@ -268,7 +268,7 @@ impl Query for FullForwardlinksQuery {
     ) -> Result<Self::IntermediateOutput> {
         let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
         let edges = fetch_edges(searcher, docs)?;
-        Ok(scores.into_iter().zip_eq(edges.into_iter()).collect())
+        Ok(scores.into_iter().zip_eq(edges).collect())
     }
 
     fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
@@ -311,12 +311,14 @@ impl Query for FullHostForwardlinksQuery {
             EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(
                 self.node.clone().into_host().id(),
                 FromHostId,
+                ToHostId,
             )),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
                 Box::new(ShortCircuitQuery::new(
                     Box::new(HostLinksQuery::new(
                         self.node.clone().into_host().id(),
                         FromHostId,
+                        ToHostId,
                     )),
                     limit as u64,
                 ))
@@ -352,7 +354,7 @@ impl Query for FullHostForwardlinksQuery {
     ) -> Result<Self::IntermediateOutput> {
         let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
         let edges = fetch_edges(searcher, docs)?;
-        Ok(scores.into_iter().zip_eq(edges.into_iter()).collect())
+        Ok(scores.into_iter().zip_eq(edges).collect())
     }
 
     fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {

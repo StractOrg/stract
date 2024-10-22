@@ -95,7 +95,7 @@ where
         &self,
         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
     ) -> tantivy::Result<Self::Fruit> {
-        T::merge_fruits(&self.0, segment_fruits)
+        T::merge_fruits(self.0, segment_fruits)
             .map_err(|e| tantivy::TantivyError::InternalError(e.to_string()))
     }
 

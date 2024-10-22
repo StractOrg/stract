@@ -56,7 +56,7 @@ pub struct Edge {
     pub to: Node,
     pub rel_flags: RelFlags,
     pub label: String,
-    pub combined_centrality: f64,
+    pub sort_score: f64,
 }
 
 impl Edge {
@@ -66,7 +66,7 @@ impl Edge {
             to: Node::empty(),
             rel_flags: RelFlags::default(),
             label: String::default(),
-            combined_centrality: 0.0,
+            sort_score: 0.0,
         }
     }
 }
@@ -147,7 +147,7 @@ impl<'a> tantivy::schema::Value<'a> for ReferenceValue<'a> {
     fn as_value(&self) -> tantivy::schema::document::ReferenceValue<'a, Self> {
         match self {
             ReferenceValue::Str(s) => tantivy::schema::document::ReferenceValue::Leaf(
-                tantivy::schema::document::ReferenceValueLeaf::Str(*s),
+                tantivy::schema::document::ReferenceValueLeaf::Str(s),
             ),
             ReferenceValue::U64(u) => tantivy::schema::document::ReferenceValue::Leaf(
                 tantivy::schema::document::ReferenceValueLeaf::U64(*u),

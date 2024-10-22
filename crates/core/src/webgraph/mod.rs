@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::io::Write;
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::{fs, io};
 
 use crate::ampc::dht::ShardId;
 use crate::Result;
@@ -103,6 +102,9 @@ impl Webgraph {
     }
 
     pub fn insert(&mut self, edge: Edge) -> Result<()> {
+        let mut edge = edge;
+        edge.label = edge.label.chars().take(MAX_LABEL_LENGTH).collect();
+
         self.store.insert(edge)?;
         Ok(())
     }
@@ -141,7 +143,12 @@ impl Webgraph {
         self.store.retrieve(query, fruit)
     }
 
-    pub fn search<Q: Query>(&self, query: &Q) -> Result<Q::Output> {
+    pub fn search<Q>(&self, query: &Q) -> Result<Q::Output>
+    where
+        Q: Query,
+        <<Q::Collector as Collector>::Child as tantivy::collector::SegmentCollector>::Fruit:
+            From<<Q::Collector as Collector>::Fruit>,
+    {
         self.store.search(query)
     }
 

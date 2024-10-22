@@ -34,14 +34,11 @@ use crate::webgraph::query::ForwardlinksQuery;
 use crate::webgraph::query::FullBacklinksQuery;
 use crate::webgraph::query::FullForwardlinksQuery;
 use crate::webgraph::query::FullHostBacklinksQuery;
+use crate::webgraph::query::FullHostForwardlinksQuery;
 use crate::webgraph::query::HostBacklinksQuery;
+use crate::webgraph::query::HostForwardlinksQuery;
 use crate::webgraph::query::Id2NodeQuery;
-use crate::webgraph::Edge;
-use crate::webgraph::EdgeLimit;
-use crate::webgraph::Node;
 use crate::webgraph::NodeID;
-use crate::webgraph::SmallEdge;
-use crate::webgraph::SmallEdgeWithLabel;
 use crate::webgraph::Webgraph;
 use crate::webgraph::WebgraphBuilder;
 use crate::Result;
@@ -144,7 +141,9 @@ impl_search!([
     BacklinksWithLabelsQuery,
     Id2NodeQuery,
     ForwardlinksQuery,
+    HostForwardlinksQuery,
     FullForwardlinksQuery,
+    FullHostForwardlinksQuery,
 ]);
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
@@ -175,7 +174,6 @@ pub async fn run(config: config::WebgraphServerConfig) -> Result<()> {
         Cluster::join(
             Member::new(Service::Webgraph {
                 host: addr,
-                granularity: config.granularity,
                 shard: config.shard,
             }),
             config.gossip_addr,

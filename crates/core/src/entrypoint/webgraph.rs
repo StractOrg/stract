@@ -137,7 +137,7 @@ impl WebgraphWorker {
                             to: destination,
                             rel_flags: link.rel,
                             label: link.text,
-                            combined_centrality: source_centrality + destination_centrality,
+                            sort_score: source_centrality + destination_centrality,
                         })
                         .unwrap();
                 }

@@ -537,7 +537,6 @@ pub struct WebgraphServerConfig {
     pub host: SocketAddr,
     pub shard: ShardId,
     pub graph_path: String,
-    pub granularity: WebgraphGranularity,
 
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,

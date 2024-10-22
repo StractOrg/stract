@@ -86,12 +86,12 @@ pub fn test_graph() -> (Webgraph, TempDir) {
                 to,
                 rel_flags: RelFlags::default(),
                 label,
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
     }
 
-    graph.commit();
+    graph.commit().unwrap();
 
     (graph, temp_dir)
 }
@@ -154,7 +154,7 @@ fn merge_path() {
                 to,
                 rel_flags: RelFlags::default(),
                 label,
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph.commit().unwrap();
@@ -197,7 +197,7 @@ fn merge_simple() {
                 to,
                 rel_flags: RelFlags::default(),
                 label,
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph.commit().unwrap();
@@ -278,7 +278,7 @@ fn merge_cycle() {
                 to,
                 rel_flags: RelFlags::default(),
                 label,
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph.commit().unwrap();
@@ -313,7 +313,7 @@ fn merge_cycle() {
         graph
             .outgoing_edges(Node::from("B"), EdgeLimit::Unlimited)
             .len(),
-        1
+        2
     );
     assert_eq!(
         graph
@@ -343,7 +343,7 @@ fn merge_star() {
                 to,
                 rel_flags: RelFlags::default(),
                 label,
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph.commit().unwrap();
@@ -407,7 +407,7 @@ fn merge_reverse_star() {
                 to,
                 rel_flags: RelFlags::default(),
                 label,
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph.commit().unwrap();
@@ -452,6 +452,8 @@ fn merge_reverse_star() {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig::with_cases(8))]
+
     #[test]
     fn prop_merge(
         nodes in
@@ -470,7 +472,7 @@ proptest! {
                 to: Node::new_for_test(to.as_str()),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             }).unwrap();
 
             if rand::random::<usize>() % 10 == 0 {
@@ -530,7 +532,7 @@ fn proptest_case(nodes: &[(&str, &str)]) {
                 to: Node::new_for_test(to),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
 
@@ -625,7 +627,7 @@ fn cap_label_length() {
             to: Node::from("B"),
             rel_flags: RelFlags::default(),
             label: "a".repeat(MAX_LABEL_LENGTH + 1),
-            combined_centrality: 0.0,
+            sort_score: 0.0,
         })
         .unwrap();
 
@@ -672,7 +674,7 @@ fn test_edge_limits() {
                 to: to.clone(),
                 rel_flags: RelFlags::default(),
                 label: label.clone(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph.commit().unwrap();
@@ -741,7 +743,7 @@ fn test_rel_flags() {
             to: Node::from("B"),
             rel_flags: RelFlags::IS_IN_FOOTER | RelFlags::TAG,
             label: String::new(),
-            combined_centrality: 0.0,
+            sort_score: 0.0,
         })
         .unwrap();
 

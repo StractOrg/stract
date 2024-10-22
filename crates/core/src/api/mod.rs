@@ -33,7 +33,7 @@ use crate::{
     ranking::models::lambdamart::LambdaMART,
     searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher, SearchClient},
     similar_hosts::SimilarHostsFinder,
-    webgraph::remote::{Host, Page, RemoteWebgraph},
+    webgraph::remote::RemoteWebgraph,
 };
 
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
@@ -72,14 +72,13 @@ pub struct Counters {
 
 pub struct State {
     pub config: ApiConfig,
-    pub searcher: Arc<ApiSearcher<DistributedSearcher, LiveSearcher, Arc<RemoteWebgraph<Host>>>>,
-    pub page_webgraph: Arc<RemoteWebgraph<Page>>,
-    pub host_webgraph: Arc<RemoteWebgraph<Host>>,
+    pub searcher: Arc<ApiSearcher<DistributedSearcher, LiveSearcher, Arc<RemoteWebgraph>>>,
+    pub webgraph: Arc<RemoteWebgraph>,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
     pub improvement_queue: Option<Arc<Mutex<LeakyQueue<ImprovementEvent>>>>,
     pub _cluster: Arc<Cluster>,
-    pub similar_hosts: SimilarHostsFinder<Host>,
+    pub similar_hosts: SimilarHostsFinder,
 }
 
 pub async fn favicon() -> impl IntoResponse {
@@ -172,8 +171,7 @@ pub async fn router(
         None => Bangs::empty(),
     };
 
-    let host_webgraph = RemoteWebgraph::<Host>::new(cluster.clone()).await;
-    let page_webgraph = RemoteWebgraph::<Page>::new(cluster.clone()).await;
+    let webgraph = RemoteWebgraph::new(cluster.clone()).await;
 
     let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster)).await;
     let live_searcher = LiveSearcher::new(Arc::clone(&cluster));
@@ -228,21 +226,19 @@ pub async fn router(
                 .await;
         }
 
-        let host_webgraph = Arc::new(host_webgraph);
-        let page_webgraph = Arc::new(page_webgraph);
+        let webgraph = Arc::new(webgraph);
 
-        searcher = searcher.with_webgraph(Arc::clone(&host_webgraph));
+        searcher = searcher.with_webgraph(Arc::clone(&webgraph));
 
         let similar_hosts =
-            SimilarHostsFinder::new(Arc::clone(&host_webgraph), config.max_similar_hosts);
+            SimilarHostsFinder::new(Arc::clone(&webgraph), config.max_similar_hosts);
 
         Arc::new(State {
             config: config.clone(),
             searcher: Arc::new(searcher),
             autosuggest,
             counters,
-            host_webgraph,
-            page_webgraph,
+            webgraph,
             improvement_queue: query_store_queue,
             _cluster: cluster,
             similar_hosts,

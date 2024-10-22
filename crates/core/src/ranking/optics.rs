@@ -43,7 +43,7 @@ mod tests {
                 to: Node::from("https://www.nan.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -52,7 +52,7 @@ mod tests {
                 to: Node::from("https://www.first.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -61,7 +61,7 @@ mod tests {
                 to: Node::from("https://www.third.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -70,7 +70,7 @@ mod tests {
                 to: Node::from("https://www.second.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -79,7 +79,7 @@ mod tests {
                 to: Node::from("https://www.nan.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -88,7 +88,7 @@ mod tests {
                 to: Node::from("https://www.third.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -97,7 +97,7 @@ mod tests {
                 to: Node::from("https://www.first.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph
@@ -106,7 +106,7 @@ mod tests {
                 to: Node::from("https://www.extra.com").into_host(),
                 rel_flags: RelFlags::default(),
                 label: String::new(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             })
             .unwrap();
         graph.commit().unwrap();

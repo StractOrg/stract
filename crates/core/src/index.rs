@@ -19,8 +19,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use tantivy::tokenizer::TokenizerManager;
-
 use crate::collector::MainCollector;
 use crate::inverted_index::{self, InvertedIndex};
 use crate::query::Query;
@@ -63,10 +61,6 @@ impl Index {
 
     pub fn set_auto_merge_policy(&mut self) {
         self.inverted_index.set_auto_merge_policy();
-    }
-
-    pub fn tokenizers(&self) -> &TokenizerManager {
-        self.inverted_index.tokenizers()
     }
 
     #[cfg(test)]

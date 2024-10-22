@@ -196,10 +196,6 @@ impl InvertedIndex {
         self.snippet_config = config;
     }
 
-    pub fn tokenizers(&self) -> &TokenizerManager {
-        self.tantivy_index.tokenizers()
-    }
-
     pub fn schema(&self) -> Arc<Schema> {
         Arc::clone(&self.schema)
     }

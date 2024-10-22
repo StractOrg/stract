@@ -16,7 +16,7 @@
 
 use tantivy::{columnar::Column, DocId, Score, SegmentReader};
 
-use crate::webgraph::schema::{CombinedCentrality, Field};
+use crate::webgraph::schema::{Field, SortScore};
 
 pub trait DocumentScorer: Send + Sync + Sized {
     fn for_segment(segment: &SegmentReader) -> tantivy::Result<Self>;
@@ -29,7 +29,7 @@ pub struct DefaultDocumentScorer {
 
 impl DocumentScorer for DefaultDocumentScorer {
     fn for_segment(segment: &SegmentReader) -> tantivy::Result<Self> {
-        let column = segment.column_fields().f64(CombinedCentrality.name())?;
+        let column = segment.column_fields().f64(SortScore.name())?;
         Ok(Self { column })
     }
 

@@ -18,12 +18,10 @@ use std::sync::Arc;
 
 use futures::{stream::FuturesUnordered, StreamExt};
 use itertools::Itertools;
-use ring::rand::Random;
 use tokio::sync::Mutex;
 use url::Url;
 
 use crate::{
-    config,
     distributed::{
         cluster::Cluster,
         member::{Service, ShardId},
@@ -40,43 +38,12 @@ use crate::{
     Result,
 };
 
-use super::{
-    query::{
-        id2node::Id2NodeQuery, BacklinksQuery, BacklinksWithLabelsQuery, ForwardlinksQuery,
-        FullBacklinksQuery, FullForwardlinksQuery,
-    },
-    Edge, EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
-};
+use super::{query::BacklinksQuery, EdgeLimit, Node, NodeID};
 use crate::webgraph;
 
-struct WebgraphClientManager<G: WebgraphGranularity>(std::marker::PhantomData<G>);
+struct WebgraphClientManager;
 
-pub trait WebgraphGranularity: Clone {
-    fn granularity() -> config::WebgraphGranularity;
-}
-
-#[derive(Clone)]
-pub struct Page;
-
-impl WebgraphGranularity for Page {
-    fn granularity() -> config::WebgraphGranularity {
-        config::WebgraphGranularity::Page
-    }
-}
-
-#[derive(Clone)]
-pub struct Host;
-
-impl WebgraphGranularity for Host {
-    fn granularity() -> config::WebgraphGranularity {
-        config::WebgraphGranularity::Host
-    }
-}
-
-impl<G> sonic::replication::ReusableClientManager for WebgraphClientManager<G>
-where
-    G: WebgraphGranularity,
-{
+impl sonic::replication::ReusableClientManager for WebgraphClientManager {
     const CLIENT_REFRESH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 
     type Service = WebGraphService;
@@ -90,17 +57,8 @@ where
             .await
             .into_iter()
             .filter_map(|member| {
-                if let Service::Webgraph {
-                    host,
-                    shard,
-                    granularity,
-                } = member.service
-                {
-                    if granularity == G::granularity() {
-                        Some((shard, RemoteClient::<WebGraphService>::new(host)))
-                    } else {
-                        None
-                    }
+                if let Service::Webgraph { host, shard } = member.service {
+                    Some((shard, RemoteClient::<WebGraphService>::new(host)))
                 } else {
                     None
                 }
@@ -120,12 +78,12 @@ where
 }
 
 #[derive(Clone)]
-pub struct RemoteWebgraph<G: WebgraphGranularity> {
-    client: Arc<Mutex<sonic::replication::ReusableShardedClient<WebgraphClientManager<G>>>>,
+pub struct RemoteWebgraph {
+    client: Arc<Mutex<sonic::replication::ReusableShardedClient<WebgraphClientManager>>>,
     cluster: Arc<Cluster>,
 }
 
-impl<G: WebgraphGranularity> RemoteWebgraph<G> {
+impl RemoteWebgraph {
     pub async fn new(cluster: Arc<Cluster>) -> Self {
         Self {
             client: Arc::new(Mutex::new(
@@ -136,21 +94,9 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
     }
 
     pub async fn await_ready(&self) {
-        let granularity = G::granularity();
-        tracing::info!("waiting for {granularity} webgraph to come online...");
+        tracing::info!("waiting for webgraph to come online...");
         self.cluster
-            .await_member(|member| {
-                if let Service::Webgraph {
-                    host: _,
-                    shard: _,
-                    granularity: remote_granularity,
-                } = member.service
-                {
-                    granularity == remote_granularity
-                } else {
-                    false
-                }
-            })
+            .await_member(|member| matches!(member.service, Service::Webgraph { .. }))
             .await;
     }
 
@@ -280,19 +226,29 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
 
         let mut fruits = Vec::with_capacity(queries.len());
 
-        for (query, (_, shard_results)) in queries.iter().zip(res.into_iter()) {
-            let merged_fruit = query.remote_collector().merge_fruits(
-                shard_results
-                    .into_iter()
-                    .flat_map(|(_, reps)| reps)
-                    .filter_map(|res| Result::<_, webgraph_server::EncodedError>::from(res).ok())
-                    .collect(),
-            )?;
-
-            fruits.push(merged_fruit);
+        for _ in 0..queries.len() {
+            fruits.push(Vec::new());
         }
 
-        Ok(fruits)
+        for (_, replica_results) in res.into_iter() {
+            debug_assert_eq!(replica_results.len(), 1);
+
+            for (_, shard_results) in replica_results.into_iter() {
+                for (i, shard_result) in shard_results.into_iter().enumerate() {
+                    if let Ok(shard_result) =
+                        Result::<_, webgraph_server::EncodedError>::from(shard_result)
+                    {
+                        fruits[i].push(shard_result);
+                    }
+                }
+            }
+        }
+
+        queries
+            .iter()
+            .zip_eq(fruits.into_iter())
+            .map(|(query, shard_fruits)| query.remote_collector().merge_fruits(shard_fruits))
+            .collect::<Result<Vec<_>, _>>()
     }
 
     pub async fn batch_retrieve<Q>(
@@ -338,6 +294,8 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
 
         while let Some(shard_res) = results.next().await {
             for (_, shard_res) in shard_res? {
+                assert_eq!(shard_res.len(), queries.len());
+
                 for (i, query_res) in shard_res.into_iter().enumerate() {
                     res[i].push(
                         <Result<Q::IntermediateOutput, webgraph_server::EncodedError>>::from(
@@ -383,98 +341,15 @@ impl<G: WebgraphGranularity> RemoteWebgraph<G> {
         let url = Url::parse(&("http://".to_string() + host.as_str()))?;
         let node = Node::from(url).into_host();
         let id = node.id();
-        let edges = self.raw_ingoing_edges(id, EdgeLimit::Limit(1)).await?;
+        let edges = self
+            .search(BacklinksQuery::new(id).with_limit(EdgeLimit::Limit(1)))
+            .await?;
 
         if !edges.is_empty() {
             Ok(Some(node))
         } else {
             Ok(None)
         }
-    }
-
-    pub async fn get_page_node(&self, id: NodeID) -> Result<Option<Node>> {
-        self.search(Id2NodeQuery::Page(id)).await
-    }
-
-    pub async fn batch_get_page_node(&self, ids: &[NodeID]) -> Result<Vec<Option<Node>>> {
-        self.batch_search(ids.iter().map(|id| Id2NodeQuery::Page(*id)).collect())
-            .await
-    }
-
-    pub async fn get_host_node(&self, id: NodeID) -> Result<Option<Node>> {
-        self.search(Id2NodeQuery::Host(id)).await
-    }
-
-    pub async fn batch_get_host_node(&self, ids: &[NodeID]) -> Result<Vec<Option<Node>>> {
-        self.batch_search(ids.iter().map(|id| Id2NodeQuery::Host(*id)).collect())
-            .await
-    }
-
-    pub async fn ingoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<Edge>> {
-        self.search(FullBacklinksQuery::new(node).with_limit(limit))
-            .await
-    }
-
-    pub async fn raw_ingoing_edges(&self, id: NodeID, limit: EdgeLimit) -> Result<Vec<SmallEdge>> {
-        self.search(BacklinksQuery::new(id).with_limit(limit)).await
-    }
-
-    pub async fn raw_ingoing_edges_with_labels(
-        &self,
-        id: NodeID,
-        limit: EdgeLimit,
-    ) -> Result<Vec<SmallEdgeWithLabel>> {
-        self.search(BacklinksWithLabelsQuery::new(id).with_limit(limit))
-            .await
-    }
-
-    pub async fn batch_raw_ingoing_edges_with_labels(
-        &self,
-        ids: &[NodeID],
-        limit: EdgeLimit,
-    ) -> Result<Vec<Vec<SmallEdgeWithLabel>>> {
-        self.batch_search(
-            ids.iter()
-                .map(|id| BacklinksWithLabelsQuery::new(*id).with_limit(limit))
-                .collect(),
-        )
-        .await
-    }
-
-    pub async fn batch_raw_ingoing_edges(
-        &self,
-        ids: &[NodeID],
-        limit: EdgeLimit,
-    ) -> Result<Vec<Vec<SmallEdge>>> {
-        self.batch_search(
-            ids.iter()
-                .map(|id| BacklinksQuery::new(*id).with_limit(limit))
-                .collect(),
-        )
-        .await
-    }
-
-    pub async fn outgoing_edges(&self, node: Node, limit: EdgeLimit) -> Result<Vec<Edge>> {
-        self.search(FullForwardlinksQuery::new(node).with_limit(limit))
-            .await
-    }
-
-    pub async fn raw_outgoing_edges(&self, id: NodeID, limit: EdgeLimit) -> Result<Vec<SmallEdge>> {
-        self.search(ForwardlinksQuery::new(id).with_limit(limit))
-            .await
-    }
-
-    pub async fn batch_raw_outgoing_edges(
-        &self,
-        ids: &[NodeID],
-        limit: EdgeLimit,
-    ) -> Result<Vec<Vec<SmallEdge>>> {
-        self.batch_search(
-            ids.iter()
-                .map(|id| ForwardlinksQuery::new(*id).with_limit(limit))
-                .collect(),
-        )
-        .await
     }
 
     pub async fn stream_page_node_ids(&self) -> impl futures::Stream<Item = NodeID> {

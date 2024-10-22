@@ -28,7 +28,8 @@ use crate::{
             approx_harmonic::ApproxHarmonic, harmonic::HarmonicCentrality, store_csv,
             store_harmonic, TopNodes,
         },
-        remote::{Page, RemoteWebgraph},
+        query::{BacklinksQuery, Id2NodeQuery},
+        remote::RemoteWebgraph,
         EdgeLimit, NodeID, WebgraphBuilder,
     },
     SortableFloat,
@@ -130,7 +131,8 @@ impl Centrality {
             )
             .await?,
         );
-        let graph: RemoteWebgraph<Page> = RemoteWebgraph::new(cluster).await;
+        let graph: RemoteWebgraph = RemoteWebgraph::new(cluster).await;
+        graph.await_ready().await;
 
         let mut harmonic: speedy_kv::Db<NodeID, f64> =
             speedy_kv::Db::open_or_create(config.output_path.join("harmonic"))?;
@@ -146,7 +148,7 @@ impl Centrality {
                 }
                 None => {
                     if let Some(seed) = graph
-                        .raw_ingoing_edges(node_id, EdgeLimit::Limit(1))
+                        .search(BacklinksQuery::new(node_id).with_limit(EdgeLimit::Limit(1)))
                         .await?
                         .pop()
                         .map(|edge| edge.from)
@@ -182,7 +184,9 @@ impl Centrality {
         {
             let (ids, centrality): (Vec<_>, Vec<_>) = chunk.into_iter().unzip();
 
-            let nodes = graph.batch_get_page_node(&ids).await?;
+            let nodes = graph
+                .batch_search(ids.into_iter().map(Id2NodeQuery::Page).collect())
+                .await?;
 
             for (node, centrality) in nodes.into_iter().zip(centrality) {
                 if let Some(node) = node {

@@ -16,8 +16,6 @@
 
 use std::net::SocketAddr;
 
-use crate::config::WebgraphGranularity;
-
 #[derive(
     serde::Serialize,
     serde::Deserialize,
@@ -117,7 +115,6 @@ pub enum Service {
     Webgraph {
         host: SocketAddr,
         shard: ShardId,
-        granularity: WebgraphGranularity,
     },
     Dht {
         host: SocketAddr,
@@ -148,12 +145,8 @@ impl std::fmt::Display for Service {
                 write!(f, "LiveIndex {} {} {}", host, shard, state)
             }
             Self::Api { host } => write!(f, "Api {}", host),
-            Self::Webgraph {
-                host,
-                shard,
-                granularity,
-            } => {
-                write!(f, "Webgraph {} {} {}", host, shard, granularity)
+            Self::Webgraph { host, shard } => {
+                write!(f, "Webgraph {} {}", host, shard)
             }
             Self::Dht { host, shard } => write!(f, "Dht {} {}", host, shard),
             Self::HarmonicWorker { host, shard } => write!(f, "HarmonicWorker {} {}", host, shard),

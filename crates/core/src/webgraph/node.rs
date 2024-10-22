@@ -133,7 +133,7 @@ impl Node {
     }
 
     /// Dangerous! No validation is done on the input string.
-    pub fn from_str(name: &str) -> Self {
+    pub fn from_str_not_validated(name: &str) -> Self {
         Self {
             name: name.to_string(),
         }
@@ -220,5 +220,5 @@ pub fn normalize_url(url: &Url) -> String {
         normalized = prefix.to_string();
     }
 
-    normalized
+    normalized.to_lowercase()
 }

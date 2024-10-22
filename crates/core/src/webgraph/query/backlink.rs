@@ -194,10 +194,10 @@ impl Query for HostBacklinksQuery {
 
     fn tantivy_query(&self) -> Self::TantivyQuery {
         match self.limit {
-            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(self.node, ToHostId)),
+            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(self.node, ToHostId, FromHostId)),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
                 Box::new(ShortCircuitQuery::new(
-                    Box::new(HostLinksQuery::new(self.node, ToHostId)),
+                    Box::new(HostLinksQuery::new(self.node, ToHostId, FromHostId)),
                     limit as u64,
                 ))
             }
@@ -306,7 +306,7 @@ impl Query for FullBacklinksQuery {
     ) -> Result<Self::IntermediateOutput> {
         let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
         let edges = fetch_edges(searcher, docs)?;
-        Ok(scores.into_iter().zip_eq(edges.into_iter()).collect())
+        Ok(scores.into_iter().zip_eq(edges).collect())
     }
 
     fn filter_fruit_shards(
@@ -360,12 +360,14 @@ impl Query for FullHostBacklinksQuery {
             EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(
                 self.node.clone().into_host().id(),
                 ToHostId,
+                FromHostId,
             )),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
                 Box::new(ShortCircuitQuery::new(
                     Box::new(HostLinksQuery::new(
                         self.node.clone().into_host().id(),
                         ToHostId,
+                        FromHostId,
                     )),
                     limit as u64,
                 ))
@@ -390,7 +392,7 @@ impl Query for FullHostBacklinksQuery {
     ) -> Result<Self::IntermediateOutput> {
         let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
         let edges = fetch_edges(searcher, docs)?;
-        Ok(scores.into_iter().zip_eq(edges.into_iter()).collect())
+        Ok(scores.into_iter().zip_eq(edges).collect())
     }
 
     fn filter_fruit_shards(
@@ -467,7 +469,6 @@ impl Query for BacklinksWithLabelsQuery {
                 rel_flags: e.rel_flags,
                 label: e.label,
             }))
-            .into_iter()
             .collect())
     }
 

@@ -112,7 +112,7 @@ mod tests {
                 to: to.clone(),
                 label: label.clone(),
                 rel_flags: RelFlags::default(),
-                combined_centrality: 0.0,
+                sort_score: 0.0,
             };
             combined.insert(e.clone()).unwrap();
 

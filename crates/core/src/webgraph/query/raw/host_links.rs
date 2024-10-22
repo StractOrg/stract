@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::{columnar::Column, postings::SegmentPostings};
+use tantivy::{columnar::Column, postings::SegmentPostings, DocSet};
 
 use crate::webgraph::{
     schema::{Field, FieldEnum},
@@ -25,13 +25,19 @@ use crate::webgraph::{
 pub struct HostLinksQuery {
     node: NodeID,
     field: FieldEnum,
+    deduplication_field: FieldEnum,
 }
 
 impl HostLinksQuery {
-    pub fn new<F: Field>(node: NodeID, field: F) -> Self {
+    pub fn new<F: Field, FDedup: Field>(
+        node: NodeID,
+        lookup_field: F,
+        deduplication_field: FDedup,
+    ) -> Self {
         Self {
             node,
-            field: field.into(),
+            field: lookup_field.into(),
+            deduplication_field: deduplication_field.into(),
         }
     }
 }
@@ -44,6 +50,7 @@ impl tantivy::query::Query for HostLinksQuery {
         Ok(Box::new(HostLinksWeight {
             node: self.node,
             field: self.field,
+            deduplication_field: self.deduplication_field,
         }))
     }
 }
@@ -51,6 +58,7 @@ impl tantivy::query::Query for HostLinksQuery {
 struct HostLinksWeight {
     node: NodeID,
     field: FieldEnum,
+    deduplication_field: FieldEnum,
 }
 
 impl tantivy::query::Weight for HostLinksWeight {
@@ -63,7 +71,7 @@ impl tantivy::query::Weight for HostLinksWeight {
         let field = schema.get_field(self.field.name())?;
         let term = tantivy::Term::from_field_u64(field, self.node.as_u64());
 
-        match HostLinksScorer::new(reader, term, self.field) {
+        match HostLinksScorer::new(reader, term, self.deduplication_field) {
             Ok(Some(scorer)) => Ok(Box::new(scorer)),
             _ => Ok(Box::new(tantivy::query::EmptyScorer)),
         }
@@ -88,22 +96,26 @@ impl HostLinksScorer {
     fn new(
         reader: &tantivy::SegmentReader,
         term: tantivy::Term,
-        field: FieldEnum,
+        deduplication_field: FieldEnum,
     ) -> tantivy::Result<Option<Self>> {
-        let host_id_column = reader.column_fields().u64(field.name())?;
+        let host_id_column = reader.column_fields().u64(deduplication_field.name())?;
+
         Ok(reader
             .inverted_index(term.field())?
             .read_postings(&term, tantivy::schema::IndexRecordOption::Basic)?
             .map(|postings| Self {
-                postings,
+                last_host_id: host_id_column.first(postings.doc()),
                 host_id_column,
-                last_host_id: None,
+                postings,
             }))
     }
 }
 
 impl HostLinksScorer {
     fn host_id(&self, doc: tantivy::DocId) -> Option<u64> {
+        if doc == tantivy::TERMINATED {
+            return None;
+        }
         self.host_id_column.first(doc)
     }
 }
@@ -115,6 +127,8 @@ impl tantivy::query::Scorer for HostLinksScorer {
 }
 impl tantivy::DocSet for HostLinksScorer {
     fn advance(&mut self) -> tantivy::DocId {
+        self.postings.advance();
+
         while self.last_host_id
             == self.host_id(
                 self.postings
@@ -122,12 +136,15 @@ impl tantivy::DocSet for HostLinksScorer {
                     .skip_reader()
                     .last_doc_in_block(),
             )
+            && self.doc() != tantivy::TERMINATED
         {
             self.postings.mut_block_cursor().advance();
             self.postings.reset_cursor_start_block();
         }
 
-        while self.host_id(self.postings.doc()) == self.last_host_id {
+        while self.host_id(self.postings.doc()) == self.last_host_id
+            && self.doc() != tantivy::TERMINATED
+        {
             self.postings.advance();
         }
 
