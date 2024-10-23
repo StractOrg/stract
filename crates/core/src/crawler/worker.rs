@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::anyhow;
 use hashbrown::HashSet;
+use itertools::Itertools;
 use rand::seq::SliceRandom;
 
 use std::{
@@ -222,10 +223,8 @@ impl<S: DatumStream> JobExecutor<S> {
             .filter(|(url, _)| !self.crawled_urls.contains(url))
             .filter(|(url, _)| self.job.domain == Domain::from(url))
             .filter(|(_, score)| score.is_finite())
+            .unique_by(|(url, _)| url.clone())
             .collect();
-
-        urls.sort_by(|(a, _), (b, _)| a.cmp(b));
-        urls.dedup_by(|(a, _), (b, _)| a == b);
 
         urls.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 
@@ -433,6 +432,7 @@ impl<S: DatumStream> JobExecutor<S> {
                     .all(|ext| !url.as_str().ends_with(ext))
             })
             .filter(|url| !self.crawled_urls.contains(url))
+            .unique()
             .collect()
     }
 
