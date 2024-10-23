@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 use crate::{
     canon_index::CanonicalIndex,
     config::{self, WarcSource, WebgraphConstructConfig},
@@ -176,8 +177,8 @@ impl Webgraph {
             None
         };
 
-        let host_centrality_rank_store = Arc::new(speedy_kv::Db::open_or_create(
-            &config.host_centrality_rank_store_path,
+        let host_centrality_store = Arc::new(speedy_kv::Db::open_or_create(
+            &config.host_centrality_store_path,
         )?);
 
         let num_workers = usize::from(std::thread::available_parallelism()?);
@@ -198,7 +199,7 @@ impl Webgraph {
 
             let mut worker = WebgraphWorker {
                 graph: webgraph::Webgraph::open(graph_path, config.shard)?,
-                host_centrality_store: Some(host_centrality_rank_store.clone()),
+                host_centrality_store: Some(host_centrality_store.clone()),
                 canonical_index: canonical_index.clone(),
             };
 
