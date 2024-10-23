@@ -23,7 +23,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::{
     intmap::IntMap,
-    webgraph::{EdgeLimit, Node, NodeID, Webgraph},
+    webgraph::{query, EdgeLimit, Node, NodeID, Webgraph},
 };
 
 fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32) {
@@ -31,7 +31,7 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
     let mut n = 0;
     let mut max_dist = 0;
 
-    let nodes: Vec<_> = graph.nodes().take(100_000).collect();
+    let nodes: Vec<_> = graph.host_nodes().into_iter().take(100_000).collect();
 
     let pb =
         if with_progress {
@@ -70,8 +70,11 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
 
         while let Some(v) = q.pop_front() {
             stack.push(v);
-            for edge in graph.raw_outgoing_edges(&v, EdgeLimit::Unlimited) {
-                let w = edge.to.node();
+            for edge in graph
+                .search(&query::ForwardlinksQuery::new(v).with_limit(EdgeLimit::Unlimited))
+                .unwrap_or_default()
+            {
+                let w = edge.to;
 
                 if !distances.contains_key(&w) {
                     let dist_v = distances.get(&v).unwrap();
@@ -128,7 +131,15 @@ fn calculate(graph: &Webgraph, with_progress: bool) -> (HashMap<Node, f64>, i32)
     (
         centrality
             .into_iter()
-            .map(|(id, centrality)| (graph.id2node(&id).unwrap(), centrality / norm))
+            .map(|(id, centrality)| {
+                (
+                    graph
+                        .search(&query::Id2NodeQuery::Host(id))
+                        .unwrap()
+                        .unwrap(),
+                    centrality / norm,
+                )
+            })
             .collect(),
         max_dist,
     )
@@ -166,29 +177,32 @@ mod tests {
     use file_store::temp::TempDir;
     use maplit::hashmap;
 
-    use crate::{webgraph::WebgraphWriter, webpage::html::links::RelFlags};
+    use crate::{
+        webgraph::{Edge, Webgraph},
+        webpage::html::links::RelFlags,
+    };
 
     use super::*;
 
     fn create_path_graph(n: usize) -> (Webgraph, TempDir) {
         let temp_dir = file_store::gen_temp_dir().unwrap();
-        let mut writer = WebgraphWriter::new(
-            temp_dir.as_ref().join("test-webgraph"),
-            crate::executor::Executor::single_thread(),
-            crate::webgraph::Compression::default(),
-            None,
-        );
+        let mut graph = Webgraph::builder(temp_dir.as_ref().join("test-webgraph"), 0u64.into())
+            .open()
+            .unwrap();
 
         for i in 0..n - 1 {
-            writer.insert(
-                Node::from(i.to_string()),
-                Node::from((i + 1).to_string()),
-                String::new(),
-                RelFlags::default(),
-            );
+            graph
+                .insert(Edge {
+                    from: Node::from(i.to_string()),
+                    to: Node::from((i + 1).to_string()),
+                    label: String::new(),
+                    rel_flags: RelFlags::default(),
+                    sort_score: 0.0,
+                })
+                .unwrap();
         }
+        graph.commit().unwrap();
 
-        let graph = writer.finalize();
         (graph, temp_dir)
     }
 

@@ -20,8 +20,11 @@ use std::{cmp, collections::BTreeMap};
 
 use super::{worker::ApproxCentralityWorker, ApproxCentralityJob, Mapper};
 use crate::{
-    ampc::dht::upsert, entrypoint::ampc::approximated_harmonic_centrality::DhtTable,
-    kahan_sum::KahanSum, webgraph, webpage::html::links::RelFlags,
+    ampc::dht::upsert,
+    entrypoint::ampc::approximated_harmonic_centrality::DhtTable,
+    kahan_sum::KahanSum,
+    webgraph::{self, EdgeLimit},
+    webpage::html::links::RelFlags,
 };
 use rayon::prelude::*;
 
@@ -70,20 +73,24 @@ impl Workers {
             for outgoing in self
                 .worker
                 .graph()
-                .raw_outgoing_edges(&node, webgraph::EdgeLimit::Limit(MAX_OUTGOING_EDGES))
+                .search(
+                    &webgraph::query::ForwardlinksQuery::new(node)
+                        .with_limit(EdgeLimit::Limit(MAX_OUTGOING_EDGES)),
+                )
+                .unwrap_or_default()
                 .into_iter()
-                .filter(|e| !e.rel_flags().intersects(*SKIPPED_REL))
+                .filter(|e| !e.rel_flags.intersects(*SKIPPED_REL))
                 .map(|e| e.to)
             {
                 let d = dist + 1;
 
-                let current_dist = distances.entry(outgoing.node()).or_insert(u8::MAX);
+                let current_dist = distances.entry(outgoing).or_insert(u8::MAX);
 
                 if d < *current_dist {
                     *current_dist = d;
 
                     if d < max_dist {
-                        queue.push(cmp::Reverse((d, outgoing.node())));
+                        queue.push(cmp::Reverse((d, outgoing)));
                     }
                 }
             }
@@ -111,8 +118,8 @@ impl Mapper for ApproxCentralityMapper {
 
         pool.install(|| match self {
             ApproxCentralityMapper::InitCentrality => {
-                let num_nodes = worker.graph().estimate_num_nodes();
-                let nodes = worker.graph().nodes().collect::<Vec<_>>();
+                let num_nodes = worker.graph().page_nodes().len();
+                let nodes: Vec<_> = worker.graph().page_nodes().into_iter().collect();
                 nodes
                     .par_chunks(BATCH_SIZE)
                     .progress_count(num_nodes as u64 / BATCH_SIZE as u64)
@@ -133,7 +140,7 @@ impl Mapper for ApproxCentralityMapper {
 
                 let sampled = worker
                     .graph()
-                    .random_nodes_with_outgoing(num_samples as usize);
+                    .random_page_nodes_with_outgoing(num_samples as usize);
 
                 let pb = indicatif::ProgressBar::new(sampled.len() as u64);
 

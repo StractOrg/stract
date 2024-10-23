@@ -135,7 +135,7 @@ mod tests {
         index::Index,
         models::dual_encoder::DualEncoder,
         searcher::{LocalSearcher, SearchQuery},
-        webgraph::{Edge, NodeDatum},
+        webgraph::{NodeID, SmallEdgeWithLabel},
         webpage::{Html, Webpage},
     };
 
@@ -438,11 +438,11 @@ mod tests {
             ..Default::default()
         };
 
-        webpage.set_backlinks(vec![Edge {
-            from: NodeDatum::new(0u64, 0),
-            to: NodeDatum::new(1u64, 1),
+        webpage.set_backlinks(vec![SmallEdgeWithLabel {
+            from: NodeID::from(0u64),
+            to: NodeID::from(1u64),
             label: "test this is the best test site".to_string(),
-            rel: Default::default(),
+            rel_flags: Default::default(),
         }]);
 
         index.insert(&webpage).expect("failed to insert webpage");

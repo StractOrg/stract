@@ -12,27 +12,15 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#[derive(Default, Debug, Clone, Copy, bincode::Encode, bincode::Decode)]
-pub enum Compression {
-    None,
-    #[default]
-    Lz4,
-}
+pub mod dummy;
+pub use dummy::DummyQuery;
 
-impl Compression {
-    pub fn compress(&self, bytes: &[u8]) -> Vec<u8> {
-        match self {
-            Compression::None => bytes.to_vec(),
-            Compression::Lz4 => lz4_flex::compress_prepend_size(bytes),
-        }
-    }
+pub mod host_links;
+pub mod id2node;
+pub mod links;
 
-    pub fn decompress(&self, bytes: &[u8]) -> Vec<u8> {
-        match self {
-            Compression::None => bytes.to_vec(),
-            Compression::Lz4 => lz4_flex::decompress_size_prepended(bytes).unwrap(),
-        }
-    }
-}
+pub use host_links::HostLinksQuery;
+pub use id2node::Id2NodeQuery;
+pub use links::LinksQuery;

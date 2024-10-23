@@ -10,6 +10,8 @@ use std::sync::LazyLock;
 pub use self::executor::Executor;
 pub use self::searcher::{Searcher, SearcherGeneration};
 
+pub use std::result;
+
 /// The meta file contains all the information about the list of segments and the schema
 /// of the index.
 pub static META_FILEPATH: LazyLock<&'static Path> = LazyLock::new(|| Path::new("meta.json"));

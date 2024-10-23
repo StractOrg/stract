@@ -27,13 +27,13 @@ use crate::backlink_grouper::BacklinkGrouper;
 use crate::config::{GossipConfig, IndexerConfig, IndexerDualEncoderConfig};
 use crate::distributed::cluster::Cluster;
 use crate::models::dual_encoder::DualEncoder as DualEncoderModel;
-use crate::webgraph::remote::{Page, RemoteWebgraph};
+use crate::webgraph::remote::RemoteWebgraph;
 use crate::Result;
 
 use crate::index::Index;
 use crate::rake::RakeModel;
 use crate::ranking::SignalComputer;
-use crate::webgraph::{self, Edge, EdgeLimit, Node, NodeID};
+use crate::webgraph::{self, EdgeLimit, Node, NodeID, SmallEdgeWithLabel};
 use crate::webpage::{safety_classifier, Html, Webpage};
 
 const MAX_BACKLINKS: EdgeLimit = EdgeLimit::Limit(1024);
@@ -83,7 +83,7 @@ struct DualEncoder {
 }
 
 pub(super) enum Webgraph {
-    Remote(RemoteWebgraph<Page>),
+    Remote(RemoteWebgraph),
     Local(webgraph::Webgraph),
 }
 
@@ -92,17 +92,30 @@ impl Webgraph {
         &self,
         ids: Vec<NodeID>,
         limit: EdgeLimit,
-    ) -> Vec<Vec<Edge<String>>> {
+    ) -> Vec<Vec<SmallEdgeWithLabel>> {
         let edges = match self {
             Self::Remote(webgraph) => webgraph
-                .batch_raw_ingoing_edges_with_labels(&ids, limit)
+                .batch_search(
+                    ids.into_iter()
+                        .map(|id| {
+                            webgraph::query::BacklinksWithLabelsQuery::new(id).with_limit(limit)
+                        })
+                        .collect(),
+                )
                 .await
                 .unwrap_or_default(),
             Self::Local(webgraph) => {
                 let mut res = Vec::new();
 
                 for id in ids {
-                    res.push(webgraph.raw_ingoing_edges_with_labels(&id, limit));
+                    res.push(
+                        webgraph
+                            .search(
+                                &webgraph::query::BacklinksWithLabelsQuery::new(id)
+                                    .with_limit(limit),
+                            )
+                            .unwrap_or_default(),
+                    );
                 }
 
                 res
@@ -148,9 +161,9 @@ impl Webgraph {
     async fn new(config: &IndexerGraphConfig) -> Self {
         match config {
             IndexerGraphConfig::Local { path } => Self::Local(
-                webgraph::WebgraphBuilder::new(path)
-                    .single_threaded()
-                    .open(),
+                webgraph::WebgraphBuilder::new(path, 0u64.into())
+                    .open()
+                    .expect("webgraph should open"),
             ),
             IndexerGraphConfig::Remote { gossip } => {
                 let cluster = crate::start_gossip_cluster_thread(gossip.clone(), None);
@@ -421,7 +434,13 @@ impl IndexingWorker {
                     BacklinkGrouper::new(self.host_centrality_rank_store.len() as u64);
 
                 for backlink in backlinks {
-                    grouper.add(backlink);
+                    let from = self
+                        .host_centrality_rank_store
+                        .get(&backlink.from)
+                        .unwrap()
+                        .unwrap_or(u64::MAX);
+
+                    grouper.add(backlink, from);
                 }
 
                 page.set_grouped_backlinks(grouper.groups())

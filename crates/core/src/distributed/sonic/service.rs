@@ -210,11 +210,11 @@ macro_rules! sonic_service {
 
             use $crate::distributed::sonic;
 
-            #[derive(Debug, Clone, ::bincode::Encode, ::bincode::Decode)]
+            #[derive(Clone, ::bincode::Encode, ::bincode::Decode)]
             pub enum Request {
                 $($req(Box<$req>),)*
             }
-            #[derive(::bincode::Encode, ::bincode::Decode, Debug)]
+            #[derive(::bincode::Encode, ::bincode::Decode)]
             pub enum Response {
                 $($req(Box<<$req as sonic::service::Message<$service>>::Response>),)*
             }

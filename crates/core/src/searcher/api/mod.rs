@@ -41,7 +41,7 @@ use crate::ranking::{
 };
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
 use crate::web_spell::SpellChecker;
-use crate::webgraph::remote::{RemoteWebgraph, WebgraphGranularity};
+use crate::webgraph::remote::RemoteWebgraph;
 use crate::webgraph::EdgeLimit;
 use crate::webpage::html::links::RelFlags;
 use crate::widgets::{Widget, Widgets};
@@ -171,34 +171,42 @@ impl From<ApiConfig> for Config {
 }
 
 pub trait Graph {
-    fn batch_raw_ingoing(
+    fn batch_raw_ingoing_hosts(
         &self,
         nodes: &[webgraph::NodeID],
         limit: EdgeLimit,
-    ) -> impl Future<Output = Vec<Vec<webgraph::Edge<()>>>>;
+    ) -> impl Future<Output = Vec<Vec<webgraph::SmallEdge>>>;
 }
 
-impl<G: WebgraphGranularity> Graph for RemoteWebgraph<G> {
-    async fn batch_raw_ingoing(
+impl Graph for RemoteWebgraph {
+    async fn batch_raw_ingoing_hosts(
         &self,
         nodes: &[webgraph::NodeID],
         limit: EdgeLimit,
-    ) -> Vec<Vec<webgraph::Edge<()>>> {
-        self.batch_raw_ingoing_edges(nodes, limit)
-            .await
-            .unwrap_or_default()
+    ) -> Vec<Vec<webgraph::SmallEdge>> {
+        self.batch_search(
+            nodes
+                .iter()
+                .map(|n| webgraph::query::HostBacklinksQuery::new(*n).with_limit(limit))
+                .collect(),
+        )
+        .await
+        .unwrap_or_default()
     }
 }
 
 impl Graph for webgraph::Webgraph {
-    async fn batch_raw_ingoing(
+    async fn batch_raw_ingoing_hosts(
         &self,
         nodes: &[webgraph::NodeID],
         limit: EdgeLimit,
-    ) -> Vec<Vec<webgraph::Edge<()>>> {
+    ) -> Vec<Vec<webgraph::SmallEdge>> {
         nodes
             .iter()
-            .map(|n| self.raw_ingoing_edges(n, limit))
+            .map(|n| {
+                self.search(&webgraph::query::HostBacklinksQuery::new(*n).with_limit(limit))
+                    .unwrap_or_default()
+            })
             .collect()
     }
 }
@@ -207,12 +215,12 @@ impl<T> Graph for Arc<T>
 where
     T: Graph,
 {
-    fn batch_raw_ingoing(
+    fn batch_raw_ingoing_hosts(
         &self,
         nodes: &[webgraph::NodeID],
         limit: EdgeLimit,
-    ) -> impl Future<Output = Vec<Vec<webgraph::Edge<()>>>> {
-        self.as_ref().batch_raw_ingoing(nodes, limit)
+    ) -> impl Future<Output = Vec<Vec<webgraph::SmallEdge>>> {
+        self.as_ref().batch_raw_ingoing_hosts(nodes, limit)
     }
 }
 
@@ -221,14 +229,14 @@ where
     T: Graph,
 {
     async fn batch_ingoing(&self, nodes: &[webgraph::NodeID]) -> Vec<Vec<webgraph::NodeID>> {
-        self.batch_raw_ingoing(nodes, EdgeLimit::Limit(1024))
+        self.batch_raw_ingoing_hosts(nodes, EdgeLimit::Limit(1024))
             .await
             .into_iter()
             .map(|edges| {
                 edges
                     .into_iter()
-                    .filter(|edge| !edge.rel.contains(RelFlags::NOFOLLOW))
-                    .map(|edge| edge.from.node())
+                    .filter(|edge| !edge.rel_flags.contains(RelFlags::NOFOLLOW))
+                    .map(|edge| edge.from)
                     .collect()
             })
             .collect()

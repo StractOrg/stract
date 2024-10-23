@@ -19,6 +19,7 @@ mod range_query;
 mod reqopt_scorer;
 mod scorer;
 mod set_query;
+mod shortcircuit;
 mod term_query;
 mod union;
 mod weight;
@@ -61,6 +62,7 @@ pub use self::score_combiner::{
 };
 pub use self::scorer::Scorer;
 pub use self::set_query::TermSetQuery;
+pub use self::shortcircuit::ShortCircuitQuery;
 pub use self::term_query::TermQuery;
 pub use self::union::Union;
 #[cfg(test)]

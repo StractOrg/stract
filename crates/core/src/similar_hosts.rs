@@ -23,8 +23,9 @@ use url::Url;
 use crate::{
     ranking::{bitvec_similarity, inbound_similarity},
     webgraph::{
-        remote::{RemoteWebgraph, WebgraphGranularity},
-        EdgeLimit, Node, NodeID,
+        query::{HostBacklinksQuery, HostForwardlinksQuery, Id2NodeQuery},
+        remote::RemoteWebgraph,
+        EdgeLimit, Node, NodeID, SmallEdge,
     },
     webpage::{html::links::RelFlags, url_ext::UrlExt},
     SortableFloat,
@@ -36,13 +37,13 @@ pub struct ScoredNode {
     pub score: f64,
 }
 
-pub struct SimilarHostsFinder<G: WebgraphGranularity> {
-    webgraph: Arc<RemoteWebgraph<G>>,
+pub struct SimilarHostsFinder {
+    webgraph: Arc<RemoteWebgraph>,
     max_similar_hosts: usize,
 }
 
-impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
-    pub fn new(webgraph: Arc<RemoteWebgraph<G>>, max_similar_hosts: usize) -> Self {
+impl SimilarHostsFinder {
+    pub fn new(webgraph: Arc<RemoteWebgraph>, max_similar_hosts: usize) -> Self {
         Self {
             webgraph,
             max_similar_hosts,
@@ -51,6 +52,81 @@ impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
 
     async fn scorer(&self, liked: &[NodeID]) -> inbound_similarity::Scorer {
         inbound_similarity::Scorer::new(&self.webgraph, liked, &[], true).await
+    }
+
+    async fn batch_ingoing_edges(&self, nodes: &[NodeID], limit: EdgeLimit) -> Vec<Vec<SmallEdge>> {
+        self.webgraph
+            .batch_search(
+                nodes
+                    .iter()
+                    .map(|n| HostBacklinksQuery::new(*n).with_limit(limit))
+                    .collect(),
+            )
+            .await
+            .unwrap_or_default()
+    }
+
+    async fn batch_outgoing_edges(
+        &self,
+        nodes: &[NodeID],
+        limit: EdgeLimit,
+    ) -> Vec<Vec<SmallEdge>> {
+        self.webgraph
+            .batch_search(
+                nodes
+                    .iter()
+                    .map(|n| HostForwardlinksQuery::new(*n).with_limit(limit))
+                    .collect(),
+            )
+            .await
+            .unwrap_or_default()
+    }
+
+    async fn potential_nodes(&self, nodes: &[NodeID]) -> Vec<NodeID> {
+        let in_edges = self.batch_ingoing_edges(nodes, EdgeLimit::Limit(128)).await;
+
+        let backlink_nodes = in_edges
+            .iter()
+            .flatten()
+            .filter(|e| !e.rel_flags.contains(RelFlags::NOFOLLOW))
+            .map(|e| e.from)
+            .unique()
+            .collect::<Vec<_>>();
+
+        let outgoing_edges = self
+            .batch_outgoing_edges(&backlink_nodes, EdgeLimit::Limit(512))
+            .await;
+
+        outgoing_edges
+            .iter()
+            .flatten()
+            .filter(|e| !e.rel_flags.contains(RelFlags::NOFOLLOW))
+            .map(|e| e.to)
+            .unique()
+            .filter(|n| !nodes.contains(n))
+            .collect()
+    }
+
+    async fn scored_nodes(&self, nodes: &[NodeID], limit: usize) -> Vec<(NodeID, SortableFloat)> {
+        let mut scorer = self.scorer(nodes).await;
+        let potential_nodes = self.potential_nodes(nodes).await;
+
+        let inbounds = bitvec_similarity::BitVec::batch_new_for(&potential_nodes, &self.webgraph)
+            .await
+            .into_iter()
+            .zip_eq(potential_nodes.into_iter())
+            .map(|(b, n)| (n, b));
+
+        crate::sorted_k(
+            inbounds.map(|(n, b)| {
+                let score = scorer.score(&n, &b);
+                Reverse((SortableFloat(score), n))
+            }),
+            limit,
+        )
+        .into_iter()
+        .map(|Reverse((score, n))| (n, score))
+        .collect()
     }
 
     pub async fn find_similar_hosts(&self, nodes: &[String], limit: usize) -> Vec<ScoredNode> {
@@ -75,53 +151,7 @@ impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
 
         let nodes = nodes.into_iter().map(|node| node.id()).collect::<Vec<_>>();
 
-        let mut scorer = self.scorer(&nodes).await;
-
-        let in_edges = self
-            .webgraph
-            .batch_raw_ingoing_edges(&nodes, EdgeLimit::Limit(128))
-            .await
-            .unwrap_or_default();
-
-        let backlink_nodes = in_edges
-            .iter()
-            .flatten()
-            .filter(|e| !e.rel.contains(RelFlags::NOFOLLOW))
-            .map(|e| e.from.node())
-            .unique()
-            .collect::<Vec<_>>();
-
-        let outgoing_edges = self
-            .webgraph
-            .batch_raw_outgoing_edges(&backlink_nodes, EdgeLimit::Limit(512))
-            .await
-            .unwrap_or_default();
-
-        let potential_nodes: Vec<_> = outgoing_edges
-            .iter()
-            .flatten()
-            .filter(|e| !e.rel.contains(RelFlags::NOFOLLOW))
-            .map(|e| e.to.node())
-            .unique()
-            .filter(|n| !nodes.contains(n))
-            .collect();
-
-        let inbounds = bitvec_similarity::BitVec::batch_new_for(&potential_nodes, &self.webgraph)
-            .await
-            .into_iter()
-            .zip_eq(potential_nodes.into_iter())
-            .map(|(b, n)| (n, b));
-
-        let scored_nodes: Vec<_> = crate::sorted_k(
-            inbounds.map(|(n, b)| {
-                let score = scorer.score(&n, &b);
-                Reverse((SortableFloat(score), n))
-            }),
-            limit,
-        )
-        .into_iter()
-        .map(|Reverse((score, n))| (n, score))
-        .collect();
+        let scored_nodes = self.scored_nodes(&nodes, limit).await;
 
         let potential_nodes = scored_nodes
             .iter()
@@ -130,10 +160,8 @@ impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
 
         // remove dead links (nodes without outgoing edges might be dead links)
         let known_nodes = self
-            .webgraph
-            .batch_raw_ingoing_edges(&potential_nodes, EdgeLimit::Limit(1))
-            .await
-            .unwrap_or_default();
+            .batch_ingoing_edges(&potential_nodes, EdgeLimit::Limit(1))
+            .await;
 
         let (potential_nodes, scores): (Vec<_>, Vec<_>) = scored_nodes
             .into_iter()
@@ -143,7 +171,12 @@ impl<G: WebgraphGranularity> SimilarHostsFinder<G> {
 
         let nodes = self
             .webgraph
-            .batch_get_node(&potential_nodes)
+            .batch_search(
+                potential_nodes
+                    .into_iter()
+                    .map(Id2NodeQuery::Host)
+                    .collect(),
+            )
             .await
             .unwrap_or_default();
 

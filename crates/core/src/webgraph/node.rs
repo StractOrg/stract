@@ -126,6 +126,19 @@ impl Node {
         }
     }
 
+    pub fn empty() -> Self {
+        Node {
+            name: String::new(),
+        }
+    }
+
+    /// Dangerous! No validation is done on the input string.
+    pub fn from_str_not_validated(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+        }
+    }
+
     pub fn into_host(self) -> Node {
         let url = if self.name.contains("://") {
             Url::parse(&self.name)
@@ -207,64 +220,5 @@ pub fn normalize_url(url: &Url) -> String {
         normalized = prefix.to_string();
     }
 
-    normalized
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct NodeDatum {
-    id: NodeID,
-    host_rank: u64,
-}
-
-impl PartialOrd for NodeDatum {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for NodeDatum {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.host_rank
-            .cmp(&other.host_rank)
-            .then_with(|| self.id.cmp(&other.id))
-    }
-}
-
-impl PartialEq for NodeDatum {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.host_rank == other.host_rank
-    }
-}
-
-impl Eq for NodeDatum {}
-
-impl std::hash::Hash for NodeDatum {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-        self.host_rank.hash(state);
-    }
-}
-
-impl NodeDatum {
-    pub fn new<N>(node: N, host_rank: u64) -> Self
-    where
-        N: Into<NodeID>,
-    {
-        Self {
-            id: node.into(),
-            host_rank,
-        }
-    }
-}
-
-impl NodeDatum {
-    #[inline]
-    pub fn node(&self) -> NodeID {
-        self.id
-    }
-
-    #[inline]
-    pub fn host_rank(&self) -> u64 {
-        self.host_rank
-    }
+    normalized.to_lowercase()
 }

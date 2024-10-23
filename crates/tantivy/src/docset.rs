@@ -152,3 +152,36 @@ impl<TDocSet: DocSet + ?Sized> DocSet for Box<TDocSet> {
         unboxed.count()
     }
 }
+
+pub struct DocSetIter<T>
+where
+    T: DocSet,
+{
+    docset: T,
+}
+
+impl<T> From<T> for DocSetIter<T>
+where
+    T: DocSet,
+{
+    fn from(docset: T) -> Self {
+        DocSetIter { docset }
+    }
+}
+
+impl<T> Iterator for DocSetIter<T>
+where
+    T: DocSet,
+{
+    type Item = DocId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let doc = self.docset.doc();
+        if doc == TERMINATED {
+            None
+        } else {
+            self.docset.advance();
+            Some(doc)
+        }
+    }
+}

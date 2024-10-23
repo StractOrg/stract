@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -39,11 +39,24 @@ pub struct ImageLink {
 
 /// Flags for the `rel` attribute of the `a` element.
 /// See https://html.spec.whatwg.org/multipage/links.html#linkTypes
-#[derive(Default, Debug, Clone, Copy, bincode::Encode, bincode::Decode, PartialEq, Eq, Hash)]
-pub struct RelFlags(u32);
+#[derive(
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    bincode::Encode,
+    bincode::Decode,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    Hash,
+    utoipa::ToSchema,
+)]
+pub struct RelFlags(u64);
 
 impl RelFlags {
-    pub fn as_u32(&self) -> u32 {
+    pub fn as_u64(&self) -> u64 {
         self.0
     }
 
@@ -91,14 +104,14 @@ impl RelFlags {
     }
 }
 
-impl From<u32> for RelFlags {
-    fn from(value: u32) -> Self {
+impl From<u64> for RelFlags {
+    fn from(value: u64) -> Self {
         Self(value)
     }
 }
 
 bitflags! {
-    impl RelFlags: u32 {
+    impl RelFlags: u64 {
         const ALTERNATE = 1 << 0;
         const AUTHOR = 1 << 1;
         const CANONICAL = 1 << 2;

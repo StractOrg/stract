@@ -352,21 +352,16 @@ fn main() -> Result<()> {
                 mut paths,
                 merge_all_segments,
             } => {
-                let mut webgraph = WebgraphBuilder::new(paths.remove(0))
-                    .single_threaded()
-                    .open();
+                let mut webgraph = WebgraphBuilder::new(paths.remove(0), 0u64.into()).open()?;
 
                 for other_path in paths {
-                    let other = WebgraphBuilder::new(&other_path).single_threaded().open();
+                    let other = WebgraphBuilder::new(&other_path, 0u64.into()).open()?;
                     webgraph.merge(other)?;
                 }
 
                 if merge_all_segments {
-                    webgraph.optimize_read(); // save space in id2node db
-                    webgraph.merge_all_segments(Default::default())?;
+                    webgraph.optimize_read()?;
                 }
-
-                webgraph.optimize_read();
             }
             WebgraphOptions::Server { config_path } => {
                 let config: config::WebgraphServerConfig = load_toml_config(config_path);

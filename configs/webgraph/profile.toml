@@ -1,5 +1,4 @@
 graph_base_path = "data/webgraph"
-level = "host"
 
 [warc_source]
 folder = "data"

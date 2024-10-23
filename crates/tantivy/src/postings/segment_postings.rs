@@ -28,6 +28,15 @@ impl SegmentPostings {
         }
     }
 
+    /// Returns the underlying block segment postings
+    pub fn block_cursor(&self) -> &BlockSegmentPostings {
+        &self.block_cursor
+    }
+
+    pub fn mut_block_cursor(&mut self) -> &mut BlockSegmentPostings {
+        &mut self.block_cursor
+    }
+
     /// Returns the overall number of documents in the block postings.
     /// It does not take in account whether documents are deleted or not.
     pub fn doc_freq(&self) -> u32 {
@@ -131,6 +140,10 @@ impl SegmentPostings {
             cur: 0, // cursor within the block
             position_reader,
         }
+    }
+
+    pub fn reset_cursor_start_block(&mut self) {
+        self.cur = 0;
     }
 }
 

@@ -97,14 +97,14 @@ pub struct IndexerDualEncoderConfig {
 
 #[derive(Debug, serde::Deserialize, Clone)]
 pub struct WebgraphConstructConfig {
-    pub host_graph_base_path: Option<String>,
-    pub page_graph_base_path: Option<String>,
+    pub graph_base_path: String,
+    pub shard: ShardId,
+    pub host_centrality_rank_store_path: String,
     pub warc_source: WarcSource,
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,
     pub batch_size: Option<usize>,
     pub canonical_index_path: Option<String>,
-    pub host_centrality_rank_store_path: Option<String>,
 
     #[serde(default = "defaults::Webgraph::merge_all_segments")]
     pub merge_all_segments: bool,
@@ -537,7 +537,6 @@ pub struct WebgraphServerConfig {
     pub host: SocketAddr,
     pub shard: ShardId,
     pub graph_path: String,
-    pub granularity: WebgraphGranularity,
 
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,

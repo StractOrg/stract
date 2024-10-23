@@ -22,7 +22,13 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     config::WebgraphGranularity,
-    webgraph::{EdgeLimit, FullEdge, Node},
+    webgraph::{
+        query::{
+            FullBacklinksQuery, FullForwardlinksQuery, FullHostBacklinksQuery,
+            FullHostForwardlinksQuery,
+        },
+        Edge, EdgeLimit, Node,
+    },
 };
 
 use super::State;
@@ -104,7 +110,7 @@ pub mod host {
             Err(_) => return Err(StatusCode::BAD_REQUEST),
         }
 
-        match state.host_webgraph.knows(params.host).await {
+        match state.webgraph.knows(params.host).await {
             Ok(Some(node)) => Ok(Json(KnowsHost::Known {
                 host: node.as_str().to_string(),
             })),
@@ -120,7 +126,7 @@ pub mod host {
         path = "/beta/api/webgraph/host/ingoing",
         params(HostLinksParams),
         responses(
-            (status = 200, description = "Incoming links for a particular host", body = Vec<FullEdge>),
+            (status = 200, description = "Incoming links for a particular host", body = Vec<Edge>),
         )
     )]
     pub async fn ingoing_hosts(
@@ -144,7 +150,7 @@ pub mod host {
         path = "/beta/api/webgraph/host/outgoing",
         params(HostLinksParams),
         responses(
-            (status = 200, description = "Outgoing links for a particular host", body = Vec<FullEdge>),
+            (status = 200, description = "Outgoing links for a particular host", body = Vec<Edge>),
         )
     )]
     pub async fn outgoing_hosts(
@@ -182,7 +188,7 @@ pub mod page {
         path = "/beta/api/webgraph/page/ingoing",
         params(PageLinksParams),
         responses(
-            (status = 200, description = "Incoming links for a particular page", body = Vec<FullEdge>),
+            (status = 200, description = "Incoming links for a particular page", body = Vec<Edge>),
         )
     )]
     pub async fn ingoing_pages(
@@ -205,7 +211,7 @@ pub mod page {
         path = "/beta/api/webgraph/page/outgoing",
         params(PageLinksParams),
         responses(
-            (status = 200, description = "Outgoing links for a particular page", body = Vec<FullEdge>),
+            (status = 200, description = "Outgoing links for a particular page", body = Vec<Edge>),
         )
     )]
     pub async fn outgoing_pages(
@@ -229,18 +235,18 @@ async fn ingoing_links(
     state: Arc<State>,
     node: Node,
     level: WebgraphGranularity,
-) -> anyhow::Result<Vec<FullEdge>> {
+) -> anyhow::Result<Vec<Edge>> {
     match level {
         WebgraphGranularity::Host => {
             state
-                .host_webgraph
-                .ingoing_edges(node, EdgeLimit::Limit(1024))
+                .webgraph
+                .search(FullHostBacklinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
                 .await
         }
         WebgraphGranularity::Page => {
             state
-                .page_webgraph
-                .ingoing_edges(node, EdgeLimit::Limit(1024))
+                .webgraph
+                .search(FullBacklinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
                 .await
         }
     }
@@ -250,18 +256,18 @@ async fn outgoing_links(
     state: Arc<State>,
     node: Node,
     level: WebgraphGranularity,
-) -> anyhow::Result<Vec<FullEdge>> {
+) -> anyhow::Result<Vec<Edge>> {
     match level {
         WebgraphGranularity::Host => {
             state
-                .host_webgraph
-                .outgoing_edges(node, EdgeLimit::Limit(1024))
+                .webgraph
+                .search(FullHostForwardlinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
                 .await
         }
         WebgraphGranularity::Page => {
             state
-                .page_webgraph
-                .outgoing_edges(node, EdgeLimit::Limit(1024))
+                .webgraph
+                .search(FullForwardlinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
                 .await
         }
     }

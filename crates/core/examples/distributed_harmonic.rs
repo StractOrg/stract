@@ -1,7 +1,11 @@
 use std::{net::SocketAddr, time::Duration};
 
 use clap::Parser;
-use stract::{distributed::member::ShardId, webgraph::Node, webpage::url_ext::UrlExt};
+use stract::{
+    distributed::member::ShardId,
+    webgraph::{Edge, Node},
+    webpage::url_ext::UrlExt,
+};
 use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(Parser)]
@@ -66,11 +70,9 @@ fn build_graphs_if_not_exist(warc_path: &str, graph_path: &str) -> anyhow::Resul
     let a_path = path.join("graph_a");
     let b_path = path.join("graph_b");
 
-    let mut a =
-        stract::webgraph::WebgraphWriter::new(a_path, Default::default(), Default::default(), None);
+    let mut a = stract::webgraph::WebgraphBuilder::new(a_path, 0u64.into()).open()?;
 
-    let mut b =
-        stract::webgraph::WebgraphWriter::new(b_path, Default::default(), Default::default(), None);
+    let mut b = stract::webgraph::WebgraphBuilder::new(b_path, 0u64.into()).open()?;
 
     for (i, record) in warc.records().flatten().enumerate() {
         let webpage = match stract::webpage::Html::parse_without_text(
@@ -97,19 +99,31 @@ fn build_graphs_if_not_exist(warc_path: &str, graph_path: &str) -> anyhow::Resul
 
             if dest_domain.is_some() && source_domain.is_some() && dest_domain != source_domain {
                 if i <= num_records / 2 {
-                    a.insert(source, destination, link.text, link.rel);
+                    a.insert(Edge {
+                        from: source,
+                        to: destination,
+                        rel_flags: link.rel,
+                        label: link.text,
+                        sort_score: 0.0,
+                    })?;
                 } else {
-                    b.insert(source, destination, link.text, link.rel);
+                    b.insert(Edge {
+                        from: source,
+                        to: destination,
+                        rel_flags: link.rel,
+                        label: link.text,
+                        sort_score: 0.0,
+                    })?;
                 }
             }
         }
     }
 
-    a.commit();
-    b.commit();
+    a.commit()?;
+    a.optimize_read()?;
 
-    a.finalize();
-    b.finalize();
+    b.commit()?;
+    b.optimize_read()?;
 
     Ok(())
 }

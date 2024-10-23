@@ -22,7 +22,6 @@ use super::{Node, NodeID};
 
 pub mod approx_harmonic;
 pub mod betweenness;
-pub mod derived_harmonic;
 pub mod harmonic;
 
 #[derive(Debug, Clone, Copy)]

@@ -28,7 +28,8 @@ use crate::{
             approx_harmonic::ApproxHarmonic, harmonic::HarmonicCentrality, store_csv,
             store_harmonic, TopNodes,
         },
-        remote::{Page, RemoteWebgraph},
+        query::{BacklinksQuery, Id2NodeQuery},
+        remote::RemoteWebgraph,
         EdgeLimit, NodeID, WebgraphBuilder,
     },
     SortableFloat,
@@ -42,7 +43,9 @@ impl Centrality {
             "Building harmonic centrality for {}",
             webgraph_path.as_ref().to_str().unwrap()
         );
-        let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
+        let graph = WebgraphBuilder::new(webgraph_path, 0u64.into())
+            .open()
+            .expect("webgraph should open");
         let harmonic_centrality = HarmonicCentrality::calculate(&graph);
         let store = store_harmonic(
             harmonic_centrality.iter().map(|(n, c)| (*n, c)),
@@ -52,7 +55,15 @@ impl Centrality {
         let top_harmonics =
             crate::webgraph::centrality::top_nodes(&store, TopNodes::Top(1_000_000))
                 .into_iter()
-                .map(|(n, c)| (graph.id2node(&n).unwrap(), c))
+                .map(|(n, c)| {
+                    (
+                        graph
+                            .search(&crate::webgraph::query::Id2NodeQuery::Host(n))
+                            .unwrap()
+                            .unwrap(),
+                        c,
+                    )
+                })
                 .collect();
 
         store_csv(top_harmonics, base_output.as_ref().join("harmonic.csv"));
@@ -65,7 +76,7 @@ impl Centrality {
             webgraph_path.as_ref().to_str().unwrap()
         );
 
-        let graph = WebgraphBuilder::new(webgraph_path).single_threaded().open();
+        let graph = WebgraphBuilder::new(webgraph_path, 0u64.into()).open()?;
 
         let approx = ApproxHarmonic::build(&graph, base_output.as_ref().join("harmonic"));
         let mut approx_rank: speedy_kv::Db<crate::webgraph::NodeID, u64> =
@@ -92,7 +103,13 @@ impl Centrality {
             }
 
             if top_nodes.len() < 1_000_000 {
-                top_nodes.push((graph.id2node(&node).unwrap(), centrality));
+                top_nodes.push((
+                    graph
+                        .search(&crate::webgraph::query::Id2NodeQuery::Page(node))
+                        .unwrap()
+                        .unwrap(),
+                    centrality,
+                ));
             }
         }
 
@@ -114,14 +131,15 @@ impl Centrality {
             )
             .await?,
         );
-        let graph: RemoteWebgraph<Page> = RemoteWebgraph::new(cluster).await;
+        let graph: RemoteWebgraph = RemoteWebgraph::new(cluster).await;
+        graph.await_ready().await;
 
         let mut harmonic: speedy_kv::Db<NodeID, f64> =
             speedy_kv::Db::open_or_create(config.output_path.join("harmonic"))?;
         let original_centrality: speedy_kv::Db<NodeID, f64> =
             speedy_kv::Db::open_or_create(&config.original_centrality_path)?;
 
-        let mut node_ids = graph.stream_node_ids().await;
+        let mut node_ids = graph.stream_page_node_ids().await;
 
         while let Some(node_id) = node_ids.next().await {
             match original_centrality.get(&node_id)? {
@@ -130,10 +148,10 @@ impl Centrality {
                 }
                 None => {
                     if let Some(seed) = graph
-                        .raw_ingoing_edges(node_id, EdgeLimit::Limit(1))
+                        .search(BacklinksQuery::new(node_id).with_limit(EdgeLimit::Limit(1)))
                         .await?
                         .pop()
-                        .map(|edge| edge.from.node())
+                        .map(|edge| edge.from)
                     {
                         if let Some(seed_centrality) = original_centrality.get(&seed)? {
                             harmonic.insert(node_id, seed_centrality * config.discount_factor)?;
@@ -166,7 +184,9 @@ impl Centrality {
         {
             let (ids, centrality): (Vec<_>, Vec<_>) = chunk.into_iter().unzip();
 
-            let nodes = graph.batch_get_node(&ids).await?;
+            let nodes = graph
+                .batch_search(ids.into_iter().map(Id2NodeQuery::Page).collect())
+                .await?;
 
             for (node, centrality) in nodes.into_iter().zip(centrality) {
                 if let Some(node) = node {

@@ -33,7 +33,8 @@ use crate::crawler::WeightedUrl;
 use crate::distributed::cluster::Cluster;
 use crate::external_sort::ExternalSorter;
 use crate::log_group::HarmonicRankGroup;
-use crate::webgraph::remote::{Host, Page, RemoteWebgraph};
+use crate::webgraph::query::Id2NodeQuery;
+use crate::webgraph::remote::RemoteWebgraph;
 use crate::webgraph::Node;
 use crate::webpage::url_ext::UrlExt;
 use crate::SortableFloat;
@@ -172,8 +173,7 @@ pub struct CrawlPlanner {
     host_centrality: Arc<speedy_kv::Db<NodeID, f64>>,
     host_centrality_rank: Arc<speedy_kv::Db<NodeID, u64>>,
     page_centrality: Arc<speedy_kv::Db<NodeID, f64>>,
-    page_graph: RemoteWebgraph<Page>,
-    host_graph: RemoteWebgraph<Host>,
+    webgraph: RemoteWebgraph,
     config: CrawlPlannerConfig,
 
     harmonic_group: Arc<HarmonicRankGroup>,
@@ -193,10 +193,8 @@ impl CrawlPlanner {
     ) -> Result<Self> {
         Self::check_config(&config)?;
 
-        let page_graph = RemoteWebgraph::new(cluster.clone()).await;
-        page_graph.await_ready().await;
-        let host_graph = RemoteWebgraph::new(cluster.clone()).await;
-        host_graph.await_ready().await;
+        let webgraph = RemoteWebgraph::new(cluster.clone()).await;
+        webgraph.await_ready().await;
 
         let domain_boosts = config
             .domain_boosts
@@ -209,8 +207,7 @@ impl CrawlPlanner {
         Ok(Self {
             host_centrality: Arc::new(host_centrality),
             page_centrality: Arc::new(page_centrality),
-            page_graph,
-            host_graph,
+            webgraph,
             domain_boosts,
             excluded_domains: config
                 .excluded_domains
@@ -404,9 +401,14 @@ impl CrawlPlanner {
             }
 
             let nodes = chunk.collect::<Vec<_>>();
-            let page_graph = self.page_graph.clone();
+            let webgraph = self.webgraph.clone();
 
-            futures.push_back(async move { page_graph.batch_get_node(&nodes).await.unwrap() });
+            futures.push_back(async move {
+                webgraph
+                    .batch_search(nodes.into_iter().map(Id2NodeQuery::Page).collect())
+                    .await
+                    .unwrap()
+            });
         }
 
         while let Some(nodes) = futures.next().await {
@@ -441,9 +443,14 @@ impl CrawlPlanner {
             }
 
             let nodes = chunk.collect::<Vec<_>>();
-            let host_graph = self.host_graph.clone();
+            let webgraph = self.webgraph.clone();
 
-            futures.push_back(async move { host_graph.batch_get_node(&nodes).await.unwrap() });
+            futures.push_back(async move {
+                webgraph
+                    .batch_search(nodes.into_iter().map(Id2NodeQuery::Host).collect())
+                    .await
+                    .unwrap()
+            });
         }
 
         while let Some(nodes) = futures.next().await {

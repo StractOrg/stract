@@ -46,7 +46,7 @@ pub struct CentralityWorker {
 
 impl CentralityWorker {
     pub fn new(shard: ShardId, graph: Webgraph) -> Self {
-        let num_nodes = graph.estimate_num_nodes() as u64;
+        let num_nodes = graph.host_nodes().len() as u64;
         let mut changed_nodes = U64BloomFilter::new(num_nodes, 0.05);
 
         changed_nodes.fill();
@@ -107,7 +107,7 @@ impl Message<CentralityWorker> for NumNodes {
     type Response = u64;
 
     fn handle(self, worker: &CentralityWorker) -> Self::Response {
-        worker.graph.estimate_num_nodes() as u64
+        worker.graph.host_nodes().len() as u64
     }
 }
 
@@ -120,7 +120,14 @@ impl Message<CentralityWorker> for BatchId2Node {
     fn handle(self, worker: &CentralityWorker) -> Self::Response {
         self.0
             .iter()
-            .filter_map(|id| worker.graph.id2node(id).map(|node| (*id, node)))
+            .filter_map(|id| {
+                worker
+                    .graph
+                    .search(&webgraph::query::Id2NodeQuery::Host(*id))
+                    .ok()
+                    .flatten()
+                    .map(|node| (*id, node))
+            })
             .collect()
     }
 }
@@ -168,9 +175,7 @@ impl RemoteWorker for RemoteCentralityWorker {
 pub fn run(config: HarmonicWorkerConfig) -> Result<()> {
     let tokio_conf = config.clone();
 
-    let graph = Webgraph::builder(config.graph_path)
-        .single_threaded()
-        .open();
+    let graph = Webgraph::builder(config.graph_path, config.shard).open()?;
     let worker = CentralityWorker::new(config.shard, graph);
     let service = Service::HarmonicWorker {
         host: tokio_conf.host,

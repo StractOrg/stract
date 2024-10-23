@@ -14,10 +14,52 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use itertools::Itertools;
 use tantivy::{Score, Searcher, Term};
 
+use crate::schema::text_field::{AllBody, TextField};
+
 use super::bm25::{compute_tf_cache, idf, Bm25Constants};
+
+#[derive(Default)]
+pub struct WeightCache {
+    cache: HashMap<String, u64>,
+}
+
+impl WeightCache {
+    pub fn new() -> Self {
+        Self {
+            cache: HashMap::new(),
+        }
+    }
+
+    fn compute(term: &str, searcher: &Searcher) -> u64 {
+        // use 'AllBody' field as an approximation of the term doc freq across all fields
+        let field = searcher.schema().get_field(AllBody.name()).unwrap();
+        let term = Term::from_field_text(field, term);
+        searcher.doc_freq(&term).unwrap_or_default()
+    }
+
+    pub fn get(&mut self, term: &str, searcher: &Searcher) -> u64 {
+        *self
+            .cache
+            .entry(term.to_string())
+            .or_insert_with(|| Self::compute(term, searcher))
+    }
+}
+
+pub struct PreparedTerm {
+    term: Term,
+    doc_freq: u64,
+}
+
+impl PreparedTerm {
+    pub fn new(term: Term, doc_freq: u64) -> Self {
+        Self { term, doc_freq }
+    }
+}
 
 /// A BM25F weight that uses the same IDF weight for all fields.
 /// The idea is that the term 'the' might not appear very frequently e.g. in the title field,
@@ -39,17 +81,21 @@ pub struct MultiBm25FWeight {
 }
 
 impl MultiBm25FWeight {
-    pub fn for_terms(searcher: &Searcher, terms: &[Term], constants: Bm25Constants) -> Self {
+    pub fn for_terms(
+        searcher: &Searcher,
+        terms: &[PreparedTerm],
+        constants: Bm25Constants,
+    ) -> Self {
         if terms.is_empty() {
             return Self {
                 weights: Vec::new(),
             };
         }
 
-        let field = terms[0].field();
+        let field = terms[0].term.field();
         for term in terms.iter().skip(1) {
             assert_eq!(
-                term.field(),
+                term.term.field(),
                 field,
                 "All terms must belong to the same field."
             );
@@ -69,19 +115,8 @@ impl MultiBm25FWeight {
         let mut weights = Vec::new();
 
         for term in terms {
-            // use highest freq as an approximation of the term doc freq across all fields
-            let term_doc_freq = searcher
-                .schema()
-                .fields()
-                .filter_map(|(field, _)| {
-                    let term = Term::from_field_text(field, term.value().as_str().unwrap());
-                    searcher.doc_freq(&term).ok()
-                })
-                .max()
-                .unwrap_or_default();
-
             weights.push(Bm25FWeight::for_one_term(
-                term_doc_freq,
+                term.doc_freq,
                 total_num_docs,
                 average_fieldnorm,
                 constants,
