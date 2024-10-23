@@ -30,6 +30,7 @@ use super::{
 };
 use crate::{ampc::dht::ShardId, webpage::html::links::RelFlags, Result};
 use itertools::Itertools;
+use rustc_hash::FxHashSet;
 use tantivy::{
     columnar::Column, directory::MmapDirectory, indexer::NoMergePolicy, DocId, SegmentReader,
 };
@@ -39,6 +40,7 @@ use super::{query::Query, NodeID};
 pub struct EdgeStore {
     index: tantivy::Index,
     writer: Option<tantivy::IndexWriter<Edge>>,
+    writer_dedup: FxHashSet<(NodeID, NodeID)>,
     reader: tantivy::IndexReader,
     shard_id: ShardId,
     path: PathBuf,
@@ -67,6 +69,7 @@ impl EdgeStore {
             reader: index.reader()?,
             index,
             shard_id,
+            writer_dedup: FxHashSet::default(),
         })
     }
 
@@ -104,6 +107,11 @@ impl EdgeStore {
 
     pub fn insert(&mut self, edge: Edge) -> Result<()> {
         self.prepare_writer()?;
+
+        if !self.writer_dedup.insert((edge.from.id(), edge.to.id())) {
+            return Ok(());
+        }
+
         self.writer
             .as_mut()
             .expect("writer should have been prepared")
@@ -117,6 +125,7 @@ impl EdgeStore {
             .as_mut()
             .expect("writer should have been prepared")
             .commit()?;
+        self.writer_dedup.clear();
         self.reader.reload()?;
         Ok(())
     }
