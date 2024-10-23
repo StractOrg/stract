@@ -1,8 +1,0 @@
-cluster_id = "dev_webgraph"
-gossip_addr = "0.0.0.0:3007"
-gossip_seed_nodes = ["0.0.0.0:3005"]
-granularity = "host"
-graph_path = "data/webgraph_host"
-host = "0.0.0.0:3003"
-shard = 0
-inbound_similarity_path = "data/centrality/inbound_similarity"

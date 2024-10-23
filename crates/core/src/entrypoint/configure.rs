@@ -98,15 +98,10 @@ fn build_spellchecker() -> Result<()> {
 
 fn create_webgraph() -> Result<()> {
     debug!("Creating webgraph");
-    let out_path_host = Path::new(DATA_PATH).join("webgraph_host");
-    let out_path_page = Path::new(DATA_PATH).join("webgraph_page");
+    let out_path = Path::new(DATA_PATH).join("webgraph");
 
-    if out_path_host.exists() {
-        std::fs::remove_dir_all(&out_path_host)?;
-    }
-
-    if out_path_page.exists() {
-        std::fs::remove_dir_all(&out_path_page)?;
+    if out_path.exists() {
+        std::fs::remove_dir_all(&out_path)?;
     }
 
     let warc_path = Path::new(DATA_PATH).join("sample.warc.gz");
@@ -120,7 +115,7 @@ fn create_webgraph() -> Result<()> {
     };
 
     let mut worker = webgraph::WebgraphWorker {
-        graph: crate::webgraph::Webgraph::open(&out_path_host, 0u64.into()).unwrap(),
+        graph: crate::webgraph::Webgraph::open(&out_path, 0u64.into()).unwrap(),
         host_centrality_store: None,
         canonical_index: None,
     };
@@ -133,18 +128,17 @@ fn create_webgraph() -> Result<()> {
 
 fn calculate_centrality() {
     debug!("Calculating centrality");
-    let webgraph_path = Path::new(DATA_PATH).join("webgraph_host");
+    let webgraph_path = Path::new(DATA_PATH).join("webgraph");
     let out_path = Path::new(DATA_PATH).join("centrality");
 
     if !out_path.exists() {
         Centrality::build_harmonic(&webgraph_path, &out_path);
     }
 
-    let webgraph_page = Path::new(DATA_PATH).join("webgraph_page");
     let out_path_page = Path::new(DATA_PATH).join("centrality_page");
 
     if !out_path_page.exists() {
-        Centrality::build_approx_harmonic(webgraph_page, out_path_page).unwrap();
+        Centrality::build_approx_harmonic(webgraph_path, out_path_page).unwrap();
     }
 }
 
@@ -173,7 +167,7 @@ fn create_inverted_index() -> Result<()> {
         },
     };
 
-    let webgraph_path = Path::new(DATA_PATH).join("webgraph_page");
+    let webgraph_path = Path::new(DATA_PATH).join("webgraph");
     let centrality_path = Path::new(DATA_PATH).join("centrality");
     let page_centrality_path = Path::new(DATA_PATH).join("centrality_page");
     let dual_encoder_path = Path::new(DATA_PATH).join("dual_encoder");

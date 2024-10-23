@@ -354,7 +354,16 @@ impl Query for FullHostForwardlinksQuery {
     ) -> Result<Self::IntermediateOutput> {
         let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
         let edges = fetch_edges(searcher, docs)?;
-        Ok(scores.into_iter().zip_eq(edges).collect())
+        Ok(scores
+            .into_iter()
+            .zip_eq(edges.into_iter().map(|e| Edge {
+                from: e.from.into_host(),
+                to: e.to.into_host(),
+                rel_flags: e.rel_flags,
+                label: e.label,
+                sort_score: e.sort_score,
+            }))
+            .collect())
     }
 
     fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {

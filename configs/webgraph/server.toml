@@ -1,8 +1,7 @@
 cluster_id = "dev_webgraph"
-gossip_addr = "0.0.0.0:3012"
+gossip_addr = "0.0.0.0:3007"
 gossip_seed_nodes = ["0.0.0.0:3005"]
-granularity = "page"
-graph_path = "data/webgraph_page"
-host = "0.0.0.0:3011"
+graph_path = "data/webgraph"
+host = "0.0.0.0:3003"
 shard = 0
 inbound_similarity_path = "data/centrality/inbound_similarity"

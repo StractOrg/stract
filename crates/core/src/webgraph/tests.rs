@@ -49,6 +49,7 @@ impl Webgraph {
     }
 }
 
+use crate::config::WebgraphGranularity;
 use crate::webpage::html::links::RelFlags;
 
 use file_store::temp::TempDir;
@@ -100,7 +101,7 @@ pub fn test_graph() -> (Webgraph, TempDir) {
 fn distance_calculation() {
     let (graph, _temp_dir) = test_graph();
 
-    let distances = graph.distances(Node::from("D"));
+    let distances = graph.distances(Node::from("D"), WebgraphGranularity::Page);
 
     assert_eq!(distances.get(&Node::from("C")), Some(&1));
     assert_eq!(distances.get(&Node::from("A")), Some(&2));
@@ -110,21 +111,31 @@ fn distance_calculation() {
 #[test]
 fn nonexisting_node() {
     let (graph, _temp_dir) = test_graph();
-    assert_eq!(graph.distances(Node::from("E")).len(), 0);
-    assert_eq!(graph.reversed_distances(Node::from("E")).len(), 0);
+    assert_eq!(
+        graph
+            .distances(Node::from("E"), WebgraphGranularity::Page)
+            .len(),
+        0
+    );
+    assert_eq!(
+        graph
+            .reversed_distances(Node::from("E"), WebgraphGranularity::Page)
+            .len(),
+        0
+    );
 }
 
 #[test]
 fn reversed_distance_calculation() {
     let (graph, _temp_dir) = test_graph();
 
-    let distances = graph.reversed_distances(Node::from("D"));
+    let distances = graph.reversed_distances(Node::from("D"), WebgraphGranularity::Page);
 
     assert_eq!(distances.get(&Node::from("C")), None);
     assert_eq!(distances.get(&Node::from("A")), None);
     assert_eq!(distances.get(&Node::from("B")), None);
 
-    let distances = graph.reversed_distances(Node::from("A"));
+    let distances = graph.reversed_distances(Node::from("A"), WebgraphGranularity::Page);
 
     assert_eq!(distances.get(&Node::from("C")), Some(&1));
     assert_eq!(distances.get(&Node::from("D")), Some(&2));
@@ -170,13 +181,15 @@ fn merge_path() {
     graph.optimize_read().unwrap();
 
     assert_eq!(
-        graph.distances(Node::from("A")).get(&Node::from("H")),
+        graph
+            .distances(Node::from("A"), WebgraphGranularity::Page)
+            .get(&Node::from("H")),
         Some(&7)
     );
 
     assert_eq!(
         graph
-            .reversed_distances(Node::from("H"))
+            .reversed_distances(Node::from("H"), WebgraphGranularity::Page)
             .get(&Node::from("A")),
         Some(&7)
     );
@@ -292,14 +305,18 @@ fn merge_cycle() {
     }
 
     assert_eq!(
-        graph.distances(Node::from("A")).get(&Node::from("C")),
+        graph
+            .distances(Node::from("A"), WebgraphGranularity::Page)
+            .get(&Node::from("C")),
         Some(&2)
     );
 
     graph.optimize_read().unwrap();
 
     assert_eq!(
-        graph.distances(Node::from("A")).get(&Node::from("C")),
+        graph
+            .distances(Node::from("A"), WebgraphGranularity::Page)
+            .get(&Node::from("C")),
         Some(&2)
     );
 

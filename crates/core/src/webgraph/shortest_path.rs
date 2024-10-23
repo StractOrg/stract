@@ -19,16 +19,39 @@ use std::{
     collections::{BTreeMap, BinaryHeap},
 };
 
+use crate::config::WebgraphGranularity;
+
 use super::{query, EdgeLimit, Node, NodeID, SmallEdge, Webgraph};
 
 pub trait ShortestPaths {
-    fn distances(&self, source: Node) -> BTreeMap<Node, u8>;
-    fn raw_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8>;
-    fn raw_distances_with_max(&self, source: NodeID, max_dist: u8) -> BTreeMap<NodeID, u8>;
-    fn raw_reversed_distances_with_max(&self, source: NodeID, max_dist: u8)
-        -> BTreeMap<NodeID, u8>;
-    fn raw_reversed_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8>;
-    fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8>;
+    fn distances(&self, source: Node, granularity: WebgraphGranularity) -> BTreeMap<Node, u8>;
+    fn raw_distances(
+        &self,
+        source: NodeID,
+        granularity: WebgraphGranularity,
+    ) -> BTreeMap<NodeID, u8>;
+    fn raw_distances_with_max(
+        &self,
+        source: NodeID,
+        max_dist: u8,
+        granularity: WebgraphGranularity,
+    ) -> BTreeMap<NodeID, u8>;
+    fn raw_reversed_distances_with_max(
+        &self,
+        source: NodeID,
+        max_dist: u8,
+        granularity: WebgraphGranularity,
+    ) -> BTreeMap<NodeID, u8>;
+    fn raw_reversed_distances(
+        &self,
+        source: NodeID,
+        granularity: WebgraphGranularity,
+    ) -> BTreeMap<NodeID, u8>;
+    fn reversed_distances(
+        &self,
+        source: Node,
+        granularity: WebgraphGranularity,
+    ) -> BTreeMap<Node, u8>;
 }
 
 fn dijkstra_multi<F1, F2>(
@@ -80,51 +103,81 @@ where
 }
 
 impl ShortestPaths for Webgraph {
-    fn distances(&self, source: Node) -> BTreeMap<Node, u8> {
-        self.raw_distances(source.id())
+    fn distances(&self, source: Node, granularity: WebgraphGranularity) -> BTreeMap<Node, u8> {
+        self.raw_distances(source.id(), granularity)
             .into_iter()
-            .filter_map(|(id, dist)| {
-                self.search(&query::Id2NodeQuery::Host(id))
+            .filter_map(|(id, dist)| match granularity {
+                WebgraphGranularity::Host => self
+                    .search(&query::Id2NodeQuery::Host(id))
                     .unwrap()
-                    .map(|node| (node, dist))
+                    .map(|node| (node, dist)),
+                WebgraphGranularity::Page => self
+                    .search(&query::Id2NodeQuery::Page(id))
+                    .unwrap()
+                    .map(|node| (node, dist)),
             })
             .collect()
     }
 
-    fn raw_distances_with_max(&self, source: NodeID, max_dist: u8) -> BTreeMap<NodeID, u8> {
+    fn raw_distances_with_max(
+        &self,
+        source: NodeID,
+        max_dist: u8,
+        granularity: WebgraphGranularity,
+    ) -> BTreeMap<NodeID, u8> {
         dijkstra_multi(
             &[source],
-            |node| {
-                self.search(
-                    &query::HostForwardlinksQuery::new(node).with_limit(EdgeLimit::Unlimited),
-                )
-                .unwrap_or_default()
+            |node| match granularity {
+                WebgraphGranularity::Host => self
+                    .search(
+                        &query::HostForwardlinksQuery::new(node).with_limit(EdgeLimit::Unlimited),
+                    )
+                    .unwrap_or_default(),
+                WebgraphGranularity::Page => self
+                    .search(&query::ForwardlinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
+                    .unwrap_or_default(),
             },
             |edge| edge.to,
             Some(max_dist),
         )
     }
 
-    fn raw_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8> {
+    fn raw_distances(
+        &self,
+        source: NodeID,
+        granularity: WebgraphGranularity,
+    ) -> BTreeMap<NodeID, u8> {
         dijkstra_multi(
             &[source],
-            |node| {
-                self.search(
-                    &query::HostForwardlinksQuery::new(node).with_limit(EdgeLimit::Unlimited),
-                )
-                .unwrap_or_default()
+            |node| match granularity {
+                WebgraphGranularity::Host => self
+                    .search(
+                        &query::HostForwardlinksQuery::new(node).with_limit(EdgeLimit::Unlimited),
+                    )
+                    .unwrap_or_default(),
+                WebgraphGranularity::Page => self
+                    .search(&query::ForwardlinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
+                    .unwrap_or_default(),
             },
             |edge| edge.to,
             None,
         )
     }
 
-    fn raw_reversed_distances(&self, source: NodeID) -> BTreeMap<NodeID, u8> {
+    fn raw_reversed_distances(
+        &self,
+        source: NodeID,
+        granularity: WebgraphGranularity,
+    ) -> BTreeMap<NodeID, u8> {
         dijkstra_multi(
             &[source],
-            |node| {
-                self.search(&query::HostBacklinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
-                    .unwrap_or_default()
+            |node| match granularity {
+                WebgraphGranularity::Host => self
+                    .search(&query::HostBacklinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
+                    .unwrap_or_default(),
+                WebgraphGranularity::Page => self
+                    .search(&query::BacklinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
+                    .unwrap_or_default(),
             },
             |edge| edge.from,
             None,
@@ -135,25 +188,39 @@ impl ShortestPaths for Webgraph {
         &self,
         source: NodeID,
         max_dist: u8,
+        granularity: WebgraphGranularity,
     ) -> BTreeMap<NodeID, u8> {
         dijkstra_multi(
             &[source],
-            |node| {
-                self.search(&query::HostBacklinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
-                    .unwrap_or_default()
+            |node| match granularity {
+                WebgraphGranularity::Host => self
+                    .search(&query::HostBacklinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
+                    .unwrap_or_default(),
+                WebgraphGranularity::Page => self
+                    .search(&query::BacklinksQuery::new(node).with_limit(EdgeLimit::Unlimited))
+                    .unwrap_or_default(),
             },
             |edge| edge.from,
             Some(max_dist),
         )
     }
 
-    fn reversed_distances(&self, source: Node) -> BTreeMap<Node, u8> {
-        self.raw_reversed_distances(source.id())
+    fn reversed_distances(
+        &self,
+        source: Node,
+        granularity: WebgraphGranularity,
+    ) -> BTreeMap<Node, u8> {
+        self.raw_reversed_distances(source.id(), granularity)
             .into_iter()
-            .filter_map(|(id, dist)| {
-                self.search(&query::Id2NodeQuery::Host(id))
+            .filter_map(|(id, dist)| match granularity {
+                WebgraphGranularity::Host => self
+                    .search(&query::Id2NodeQuery::Host(id))
                     .unwrap()
-                    .map(|node| (node, dist))
+                    .map(|node| (node, dist)),
+                WebgraphGranularity::Page => self
+                    .search(&query::Id2NodeQuery::Page(id))
+                    .unwrap()
+                    .map(|node| (node, dist)),
             })
             .collect()
     }

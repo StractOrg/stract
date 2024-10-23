@@ -20,7 +20,10 @@ use dashmap::DashMap;
 use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 
-use crate::webgraph::{NodeID, ShortestPaths, Webgraph};
+use crate::{
+    config::WebgraphGranularity,
+    webgraph::{NodeID, ShortestPaths, Webgraph},
+};
 
 const EPSILON: f64 = 0.3;
 
@@ -49,7 +52,7 @@ impl ApproxHarmonic {
         let norm = num_nodes as f32 / (num_samples as f32 * (num_nodes as f32 - 1.0));
 
         sampled.into_par_iter().progress().for_each(|source| {
-            let dists = graph.raw_distances_with_max(source, 7);
+            let dists = graph.raw_distances_with_max(source, 7, WebgraphGranularity::Page);
 
             for (target, dist) in dists {
                 if dist == 0 {
