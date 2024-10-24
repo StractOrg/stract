@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -155,23 +155,17 @@ impl InnerRobotsTxtManager {
             .fetch_robots_txt_from_url(&format!("https://{}/robots.txt", site.0))
             .await
         {
-            Lookup::Unavailable | Lookup::Unreachable => {
+            Lookup::Unreachable => {
+                self.fetch_robots_txt_from_url(&format!("http://{}/robots.txt", site.0))
+                    .await
+            }
+            Lookup::Unavailable => {
                 match self
                     .fetch_robots_txt_from_url(&format!("http://{}/robots.txt", site.0))
                     .await
                 {
                     Lookup::Found(robots_txt) => Lookup::Found(robots_txt),
-                    Lookup::Unreachable => Lookup::Unreachable,
-                    Lookup::Unavailable
-                        if !site.0.starts_with("www.")
-                            && site.0.chars().filter(|&c| c == '.').count() == 1 =>
-                    {
-                        self.fetch_robots_txt_from_url(&format!(
-                            "https://www.{}/robots.txt",
-                            &site.0
-                        ))
-                        .await
-                    }
+                    Lookup::Unreachable => Lookup::Unavailable,
                     Lookup::Unavailable => Lookup::Unavailable,
                 }
             }

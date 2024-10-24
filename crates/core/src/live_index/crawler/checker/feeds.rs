@@ -48,11 +48,15 @@ impl Checker for Feeds {
             let Ok(req) = self.client.get(feed.url.clone()).await else {
                 continue;
             };
+
             let Ok(resp) = req.send().await else {
                 continue;
             };
 
-            let text = resp.text().await?;
+            let Ok(text) = resp.text().await else {
+                continue;
+            };
+
             let Ok(parsed_feed) = parse(&text, feed.kind) else {
                 continue;
             };
