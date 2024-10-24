@@ -65,6 +65,12 @@ impl SignalComputeOrder {
         doc: DocId,
         signal_computer: &'a SignalComputer,
     ) -> impl Iterator<Item = ComputedSignal> + 'a {
+        signal_computer
+            .segment_reader
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .prepare_for_doc(doc);
         self.text_signals
             .values()
             .flat_map(move |ngram| ngram.compute(doc, signal_computer))

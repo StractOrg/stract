@@ -162,9 +162,10 @@ impl LocalRecallRankingWebpage {
     /// the index to calculate bm25.
     pub fn new(
         pointer: WebpagePointer,
-        columnfield_reader: &numericalfield_reader::SegmentReader,
+        columnfield_reader: &mut numericalfield_reader::SegmentReader,
         computer: &mut SignalComputer,
     ) -> Self {
+        columnfield_reader.prepare_row_for_doc(pointer.address.doc_id);
         let columnfields = columnfield_reader.get_field_reader(pointer.address.doc_id);
 
         let title_embedding: Option<Vec<u8>> = columnfields

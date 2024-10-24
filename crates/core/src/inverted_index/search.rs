@@ -127,7 +127,12 @@ impl InvertedIndex {
                 .then_with(|| a.1.address.doc_id.cmp(&b.1.address.doc_id))
         });
 
+        if pointers.is_empty() {
+            return Ok(vec![]);
+        }
+
         let mut prev_segment = None;
+        let mut numeric_segment_reader = None;
         for (orig_index, pointer) in pointers {
             let update_segment = match prev_segment {
                 Some(prev_segment) if prev_segment != pointer.address.segment => true,
@@ -138,6 +143,11 @@ impl InvertedIndex {
             let segment_reader = ctx.tv_searcher.segment_reader(pointer.address.segment);
             if update_segment {
                 computer.register_segment(&ctx.tv_searcher, segment_reader, columnfield_reader)?;
+                numeric_segment_reader = Some(
+                    columnfield_reader
+                        .borrow_segment(&segment_reader.segment_id())
+                        .clone(),
+                );
             }
 
             prev_segment = Some(pointer.address.segment);
@@ -146,7 +156,7 @@ impl InvertedIndex {
                 orig_index,
                 LocalRecallRankingWebpage::new(
                     pointer,
-                    columnfield_reader.borrow_segment(&segment_reader.segment_id()),
+                    numeric_segment_reader.as_mut().unwrap(),
                     &mut computer,
                 ),
             ));

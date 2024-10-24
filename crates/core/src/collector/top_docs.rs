@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use bloom::combine_u64s;
 use min_max_heap::MinMaxHeap;
@@ -101,7 +101,10 @@ impl TopDocs {
             .map(|max_docs| max_docs.total_docs / max_docs.segments);
 
         Ok(TopSegmentCollector {
-            columnfield_segment_reader: self.columnfield_reader.get_segment(&segment.segment_id()),
+            columnfield_segment_reader: self
+                .columnfield_reader
+                .borrow_segment(&segment.segment_id())
+                .clone(),
             max_docs,
             num_docs_taken: 0,
             segment_ord: segment_local_id,
@@ -114,7 +117,7 @@ impl TopDocs {
 }
 
 pub struct TopSegmentCollector {
-    columnfield_segment_reader: Arc<numericalfield_reader::SegmentReader>,
+    columnfield_segment_reader: numericalfield_reader::SegmentReader,
     max_docs: Option<usize>,
     num_docs_taken: usize,
     segment_ord: SegmentOrdinal,

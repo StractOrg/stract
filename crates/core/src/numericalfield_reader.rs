@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -28,7 +28,7 @@ use crate::{
 
 #[derive(Default)]
 struct InnerNumericalFieldReader {
-    segments: HashMap<SegmentId, Arc<SegmentReader>>,
+    segments: HashMap<SegmentId, SegmentReader>,
 }
 
 #[derive(Default, Clone)]
@@ -37,12 +37,8 @@ pub struct NumericalFieldReader {
 }
 
 impl NumericalFieldReader {
-    pub fn get_segment(&self, segment: &SegmentId) -> Arc<SegmentReader> {
-        Arc::clone(self.inner.segments.get(segment).unwrap())
-    }
-
     pub fn borrow_segment(&self, segment: &SegmentId) -> &SegmentReader {
-        self.inner.segments.get(segment).unwrap()
+        self.inner.segments.get(segment).as_ref().unwrap()
     }
 }
 
@@ -91,7 +87,7 @@ impl NumericalFieldReader {
 
             segments.insert(
                 reader.segment_id(),
-                Arc::new(SegmentReader {
+                SegmentReader {
                     row_reader: reader.row_fields().clone(),
                     columnar_readers: ColumnarReaders {
                         u64s,
@@ -100,7 +96,8 @@ impl NumericalFieldReader {
                         f64s,
                     },
                     field_ids,
-                }),
+                    row: None,
+                },
             );
         }
 
@@ -110,6 +107,7 @@ impl NumericalFieldReader {
     }
 }
 
+#[derive(Clone)]
 struct ColumnarReaders {
     u64s: EnumMap<NumericalFieldEnum, Arc<dyn ColumnValues<u64>>>,
     f64s: EnumMap<NumericalFieldEnum, Arc<dyn ColumnValues<f64>>>,
@@ -207,7 +205,7 @@ impl From<Value> for Option<bool> {
 
 pub struct FieldReader<'a> {
     columnar_readers: &'a ColumnarReaders,
-    row: Option<tantivy::roworder::Row<'a>>,
+    row: Option<&'a tantivy::roworder::Row>,
     field_ids: &'a EnumMap<NumericalFieldEnum, u32>,
     doc: DocId,
 }
@@ -273,20 +271,47 @@ impl<'a> FieldReader<'a> {
     }
 }
 
+struct Row {
+    doc: DocId,
+    row: tantivy::roworder::Row,
+}
+
 pub struct SegmentReader {
     columnar_readers: ColumnarReaders,
     row_reader: tantivy::roworder::readers::RowFieldReaders,
     field_ids: EnumMap<NumericalFieldEnum, u32>,
+    row: Option<Row>,
+}
+
+impl Clone for SegmentReader {
+    fn clone(&self) -> Self {
+        Self {
+            columnar_readers: self.columnar_readers.clone(),
+            row_reader: self.row_reader.clone(),
+            field_ids: self.field_ids.clone(),
+            row: None,
+        }
+    }
 }
 
 impl SegmentReader {
+    pub fn prepare_row_for_doc(&mut self, doc: DocId) {
+        self.row = Some(Row {
+            doc,
+            row: self.row_reader.row_index().get_row(doc as usize).unwrap(),
+        });
+    }
+
     pub fn get_field_reader(&self, doc: DocId) -> FieldReader<'_> {
-        let row = self.row_reader.row_index().get_row(doc as usize);
+        debug_assert!(
+            self.row.as_ref().map(|r| r.doc == doc).unwrap_or(true),
+            "Row prepared for wrong doc"
+        );
 
         FieldReader {
             columnar_readers: &self.columnar_readers,
             field_ids: &self.field_ids,
-            row,
+            row: self.row.as_ref().map(|r| &r.row),
             doc,
         }
     }

@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use tantivy::{
     postings::{Postings, SegmentPostings},
     query::Scorer,
@@ -126,7 +124,7 @@ impl Scorer for AllScorer {
 }
 
 pub struct EmptyFieldScorer {
-    pub segment_reader: Arc<numericalfield_reader::SegmentReader>,
+    pub segment_reader: numericalfield_reader::SegmentReader,
     pub num_tokens_columnfield: NumericalFieldEnum,
     pub all_scorer: AllScorer,
 }
@@ -211,7 +209,7 @@ pub struct NormalPatternScorer {
     right: Vec<u32>,
     phrase_count: u32,
     num_tokens_field: NumericalFieldEnum,
-    segment_reader: Arc<numericalfield_reader::SegmentReader>,
+    segment_reader: numericalfield_reader::SegmentReader,
 }
 
 impl NormalPatternScorer {
@@ -223,7 +221,7 @@ impl NormalPatternScorer {
         columnfield_reader: NumericalFieldReader,
     ) -> Self {
         let num_query_terms = term_postings_list.len();
-        let segment_reader = columnfield_reader.get_segment(&segment);
+        let segment_reader = columnfield_reader.borrow_segment(&segment).clone();
 
         let mut s = Self {
             pattern_all_simple: pattern.iter().all(|p| matches!(p, SmallPatternPart::Term)),

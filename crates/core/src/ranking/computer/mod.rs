@@ -160,7 +160,7 @@ pub struct OpticBoosts {
 pub struct SegmentReader {
     text_fields: EnumMap<TextFieldEnum, TextFieldData>,
     optic_boosts: OpticBoosts,
-    numericalfield_reader: Arc<numericalfield_reader::SegmentReader>,
+    numericalfield_reader: numericalfield_reader::SegmentReader,
 }
 
 impl SegmentReader {
@@ -170,6 +170,10 @@ impl SegmentReader {
 
     pub fn numericalfield_reader(&self) -> &numericalfield_reader::SegmentReader {
         &self.numericalfield_reader
+    }
+
+    pub fn prepare_for_doc(&mut self, doc: DocId) {
+        self.numericalfield_reader.prepare_row_for_doc(doc);
     }
 }
 
@@ -410,8 +414,9 @@ impl SignalComputer {
         segment_reader: &tantivy::SegmentReader,
         numericalfield_reader: &numericalfield_reader::NumericalFieldReader,
     ) -> Result<()> {
-        let numericalfield_segment_reader =
-            numericalfield_reader.get_segment(&segment_reader.segment_id());
+        let numericalfield_segment_reader = numericalfield_reader
+            .borrow_segment(&segment_reader.segment_id())
+            .clone();
         let text_fields = self.prepare_textfields(tv_searcher, segment_reader)?;
         let optic_rule_boosts =
             self.prepare_optic(tv_searcher, segment_reader, numericalfield_reader);

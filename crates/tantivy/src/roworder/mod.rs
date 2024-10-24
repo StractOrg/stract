@@ -255,12 +255,12 @@ impl RowValue {
     }
 }
 
-pub struct Row<'a> {
-    index: &'a [Option<usize>],
+pub struct Row {
+    index: Vec<Option<usize>>,
     values: Vec<RowValue>,
 }
 
-impl<'a> fmt::Debug for Row<'a> {
+impl fmt::Debug for Row {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Row").field("values", &self.values).finish()
     }
@@ -288,7 +288,7 @@ impl AsFieldId for u32 {
     }
 }
 
-impl<'a> Row<'a> {
+impl Row {
     pub fn get<F: AsFieldId>(&self, field: &F) -> Option<&RowValue> {
         self.get_by_field_id(field.field_id())
     }
@@ -427,7 +427,7 @@ impl RowIndex {
         })
     }
 
-    pub fn get_row(&self, idx: usize) -> Option<Row<'_>> {
+    pub fn get_row(&self, idx: usize) -> Option<Row> {
         if self.header.field_order().is_empty() {
             return None;
         }
@@ -456,12 +456,12 @@ impl RowIndex {
         }
 
         Some(Row {
-            index: &self.index,
+            index: self.index.clone(),
             values,
         })
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Row<'_>> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = Row> + '_ {
         (0..self.num_rows()).filter_map(move |idx| self.get_row(idx))
     }
 
