@@ -520,20 +520,23 @@ where
             .unique()
             .collect::<Vec<_>>();
 
-        let host_nodes = self
-            .inbound_vecs(&host_nodes)
-            .await
-            .into_iter()
-            .zip_eq(host_nodes)
-            .map(|(v, n)| (n, v))
-            .collect::<HashMap<_, _>>();
+        let inbound_vecs = if !query.fetch_backlinks() {
+            HashMap::default()
+        } else {
+            self.inbound_vecs(&host_nodes)
+                .await
+                .into_iter()
+                .zip_eq(host_nodes)
+                .map(|(v, n)| (n, v))
+                .collect::<HashMap<_, _>>()
+        };
 
         let mut num_results = 0;
 
         for result in initial_results {
             num_results += result.local_result.websites.len();
             for website in result.local_result.websites {
-                let inbound = host_nodes
+                let inbound = inbound_vecs
                     .get(website.host_id())
                     .cloned()
                     .unwrap_or_default();
@@ -551,7 +554,7 @@ where
         for result in live_results {
             num_results += result.local_result.websites.len();
             for website in result.local_result.websites {
-                let inbound = host_nodes
+                let inbound = inbound_vecs
                     .get(website.host_id())
                     .cloned()
                     .unwrap_or_default();
@@ -578,6 +581,10 @@ where
     }
 
     async fn inbound_scorer(&self, query: &SearchQuery) -> inbound_similarity::Scorer {
+        if !query.fetch_backlinks() {
+            return inbound_similarity::Scorer::empty();
+        }
+
         match self.webgraph.as_ref() {
             Some(webgraph) => {
                 let host_rankings = query.host_rankings();

@@ -144,6 +144,11 @@ impl SearchQuery {
         rankings
     }
 
+    pub fn fetch_backlinks(&self) -> bool {
+        let host_rankings = self.host_rankings();
+        !host_rankings.liked.is_empty() || !host_rankings.disliked.is_empty()
+    }
+
     pub fn text(&self) -> &str {
         &self.query
     }
