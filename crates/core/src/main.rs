@@ -241,9 +241,6 @@ enum WebgraphOptions {
     Merge {
         #[clap(required = true)]
         paths: Vec<String>,
-
-        #[clap(default_value_t = stract::config::defaults::Webgraph::merge_all_segments())]
-        merge_all_segments: bool,
     },
 
     /// Deploy the webgraph server. The webgraph server is responsible for serving the webgraph to the search servers.
@@ -348,10 +345,7 @@ fn main() -> Result<()> {
                 let config = load_toml_config(config_path);
                 entrypoint::Webgraph::run(&config)?;
             }
-            WebgraphOptions::Merge {
-                mut paths,
-                merge_all_segments,
-            } => {
+            WebgraphOptions::Merge { mut paths } => {
                 let mut webgraph = WebgraphBuilder::new(paths.remove(0), 0u64.into()).open()?;
 
                 for other_path in paths {
@@ -359,9 +353,7 @@ fn main() -> Result<()> {
                     webgraph.merge(other)?;
                 }
 
-                if merge_all_segments {
-                    webgraph.optimize_read()?;
-                }
+                webgraph.optimize_read()?;
             }
             WebgraphOptions::Server { config_path } => {
                 let config: config::WebgraphServerConfig = load_toml_config(config_path);

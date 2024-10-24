@@ -59,7 +59,10 @@ pub fn merge_segments<P: AsRef<Path>, D: crate::Document>(
             .min_by(|a, b| a.num_docs.cmp(&b.num_docs))
             .unwrap();
 
-        best_candidate.num_docs += segment.num_docs();
+        best_candidate.num_docs = best_candidate
+            .num_docs
+            .checked_add(segment.num_docs())
+            .expect("num docs must always be within u32::MAX");
         best_candidate.segments.push(segment);
     }
 

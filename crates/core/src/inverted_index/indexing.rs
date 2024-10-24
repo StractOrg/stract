@@ -347,4 +347,62 @@ mod test {
             search(&index, &query, &ctx, ranker.collector(ctx.clone())).expect("Search failed");
         assert_eq!(result.documents.len(), 0);
     }
+
+    #[test]
+    fn test_merge_into_max_segments() {
+        let (mut index, _dir) = InvertedIndex::temporary().expect("Unable to open index");
+
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                TEST
+                            </body>
+                        </html>
+                    "#
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test website</title>
+                            </head>
+                            <body>
+                                TEST
+                            </body>
+                        </html>
+                    "#
+                    ),
+                    "https://www.example.com",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index.commit().expect("failed to commit index");
+
+        let segments = index.segment_ids();
+
+        assert_eq!(segments.len(), 2);
+
+        index.merge_into_max_segments(1).unwrap();
+
+        let segments = index.segment_ids();
+        assert_eq!(segments.len(), 1);
+    }
 }

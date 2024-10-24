@@ -91,16 +91,43 @@ impl EdgeStore {
     pub fn optimize_read(&mut self) -> Result<()> {
         self.prepare_writer()?;
         let base_path = Path::new(&self.path);
-        let segments: Vec<_> = self.index.load_metas()?.segments.into_iter().collect();
+        let mut segments: Vec<_> = self.index.load_metas()?.segments.into_iter().collect();
+        segments.sort_by_key(|a| a.max_doc());
 
-        tantivy::merge_segments(
-            self.writer
-                .as_mut()
-                .expect("writer should have been prepared"),
-            segments,
-            base_path,
-            1,
-        )?;
+        let mut num_docs: tantivy::DocId = 0;
+        let mut segments_to_merge = Vec::new();
+
+        for segment in segments {
+            if num_docs.saturating_add(segment.max_doc()) > tantivy::TERMINATED {
+                let segments_to_merge = std::mem::take(&mut segments_to_merge);
+                num_docs = 0;
+
+                if segments_to_merge.len() > 1 {
+                    tantivy::merge_segments(
+                        self.writer
+                            .as_mut()
+                            .expect("writer should have been prepared"),
+                        segments_to_merge,
+                        base_path,
+                        1,
+                    )?;
+                }
+            } else {
+                num_docs += segment.max_doc();
+                segments_to_merge.push(segment);
+            }
+        }
+
+        if !segments_to_merge.is_empty() {
+            tantivy::merge_segments(
+                self.writer
+                    .as_mut()
+                    .expect("writer should have been prepared"),
+                segments_to_merge,
+                base_path,
+                1,
+            )?;
+        }
 
         Ok(())
     }
@@ -430,5 +457,52 @@ mod tests {
         assert_eq!(edges[0].from, e2.from.id());
         assert_eq!(edges[1].from, e3.from.id());
         assert_eq!(edges[2].from, e1.from.id());
+    }
+
+    #[test]
+    fn test_optimize_read() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut store = EdgeStore::open(&temp_dir, ShardId::new(0)).unwrap();
+
+        store
+            .insert(Edge {
+                from: Node::from("https://www.first.com").into_host(),
+                to: Node::from("https://www.second.com").into_host(),
+                label: String::new(),
+                rel_flags: RelFlags::default(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+        store.commit().unwrap();
+
+        store
+            .insert(Edge {
+                from: Node::from("https://www.second.com").into_host(),
+                to: Node::from("https://www.first.com").into_host(),
+                label: String::new(),
+                rel_flags: RelFlags::default(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+        store.commit().unwrap();
+
+        store
+            .insert(Edge {
+                from: Node::from("https://www.third.com").into_host(),
+                to: Node::from("https://www.first.com").into_host(),
+                label: String::new(),
+                rel_flags: RelFlags::default(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+        store.commit().unwrap();
+
+        let segments = store.index.load_metas().unwrap().segments;
+        assert_eq!(segments.len(), 3);
+
+        store.optimize_read().unwrap();
+
+        let segments = store.index.load_metas().unwrap().segments;
+        assert_eq!(segments.len(), 1);
     }
 }
