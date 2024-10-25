@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use itertools::Itertools;
 use tantivy::query::ShortCircuitQuery;
 
 use super::{
@@ -27,7 +26,7 @@ use crate::{
     webgraph::{
         doc_address::DocAddress,
         document::Edge,
-        schema::{Field, FromHostId, FromId, RelFlags, ToHostId, ToId},
+        schema::{Field, FromHostId, FromId, RelFlags, SortScore, ToHostId, ToId},
         searcher::Searcher,
         EdgeLimit, Node, NodeID, SmallEdge, SmallEdgeWithLabel,
     },
@@ -38,10 +37,11 @@ pub fn fetch_small_edges<F: Field>(
     searcher: &Searcher,
     mut doc_ids: Vec<DocAddress>,
     node_id_field: F,
-) -> Result<Vec<(NodeID, crate::webpage::RelFlags)>> {
+) -> Result<Vec<(NodeID, crate::webpage::RelFlags, f64)>> {
     doc_ids.sort_unstable_by_key(|doc| doc.segment_ord);
     let mut prev_segment_id = None;
     let mut field_column = None;
+    let mut score_column = None;
     let mut rel_flags_column = None;
 
     let mut edges = Vec::with_capacity(doc_ids.len());
@@ -57,6 +57,7 @@ pub fn fetch_small_edges<F: Field>(
             );
             field_column = Some(segment_column_fields.u64(node_id_field).unwrap());
             rel_flags_column = Some(segment_column_fields.u64(RelFlags).unwrap());
+            score_column = Some(segment_column_fields.f64(SortScore).unwrap());
         }
 
         let Some(id) = field_column.as_ref().unwrap().first(doc.doc_id) else {
@@ -65,8 +66,15 @@ pub fn fetch_small_edges<F: Field>(
         let Some(rel_flags) = rel_flags_column.as_ref().unwrap().first(doc.doc_id) else {
             continue;
         };
+        let Some(sort_score) = score_column.as_ref().unwrap().first(doc.doc_id) else {
+            continue;
+        };
 
-        edges.push((NodeID::from(id), crate::webpage::RelFlags::from(rel_flags)));
+        edges.push((
+            NodeID::from(id),
+            crate::webpage::RelFlags::from(rel_flags),
+            sort_score,
+        ));
     }
 
     Ok(edges)
@@ -109,7 +117,7 @@ impl BacklinksQuery {
 impl Query for BacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
-    type IntermediateOutput = Vec<(f32, SmallEdge)>;
+    type IntermediateOutput = Vec<(f64, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
@@ -136,15 +144,20 @@ impl Query for BacklinksQuery {
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::IntermediateOutput> {
-        let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
+        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
         let nodes = fetch_small_edges(searcher, docs, FromId)?;
-        Ok(scores
+        Ok(nodes
             .into_iter()
-            .zip_eq(nodes.into_iter().map(|(node, rel_flags)| SmallEdge {
-                from: node,
-                to: self.node,
-                rel_flags,
-            }))
+            .map(|(node, rel_flags, sort_score)| {
+                (
+                    sort_score,
+                    SmallEdge {
+                        from: node,
+                        to: self.node,
+                        rel_flags,
+                    },
+                )
+            })
             .collect())
     }
 
@@ -189,7 +202,7 @@ impl HostBacklinksQuery {
 impl Query for HostBacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
-    type IntermediateOutput = Vec<(f32, SmallEdge)>;
+    type IntermediateOutput = Vec<(f64, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
@@ -229,15 +242,20 @@ impl Query for HostBacklinksQuery {
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::IntermediateOutput> {
-        let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
+        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
         let nodes = fetch_small_edges(searcher, docs, FromHostId)?;
-        Ok(scores
+        Ok(nodes
             .into_iter()
-            .zip_eq(nodes.into_iter().map(|(node, rel_flags)| SmallEdge {
-                from: node,
-                to: self.node,
-                rel_flags,
-            }))
+            .map(|(node, rel_flags, score)| {
+                (
+                    score,
+                    SmallEdge {
+                        from: node,
+                        to: self.node,
+                        rel_flags,
+                    },
+                )
+            })
             .collect())
     }
 
@@ -284,7 +302,7 @@ impl FullBacklinksQuery {
 impl Query for FullBacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
-    type IntermediateOutput = Vec<(f32, Edge)>;
+    type IntermediateOutput = Vec<Edge>;
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
@@ -314,9 +332,9 @@ impl Query for FullBacklinksQuery {
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::IntermediateOutput> {
-        let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
+        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
         let edges = fetch_edges(searcher, docs)?;
-        Ok(scores.into_iter().zip_eq(edges).collect())
+        Ok(edges)
     }
 
     fn filter_fruit_shards(
@@ -332,8 +350,8 @@ impl Query for FullBacklinksQuery {
 
     fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
         let mut edges: Vec<_> = results.into_iter().flatten().collect();
-        edges.sort_by(|(a, _), (b, _)| b.total_cmp(a));
-        edges.into_iter().map(|(_, e)| e).collect()
+        edges.sort_by(|a, b| b.sort_score.total_cmp(&a.sort_score));
+        edges
     }
 }
 
@@ -362,7 +380,7 @@ impl FullHostBacklinksQuery {
 impl Query for FullHostBacklinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
-    type IntermediateOutput = Vec<(f32, Edge)>;
+    type IntermediateOutput = Vec<Edge>;
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
@@ -402,17 +420,16 @@ impl Query for FullHostBacklinksQuery {
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::IntermediateOutput> {
-        let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
+        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
         let edges = fetch_edges(searcher, docs)?;
-        Ok(scores
+
+        Ok(edges
             .into_iter()
-            .zip_eq(edges.into_iter().map(|e| Edge {
+            .map(|e| Edge {
                 from: e.from.into_host(),
                 to: e.to.into_host(),
-                rel_flags: e.rel_flags,
-                label: e.label,
-                sort_score: e.sort_score,
-            }))
+                ..e
+            })
             .collect())
     }
 
@@ -429,8 +446,8 @@ impl Query for FullHostBacklinksQuery {
 
     fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
         let mut edges: Vec<_> = results.into_iter().flatten().collect();
-        edges.sort_by(|(a, _), (b, _)| b.total_cmp(a));
-        edges.into_iter().map(|(_, e)| e).collect()
+        edges.sort_by(|a, b| b.sort_score.total_cmp(&a.sort_score));
+        edges
     }
 }
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
@@ -458,7 +475,7 @@ impl BacklinksWithLabelsQuery {
 impl Query for BacklinksWithLabelsQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
-    type IntermediateOutput = Vec<(f32, SmallEdgeWithLabel)>;
+    type IntermediateOutput = Vec<(f64, SmallEdgeWithLabel)>;
     type Output = Vec<SmallEdgeWithLabel>;
 
     fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
@@ -480,16 +497,21 @@ impl Query for BacklinksWithLabelsQuery {
         searcher: &Searcher,
         fruit: <Self::Collector as super::Collector>::Fruit,
     ) -> Result<Self::IntermediateOutput> {
-        let (scores, docs): (Vec<_>, Vec<_>) = fruit.into_iter().unzip();
+        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
         let edges = fetch_edges(searcher, docs)?;
-        Ok(scores
+        Ok(edges
             .into_iter()
-            .zip_eq(edges.into_iter().map(|e| SmallEdgeWithLabel {
-                from: e.from.id(),
-                to: e.to.id(),
-                rel_flags: e.rel_flags,
-                label: e.label,
-            }))
+            .map(|e| {
+                (
+                    e.sort_score,
+                    SmallEdgeWithLabel {
+                        from: e.from.id(),
+                        to: e.to.id(),
+                        rel_flags: e.rel_flags,
+                        label: e.label,
+                    },
+                )
+            })
             .collect())
     }
 

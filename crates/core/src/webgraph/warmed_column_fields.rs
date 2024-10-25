@@ -24,12 +24,20 @@ use crate::{enum_map::EnumMap, Result};
 #[derive(Debug, Clone)]
 pub struct SegmentColumnFields {
     u64_fields: EnumMap<FieldEnumDiscriminants, Column<u64>>,
+    f64_fields: EnumMap<FieldEnumDiscriminants, Column<f64>>,
 }
 
 impl SegmentColumnFields {
     pub fn u64<F: Field>(&self, field: F) -> Option<Column<u64>> {
         let field_enum: FieldEnum = field.into();
         self.u64_fields
+            .get(FieldEnumDiscriminants::from(field_enum))
+            .cloned()
+    }
+
+    pub fn f64<F: Field>(&self, field: F) -> Option<Column<f64>> {
+        let field_enum: FieldEnum = field.into();
+        self.f64_fields
             .get(FieldEnumDiscriminants::from(field_enum))
             .cloned()
     }
@@ -45,6 +53,7 @@ impl WarmedColumnFields {
         let mut segments = HashMap::new();
         for segment in tantivy_searcher.segment_readers() {
             let mut u64_fields = EnumMap::new();
+            let mut f64_fields = EnumMap::new();
             for field in FieldEnum::iter() {
                 match field.field_type() {
                     tantivy::schema::FieldType::U64(numeric_options)
@@ -53,10 +62,22 @@ impl WarmedColumnFields {
                         let column = segment.column_fields().u64(field.name())?;
                         u64_fields.insert(field.into(), column);
                     }
+                    tantivy::schema::FieldType::F64(numeric_options)
+                        if numeric_options.is_columnar() =>
+                    {
+                        let column = segment.column_fields().f64(field.name())?;
+                        f64_fields.insert(field.into(), column);
+                    }
                     _ => {}
                 }
             }
-            segments.insert(segment.segment_id(), SegmentColumnFields { u64_fields });
+            segments.insert(
+                segment.segment_id(),
+                SegmentColumnFields {
+                    u64_fields,
+                    f64_fields,
+                },
+            );
         }
 
         Ok(Self { segments })
