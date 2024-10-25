@@ -2,12 +2,12 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { deleteQuery } from '$lib/db';
 
 export async function POST({ request }: RequestEvent): Promise<Response> {
-  const {
-    id,
-  }: {
-    id: number;
-  } = await request.json();
-  deleteQuery(id);
+	const {
+		id
+	}: {
+		id: number;
+	} = await request.json();
+	deleteQuery(id);
 
-  return new Response('OK');
+	return new Response('OK');
 }

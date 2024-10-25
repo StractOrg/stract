@@ -114,7 +114,10 @@ export function getSearchResults(qid: string): SearchResult[] {
   }));
 }
 
-export const saveSearchResults = (qid: string, searchResults: SearchResult[]) => {
+export const saveSearchResults = (
+  qid: string,
+  searchResults: SearchResult[],
+) => {
   const upsertSearchResults = db.prepare(`
     INSERT INTO search_results (qid, url, orig_rank, webpage_json, annotation)
     VALUES (@qid, @url, @origRank, @webpageJson, @annotation)
@@ -131,7 +134,7 @@ export const saveSearchResults = (qid: string, searchResults: SearchResult[]) =>
       annotation: searchResult.annotation,
     });
   }
-}
+};
 
 export function getQuery(qid: String): Query | undefined {
   const query = db.prepare(`

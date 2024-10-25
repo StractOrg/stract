@@ -1,9 +1,9 @@
 <script lang="ts">
-  import Home from '~icons/heroicons/home-20-solid';
-  import ArrowLeft from '~icons/heroicons/arrow-left-20-solid';
-  import ArrowRight from '~icons/heroicons/arrow-right-20-solid';
+  import Home from "~icons/heroicons/home-20-solid";
+  import ArrowLeft from "~icons/heroicons/arrow-left-20-solid";
+  import ArrowRight from "~icons/heroicons/arrow-right-20-solid";
   import type { PageData } from "./$types";
-  import { browser } from '$app/environment';
+  import { browser } from "$app/environment";
 
   $: shownSignals = -1;
   $: searchResults = data.searchResults;
@@ -23,7 +23,7 @@
         qid: data.query.qid,
         results: searchResults,
       }),
-    })
+    });
   }
 
   function handleKeyPress(event: KeyboardEvent) {
@@ -62,7 +62,6 @@
       selected = 0;
       window.location.href = `/annotate/${data.nextQuery?.qid}`;
     }
-
   }
 
   $: searchResults && save();
@@ -70,25 +69,32 @@
   export let data: PageData;
 </script>
 
-<div class="flex flex-col w-full items-center mt-5">
-  <div class="max-w-xl flex flex-col space-y-5">
+<div class="mt-5 flex w-full flex-col items-center">
+  <div class="flex max-w-xl flex-col space-y-5">
     <div class="flex w-full justify-around">
-      <div class="w-8 h-8">
-        <a href="/" class="w-full h-full text-sky-300 hover:text-sky-500">
-          <Home class="w-full h-full"/>
+      <div class="h-8 w-8">
+        <a href="/" class="h-full w-full text-sky-300 hover:text-sky-500">
+          <Home class="h-full w-full" />
         </a>
       </div>
       <div class="text-xl">
         <div>
-          <b class="font-bold">Query:</b> {data.query.query}
+          <b class="font-bold">Query:</b>
+          {data.query.query}
         </div>
       </div>
       <div class="flex">
-        <a href="/annotate/{data.previousQuery?.qid}" class="text-orange-300 hover:text-orange-500">
-          <ArrowLeft class="w-6 h-6"/>
+        <a
+          href="/annotate/{data.previousQuery?.qid}"
+          class="text-orange-300 hover:text-orange-500"
+        >
+          <ArrowLeft class="h-6 w-6" />
         </a>
-        <a href="/annotate/{data.nextQuery?.qid}" class="text-orange-300 hover:text-orange-500">
-          <ArrowRight class="w-6 h-6"/>
+        <a
+          href="/annotate/{data.nextQuery?.qid}"
+          class="text-orange-300 hover:text-orange-500"
+        >
+          <ArrowRight class="h-6 w-6" />
         </a>
       </div>
     </div>
@@ -97,9 +103,16 @@
         <div id={res.id}>
           <div class="relative">
             <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-            <div role="listitem" class="py-2 px-2 {selected == i ? 'bg-slate-300' : 'bg-slate-100'} border shadow-sm rounded-lg" on:click={() => selected = i} on:keypress={handleKeyPress}>
-              <div class="w-full flex justify-between">
-                <a href="{res.webpage.url}" target="_blank">{res.webpage.url}</a>
+            <div
+              role="listitem"
+              class="px-2 py-2 {selected == i
+                ? 'bg-slate-300'
+                : 'bg-slate-100'} rounded-lg border shadow-sm"
+              on:click={() => (selected = i)}
+              on:keypress={handleKeyPress}
+            >
+              <div class="flex w-full justify-between">
+                <a href={res.webpage.url} target="_blank">{res.webpage.url}</a>
                 {#if res.annotation != null}
                   {#if res.annotation == 4}
                     <div class="text-green-600">{res.annotation}</div>
@@ -115,17 +128,25 @@
                 {/if}
               </div>
               <div class="font-bold">
-                <a href="{res.webpage.url}" target="_blank">{res.webpage.title}</a>
+                <a href={res.webpage.url} target="_blank">{res.webpage.title}</a
+                >
               </div>
               <div class="line-clamp-3 text-sm">
                 {res.webpage.snippet}
               </div>
-              <div class="text-sm mt-2 text-slate-500">
-                Host centrality: {res.webpage.rankingSignals["host_centrality"].toFixed(3)}
-                Tracker score: {res.webpage.rankingSignals["tracker_score"].toFixed(3)}
+              <div class="mt-2 text-sm text-slate-500">
+                Host centrality: {res.webpage.rankingSignals[
+                  "host_centrality"
+                ].toFixed(3)}
+                Tracker score: {res.webpage.rankingSignals[
+                  "tracker_score"
+                ].toFixed(3)}
               </div>
               <div>
-                <button class="text-sm text-slate-500" on:click={() => shownSignals = (shownSignals == i) ? -1 : i}>
+                <button
+                  class="text-sm text-slate-500"
+                  on:click={() => (shownSignals = shownSignals == i ? -1 : i)}
+                >
                   {shownSignals === i ? "Hide" : "Show"} signals
                 </button>
               </div>
@@ -149,4 +170,4 @@
   </div>
 </div>
 
-<svelte:window on:keydown={handleKeyPress}/>
+<svelte:window on:keydown={handleKeyPress} />

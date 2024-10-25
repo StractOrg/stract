@@ -50,8 +50,8 @@
 		"ts-pattern": "^5.1.1"
 	},
 	"overrides": {
-    "@sveltejs/kit": {
-      "cookie": "^0.7.0"
-    }
-  }
+		"@sveltejs/kit": {
+			"cookie": "^0.7.0"
+		}
+	}
 }

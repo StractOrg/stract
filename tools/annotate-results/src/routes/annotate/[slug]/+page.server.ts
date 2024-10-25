@@ -1,4 +1,10 @@
-import { getNextQuery, getPreviousQuery, getQuery, getSearchResults, saveSearchResults } from "$lib/db";
+import {
+  getNextQuery,
+  getPreviousQuery,
+  getQuery,
+  getSearchResults,
+  saveSearchResults,
+} from "$lib/db";
 import type { Webpage } from "$lib/webpage";
 import { asSimpleWebpage } from "$lib/webpage";
 import { redirect } from "@sveltejs/kit";
@@ -26,7 +32,6 @@ export const load = async ({ params }) => {
   const { slug } = params;
   const qid = slug;
 
-
   if (!getQuery(qid)) {
     throw redirect(301, "/");
   }
@@ -39,7 +44,7 @@ export const load = async ({ params }) => {
 
   if (searchResults.length === 0) {
     const webpages = (await search(query.query)).map((w) => asSimpleWebpage(w));
-    
+
     searchResults = webpages.map((w, i) => ({
       id: `${query.qid}-${w.url}`,
       origRank: i,
@@ -53,7 +58,10 @@ export const load = async ({ params }) => {
   // sort results by annotation and then origRank
   // annotation is 0-4 where 4 is best, null is unannotated
   searchResults.sort((a, b) => {
-    if ((a.annotation === null && b.annotation === null) || a.annotation === b.annotation) {
+    if (
+      (a.annotation === null && b.annotation === null) ||
+      a.annotation === b.annotation
+    ) {
       return a.origRank - b.origRank;
     } else if (a.annotation === null) {
       return 1;
