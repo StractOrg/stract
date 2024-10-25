@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use rustc_hash::FxHashSet;
 use tantivy::{columnar::Column, postings::SegmentPostings, DocSet};
 
 use crate::webgraph::{
@@ -100,7 +101,7 @@ impl tantivy::query::Weight for HostLinksWeight {
 struct HostLinksScorer {
     postings: SegmentPostings,
     host_id_column: Column<u64>,
-    last_host_id: Option<u64>,
+    seen_host_ids: FxHashSet<u64>,
 }
 
 impl HostLinksScorer {
@@ -118,10 +119,18 @@ impl HostLinksScorer {
         Ok(reader
             .inverted_index(term.field())?
             .read_postings(&term, tantivy::schema::IndexRecordOption::Basic)?
-            .map(|postings| Self {
-                last_host_id: host_id_column.first(postings.doc()),
-                host_id_column,
-                postings,
+            .map(|postings| {
+                let mut seen_host_ids = FxHashSet::default();
+
+                if let Some(host_id) = host_id_column.first(postings.doc()) {
+                    seen_host_ids.insert(host_id);
+                }
+
+                Self {
+                    seen_host_ids,
+                    host_id_column,
+                    postings,
+                }
             }))
     }
 }
@@ -132,6 +141,12 @@ impl HostLinksScorer {
             return None;
         }
         self.host_id_column.first(doc)
+    }
+
+    fn has_seen_host(&self, doc: tantivy::DocId) -> bool {
+        self.host_id(doc)
+            .map(|host_id| self.seen_host_ids.contains(&host_id))
+            .unwrap_or(false)
     }
 }
 
@@ -144,26 +159,25 @@ impl tantivy::DocSet for HostLinksScorer {
     fn advance(&mut self) -> tantivy::DocId {
         self.postings.advance();
 
-        while self.last_host_id
-            == self.host_id(
-                self.postings
-                    .block_cursor()
-                    .skip_reader()
-                    .last_doc_in_block(),
-            )
-            && self.doc() != tantivy::TERMINATED
+        while self.has_seen_host(
+            self.postings
+                .block_cursor()
+                .skip_reader()
+                .last_doc_in_block(),
+        ) && self.doc() != tantivy::TERMINATED
         {
             self.postings.mut_block_cursor().advance();
             self.postings.reset_cursor_start_block();
         }
 
-        while self.host_id(self.postings.doc()) == self.last_host_id
-            && self.doc() != tantivy::TERMINATED
-        {
+        while self.has_seen_host(self.postings.doc()) && self.doc() != tantivy::TERMINATED {
             self.postings.advance();
         }
 
-        self.last_host_id = self.host_id(self.postings.doc());
+        if let Some(host_id) = self.host_id(self.postings.doc()) {
+            self.seen_host_ids.insert(host_id);
+        }
+
         self.postings.doc()
     }
 
