@@ -73,5 +73,10 @@
   },
   "engines": {
     "node": "^20.10.x"
+  },
+  "overrides": {
+    "@sveltejs/kit" : {
+      "cookie": "^0.7.0"
+    }
   }
 }

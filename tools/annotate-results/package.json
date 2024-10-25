@@ -41,5 +41,10 @@
     "cassandra-driver": "^4.7.2",
     "papaparse": "^5.4.1"
   },
+  "overrides": {
+    "@sveltejs/kit": {
+      "cookie": "^0.7.0"
+    }
+  },
   "type": "module"
 }
