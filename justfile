@@ -33,6 +33,7 @@ export STRACT_CARGO_ARGS := env_var_or_default("STRACT_CARGO_ARGS", "")
 
 @update:
     cargo update
+    cd crates/leechy-py && cargo update
     cd frontend && npm update
     cd crates/optics-lsp && npm update
     cd tools/annotate-results && npm update
