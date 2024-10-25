@@ -16,15 +16,23 @@
 
 use crate::ampc::dht::ShardId;
 
+use super::warmed_column_fields::WarmedColumnFields;
+
 pub struct Searcher {
     tantivy_searcher: tantivy::Searcher,
     shard: ShardId,
+    warmed_column_fields: WarmedColumnFields,
 }
 
 impl Searcher {
-    pub fn new(tantivy_searcher: tantivy::Searcher, shard: ShardId) -> Self {
+    pub fn new(
+        tantivy_searcher: tantivy::Searcher,
+        warmed_column_fields: WarmedColumnFields,
+        shard: ShardId,
+    ) -> Self {
         Self {
             tantivy_searcher,
+            warmed_column_fields,
             shard,
         }
     }
@@ -35,5 +43,9 @@ impl Searcher {
 
     pub fn tantivy_searcher(&self) -> &tantivy::Searcher {
         &self.tantivy_searcher
+    }
+
+    pub fn warmed_column_fields(&self) -> &WarmedColumnFields {
+        &self.warmed_column_fields
     }
 }

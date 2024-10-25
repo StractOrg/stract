@@ -26,6 +26,7 @@ use super::{
     query::collector::{Collector, TantivyCollector},
     schema::{self, create_schema, Field, FromHostId, FromId, ToHostId, ToId},
     searcher::Searcher,
+    warmed_column_fields::WarmedColumnFields,
     Edge,
 };
 use crate::{ampc::dht::ShardId, webpage::html::links::RelFlags, Result};
@@ -44,6 +45,7 @@ pub struct EdgeStore {
     reader: tantivy::IndexReader,
     shard_id: ShardId,
     path: PathBuf,
+    warmed_column_fields: WarmedColumnFields,
 }
 
 impl EdgeStore {
@@ -63,12 +65,15 @@ impl EdgeStore {
             })
             .open_or_create(MmapDirectory::open(&path)?)?;
 
+        let warmed_column_fields = WarmedColumnFields::new(&index.reader()?.searcher())?;
+
         Ok(Self {
             path: path.as_ref().to_path_buf(),
             writer: None,
             reader: index.reader()?,
             index,
             shard_id,
+            warmed_column_fields,
             writer_dedup: FxHashSet::default(),
         })
     }
@@ -129,6 +134,8 @@ impl EdgeStore {
             )?;
         }
 
+        self.commit()?;
+
         Ok(())
     }
 
@@ -154,6 +161,7 @@ impl EdgeStore {
             .commit()?;
         self.writer_dedup.clear();
         self.reader.reload()?;
+        self.warmed_column_fields = WarmedColumnFields::new(&self.reader.searcher())?;
         Ok(())
     }
 
@@ -217,15 +225,21 @@ impl EdgeStore {
     }
 
     fn searcher(&self) -> Searcher {
-        Searcher::new(self.reader.searcher(), self.shard_id)
+        Searcher::new(
+            self.reader.searcher(),
+            self.warmed_column_fields.clone(),
+            self.shard_id,
+        )
     }
 
     pub fn search_initial<Q: Query>(
         &self,
         query: &Q,
     ) -> Result<<Q::Collector as Collector>::Fruit> {
-        let res = self.searcher().tantivy_searcher().search(
-            &query.tantivy_query(),
+        let searcher = self.searcher();
+
+        let res = searcher.tantivy_searcher().search(
+            &query.tantivy_query(&searcher),
             &TantivyCollector::from(&query.collector(self.shard_id)),
         )?;
 

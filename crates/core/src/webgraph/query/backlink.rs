@@ -49,14 +49,14 @@ pub fn fetch_small_edges<F: Field>(
     for doc in doc_ids {
         if Some(doc.segment_ord) != prev_segment_id {
             prev_segment_id = Some(doc.segment_ord);
-            let segment_reader = searcher.tantivy_searcher().segment_reader(doc.segment_ord);
-            field_column = Some(
-                segment_reader
-                    .column_fields()
-                    .u64(node_id_field.name())
-                    .unwrap(),
+            let segment_column_fields = searcher.warmed_column_fields().segment(
+                &searcher
+                    .tantivy_searcher()
+                    .segment_reader(doc.segment_ord)
+                    .segment_id(),
             );
-            rel_flags_column = Some(segment_reader.column_fields().u64(RelFlags.name()).unwrap());
+            field_column = Some(segment_column_fields.u64(node_id_field).unwrap());
+            rel_flags_column = Some(segment_column_fields.u64(RelFlags).unwrap());
         }
 
         let Some(id) = field_column.as_ref().unwrap().first(doc.doc_id) else {
@@ -112,7 +112,7 @@ impl Query for BacklinksQuery {
     type IntermediateOutput = Vec<(f32, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
         match self.limit {
             EdgeLimit::Unlimited => Box::new(LinksQuery::new(self.node, ToId)),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => Box::new(
@@ -192,12 +192,22 @@ impl Query for HostBacklinksQuery {
     type IntermediateOutput = Vec<(f32, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
         match self.limit {
-            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(self.node, ToHostId, FromHostId)),
+            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(
+                self.node,
+                ToHostId,
+                FromHostId,
+                searcher.warmed_column_fields().clone(),
+            )),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
                 Box::new(ShortCircuitQuery::new(
-                    Box::new(HostLinksQuery::new(self.node, ToHostId, FromHostId)),
+                    Box::new(HostLinksQuery::new(
+                        self.node,
+                        ToHostId,
+                        FromHostId,
+                        searcher.warmed_column_fields().clone(),
+                    )),
                     limit as u64,
                 ))
             }
@@ -277,7 +287,7 @@ impl Query for FullBacklinksQuery {
     type IntermediateOutput = Vec<(f32, Edge)>;
     type Output = Vec<Edge>;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
         match self.limit {
             EdgeLimit::Unlimited => Box::new(LinksQuery::new(self.node.id(), ToId)),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
@@ -355,12 +365,13 @@ impl Query for FullHostBacklinksQuery {
     type IntermediateOutput = Vec<(f32, Edge)>;
     type Output = Vec<Edge>;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
         match self.limit {
             EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(
                 self.node.clone().into_host().id(),
                 ToHostId,
                 FromHostId,
+                searcher.warmed_column_fields().clone(),
             )),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
                 Box::new(ShortCircuitQuery::new(
@@ -368,6 +379,7 @@ impl Query for FullHostBacklinksQuery {
                         self.node.clone().into_host().id(),
                         ToHostId,
                         FromHostId,
+                        searcher.warmed_column_fields().clone(),
                     )),
                     limit as u64,
                 ))
@@ -449,7 +461,7 @@ impl Query for BacklinksWithLabelsQuery {
     type IntermediateOutput = Vec<(f32, SmallEdgeWithLabel)>;
     type Output = Vec<SmallEdgeWithLabel>;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
         Box::new(LinksQuery::new(self.node, ToId))
     }
 

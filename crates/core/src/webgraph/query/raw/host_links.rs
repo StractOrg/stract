@@ -18,14 +18,16 @@ use tantivy::{columnar::Column, postings::SegmentPostings, DocSet};
 
 use crate::webgraph::{
     schema::{Field, FieldEnum},
+    warmed_column_fields::WarmedColumnFields,
     NodeID,
 };
 
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+#[derive(Debug, Clone)]
 pub struct HostLinksQuery {
     node: NodeID,
     field: FieldEnum,
     deduplication_field: FieldEnum,
+    warmed_column_fields: WarmedColumnFields,
 }
 
 impl HostLinksQuery {
@@ -33,11 +35,13 @@ impl HostLinksQuery {
         node: NodeID,
         lookup_field: F,
         deduplication_field: FDedup,
+        warmed_column_fields: WarmedColumnFields,
     ) -> Self {
         Self {
             node,
             field: lookup_field.into(),
             deduplication_field: deduplication_field.into(),
+            warmed_column_fields,
         }
     }
 }
@@ -51,6 +55,7 @@ impl tantivy::query::Query for HostLinksQuery {
             node: self.node,
             field: self.field,
             deduplication_field: self.deduplication_field,
+            warmed_column_fields: self.warmed_column_fields.clone(),
         }))
     }
 }
@@ -59,6 +64,7 @@ struct HostLinksWeight {
     node: NodeID,
     field: FieldEnum,
     deduplication_field: FieldEnum,
+    warmed_column_fields: WarmedColumnFields,
 }
 
 impl tantivy::query::Weight for HostLinksWeight {
@@ -71,7 +77,12 @@ impl tantivy::query::Weight for HostLinksWeight {
         let field = schema.get_field(self.field.name())?;
         let term = tantivy::Term::from_field_u64(field, self.node.as_u64());
 
-        match HostLinksScorer::new(reader, term, self.deduplication_field) {
+        match HostLinksScorer::new(
+            reader,
+            term,
+            self.deduplication_field,
+            &self.warmed_column_fields,
+        ) {
             Ok(Some(scorer)) => Ok(Box::new(scorer)),
             _ => Ok(Box::new(tantivy::query::EmptyScorer)),
         }
@@ -97,8 +108,12 @@ impl HostLinksScorer {
         reader: &tantivy::SegmentReader,
         term: tantivy::Term,
         deduplication_field: FieldEnum,
+        warmed_column_fields: &WarmedColumnFields,
     ) -> tantivy::Result<Option<Self>> {
-        let host_id_column = reader.column_fields().u64(deduplication_field.name())?;
+        let host_id_column = warmed_column_fields
+            .segment(&reader.segment_id())
+            .u64(deduplication_field)
+            .unwrap();
 
         Ok(reader
             .inverted_index(term.field())?

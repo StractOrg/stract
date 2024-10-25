@@ -318,3 +318,9 @@ enum_dispatch_from_discriminant!(FieldEnumDiscriminants => FieldEnum,
   Label,
   SortScore,
 ]);
+
+impl crate::enum_map::InsertEnumMapKey for FieldEnumDiscriminants {
+    fn into_usize(self) -> usize {
+        self as usize
+    }
+}

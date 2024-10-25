@@ -41,7 +41,7 @@ impl Query for InDegreeQuery {
     type IntermediateOutput = FxHashMap<ShardId, u64>;
     type Output = u64;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
         raw::DummyQuery
     }
 

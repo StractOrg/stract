@@ -69,14 +69,12 @@ pub async fn main() {
 
     let searcher = stract::searcher::LocalSearchClient::from(searcher);
 
+    let webgraph = Webgraph::open("data/webgraph", 0u64.into()).unwrap();
+
     let searcher: ApiSearcher<LocalSearchClient, LiveSearcher, Webgraph> =
-        ApiSearcher::new(searcher, bangs, config);
+        ApiSearcher::new(searcher, bangs, config).with_webgraph(webgraph);
 
     for query in queries {
-        let mut query = query;
-        query.push(' ');
-        let query = query.repeat(32);
-
         let mut desc = "search '".to_string();
         desc.push_str(&query);
         desc.push('\'');
@@ -87,7 +85,7 @@ pub async fn main() {
             .search(&SearchQuery {
                 query: query.to_string(),
                 host_rankings: Some(HostRankings {
-                    liked: vec![],
+                    liked: vec!["en.wikipedia.org".to_string()],
                     disliked: vec![],
                     blocked: vec![],
                 }),

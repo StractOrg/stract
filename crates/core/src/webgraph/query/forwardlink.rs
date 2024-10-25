@@ -61,7 +61,7 @@ impl Query for ForwardlinksQuery {
     type IntermediateOutput = Vec<(f32, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
         match self.limit {
             EdgeLimit::Unlimited => Box::new(LinksQuery::new(self.node, FromId)),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => Box::new(
@@ -143,12 +143,22 @@ impl Query for HostForwardlinksQuery {
     type IntermediateOutput = Vec<(f32, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
         match self.limit {
-            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(self.node, FromHostId, ToHostId)),
+            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(
+                self.node,
+                FromHostId,
+                ToHostId,
+                searcher.warmed_column_fields().clone(),
+            )),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
                 Box::new(ShortCircuitQuery::new(
-                    Box::new(HostLinksQuery::new(self.node, FromHostId, ToHostId)),
+                    Box::new(HostLinksQuery::new(
+                        self.node,
+                        FromHostId,
+                        ToHostId,
+                        searcher.warmed_column_fields().clone(),
+                    )),
                     limit as u64,
                 ))
             }
@@ -228,7 +238,7 @@ impl Query for FullForwardlinksQuery {
     type IntermediateOutput = Vec<(f32, Edge)>;
     type Output = Vec<Edge>;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
         match self.limit {
             EdgeLimit::Unlimited => Box::new(LinksQuery::new(self.node.id(), FromId)),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
@@ -306,12 +316,13 @@ impl Query for FullHostForwardlinksQuery {
     type IntermediateOutput = Vec<(f32, Edge)>;
     type Output = Vec<Edge>;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
         match self.limit {
             EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(
                 self.node.clone().into_host().id(),
                 FromHostId,
                 ToHostId,
+                searcher.warmed_column_fields().clone(),
             )),
             EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
                 Box::new(ShortCircuitQuery::new(
@@ -319,6 +330,7 @@ impl Query for FullHostForwardlinksQuery {
                         self.node.clone().into_host().id(),
                         FromHostId,
                         ToHostId,
+                        searcher.warmed_column_fields().clone(),
                     )),
                     limit as u64,
                 ))

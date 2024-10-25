@@ -44,6 +44,7 @@ mod schema;
 mod searcher;
 mod shortest_path;
 mod store;
+mod warmed_column_fields;
 
 #[cfg(test)]
 pub mod tests;

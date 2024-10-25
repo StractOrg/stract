@@ -34,7 +34,7 @@ impl Query for Id2NodeQuery {
     type IntermediateOutput = Option<Node>;
     type Output = Option<Node>;
 
-    fn tantivy_query(&self) -> Self::TantivyQuery {
+    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
         match self {
             Self::Page(node) => raw::Id2NodeQuery::new(*node, vec![ToId.into(), FromId.into()]),
             Self::Host(node) => {
