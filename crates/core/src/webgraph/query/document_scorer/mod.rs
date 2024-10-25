@@ -34,6 +34,10 @@ impl DocumentScorer for DefaultDocumentScorer {
     }
 
     fn score(&self, doc: DocId) -> Score {
+        if doc == tantivy::TERMINATED {
+            return 0.0;
+        }
+
         self.column.first(doc).unwrap_or(0.0) as Score
     }
 }

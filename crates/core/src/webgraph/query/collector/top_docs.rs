@@ -215,6 +215,10 @@ impl<S: DocumentScorer + 'static> SegmentCollector for TopDocsSegmentCollector<S
     type Fruit = Vec<(tantivy::Score, DocAddress)>;
 
     fn collect(&mut self, doc: DocId, _: tantivy::Score) {
+        if doc == tantivy::TERMINATED {
+            return;
+        }
+
         let score = self.scorer.score(doc);
         self.computer
             .push(score, DocAddress::new(self.shard_id, self.segment_ord, doc));

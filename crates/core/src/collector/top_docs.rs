@@ -151,7 +151,7 @@ impl TopSegmentCollector {
     }
 
     fn collect(&mut self, doc: DocId, score: Score) {
-        if self.is_done() {
+        if self.is_done() || doc == tantivy::TERMINATED {
             return;
         }
 
