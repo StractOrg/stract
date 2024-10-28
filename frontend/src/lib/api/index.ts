@@ -128,7 +128,7 @@ export const api = {
     },
     options?: ApiOptions,
   ) =>
-    requestJson<FullEdge[]>(
+    requestJson<PrettyEdge[]>(
       'POST',
       `/beta/api/webgraph/host/ingoing?${new URLSearchParams(query)}`,
       options,
@@ -150,7 +150,7 @@ export const api = {
     },
     options?: ApiOptions,
   ) =>
-    requestJson<FullEdge[]>(
+    requestJson<PrettyEdge[]>(
       'POST',
       `/beta/api/webgraph/host/outgoing?${new URLSearchParams(query)}`,
       options,
@@ -163,7 +163,7 @@ export const api = {
     },
     options?: ApiOptions,
   ) =>
-    requestJson<FullEdge[]>(
+    requestJson<PrettyEdge[]>(
       'POST',
       `/beta/api/webgraph/page/ingoing?${new URLSearchParams(query)}`,
       options,
@@ -174,7 +174,7 @@ export const api = {
     },
     options?: ApiOptions,
   ) =>
-    requestJson<FullEdge[]>(
+    requestJson<PrettyEdge[]>(
       'POST',
       `/beta/api/webgraph/page/outgoing?${new URLSearchParams(query)}`,
       options,
@@ -296,11 +296,6 @@ export type ExploreExportOpticParams = {
   chosenHosts: string[];
   similarHosts: string[];
 };
-export type FullEdge = {
-  from: Node;
-  label: string;
-  to: Node;
-};
 export type HighlightedFragment = {
   kind: HighlightedKind;
   text: string;
@@ -345,6 +340,59 @@ export type PartOfSpeechMeaning = {
   meanings: WordMeaning[];
   pos: PartOfSpeech;
 };
+export type PrettyEdge = {
+  from: string;
+  label: string;
+  rel_flags: PrettyRelFlag[];
+  to: string;
+};
+export type PrettyRelFlag =
+  | 'alternate'
+  | 'author'
+  | 'canonical'
+  | 'help'
+  | 'icon'
+  | 'license'
+  | 'me'
+  | 'next'
+  | 'no_follow'
+  | 'prev'
+  | 'privacy_policy'
+  | 'search'
+  | 'stylesheet'
+  | 'tag'
+  | 'terms_of_service'
+  | 'sponsored'
+  | 'is_in_footer'
+  | 'is_in_navigation'
+  | 'link_tag'
+  | 'script_tag'
+  | 'meta_tag'
+  | 'same_icann_domain';
+export const PRETTY_REL_FLAGS = [
+  'alternate',
+  'author',
+  'canonical',
+  'help',
+  'icon',
+  'license',
+  'me',
+  'next',
+  'no_follow',
+  'prev',
+  'privacy_policy',
+  'search',
+  'stylesheet',
+  'tag',
+  'terms_of_service',
+  'sponsored',
+  'is_in_footer',
+  'is_in_navigation',
+  'link_tag',
+  'script_tag',
+  'meta_tag',
+  'same_icann_domain',
+] satisfies PrettyRelFlag[];
 export type Property = string | StructuredData;
 export type Region = 'All' | 'Denmark' | 'France' | 'Germany' | 'Spain' | 'US';
 export const REGIONS = ['All', 'Denmark', 'France', 'Germany', 'Spain', 'US'] satisfies Region[];

@@ -45,12 +45,127 @@ pub struct SmallEdgeWithLabel {
 #[derive(
     Debug,
     Clone,
-    serde::Serialize,
-    serde::Deserialize,
     bincode::Encode,
     bincode::Decode,
+    serde::Serialize,
+    serde::Deserialize,
     utoipa::ToSchema,
 )]
+#[serde(rename_all = "snake_case")]
+pub enum PrettyRelFlag {
+    Alternate,
+    Author,
+    Canonical,
+    Help,
+    Icon,
+    License,
+    Me,
+    Next,
+    NoFollow,
+    Prev,
+    PrivacyPolicy,
+    Search,
+    Stylesheet,
+    Tag,
+    TermsOfService,
+    Sponsored,
+    IsInFooter,
+    IsInNavigation,
+    LinkTag,
+    ScriptTag,
+    MetaTag,
+    SameIcannDomain,
+}
+
+impl From<RelFlags> for Option<PrettyRelFlag> {
+    fn from(flags: RelFlags) -> Self {
+        if flags.contains(RelFlags::ALTERNATE) {
+            Some(PrettyRelFlag::Alternate)
+        } else if flags.contains(RelFlags::AUTHOR) {
+            Some(PrettyRelFlag::Author)
+        } else if flags.contains(RelFlags::CANONICAL) {
+            Some(PrettyRelFlag::Canonical)
+        } else if flags.contains(RelFlags::HELP) {
+            Some(PrettyRelFlag::Help)
+        } else if flags.contains(RelFlags::ICON) {
+            Some(PrettyRelFlag::Icon)
+        } else if flags.contains(RelFlags::LICENSE) {
+            Some(PrettyRelFlag::License)
+        } else if flags.contains(RelFlags::ME) {
+            Some(PrettyRelFlag::Me)
+        } else if flags.contains(RelFlags::NEXT) {
+            Some(PrettyRelFlag::Next)
+        } else if flags.contains(RelFlags::NOFOLLOW) {
+            Some(PrettyRelFlag::NoFollow)
+        } else if flags.contains(RelFlags::PREV) {
+            Some(PrettyRelFlag::Prev)
+        } else if flags.contains(RelFlags::PRIVACY_POLICY) {
+            Some(PrettyRelFlag::PrivacyPolicy)
+        } else if flags.contains(RelFlags::SEARCH) {
+            Some(PrettyRelFlag::Search)
+        } else if flags.contains(RelFlags::STYLESHEET) {
+            Some(PrettyRelFlag::Stylesheet)
+        } else if flags.contains(RelFlags::TAG) {
+            Some(PrettyRelFlag::Tag)
+        } else if flags.contains(RelFlags::TERMS_OF_SERVICE) {
+            Some(PrettyRelFlag::TermsOfService)
+        } else if flags.contains(RelFlags::SPONSORED) {
+            Some(PrettyRelFlag::Sponsored)
+        } else if flags.contains(RelFlags::IS_IN_FOOTER) {
+            Some(PrettyRelFlag::IsInFooter)
+        } else if flags.contains(RelFlags::IS_IN_NAVIGATION) {
+            Some(PrettyRelFlag::IsInNavigation)
+        } else if flags.contains(RelFlags::LINK_TAG) {
+            Some(PrettyRelFlag::LinkTag)
+        } else if flags.contains(RelFlags::SCRIPT_TAG) {
+            Some(PrettyRelFlag::ScriptTag)
+        } else if flags.contains(RelFlags::META_TAG) {
+            Some(PrettyRelFlag::MetaTag)
+        } else if flags.contains(RelFlags::SAME_ICANN_DOMAIN) {
+            Some(PrettyRelFlag::SameIcannDomain)
+        } else {
+            None
+        }
+    }
+}
+
+impl From<RelFlags> for Vec<PrettyRelFlag> {
+    fn from(flags: RelFlags) -> Self {
+        flags
+            .iter_names()
+            .flat_map(|(_, flag)| <Option<PrettyRelFlag>>::from(flag))
+            .collect()
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    bincode::Encode,
+    bincode::Decode,
+    serde::Serialize,
+    serde::Deserialize,
+    utoipa::ToSchema,
+)]
+pub struct PrettyEdge {
+    pub from: String,
+    pub to: String,
+    pub rel_flags: Vec<PrettyRelFlag>,
+    pub label: String,
+}
+
+impl From<Edge> for PrettyEdge {
+    fn from(edge: Edge) -> Self {
+        Self {
+            from: edge.from.as_str().to_string(),
+            to: edge.to.as_str().to_string(),
+            rel_flags: edge.rel_flags.into(),
+            label: edge.label,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Edge {
     pub from: Node,
     pub to: Node,

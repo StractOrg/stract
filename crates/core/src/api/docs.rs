@@ -93,7 +93,8 @@ use utoipa_swagger_ui::SwaggerUi;
                 explore::ExploreExportOpticParams,
 
                 crate::webgraph::Node,
-                crate::webgraph::Edge,
+                crate::webgraph::PrettyRelFlag,
+                crate::webgraph::PrettyEdge,
 
                 crate::search_prettifier::StructuredData,
                 crate::search_prettifier::OneOrManyString,

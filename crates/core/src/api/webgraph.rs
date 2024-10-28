@@ -27,7 +27,7 @@ use crate::{
             FullBacklinksQuery, FullForwardlinksQuery, FullHostBacklinksQuery,
             FullHostForwardlinksQuery,
         },
-        Edge, EdgeLimit, Node,
+        EdgeLimit, Node, PrettyEdge,
     },
 };
 
@@ -94,8 +94,7 @@ pub mod host {
         path = "/beta/api/webgraph/host/knows",
         params(KnowsHostParams),
         responses(
-            (status = 200, description = "Whether the host is known", body = KnowsHost),
-            (status = 400, description = "Invalid host", body = String),
+            (status = 200, description = "Whether the host is known", body = KnowsHost)
         )
     )]
     pub async fn knows(
@@ -126,7 +125,7 @@ pub mod host {
         path = "/beta/api/webgraph/host/ingoing",
         params(HostLinksParams),
         responses(
-            (status = 200, description = "Incoming links for a particular host", body = Vec<Edge>),
+            (status = 200, description = "Incoming links for a particular host", body = Vec<PrettyEdge>),
         )
     )]
     pub async fn ingoing_hosts(
@@ -150,7 +149,7 @@ pub mod host {
         path = "/beta/api/webgraph/host/outgoing",
         params(HostLinksParams),
         responses(
-            (status = 200, description = "Outgoing links for a particular host", body = Vec<Edge>),
+            (status = 200, description = "Outgoing links for a particular host", body = Vec<PrettyEdge>),
         )
     )]
     pub async fn outgoing_hosts(
@@ -188,7 +187,7 @@ pub mod page {
         path = "/beta/api/webgraph/page/ingoing",
         params(PageLinksParams),
         responses(
-            (status = 200, description = "Incoming links for a particular page", body = Vec<Edge>),
+            (status = 200, description = "Incoming links for a particular page", body = Vec<PrettyEdge>),
         )
     )]
     pub async fn ingoing_pages(
@@ -211,7 +210,7 @@ pub mod page {
         path = "/beta/api/webgraph/page/outgoing",
         params(PageLinksParams),
         responses(
-            (status = 200, description = "Outgoing links for a particular page", body = Vec<Edge>),
+            (status = 200, description = "Outgoing links for a particular page", body = Vec<PrettyEdge>),
         )
     )]
     pub async fn outgoing_pages(
@@ -235,20 +234,18 @@ async fn ingoing_links(
     state: Arc<State>,
     node: Node,
     level: WebgraphGranularity,
-) -> anyhow::Result<Vec<Edge>> {
+) -> anyhow::Result<Vec<PrettyEdge>> {
     match level {
-        WebgraphGranularity::Host => {
-            state
-                .webgraph
-                .search(FullHostBacklinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
-                .await
-        }
-        WebgraphGranularity::Page => {
-            state
-                .webgraph
-                .search(FullBacklinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
-                .await
-        }
+        WebgraphGranularity::Host => state
+            .webgraph
+            .search(FullHostBacklinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
+            .await
+            .map(|edges| edges.into_iter().map(PrettyEdge::from).collect()),
+        WebgraphGranularity::Page => state
+            .webgraph
+            .search(FullBacklinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
+            .await
+            .map(|edges| edges.into_iter().map(PrettyEdge::from).collect()),
     }
 }
 
@@ -256,20 +253,18 @@ async fn outgoing_links(
     state: Arc<State>,
     node: Node,
     level: WebgraphGranularity,
-) -> anyhow::Result<Vec<Edge>> {
+) -> anyhow::Result<Vec<PrettyEdge>> {
     match level {
-        WebgraphGranularity::Host => {
-            state
-                .webgraph
-                .search(FullHostForwardlinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
-                .await
-        }
-        WebgraphGranularity::Page => {
-            state
-                .webgraph
-                .search(FullForwardlinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
-                .await
-        }
+        WebgraphGranularity::Host => state
+            .webgraph
+            .search(FullHostForwardlinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
+            .await
+            .map(|edges| edges.into_iter().map(PrettyEdge::from).collect()),
+        WebgraphGranularity::Page => state
+            .webgraph
+            .search(FullForwardlinksQuery::new(node).with_limit(EdgeLimit::Limit(1024)))
+            .await
+            .map(|edges| edges.into_iter().map(PrettyEdge::from).collect()),
     }
 }
 
