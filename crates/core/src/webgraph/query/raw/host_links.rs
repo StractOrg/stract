@@ -121,11 +121,29 @@ impl HostLinksScorer {
         Ok(reader
             .inverted_index(term.field())?
             .read_postings(&term, tantivy::schema::IndexRecordOption::Basic)?
-            .map(|postings| Self {
-                last_host_id: host_id_column.first(postings.doc()),
-                host_id_column,
-                postings,
-                self_host_id,
+            .map(|mut postings| {
+                let mut last_host_id = None;
+
+                if postings.doc() != tantivy::TERMINATED {
+                    last_host_id = host_id_column.first(postings.doc());
+                }
+
+                while postings.doc() != tantivy::TERMINATED && last_host_id == Some(self_host_id) {
+                    postings.advance();
+
+                    if postings.doc() != tantivy::TERMINATED {
+                        last_host_id = host_id_column.first(postings.doc());
+                    } else {
+                        last_host_id = None;
+                    }
+                }
+
+                Self {
+                    last_host_id,
+                    host_id_column,
+                    postings,
+                    self_host_id,
+                }
             }))
     }
 }
@@ -135,6 +153,7 @@ impl HostLinksScorer {
         if doc == tantivy::TERMINATED {
             return None;
         }
+
         self.host_id_column.first(doc)
     }
 
