@@ -45,12 +45,12 @@ impl Query for InDegreeQuery {
         raw::DummyQuery
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
         FastCountCollector::new(
             ToId.name().to_string(),
             FastCountValue::U64(self.node.as_u64()),
         )
-        .with_shard_id(shard_id)
+        .with_shard_id(searcher.shard())
     }
 
     fn remote_collector(&self) -> Self::Collector {

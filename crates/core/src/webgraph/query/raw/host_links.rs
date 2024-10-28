@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use rustc_hash::FxHashSet;
 use tantivy::{columnar::Column, postings::SegmentPostings, DocSet};
 
 use crate::webgraph::{
@@ -83,6 +82,7 @@ impl tantivy::query::Weight for HostLinksWeight {
             term,
             self.deduplication_field,
             &self.warmed_column_fields,
+            self.node.as_u64(),
         ) {
             Ok(Some(scorer)) => Ok(Box::new(scorer)),
             _ => Ok(Box::new(tantivy::query::EmptyScorer)),
@@ -101,7 +101,8 @@ impl tantivy::query::Weight for HostLinksWeight {
 struct HostLinksScorer {
     postings: SegmentPostings,
     host_id_column: Column<u64>,
-    seen_host_ids: FxHashSet<u64>,
+    last_host_id: Option<u64>,
+    self_host_id: u64,
 }
 
 impl HostLinksScorer {
@@ -110,6 +111,7 @@ impl HostLinksScorer {
         term: tantivy::Term,
         deduplication_field: FieldEnum,
         warmed_column_fields: &WarmedColumnFields,
+        self_host_id: u64,
     ) -> tantivy::Result<Option<Self>> {
         let host_id_column = warmed_column_fields
             .segment(&reader.segment_id())
@@ -119,18 +121,11 @@ impl HostLinksScorer {
         Ok(reader
             .inverted_index(term.field())?
             .read_postings(&term, tantivy::schema::IndexRecordOption::Basic)?
-            .map(|postings| {
-                let mut seen_host_ids = FxHashSet::default();
-
-                if let Some(host_id) = host_id_column.first(postings.doc()) {
-                    seen_host_ids.insert(host_id);
-                }
-
-                Self {
-                    seen_host_ids,
-                    host_id_column,
-                    postings,
-                }
+            .map(|postings| Self {
+                last_host_id: host_id_column.first(postings.doc()),
+                host_id_column,
+                postings,
+                self_host_id,
             }))
     }
 }
@@ -145,8 +140,12 @@ impl HostLinksScorer {
 
     fn has_seen_host(&self, doc: tantivy::DocId) -> bool {
         self.host_id(doc)
-            .map(|host_id| self.seen_host_ids.contains(&host_id))
+            .map(|host_id| self.last_host_id == Some(host_id))
             .unwrap_or(false)
+    }
+
+    fn is_self_host(&self, doc: tantivy::DocId) -> bool {
+        self.host_id(doc) == Some(self.self_host_id)
     }
 }
 
@@ -170,15 +169,17 @@ impl tantivy::DocSet for HostLinksScorer {
             self.postings.reset_cursor_start_block();
         }
 
-        while self.has_seen_host(self.postings.doc()) && self.doc() != tantivy::TERMINATED {
+        while (self.has_seen_host(self.doc()) || self.is_self_host(self.doc()))
+            && self.doc() != tantivy::TERMINATED
+        {
             self.postings.advance();
         }
 
-        if let Some(host_id) = self.host_id(self.postings.doc()) {
-            self.seen_host_ids.insert(host_id);
+        if let Some(host_id) = self.host_id(self.doc()) {
+            self.last_host_id = Some(host_id);
         }
 
-        self.postings.doc()
+        self.doc()
     }
 
     fn doc(&self) -> tantivy::DocId {
@@ -187,5 +188,134 @@ impl tantivy::DocSet for HostLinksScorer {
 
     fn size_hint(&self) -> u32 {
         self.postings.size_hint()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        webgraph::{query::HostBacklinksQuery, Edge, Node, Webgraph},
+        webpage::RelFlags,
+    };
+
+    #[test]
+    fn test_simple() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
+
+        let node_a = Node::from("A");
+        let node_b = Node::from("B");
+        let node_c = Node::from("C");
+
+        graph
+            .insert(Edge {
+                from: node_a.clone(),
+                to: node_b.clone(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+
+        graph
+            .insert(Edge {
+                from: node_c.clone(),
+                to: node_b.clone(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+
+        graph.commit().unwrap();
+
+        let res = graph.search(&HostBacklinksQuery::new(node_b.id())).unwrap();
+
+        assert_eq!(res.len(), 2);
+        assert!(res.iter().any(|r| r.from == node_a.id()));
+        assert!(res.iter().any(|r| r.from == node_c.id()));
+    }
+
+    #[test]
+    fn test_self_host_skipped() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
+
+        let node_a = Node::from("A");
+        let node_b = Node::from("B");
+
+        graph
+            .insert(Edge {
+                from: node_a.clone(),
+                to: node_b.clone(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+
+        graph
+            .insert(Edge {
+                from: node_b.clone(),
+                to: node_b.clone(),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+
+        graph.commit().unwrap();
+
+        let res = graph.search(&HostBacklinksQuery::new(node_b.id())).unwrap();
+
+        assert_eq!(res.len(), 1);
+        assert!(res[0].from == node_a.id());
+    }
+
+    #[test]
+    fn test_deduplication() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
+
+        graph
+            .insert(Edge {
+                from: Node::from("https://A.com/1"),
+                to: Node::from("https://B.com/1"),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+
+        graph
+            .insert(Edge {
+                from: Node::from("https://A.com/2"),
+                to: Node::from("https://B.com/2"),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+
+        graph
+            .insert(Edge {
+                from: Node::from("https://A.com/3"),
+                to: Node::from("https://B.com/3"),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+
+        graph.commit().unwrap();
+
+        let res = graph
+            .search(&HostBacklinksQuery::new(
+                Node::from("https://B.com/").into_host().id(),
+            ))
+            .unwrap();
+
+        assert_eq!(res.len(), 1);
+        assert!(res[0].from == Node::from("https://A.com/").into_host().id());
     }
 }

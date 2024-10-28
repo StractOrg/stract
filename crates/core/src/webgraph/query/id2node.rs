@@ -16,7 +16,6 @@
 
 use super::collector::FirstDocCollector;
 use super::Query;
-use crate::ampc::dht::ShardId;
 use crate::webgraph::query::raw;
 use crate::webgraph::schema::{FromHostId, FromId, ToHostId, ToId};
 use crate::webgraph::searcher::Searcher;
@@ -43,8 +42,8 @@ impl Query for Id2NodeQuery {
         }
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
-        FirstDocCollector::with_shard_id(shard_id)
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
+        FirstDocCollector::with_shard_id(searcher.shard())
     }
 
     fn retrieve(

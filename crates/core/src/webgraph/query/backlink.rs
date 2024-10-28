@@ -17,7 +17,8 @@
 use tantivy::query::ShortCircuitQuery;
 
 use super::{
-    collector::TopDocsCollector,
+    collector::{HostDeduplicator, TopDocsCollector},
+    document_scorer::DefaultDocumentScorer,
     raw::{HostLinksQuery, LinksQuery},
     Query,
 };
@@ -129,9 +130,9 @@ impl Query for BacklinksQuery {
         }
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
         TopDocsCollector::from(self.limit)
-            .with_shard_id(shard_id)
+            .with_shard_id(searcher.shard())
             .disable_offset()
     }
 
@@ -200,7 +201,7 @@ impl HostBacklinksQuery {
 }
 
 impl Query for HostBacklinksQuery {
-    type Collector = TopDocsCollector;
+    type Collector = TopDocsCollector<DefaultDocumentScorer, HostDeduplicator>;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
     type IntermediateOutput = Vec<(f64, SmallEdge)>;
     type Output = Vec<SmallEdge>;
@@ -227,14 +228,18 @@ impl Query for HostBacklinksQuery {
         }
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
         TopDocsCollector::from(self.limit)
-            .with_shard_id(shard_id)
+            .with_shard_id(searcher.shard())
             .disable_offset()
+            .with_deduplicator(HostDeduplicator)
+            .with_column_fields(searcher.warmed_column_fields().clone(), FromHostId)
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        TopDocsCollector::from(self.limit).enable_offset()
+        TopDocsCollector::from(self.limit)
+            .enable_offset()
+            .with_deduplicator(HostDeduplicator)
     }
 
     fn retrieve(
@@ -242,7 +247,7 @@ impl Query for HostBacklinksQuery {
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::IntermediateOutput> {
-        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
+        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc.address).collect();
         let nodes = fetch_small_edges(searcher, docs, FromHostId)?;
         Ok(nodes
             .into_iter()
@@ -266,7 +271,7 @@ impl Query for HostBacklinksQuery {
     ) -> <Self::Collector as super::Collector>::Fruit {
         fruit
             .into_iter()
-            .filter(|(_, doc)| doc.shard_id == shard_id)
+            .filter(|(_, doc)| doc.address.shard_id == shard_id)
             .collect()
     }
 
@@ -317,9 +322,9 @@ impl Query for FullBacklinksQuery {
         }
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
         TopDocsCollector::from(self.limit)
-            .with_shard_id(shard_id)
+            .with_shard_id(searcher.shard())
             .disable_offset()
     }
 
@@ -378,7 +383,7 @@ impl FullHostBacklinksQuery {
 }
 
 impl Query for FullHostBacklinksQuery {
-    type Collector = TopDocsCollector;
+    type Collector = TopDocsCollector<DefaultDocumentScorer, HostDeduplicator>;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
     type IntermediateOutput = Vec<Edge>;
     type Output = Vec<Edge>;
@@ -405,14 +410,18 @@ impl Query for FullHostBacklinksQuery {
         }
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
         TopDocsCollector::from(self.limit)
-            .with_shard_id(shard_id)
+            .with_shard_id(searcher.shard())
             .disable_offset()
+            .with_deduplicator(HostDeduplicator)
+            .with_column_fields(searcher.warmed_column_fields().clone(), FromHostId)
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        TopDocsCollector::from(self.limit).enable_offset()
+        TopDocsCollector::from(self.limit)
+            .enable_offset()
+            .with_deduplicator(HostDeduplicator)
     }
 
     fn retrieve(
@@ -420,7 +429,7 @@ impl Query for FullHostBacklinksQuery {
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::IntermediateOutput> {
-        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
+        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc.address).collect();
         let edges = fetch_edges(searcher, docs)?;
 
         Ok(edges
@@ -440,7 +449,7 @@ impl Query for FullHostBacklinksQuery {
     ) -> <Self::Collector as super::Collector>::Fruit {
         fruit
             .into_iter()
-            .filter(|(_, doc)| doc.shard_id == shard_id)
+            .filter(|(_, doc)| doc.address.shard_id == shard_id)
             .collect()
     }
 
@@ -482,9 +491,9 @@ impl Query for BacklinksWithLabelsQuery {
         Box::new(LinksQuery::new(self.node, ToId))
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
         TopDocsCollector::from(self.limit)
-            .with_shard_id(shard_id)
+            .with_shard_id(searcher.shard())
             .disable_offset()
     }
 

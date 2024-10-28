@@ -16,12 +16,12 @@
 
 use super::{
     backlink::{fetch_edges, fetch_small_edges},
-    collector::TopDocsCollector,
+    collector::{HostDeduplicator, TopDocsCollector},
+    document_scorer::DefaultDocumentScorer,
     raw::{host_links::HostLinksQuery, links::LinksQuery},
     Query,
 };
 use crate::{
-    ampc::dht::ShardId,
     webgraph::{
         document::Edge,
         schema::{FromHostId, FromId, ToHostId, ToId},
@@ -69,9 +69,9 @@ impl Query for ForwardlinksQuery {
         }
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
         TopDocsCollector::from(self.limit)
-            .with_shard_id(shard_id)
+            .with_shard_id(searcher.shard())
             .disable_offset()
     }
 
@@ -142,7 +142,7 @@ impl HostForwardlinksQuery {
 }
 
 impl Query for HostForwardlinksQuery {
-    type Collector = TopDocsCollector;
+    type Collector = TopDocsCollector<DefaultDocumentScorer, HostDeduplicator>;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
     type IntermediateOutput = Vec<(f64, SmallEdge)>;
     type Output = Vec<SmallEdge>;
@@ -169,14 +169,18 @@ impl Query for HostForwardlinksQuery {
         }
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
         TopDocsCollector::from(self.limit)
-            .with_shard_id(shard_id)
+            .with_shard_id(searcher.shard())
             .disable_offset()
+            .with_deduplicator(HostDeduplicator)
+            .with_column_fields(searcher.warmed_column_fields().clone(), ToHostId)
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        TopDocsCollector::from(self.limit).enable_offset()
+        TopDocsCollector::from(self.limit)
+            .enable_offset()
+            .with_deduplicator(HostDeduplicator)
     }
 
     fn filter_fruit_shards(
@@ -186,7 +190,7 @@ impl Query for HostForwardlinksQuery {
     ) -> <Self::Collector as super::Collector>::Fruit {
         fruit
             .into_iter()
-            .filter(|(_, doc)| doc.shard_id == shard)
+            .filter(|(_, doc)| doc.address.shard_id == shard)
             .collect()
     }
 
@@ -195,7 +199,7 @@ impl Query for HostForwardlinksQuery {
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::IntermediateOutput> {
-        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
+        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc.address).collect();
         let nodes = fetch_small_edges(searcher, docs, ToHostId)?;
         Ok(nodes
             .into_iter()
@@ -259,9 +263,9 @@ impl Query for FullForwardlinksQuery {
         }
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
         TopDocsCollector::from(self.limit)
-            .with_shard_id(shard_id)
+            .with_shard_id(searcher.shard())
             .disable_offset()
     }
 
@@ -320,7 +324,7 @@ impl FullHostForwardlinksQuery {
 }
 
 impl Query for FullHostForwardlinksQuery {
-    type Collector = TopDocsCollector;
+    type Collector = TopDocsCollector<DefaultDocumentScorer, HostDeduplicator>;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
     type IntermediateOutput = Vec<Edge>;
     type Output = Vec<Edge>;
@@ -347,14 +351,18 @@ impl Query for FullHostForwardlinksQuery {
         }
     }
 
-    fn collector(&self, shard_id: ShardId) -> Self::Collector {
+    fn collector(&self, searcher: &Searcher) -> Self::Collector {
         TopDocsCollector::from(self.limit)
-            .with_shard_id(shard_id)
+            .with_shard_id(searcher.shard())
             .disable_offset()
+            .with_deduplicator(HostDeduplicator)
+            .with_column_fields(searcher.warmed_column_fields().clone(), ToHostId)
     }
 
     fn remote_collector(&self) -> Self::Collector {
-        TopDocsCollector::from(self.limit).enable_offset()
+        TopDocsCollector::from(self.limit)
+            .enable_offset()
+            .with_deduplicator(HostDeduplicator)
     }
 
     fn filter_fruit_shards(
@@ -364,7 +372,7 @@ impl Query for FullHostForwardlinksQuery {
     ) -> <Self::Collector as super::Collector>::Fruit {
         fruit
             .into_iter()
-            .filter(|(_, doc)| doc.shard_id == shard)
+            .filter(|(_, doc)| doc.address.shard_id == shard)
             .collect()
     }
 
@@ -373,7 +381,7 @@ impl Query for FullHostForwardlinksQuery {
         searcher: &Searcher,
         fruit: <Self::Collector as super::collector::Collector>::Fruit,
     ) -> Result<Self::IntermediateOutput> {
-        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc).collect();
+        let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc.address).collect();
         let edges = fetch_edges(searcher, docs)?;
         Ok(edges
             .into_iter()

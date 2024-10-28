@@ -240,7 +240,7 @@ impl EdgeStore {
 
         let res = searcher.tantivy_searcher().search(
             &query.tantivy_query(&searcher),
-            &TantivyCollector::from(&query.collector(self.shard_id)),
+            &TantivyCollector::from(&query.collector(&searcher)),
         )?;
 
         Ok(res)

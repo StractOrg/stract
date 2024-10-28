@@ -20,7 +20,7 @@ mod top_docs;
 
 pub use fast_count::{FastCountCollector, FastCountValue};
 pub use first_doc::FirstDocCollector;
-pub use top_docs::TopDocsCollector;
+pub use top_docs::{HostDeduplicator, TopDocsCollector};
 
 use tantivy::{
     collector::{Fruit, SegmentCollector},

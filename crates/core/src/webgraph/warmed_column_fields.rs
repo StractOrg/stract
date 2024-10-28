@@ -29,16 +29,22 @@ pub struct SegmentColumnFields {
 
 impl SegmentColumnFields {
     pub fn u64<F: Field>(&self, field: F) -> Option<Column<u64>> {
-        let field_enum: FieldEnum = field.into();
+        self.u64_by_enum(field.into())
+    }
+
+    pub fn u64_by_enum(&self, field: FieldEnum) -> Option<Column<u64>> {
         self.u64_fields
-            .get(FieldEnumDiscriminants::from(field_enum))
+            .get(FieldEnumDiscriminants::from(field))
             .cloned()
     }
 
     pub fn f64<F: Field>(&self, field: F) -> Option<Column<f64>> {
-        let field_enum: FieldEnum = field.into();
+        self.f64_by_enum(field.into())
+    }
+
+    pub fn f64_by_enum(&self, field: FieldEnum) -> Option<Column<f64>> {
         self.f64_fields
-            .get(FieldEnumDiscriminants::from(field_enum))
+            .get(FieldEnumDiscriminants::from(field))
             .cloned()
     }
 }

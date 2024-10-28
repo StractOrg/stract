@@ -39,7 +39,7 @@ pub trait Query: Send + Sync + bincode::Encode + bincode::Decode + Clone {
     type Output;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery;
-    fn collector(&self, shard_id: ShardId) -> Self::Collector;
+    fn collector(&self, searcher: &Searcher) -> Self::Collector;
     fn remote_collector(&self) -> Self::Collector;
 
     fn filter_fruit_shards(
