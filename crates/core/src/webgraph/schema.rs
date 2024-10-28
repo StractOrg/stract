@@ -212,7 +212,13 @@ impl Field for RelFlags {
         ReferenceValue::U64(edge.rel_flags.as_u64())
     }
 
-    fn set_value(&self, _: &mut Edge, _: OwnedValue) -> Result<()> {
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
+        edge.rel_flags = value
+            .as_ref()
+            .as_u64()
+            .ok_or(anyhow::anyhow!("Rel flags should be a u64"))?
+            .into();
+
         Ok(())
     }
 
