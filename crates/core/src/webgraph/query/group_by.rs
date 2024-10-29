@@ -19,7 +19,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::{
     hyperloglog::HyperLogLog,
     webgraph::{
-        schema::{Field, FieldEnum, FromId, ToId},
+        schema::{Field, FieldEnum, FromHostId, ToHostId},
         NodeID,
     },
 };
@@ -78,14 +78,14 @@ impl Query for HostGroupSketchQuery {
         match self.node {
             LinksDirection::From(node) => raw::HostLinksQuery::new(
                 node,
-                FromId,
-                ToId,
+                FromHostId,
+                ToHostId,
                 searcher.warmed_column_fields().clone(),
             ),
             LinksDirection::To(node) => raw::HostLinksQuery::new(
                 node,
-                ToId,
-                FromId,
+                ToHostId,
+                FromHostId,
                 searcher.warmed_column_fields().clone(),
             ),
         }
@@ -164,14 +164,14 @@ impl Query for HostGroupQuery {
         match self.node {
             LinksDirection::From(node) => raw::HostLinksQuery::new(
                 node,
-                FromId,
-                ToId,
+                FromHostId,
+                ToHostId,
                 searcher.warmed_column_fields().clone(),
             ),
             LinksDirection::To(node) => raw::HostLinksQuery::new(
                 node,
-                ToId,
-                FromId,
+                ToHostId,
+                FromHostId,
                 searcher.warmed_column_fields().clone(),
             ),
         }
@@ -218,7 +218,7 @@ mod tests {
         let (graph, _temp_dir) = test_graph();
 
         let id = Node::from("C").into_host().id();
-        let query = HostGroupSketchQuery::backlinks(id, ToId, FromId);
+        let query = HostGroupSketchQuery::backlinks(id, ToHostId, FromHostId);
         let result = graph.search(&query).unwrap();
 
         assert_eq!(result.len(), 1);
@@ -230,7 +230,7 @@ mod tests {
         let (graph, _temp_dir) = test_graph();
 
         let id = Node::from("C").into_host().id();
-        let query = HostGroupQuery::backlinks(id, ToId, FromId);
+        let query = HostGroupQuery::backlinks(id, ToHostId, FromHostId);
         let result = graph.search(&query).unwrap();
 
         assert_eq!(result.len(), 1);
