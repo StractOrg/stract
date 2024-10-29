@@ -27,6 +27,9 @@ pub use forwardlink::*;
 pub mod id2node;
 pub use id2node::*;
 
+pub mod group_sketch;
+pub use group_sketch::*;
+
 pub mod collector;
 mod degree;
 mod document_scorer;

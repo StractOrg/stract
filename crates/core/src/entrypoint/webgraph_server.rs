@@ -37,6 +37,7 @@ use crate::webgraph::query::FullHostBacklinksQuery;
 use crate::webgraph::query::FullHostForwardlinksQuery;
 use crate::webgraph::query::HostBacklinksQuery;
 use crate::webgraph::query::HostForwardlinksQuery;
+use crate::webgraph::query::HostGroupSketchQuery;
 use crate::webgraph::query::Id2NodeQuery;
 use crate::webgraph::NodeID;
 use crate::webgraph::Webgraph;
@@ -144,6 +145,7 @@ impl_search!([
     HostForwardlinksQuery,
     FullForwardlinksQuery,
     FullHostForwardlinksQuery,
+    HostGroupSketchQuery,
 ]);
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]

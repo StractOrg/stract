@@ -16,10 +16,12 @@
 
 mod fast_count;
 mod first_doc;
+mod group_sketch;
 mod top_docs;
 
 pub use fast_count::{FastCountCollector, FastCountValue};
 pub use first_doc::FirstDocCollector;
+pub use group_sketch::GroupSketchCollector;
 pub use top_docs::{HostDeduplicator, TopDocsCollector};
 
 use tantivy::{
