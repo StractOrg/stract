@@ -15,26 +15,23 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::anyhow;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use tantivy::columnar::Column;
 
-use crate::{
-    hyperloglog::HyperLogLog,
-    webgraph::{
-        schema::{Field, FieldEnum},
-        warmed_column_fields::WarmedColumnFields,
-    },
+use crate::webgraph::{
+    schema::{Field, FieldEnum},
+    warmed_column_fields::WarmedColumnFields,
 };
 
 use super::Collector;
 
-pub struct GroupSketchCollector {
+pub struct GroupExactCollector {
     group_field: FieldEnum,
     value_field: FieldEnum,
     warmed_column_fields: Option<WarmedColumnFields>,
 }
 
-impl GroupSketchCollector {
+impl GroupExactCollector {
     pub fn new<Group: Field, Value: Field>(group_field: Group, value_field: Value) -> Self {
         Self {
             group_field: group_field.into(),
@@ -49,9 +46,9 @@ impl GroupSketchCollector {
     }
 }
 
-impl Collector for GroupSketchCollector {
-    type Fruit = FxHashMap<u64, HyperLogLog<4069>>;
-    type Child = GroupSketchSegmentCollector;
+impl Collector for GroupExactCollector {
+    type Fruit = FxHashMap<u64, FxHashSet<u64>>;
+    type Child = GroupExactSegmentCollector;
 
     fn for_segment(
         &self,
@@ -72,7 +69,7 @@ impl Collector for GroupSketchCollector {
             .u64(self.value_field)
             .ok_or(anyhow!("Value field missing from index"))?;
 
-        Ok(GroupSketchSegmentCollector {
+        Ok(GroupExactSegmentCollector {
             group,
             value,
             groups: FxHashMap::default(),
@@ -83,11 +80,11 @@ impl Collector for GroupSketchCollector {
         &self,
         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
     ) -> crate::Result<Self::Fruit> {
-        let mut groups: FxHashMap<u64, HyperLogLog<4069>> = FxHashMap::default();
+        let mut groups: FxHashMap<u64, FxHashSet<u64>> = FxHashMap::default();
 
         for fruit in segment_fruits {
-            for (group, hll) in fruit {
-                groups.entry(group).or_default().merge(&hll);
+            for (group, set) in fruit {
+                groups.entry(group).or_default().extend(set);
             }
         }
 
@@ -95,20 +92,20 @@ impl Collector for GroupSketchCollector {
     }
 }
 
-pub struct GroupSketchSegmentCollector {
+pub struct GroupExactSegmentCollector {
     group: Column<u64>,
     value: Column<u64>,
-    groups: FxHashMap<u64, HyperLogLog<4069>>,
+    groups: FxHashMap<u64, FxHashSet<u64>>,
 }
 
-impl tantivy::collector::SegmentCollector for GroupSketchSegmentCollector {
-    type Fruit = FxHashMap<u64, HyperLogLog<4069>>;
+impl tantivy::collector::SegmentCollector for GroupExactSegmentCollector {
+    type Fruit = FxHashMap<u64, FxHashSet<u64>>;
 
     fn collect(&mut self, doc: tantivy::DocId, _: tantivy::Score) {
         let group = self.group.first(doc).unwrap();
         let value = self.value.first(doc).unwrap();
 
-        self.groups.entry(group).or_default().add(value);
+        self.groups.entry(group).or_default().insert(value);
     }
 
     fn harvest(self) -> Self::Fruit {

@@ -40,7 +40,7 @@ mod document;
 mod node;
 pub mod query;
 pub mod remote;
-mod schema;
+pub mod schema;
 mod searcher;
 mod shortest_path;
 mod store;

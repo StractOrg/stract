@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     hyperloglog::HyperLogLog,
@@ -24,7 +24,10 @@ use crate::{
     },
 };
 
-use super::{collector::GroupSketchCollector, raw, Query};
+use super::{
+    collector::{GroupExactCollector, GroupSketchCollector},
+    raw, Query,
+};
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub enum LinksDirection {
@@ -68,8 +71,8 @@ impl HostGroupSketchQuery {
 impl Query for HostGroupSketchQuery {
     type Collector = GroupSketchCollector;
     type TantivyQuery = raw::HostLinksQuery;
-    type IntermediateOutput = FxHashMap<u64, HyperLogLog<256>>;
-    type Output = FxHashMap<u64, HyperLogLog<256>>;
+    type IntermediateOutput = FxHashMap<u64, HyperLogLog<4069>>;
+    type Output = FxHashMap<u64, HyperLogLog<4069>>;
 
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
         match self.node {
@@ -118,6 +121,92 @@ impl Query for HostGroupSketchQuery {
     }
 }
 
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
+pub struct HostGroupQuery {
+    node: LinksDirection,
+    group: FieldEnum,
+    value: FieldEnum,
+}
+
+impl HostGroupQuery {
+    pub fn new<Group: Field, Value: Field>(
+        node: LinksDirection,
+        group: Group,
+        value: Value,
+    ) -> Self {
+        Self {
+            node,
+            group: group.into(),
+            value: value.into(),
+        }
+    }
+
+    pub fn backlinks<Group: Field, Value: Field>(node: NodeID, group: Group, value: Value) -> Self {
+        Self::new(LinksDirection::To(node), group, value)
+    }
+
+    pub fn forwardlinks<Group: Field, Value: Field>(
+        node: NodeID,
+        group: Group,
+        value: Value,
+    ) -> Self {
+        Self::new(LinksDirection::From(node), group, value)
+    }
+}
+
+impl Query for HostGroupQuery {
+    type Collector = GroupExactCollector;
+    type TantivyQuery = raw::HostLinksQuery;
+    type IntermediateOutput = FxHashMap<u64, FxHashSet<u64>>;
+    type Output = FxHashMap<u64, FxHashSet<u64>>;
+
+    fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
+        match self.node {
+            LinksDirection::From(node) => raw::HostLinksQuery::new(
+                node,
+                FromId,
+                ToId,
+                searcher.warmed_column_fields().clone(),
+            ),
+            LinksDirection::To(node) => raw::HostLinksQuery::new(
+                node,
+                ToId,
+                FromId,
+                searcher.warmed_column_fields().clone(),
+            ),
+        }
+    }
+
+    fn collector(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::Collector {
+        GroupExactCollector::new(self.group, self.value)
+            .with_column_fields(searcher.warmed_column_fields().clone())
+    }
+
+    fn remote_collector(&self) -> Self::Collector {
+        GroupExactCollector::new(self.group, self.value)
+    }
+
+    fn filter_fruit_shards(
+        &self,
+        _: crate::ampc::dht::ShardId,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> <Self::Collector as super::Collector>::Fruit {
+        fruit
+    }
+
+    fn retrieve(
+        &self,
+        _: &crate::webgraph::searcher::Searcher,
+        fruit: <Self::Collector as super::Collector>::Fruit,
+    ) -> crate::Result<Self::IntermediateOutput> {
+        Ok(fruit)
+    }
+
+    fn merge_results(mut results: Vec<Self::IntermediateOutput>) -> Self::Output {
+        results.pop().unwrap_or_default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::webgraph::{tests::test_graph, Node};
@@ -134,5 +223,17 @@ mod tests {
 
         assert_eq!(result.len(), 1);
         assert_eq!(result.get(&id.as_u64()).unwrap().size(), 3);
+    }
+
+    #[test]
+    fn test_group_exact_query() {
+        let (graph, _temp_dir) = test_graph();
+
+        let id = Node::from("C").into_host().id();
+        let query = HostGroupQuery::backlinks(id, ToId, FromId);
+        let result = graph.search(&query).unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get(&id.as_u64()).unwrap().len(), 3);
     }
 }
