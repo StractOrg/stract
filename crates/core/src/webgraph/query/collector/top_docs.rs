@@ -34,6 +34,9 @@ use crate::{distributed::member::ShardId, webgraph::warmed_column_fields::Warmed
 
 use super::Collector;
 
+/// Buffer to ensure remote has enough docs for deduplication
+pub const DEDUPLICATION_BUFFER: usize = 128;
+
 pub trait DeduplicatorDoc
 where
     Self: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Ord + Clone,
@@ -253,9 +256,11 @@ where
 {
     fn computer(&self) -> Computer<D> {
         match (self.offset, self.limit) {
-            (Some(offset), Some(limit)) => Computer::TopN(TopNComputer::new(limit + offset)),
+            (Some(offset), Some(limit)) => {
+                Computer::TopN(TopNComputer::new(limit + offset + DEDUPLICATION_BUFFER))
+            }
             (Some(_), None) => Computer::All(AllComputer::new()),
-            (None, Some(limit)) => Computer::TopN(TopNComputer::new(limit)),
+            (None, Some(limit)) => Computer::TopN(TopNComputer::new(limit + DEDUPLICATION_BUFFER)),
             (None, None) => Computer::All(AllComputer::new()),
         }
     }
@@ -296,20 +301,33 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> Collector for TopDo
     ) -> crate::Result<Self::Fruit> {
         let mut computer = self.computer();
 
-        for (score, doc) in self
-            .deduplicator
-            .deduplicate(segment_fruits.into_iter().flatten().collect())
-        {
+        let before_deduplication: Vec<_> = segment_fruits.into_iter().flatten().collect();
+        dbg!(&before_deduplication.len());
+        let deduplicated = self.deduplicator.deduplicate(before_deduplication);
+
+        for (score, doc) in deduplicated {
             computer.push(score, doc);
         }
 
-        let mut result = computer.harvest();
+        let result = computer.harvest();
 
         if self.perform_offset {
-            result = result.into_iter().skip(self.offset.unwrap_or(0)).collect();
+            Ok(result
+                .into_iter()
+                .skip(self.offset.unwrap_or(0))
+                .take(self.limit.unwrap_or(usize::MAX))
+                .collect())
+        } else {
+            Ok(result
+                .into_iter()
+                .take(
+                    // offset is only performed on remote. take buffer to ensure remote has enough docs for deduplication
+                    self.limit
+                        .unwrap_or(usize::MAX)
+                        .saturating_add(DEDUPLICATION_BUFFER),
+                )
+                .collect())
         }
-
-        Ok(result)
     }
 }
 
@@ -373,6 +391,7 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> SegmentCollector
     type Fruit = Vec<(tantivy::Score, <D as Deduplicator>::Doc)>;
 
     fn collect(&mut self, doc: DocId, _: tantivy::Score) {
+        dbg!(doc);
         if doc == tantivy::TERMINATED {
             return;
         }
@@ -392,7 +411,7 @@ mod tests {
     use crate::{
         webgraph::{
             query::{BacklinksQuery, HostBacklinksQuery},
-            Edge, Node, Webgraph,
+            Edge, EdgeLimit, Node, Webgraph,
         },
         webpage::RelFlags,
     };
@@ -498,5 +517,95 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.len(), 1);
+    }
+
+    #[test]
+    fn test_offset_with_deduplication() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
+
+        graph
+            .insert(Edge {
+                from: Node::from("https://A.com/1"),
+                to: Node::from("https://B.com/1"),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                sort_score: 0.1,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("https://A.com/2"),
+                to: Node::from("https://B.com/1"),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                sort_score: 0.1,
+            })
+            .unwrap();
+        graph
+            .insert(Edge {
+                from: Node::from("https://C.com/1"),
+                to: Node::from("https://B.com/1"),
+                rel_flags: RelFlags::default(),
+                label: String::new(),
+                sort_score: 0.0,
+            })
+            .unwrap();
+
+        graph.commit().unwrap();
+
+        let res = graph
+            .search(
+                &HostBacklinksQuery::new(Node::from("https://B.com/").into_host().id()).with_limit(
+                    EdgeLimit::LimitAndOffset {
+                        limit: 1024,
+                        offset: 0,
+                    },
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(res.len(), 2);
+
+        let res = graph
+            .search(
+                &HostBacklinksQuery::new(Node::from("https://B.com/").into_host().id()).with_limit(
+                    EdgeLimit::LimitAndOffset {
+                        limit: 1,
+                        offset: 0,
+                    },
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].from, Node::from("https://A.com/").into_host().id());
+
+        let res = graph
+            .search(
+                &HostBacklinksQuery::new(Node::from("https://B.com/").into_host().id()).with_limit(
+                    EdgeLimit::LimitAndOffset {
+                        limit: 1,
+                        offset: 1,
+                    },
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].from, Node::from("https://C.com/").into_host().id());
+
+        let res = graph
+            .search(
+                &HostBacklinksQuery::new(Node::from("https://B.com/").into_host().id()).with_limit(
+                    EdgeLimit::LimitAndOffset {
+                        limit: 1,
+                        offset: 2,
+                    },
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(res.len(), 0);
     }
 }

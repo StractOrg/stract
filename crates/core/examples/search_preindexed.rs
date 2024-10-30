@@ -29,7 +29,7 @@ pub async fn main() {
         lambda_model_path: None,
         dual_encoder_model_path: None,
         bangs_path: Some("data/bangs.json".to_string()),
-        query_store_db_host: None,
+        query_store_db: None,
         gossip_seed_nodes: None,
         gossip_addr: "0.0.0.0:8002".parse().unwrap(),
         collector: collector_conf.clone(),

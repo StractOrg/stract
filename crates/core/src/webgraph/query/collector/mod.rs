@@ -18,7 +18,7 @@ mod fast_count;
 mod first_doc;
 mod group_exact;
 mod group_sketch;
-mod top_docs;
+pub mod top_docs;
 
 pub use fast_count::{FastCountCollector, FastCountValue};
 pub use first_doc::FirstDocCollector;

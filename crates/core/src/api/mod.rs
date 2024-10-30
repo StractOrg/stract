@@ -160,9 +160,14 @@ pub async fn router(
         None => None,
     };
 
-    let query_store_queue = config.query_store_db_host.clone().map(|db_host| {
+    let query_store_queue = config.query_store_db.clone().map(|query_store_config| {
         let query_store_queue = Arc::new(Mutex::new(LeakyQueue::new(10_000)));
-        tokio::spawn(store_improvements_loop(query_store_queue.clone(), db_host));
+        tokio::spawn(store_improvements_loop(
+            query_store_queue.clone(),
+            query_store_config.host,
+            query_store_config.username,
+            query_store_config.password,
+        ));
         query_store_queue
     });
 

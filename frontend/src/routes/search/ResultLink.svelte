@@ -1,5 +1,3 @@
-<!-- Template to simplify the logic of result links, checking the results in new tab setting -->
-
 <script lang="ts">
   import { resultsInNewTab } from '$lib/stores';
   import { improvements } from '$lib/improvements';
@@ -38,7 +36,7 @@
     {title}
     use:improvements={resultIndex}
     target={$resultsInNewTab ? '_blank' : null}
-    rel={$resultsInNewTab ? 'noopener' : null}
+    rel="noopener nofollow"
     bind:this={link}
   >
     <slot />
@@ -49,7 +47,7 @@
     class={_class}
     {title}
     target={$resultsInNewTab ? '_blank' : null}
-    rel={$resultsInNewTab ? 'noopener' : null}
+    rel="noopener nofollow"
     bind:this={link}
   >
     <slot />

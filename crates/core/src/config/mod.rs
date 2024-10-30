@@ -253,6 +253,12 @@ pub struct ApiSpellCheck {
     #[serde(default)]
     pub correction_config: CorrectionConfig,
 }
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct QueryStoreConfig {
+    pub host: String,
+    pub username: String,
+    pub password: String,
+}
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ApiConfig {
@@ -262,7 +268,7 @@ pub struct ApiConfig {
     pub lambda_model_path: Option<String>,
     pub dual_encoder_model_path: Option<String>,
     pub bangs_path: Option<String>,
-    pub query_store_db_host: Option<String>,
+    pub query_store_db: Option<QueryStoreConfig>,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
 

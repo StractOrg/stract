@@ -17,7 +17,7 @@
 use tantivy::query::ShortCircuitQuery;
 
 use super::{
-    collector::{HostDeduplicator, TopDocsCollector},
+    collector::{top_docs, HostDeduplicator, TopDocsCollector},
     document_scorer::DefaultDocumentScorer,
     raw::{HostLinksQuery, LinksQuery},
     Query,
@@ -124,9 +124,14 @@ impl Query for BacklinksQuery {
     fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
         match self.limit {
             EdgeLimit::Unlimited => Box::new(LinksQuery::new(self.node, ToId)),
-            EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => Box::new(
-                ShortCircuitQuery::new(Box::new(LinksQuery::new(self.node, ToId)), limit as u64),
-            ),
+            EdgeLimit::Limit(limit) => Box::new(ShortCircuitQuery::new(
+                Box::new(LinksQuery::new(self.node, ToId)),
+                (limit + top_docs::DEDUPLICATION_BUFFER) as u64,
+            )),
+            EdgeLimit::LimitAndOffset { limit, offset } => Box::new(ShortCircuitQuery::new(
+                Box::new(LinksQuery::new(self.node, ToId)),
+                (limit + offset + top_docs::DEDUPLICATION_BUFFER) as u64,
+            )),
         }
     }
 
@@ -214,17 +219,24 @@ impl Query for HostBacklinksQuery {
                 FromHostId,
                 searcher.warmed_column_fields().clone(),
             )),
-            EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
-                Box::new(ShortCircuitQuery::new(
-                    Box::new(HostLinksQuery::new(
-                        self.node,
-                        ToHostId,
-                        FromHostId,
-                        searcher.warmed_column_fields().clone(),
-                    )),
-                    limit as u64,
-                ))
-            }
+            EdgeLimit::Limit(limit) => Box::new(ShortCircuitQuery::new(
+                Box::new(HostLinksQuery::new(
+                    self.node,
+                    ToHostId,
+                    FromHostId,
+                    searcher.warmed_column_fields().clone(),
+                )),
+                (limit + top_docs::DEDUPLICATION_BUFFER) as u64,
+            )),
+            EdgeLimit::LimitAndOffset { limit, offset } => Box::new(ShortCircuitQuery::new(
+                Box::new(HostLinksQuery::new(
+                    self.node,
+                    ToHostId,
+                    FromHostId,
+                    searcher.warmed_column_fields().clone(),
+                )),
+                (limit + offset + top_docs::DEDUPLICATION_BUFFER) as u64,
+            )),
         }
     }
 
@@ -313,12 +325,14 @@ impl Query for FullBacklinksQuery {
     fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
         match self.limit {
             EdgeLimit::Unlimited => Box::new(LinksQuery::new(self.node.id(), ToId)),
-            EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
-                Box::new(ShortCircuitQuery::new(
-                    Box::new(LinksQuery::new(self.node.id(), ToId)),
-                    limit as u64,
-                ))
-            }
+            EdgeLimit::Limit(limit) => Box::new(ShortCircuitQuery::new(
+                Box::new(LinksQuery::new(self.node.id(), ToId)),
+                (limit + top_docs::DEDUPLICATION_BUFFER) as u64,
+            )),
+            EdgeLimit::LimitAndOffset { limit, offset } => Box::new(ShortCircuitQuery::new(
+                Box::new(LinksQuery::new(self.node.id(), ToId)),
+                (limit + offset + top_docs::DEDUPLICATION_BUFFER) as u64,
+            )),
         }
     }
 
@@ -396,17 +410,24 @@ impl Query for FullHostBacklinksQuery {
                 FromHostId,
                 searcher.warmed_column_fields().clone(),
             )),
-            EdgeLimit::Limit(limit) | EdgeLimit::LimitAndOffset { limit, .. } => {
-                Box::new(ShortCircuitQuery::new(
-                    Box::new(HostLinksQuery::new(
-                        self.node.clone().into_host().id(),
-                        ToHostId,
-                        FromHostId,
-                        searcher.warmed_column_fields().clone(),
-                    )),
-                    limit as u64,
-                ))
-            }
+            EdgeLimit::Limit(limit) => Box::new(ShortCircuitQuery::new(
+                Box::new(HostLinksQuery::new(
+                    self.node.clone().into_host().id(),
+                    ToHostId,
+                    FromHostId,
+                    searcher.warmed_column_fields().clone(),
+                )),
+                (limit + top_docs::DEDUPLICATION_BUFFER) as u64,
+            )),
+            EdgeLimit::LimitAndOffset { limit, offset } => Box::new(ShortCircuitQuery::new(
+                Box::new(HostLinksQuery::new(
+                    self.node.clone().into_host().id(),
+                    ToHostId,
+                    FromHostId,
+                    searcher.warmed_column_fields().clone(),
+                )),
+                (limit + offset + top_docs::DEDUPLICATION_BUFFER) as u64,
+            )),
         }
     }
 

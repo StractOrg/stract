@@ -86,8 +86,16 @@ async fn dump_queue(queue: &Mutex<LeakyQueue<ImprovementEvent>>) -> Vec<Improvem
 pub async fn store_improvements_loop(
     queue: Arc<Mutex<LeakyQueue<ImprovementEvent>>>,
     scylla_host: String,
+    scylla_user: String,
+    scylla_password: String,
 ) {
-    let scylla = ScyllaConn::new(scylla_host.as_str()).await.unwrap();
+    let scylla = ScyllaConn::new(
+        scylla_host.as_str(),
+        scylla_user.as_str(),
+        scylla_password.as_str(),
+    )
+    .await
+    .unwrap();
     let mut interval = time::interval(Duration::from_secs(30));
 
     loop {
@@ -114,12 +122,21 @@ struct ScyllaConn {
 }
 
 impl ScyllaConn {
-    async fn new(seed_node: &str) -> Result<Self, Error> {
-        let session = SessionBuilder::new().known_node(seed_node).build().await?;
+    async fn new(seed_node: &str, user: &str, password: &str) -> Result<Self, Error> {
+        let session = SessionBuilder::new()
+            .known_node(seed_node)
+            .user(user, password)
+            .build()
+            .await?;
 
-        session.query("CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}", &[]).await?;
         session
-        .query(
+            .query(
+                "CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}",
+                &[],
+            )
+            .await?;
+        session
+            .query(
             "CREATE TABLE IF NOT EXISTS ks.queries (qid uuid, query text, urls text, timestamp timestamp, primary key (qid, timestamp)) WITH default_time_to_live = 7776000", // ttl 90 days
             &[],
         )
