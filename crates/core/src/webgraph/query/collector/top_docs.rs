@@ -302,7 +302,6 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> Collector for TopDo
         let mut computer = self.computer();
 
         let before_deduplication: Vec<_> = segment_fruits.into_iter().flatten().collect();
-        dbg!(&before_deduplication.len());
         let deduplicated = self.deduplicator.deduplicate(before_deduplication);
 
         for (score, doc) in deduplicated {
@@ -391,7 +390,6 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> SegmentCollector
     type Fruit = Vec<(tantivy::Score, <D as Deduplicator>::Doc)>;
 
     fn collect(&mut self, doc: DocId, _: tantivy::Score) {
-        dbg!(doc);
         if doc == tantivy::TERMINATED {
             return;
         }
