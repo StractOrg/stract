@@ -26,6 +26,7 @@ use super::{
     query::collector::{Collector, TantivyCollector},
     schema::{self, create_schema, Field, FromHostId, FromId, ToHostId, ToId},
     searcher::Searcher,
+    tokenizer::{Tokenizer, TokenizerEnum},
     warmed_column_fields::WarmedColumnFields,
     Edge,
 };
@@ -33,10 +34,17 @@ use crate::{ampc::dht::ShardId, webpage::html::links::RelFlags, Result};
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use tantivy::{
-    columnar::Column, directory::MmapDirectory, indexer::NoMergePolicy, DocId, SegmentReader,
+    columnar::Column, directory::MmapDirectory, indexer::NoMergePolicy,
+    tokenizer::TokenizerManager, DocId, SegmentReader,
 };
 
 use super::{query::Query, NodeID};
+
+fn register_tokenizers(manager: &TokenizerManager) {
+    for tokenizer in TokenizerEnum::iter() {
+        manager.register(tokenizer.name(), tokenizer.into_tantivy());
+    }
+}
 
 pub struct EdgeStore {
     index: tantivy::Index,
@@ -64,6 +72,8 @@ impl EdgeStore {
                 ..Default::default()
             })
             .open_or_create(MmapDirectory::open(&path)?)?;
+
+        register_tokenizers(index.tokenizers());
 
         let warmed_column_fields = WarmedColumnFields::new(&index.reader()?.searcher())?;
 

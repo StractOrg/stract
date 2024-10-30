@@ -19,6 +19,7 @@ use strum::{EnumDiscriminants, VariantArray};
 use tantivy::schema::FieldType;
 use tantivy::schema::NumericOptions;
 use tantivy::schema::OwnedValue;
+use tantivy::schema::TextFieldIndexing;
 use tantivy::schema::TextOptions;
 use tantivy::schema::Value;
 
@@ -26,6 +27,8 @@ use crate::enum_dispatch_from_discriminant;
 use crate::Result;
 
 use super::document::{Edge, ReferenceValue};
+use super::tokenizer::Tokenizer;
+use super::tokenizer::TokenizerEnum;
 use super::Node;
 
 pub fn create_schema() -> tantivy::schema::Schema {
@@ -49,6 +52,9 @@ pub trait Field:
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a>;
     fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()>;
     fn field_type(&self) -> tantivy::schema::FieldType;
+    fn tokenizer(&self) -> TokenizerEnum {
+        TokenizerEnum::default()
+    }
 }
 
 #[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
@@ -72,7 +78,13 @@ impl Field for FromUrl {
     }
 
     fn field_type(&self) -> FieldType {
-        FieldType::Str(TextOptions::default().set_stored())
+        FieldType::Str(
+            TextOptions::default().set_stored().set_indexing_options(
+                TextFieldIndexing::default()
+                    .set_tokenizer(self.tokenizer().name())
+                    .set_index_option(tantivy::schema::IndexRecordOption::WithFreqsAndPositions),
+            ),
+        )
     }
 }
 
@@ -97,7 +109,13 @@ impl Field for ToUrl {
     }
 
     fn field_type(&self) -> FieldType {
-        FieldType::Str(TextOptions::default().set_stored())
+        FieldType::Str(
+            TextOptions::default().set_stored().set_indexing_options(
+                TextFieldIndexing::default()
+                    .set_tokenizer(self.tokenizer().name())
+                    .set_index_option(tantivy::schema::IndexRecordOption::WithFreqsAndPositions),
+            ),
+        )
     }
 }
 
@@ -253,7 +271,13 @@ impl Field for Label {
     }
 
     fn field_type(&self) -> FieldType {
-        FieldType::Str(TextOptions::default().set_stored())
+        FieldType::Str(
+            TextOptions::default().set_stored().set_indexing_options(
+                TextFieldIndexing::default()
+                    .set_tokenizer(self.tokenizer().name())
+                    .set_index_option(tantivy::schema::IndexRecordOption::WithFreqsAndPositions),
+            ),
+        )
     }
 }
 

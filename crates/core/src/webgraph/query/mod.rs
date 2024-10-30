@@ -30,6 +30,9 @@ pub use id2node::*;
 pub mod group_by;
 pub use group_by::*;
 
+pub mod between;
+pub use between::*;
+
 pub mod collector;
 mod degree;
 mod document_scorer;
