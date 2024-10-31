@@ -78,6 +78,7 @@ impl Query for ForwardlinksQuery {
         TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
+            .with_column_fields(searcher.warmed_column_fields().clone())
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -186,7 +187,8 @@ impl Query for HostForwardlinksQuery {
             .with_shard_id(searcher.shard())
             .disable_offset()
             .with_deduplicator(HostDeduplicator)
-            .with_column_fields(searcher.warmed_column_fields().clone(), ToHostId)
+            .with_column_fields(searcher.warmed_column_fields().clone())
+            .with_host_field(ToHostId)
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -281,6 +283,7 @@ impl Query for FullForwardlinksQuery {
         TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
+            .with_column_fields(searcher.warmed_column_fields().clone())
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -377,7 +380,8 @@ impl Query for FullHostForwardlinksQuery {
             .with_shard_id(searcher.shard())
             .disable_offset()
             .with_deduplicator(HostDeduplicator)
-            .with_column_fields(searcher.warmed_column_fields().clone(), ToHostId)
+            .with_column_fields(searcher.warmed_column_fields().clone())
+            .with_host_field(ToHostId)
     }
 
     fn remote_collector(&self) -> Self::Collector {

@@ -139,6 +139,7 @@ impl Query for BacklinksQuery {
         TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
+            .with_column_fields(searcher.warmed_column_fields().clone())
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -245,7 +246,8 @@ impl Query for HostBacklinksQuery {
             .with_shard_id(searcher.shard())
             .disable_offset()
             .with_deduplicator(HostDeduplicator)
-            .with_column_fields(searcher.warmed_column_fields().clone(), FromHostId)
+            .with_column_fields(searcher.warmed_column_fields().clone())
+            .with_host_field(FromHostId)
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -340,6 +342,7 @@ impl Query for FullBacklinksQuery {
         TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
+            .with_column_fields(searcher.warmed_column_fields().clone())
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -436,7 +439,8 @@ impl Query for FullHostBacklinksQuery {
             .with_shard_id(searcher.shard())
             .disable_offset()
             .with_deduplicator(HostDeduplicator)
-            .with_column_fields(searcher.warmed_column_fields().clone(), FromHostId)
+            .with_column_fields(searcher.warmed_column_fields().clone())
+            .with_host_field(FromHostId)
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -516,6 +520,7 @@ impl Query for BacklinksWithLabelsQuery {
         TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
+            .with_column_fields(searcher.warmed_column_fields().clone())
     }
 
     fn remote_collector(&self) -> Self::Collector {

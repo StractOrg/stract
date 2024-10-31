@@ -16,10 +16,16 @@
 
 use tantivy::{columnar::Column, DocId, Score, SegmentReader};
 
-use crate::webgraph::schema::{Field, SortScore};
+use crate::webgraph::{
+    schema::{Field, SortScore},
+    warmed_column_fields::WarmedColumnFields,
+};
 
 pub trait DocumentScorer: Send + Sync + Sized {
-    fn for_segment(segment: &SegmentReader) -> tantivy::Result<Self>;
+    fn for_segment(
+        segment: &SegmentReader,
+        column_fields: &WarmedColumnFields,
+    ) -> tantivy::Result<Self>;
     fn score(&self, doc: DocId) -> Score;
 }
 
@@ -28,8 +34,17 @@ pub struct DefaultDocumentScorer {
 }
 
 impl DocumentScorer for DefaultDocumentScorer {
-    fn for_segment(segment: &SegmentReader) -> tantivy::Result<Self> {
-        let column = segment.column_fields().f64(SortScore.name())?;
+    fn for_segment(
+        segment: &SegmentReader,
+        column_fields: &WarmedColumnFields,
+    ) -> tantivy::Result<Self> {
+        let column = column_fields
+            .segment(&segment.segment_id())
+            .f64(SortScore)
+            .ok_or(tantivy::TantivyError::FieldNotFound(format!(
+                "{} column not found",
+                SortScore.name()
+            )))?;
         Ok(Self { column })
     }
 

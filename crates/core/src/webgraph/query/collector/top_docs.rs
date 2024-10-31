@@ -131,14 +131,21 @@ impl Deduplicator for HostDeduplicator {
 
 pub struct ColumnFields {
     warmed_column_fields: WarmedColumnFields,
-    host_field: FieldEnum,
+    host_field: Option<FieldEnum>,
 }
 
 impl ColumnFields {
-    pub fn new<F: Field>(warmed_column_fields: WarmedColumnFields, host_field: F) -> Self {
+    pub fn new(warmed_column_fields: WarmedColumnFields) -> Self {
         Self {
             warmed_column_fields,
-            host_field: host_field.into(),
+            host_field: None,
+        }
+    }
+
+    pub fn with_host_field<F: Field>(self, host_field: F) -> Self {
+        Self {
+            warmed_column_fields: self.warmed_column_fields,
+            host_field: Some(host_field.into()),
         }
     }
 }
@@ -238,13 +245,16 @@ impl<S, D> TopDocsCollector<S, D> {
         }
     }
 
-    pub fn with_column_fields<F: Field>(
-        self,
-        warmed_column_fields: WarmedColumnFields,
-        host_field: F,
-    ) -> Self {
+    pub fn with_column_fields(self, warmed_column_fields: WarmedColumnFields) -> Self {
         Self {
-            column_fields: Some(ColumnFields::new(warmed_column_fields, host_field)),
+            column_fields: Some(ColumnFields::new(warmed_column_fields)),
+            ..self
+        }
+    }
+
+    pub fn with_host_field<F: Field>(self, host_field: F) -> Self {
+        Self {
+            column_fields: Some(self.column_fields.unwrap().with_host_field(host_field)),
             ..self
         }
     }
@@ -276,7 +286,9 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> Collector for TopDo
         segment_ord: SegmentOrdinal,
         segment: &tantivy::SegmentReader,
     ) -> crate::Result<Self::Child> {
-        let scorer = S::for_segment(segment)?;
+        let column_fields = self.column_fields.as_ref().unwrap();
+
+        let scorer = S::for_segment(segment, &column_fields.warmed_column_fields)?;
 
         let segment_id = segment.segment_id();
 
@@ -285,10 +297,11 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> Collector for TopDo
             computer: self.computer(),
             segment_ord,
             scorer,
-            host_column: self.column_fields.as_ref().map(|cf| {
-                cf.warmed_column_fields
+            host_column: column_fields.host_field.map(|host_field| {
+                column_fields
+                    .warmed_column_fields
                     .segment(&segment_id)
-                    .u64_by_enum(cf.host_field)
+                    .u64_by_enum(host_field)
                     .unwrap()
             }),
             _deduplicator: PhantomData,

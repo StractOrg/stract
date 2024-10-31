@@ -71,10 +71,8 @@ impl<S: Service> Server<S> {
                         let mut res = Vec::new();
 
                         for req in bodies {
-                            res.push(S::handle(req, &service));
+                            res.push(S::handle(req, &service).await);
                         }
-
-                        let res = futures::future::join_all(res).await;
 
                         if let Err(e) = req.respond(OneOrMany::Many(res)).await {
                             tracing::error!("failed to respond to request: {}", e);

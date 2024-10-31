@@ -67,6 +67,7 @@ impl Query for FullLinksBetweenQuery {
         TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
+            .with_column_fields(searcher.warmed_column_fields().clone())
     }
 
     fn remote_collector(&self) -> Self::Collector {
