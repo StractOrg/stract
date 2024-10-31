@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -71,8 +71,10 @@ impl<S: Service> Server<S> {
                         let mut res = Vec::new();
 
                         for req in bodies {
-                            res.push(S::handle(req, &service).await);
+                            res.push(S::handle(req, &service));
                         }
+
+                        let res = futures::future::join_all(res).await;
 
                         if let Err(e) = req.respond(OneOrMany::Many(res)).await {
                             tracing::error!("failed to respond to request: {}", e);

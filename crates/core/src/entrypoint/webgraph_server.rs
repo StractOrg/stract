@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -94,7 +94,12 @@ macro_rules! impl_search {
                 type Response = Result<<<$q as webgraph::Query>::Collector as webgraph::Collector>::Fruit, EncodedError>;
 
                 async fn handle(self, server: &WebGraphService) -> Self::Response {
-                    server.graph.search_initial(&self).map_err(|e| EncodedError { msg: e.to_string() })
+                    let graph = Arc::clone(&server.graph);
+                    tokio::task::spawn_blocking(move || {
+                        graph.search_initial(&self).map_err(|e| EncodedError { msg: e.to_string() })
+                    })
+                    .await
+                    .unwrap()
                 }
             }
 
@@ -109,7 +114,12 @@ macro_rules! impl_search {
                 impl Message<WebGraphService> for [<$q Retrieve>] {
                     type Response = Result<<$q as webgraph::Query>::IntermediateOutput, EncodedError>;
                     async fn handle(self, server: &WebGraphService) -> Self::Response {
-                        server.graph.retrieve(&self.query, self.fruit).map_err(|e| EncodedError { msg: e.to_string() })
+                        let graph = Arc::clone(&server.graph);
+                        tokio::task::spawn_blocking(move || {
+                            graph.retrieve(&self.query, self.fruit).map_err(|e| EncodedError { msg: e.to_string() })
+                        })
+                        .await
+                        .unwrap()
                     }
                 }
 

@@ -229,7 +229,7 @@ where
     T: Graph,
 {
     async fn batch_ingoing(&self, nodes: &[webgraph::NodeID]) -> Vec<Vec<webgraph::NodeID>> {
-        self.batch_raw_ingoing_hosts(nodes, EdgeLimit::Limit(1024))
+        self.batch_raw_ingoing_hosts(nodes, EdgeLimit::Limit(512))
             .await
             .into_iter()
             .map(|edges| {
