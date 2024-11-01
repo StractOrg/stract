@@ -27,6 +27,7 @@ use crate::enum_dispatch_from_discriminant;
 use crate::Result;
 
 use super::document::{Edge, ReferenceValue};
+use super::tokenizer;
 use super::tokenizer::Tokenizer;
 use super::tokenizer::TokenizerEnum;
 use super::Node;
@@ -64,6 +65,10 @@ impl Field for FromUrl {
         "from_url"
     }
 
+    fn tokenizer(&self) -> TokenizerEnum {
+        tokenizer::UrlTokenizer.into()
+    }
+
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
         ReferenceValue::Str(edge.from.as_str())
     }
@@ -93,6 +98,10 @@ pub struct ToUrl;
 impl Field for ToUrl {
     fn name(&self) -> &'static str {
         "to_url"
+    }
+
+    fn tokenizer(&self) -> TokenizerEnum {
+        tokenizer::UrlTokenizer.into()
     }
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {

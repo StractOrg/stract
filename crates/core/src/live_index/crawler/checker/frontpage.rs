@@ -52,6 +52,7 @@ impl Checker for Frontpage {
         let urls = page
             .anchor_links()
             .into_iter()
+            .filter(|link| matches!(link.destination.scheme(), "http" | "https"))
             .map(|link| CrawlableUrl::from(link.destination))
             .collect::<Vec<_>>();
 

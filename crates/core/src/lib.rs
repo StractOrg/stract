@@ -69,7 +69,7 @@ pub mod iter_ext;
 mod kahan_sum;
 mod leaky_queue;
 mod live_index;
-mod log_group;
+pub mod log_group;
 mod metrics;
 mod models;
 pub mod naive_bayes;

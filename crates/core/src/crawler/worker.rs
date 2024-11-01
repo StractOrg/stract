@@ -421,6 +421,7 @@ impl<S: DatumStream> JobExecutor<S> {
         html.anchor_links()
             .into_iter()
             .map(|link| link.destination)
+            .filter(|url| matches!(url.scheme(), "http" | "https"))
             .map(|mut url| {
                 url.normalize_in_place();
                 url

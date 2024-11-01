@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-mod add_space_last;
+pub mod add_space_last;
 pub mod fields;
 pub mod normalizer;
-mod script;
-mod script_tokenizer;
-mod segmenter;
-mod split_preserve;
-mod split_with_range;
-mod stemmer;
+pub mod script;
+pub mod script_tokenizer;
+pub mod segmenter;
+pub mod split_preserve;
+pub mod split_with_range;
+pub mod stemmer;
 
 use std::borrow::{Borrow, Cow};
 

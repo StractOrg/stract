@@ -558,7 +558,6 @@ mod tests {
                 <body>
                     <a href="https://example.com">Link to example</a>
                     <p>{CONTENT}</p>
-                    <a href="mailto:hello@example.com">Email me</a>
                 </body>
             </html>
         "#

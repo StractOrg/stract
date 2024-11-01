@@ -14,9 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+mod url;
+
 use enum_dispatch::enum_dispatch;
 use strum::{EnumDiscriminants, VariantArray};
 use tantivy::tokenizer::{BoxTokenStream, Tokenizer as _};
+use url::UrlTokenStream;
 
 #[enum_dispatch]
 pub trait Tokenizer: Into<TokenizerEnum> + Clone {
@@ -41,11 +44,25 @@ impl Tokenizer for SimpleTokenizer {
     }
 }
 
+#[derive(Clone, Default)]
+pub struct UrlTokenizer;
+
+impl Tokenizer for UrlTokenizer {
+    fn name(&self) -> &'static str {
+        "url"
+    }
+
+    fn token_stream<'a>(&'a mut self, text: &'a str) -> BoxTokenStream<'a> {
+        BoxTokenStream::new(UrlTokenStream::new(text))
+    }
+}
+
 #[enum_dispatch(Tokenizer)]
 #[derive(Clone, EnumDiscriminants)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum TokenizerEnum {
     SimpleTokenizer,
+    UrlTokenizer,
 }
 
 impl TokenizerEnum {
@@ -66,6 +83,7 @@ impl From<TokenizerEnumDiscriminants> for TokenizerEnum {
     fn from(value: TokenizerEnumDiscriminants) -> Self {
         match value {
             TokenizerEnumDiscriminants::SimpleTokenizer => SimpleTokenizer::default().into(),
+            TokenizerEnumDiscriminants::UrlTokenizer => UrlTokenizer.into(),
         }
     }
 }

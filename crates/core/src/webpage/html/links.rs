@@ -288,10 +288,6 @@ impl Html {
                         if &element.name.local == "a" {
                             if let Some((text, attributes)) = open_links.pop() {
                                 if let Some(dest) = attributes.borrow().get("href") {
-                                    if dest.starts_with("mailto:") || dest.starts_with("tel:") {
-                                        continue;
-                                    }
-
                                     if let Ok(dest) =
                                         Url::parse_with_base_url(self.base_url(), dest)
                                     {
@@ -338,10 +334,6 @@ impl Html {
 
         while let Some((text, attributes)) = open_links.pop() {
             if let Some(dest) = attributes.borrow().get("href") {
-                if dest.starts_with("mailto:") || dest.starts_with("tel:") {
-                    continue;
-                }
-
                 if let Ok(dest) = Url::parse_with_base_url(self.base_url(), dest) {
                     let mut rel = RelFlags::from_html(&dest, &attributes.borrow(), &location);
 

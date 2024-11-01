@@ -110,11 +110,7 @@ impl WebgraphWorker {
                     .and_then(|store| store.get(&source.clone().into_host().id()).unwrap())
                     .unwrap_or(0.0);
 
-                for mut link in webpage
-                    .anchor_links()
-                    .into_iter()
-                    .filter(|link| matches!(link.destination.scheme(), "http" | "https"))
-                {
+                for mut link in webpage.anchor_links().into_iter() {
                     let mut destination = link.destination.clone();
 
                     if let Some(index) = &self.canonical_index {
