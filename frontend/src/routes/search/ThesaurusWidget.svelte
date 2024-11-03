@@ -8,27 +8,21 @@
   export let widget: ThesaurusWidget;
 
   // convert meanings into a list of either pos or meanings
-  enum MeaningType {
-    pos,
-    meaning,
-  }
-  interface Pos {
-    type: MeaningType.pos;
-    pos: PartOfSpeech;
-  }
-
-  interface Meaning {
-    type: MeaningType.meaning;
-    meaning: WordMeaning;
-  }
-
-  type MeaningOrPos = Pos | Meaning;
+  type MeaningOrPos =
+    | {
+        type: 'pos';
+        pos: PartOfSpeech;
+      }
+    | {
+        type: 'meaning';
+        meaning: WordMeaning;
+      };
 
   $: meanings = widget.meanings.flatMap((meaning) => {
     return [
-      { type: MeaningType.pos, pos: meaning.pos },
+      { type: 'pos', pos: meaning.pos },
       ...(meaning.meanings.map((meaning) => ({
-        type: MeaningType.meaning,
+        type: 'meaning',
         meaning: meaning,
       })) as MeaningOrPos[]),
     ];
@@ -60,22 +54,22 @@
     <h2 class="text-2xl font-bold">{widget.term}</h2>
     <div class="flex flex-col space-y-3 transition">
       {#each nonExpandedMeanings as m}
-        {#if m.type == MeaningType.pos}
+        {#if m.type == 'pos'}
           <div class="text-sm italic">
             {posName(m.pos)}
           </div>
-        {:else if m.type == MeaningType.meaning}
+        {:else if m.type == 'meaning'}
           <ThesaurusWidgetMeaning meaning={m.meaning} />
         {/if}
       {/each}
       {#if expanded}
         <div transition:slide={{ duration: 200 }} class="space-y-3">
           {#each expandedMeanings as m}
-            {#if m.type == MeaningType.pos}
+            {#if m.type == 'pos'}
               <div class="text-sm italic">
                 {posName(m.pos)}
               </div>
-            {:else if m.type == MeaningType.meaning}
+            {:else if m.type == 'meaning'}
               <ThesaurusWidgetMeaning meaning={m.meaning} />
             {/if}
           {/each}
