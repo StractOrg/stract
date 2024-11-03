@@ -60,13 +60,21 @@ fn download_files() {
                     .await
                     .unwrap();
 
+                let progress = body.content_length().map(indicatif::ProgressBar::new);
+
                 let mut file = File::create(path).await.unwrap();
                 let mut bytes = body.bytes_stream();
 
                 while let Some(item) = bytes.next().await {
-                    io::copy(&mut item.unwrap().as_ref(), &mut file)
-                        .await
-                        .unwrap();
+                    let bytes = item.unwrap();
+                    if let Some(progress) = &progress {
+                        progress.inc(bytes.len() as _);
+                    }
+                    io::copy(&mut bytes.as_ref(), &mut file).await.unwrap();
+                }
+
+                if let Some(progress) = progress {
+                    progress.finish_and_clear();
                 }
             }
         });
