@@ -172,7 +172,7 @@
               title="Limit number of similar sites shown"
             />
           </div>
-          <div />
+          <div></div>
           <Button _class="noscript:hidden" on:click={exportAsOptic}>Export as optic</Button>
         </div>
         <table class="w-full border-separate border-spacing-y-1">

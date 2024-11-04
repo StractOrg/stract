@@ -138,8 +138,8 @@
     {/if}
     <div class="mt-5">
       <div class="grid w-full grid-cols-[auto_auto_1fr_2fr_auto] gap-5" id="optics-list">
-        <span />
-        <span />
+        <span></span>
+        <span></span>
         <div class="flex-1 font-medium">Name</div>
         <div class="flex-1 font-medium">Description</div>
         <div class="flex-1 font-medium">Link</div>

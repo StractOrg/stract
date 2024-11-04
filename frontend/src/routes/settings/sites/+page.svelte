@@ -46,7 +46,7 @@
   // Called when the user selects an optic file for import
   const importOpticFile = (e: Event) => {
     // Get an array of the uploaded files
-    let files: File[] = [...((<HTMLInputElement>e.target)?.files ?? new FileList())];
+    let files: File[] = [...((e.target as HTMLInputElement)?.files ?? new FileList())];
 
     // Iterate through all files, attempt to get the contents & parse the optic
     files.forEach((file) => {

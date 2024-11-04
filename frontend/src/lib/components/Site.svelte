@@ -20,9 +20,8 @@
   >
     <slot />
   </a>
-  <span
-    class="noscript:hidden my-2 w-px bg-primary-content transition group-hover:bg-transparent"
-  />
+  <span class="noscript:hidden my-2 w-px bg-primary-content transition group-hover:bg-transparent"
+  ></span>
   <button
     class={twMerge(
       'cursor-pointer text-sm',

@@ -104,6 +104,6 @@
   {#if showDivider}
     <div
       class="absolute inset-x-0 -bottom-0 h-px bg-gradient-to-r from-primary via-primary-focus to-primary"
-    />
+    ></div>
   {/if}
 </nav>

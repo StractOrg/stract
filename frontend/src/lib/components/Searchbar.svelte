@@ -142,13 +142,15 @@
     </div>
 
     {#if suggestions.length > 0}
-      <div class="absolute inset-x-5 bottom-px hidden h-px bg-base-300 group-focus-within:block" />
+      <div
+        class="absolute inset-x-5 bottom-px hidden h-px bg-base-300 group-focus-within:block"
+      ></div>
       <div
         class={twJoin(
           'absolute inset-x-5 bottom-px h-px bg-base-300',
           hasFocus ? 'block' : 'hidden',
         )}
-      />
+      ></div>
       <div
         class={twJoin(
           'absolute -inset-x-px bottom-0 translate-y-full flex-col overflow-hidden rounded-3xl rounded-t-none border border-t-0 border-base-400 bg-base-100 shadow',
