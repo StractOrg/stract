@@ -14,7 +14,7 @@
   <label
     for={'patch_' + id}
     class="h-full w-full hover:cursor-pointer hover:bg-white/30 peer-checked:bg-black/75"
-  />
+  ></label>
   <Check
     class="pointer-events-none invisible absolute left-1/2 top-1/2 m-0 h-10 w-10 translate-x-[-50%] translate-y-[-50%] text-white peer-checked:visible"
   />

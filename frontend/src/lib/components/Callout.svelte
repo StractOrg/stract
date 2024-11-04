@@ -42,7 +42,7 @@
         <span>
           {title}
         </span>
-        <div class="m-0 flex-1" />
+        <div class="m-0 flex-1"></div>
         <slot name="top-right" />
       </div>
     </slot>

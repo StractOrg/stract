@@ -26,9 +26,9 @@
             </span>
           </span>
           <div class="flex overflow-hidden rounded border [&>*]:aspect-square [&>*]:w-10">
-            <div class="bg-primary" />
-            <div class="bg-secondary" />
-            <div class="bg-accent" />
+            <div class="bg-primary"></div>
+            <div class="bg-secondary"></div>
+            <div class="bg-accent"></div>
           </div>
         </button>
       {/each}
@@ -112,81 +112,81 @@
       <div class="color-sample">
         <h2>primary</h2>
         <div>
-          <div class="bg-primary" />
-          <div class="bg-primary-focus" />
-          <div class="bg-primary-content" />
+          <div class="bg-primary"></div>
+          <div class="bg-primary-focus"></div>
+          <div class="bg-primary-content"></div>
         </div>
       </div>
       <div class="color-sample">
         <h2>secondary</h2>
         <div>
-          <div class="bg-secondary" />
-          <div class="bg-secondary-focus" />
-          <div class="bg-secondary-content" />
+          <div class="bg-secondary"></div>
+          <div class="bg-secondary-focus"></div>
+          <div class="bg-secondary-content"></div>
         </div>
       </div>
       <div class="color-sample">
         <h2>accent</h2>
         <div>
-          <div class="bg-accent" />
-          <div class="bg-accent-focus" />
-          <div class="bg-accent-content" />
+          <div class="bg-accent"></div>
+          <div class="bg-accent-focus"></div>
+          <div class="bg-accent-content"></div>
         </div>
       </div>
       <div class="color-sample">
         <h2>neutral</h2>
         <div>
-          <div class="bg-neutral" />
-          <div class="bg-neutral-focus" />
-          <div class="bg-neutral-content" />
+          <div class="bg-neutral"></div>
+          <div class="bg-neutral-focus"></div>
+          <div class="bg-neutral-content"></div>
         </div>
       </div>
       <div class="color-sample">
         <h2>base</h2>
         <div>
-          <div class="bg-base-100" />
-          <div class="bg-base-200" />
-          <div class="bg-base-300" />
-          <div class="bg-base-content" />
+          <div class="bg-base-100"></div>
+          <div class="bg-base-200"></div>
+          <div class="bg-base-300"></div>
+          <div class="bg-base-content"></div>
         </div>
       </div>
       <div class="color-sample">
         <h2>info</h2>
         <div>
-          <div class="bg-info" />
-          <div class="bg-info-focus" />
-          <div class="bg-info-content" />
+          <div class="bg-info"></div>
+          <div class="bg-info-focus"></div>
+          <div class="bg-info-content"></div>
         </div>
       </div>
       <div class="color-sample">
         <h2>success</h2>
         <div>
-          <div class="bg-success" />
-          <div class="bg-success-focus" />
-          <div class="bg-success-content" />
+          <div class="bg-success"></div>
+          <div class="bg-success-focus"></div>
+          <div class="bg-success-content"></div>
         </div>
       </div>
       <div class="color-sample">
         <h2>warning</h2>
         <div>
-          <div class="bg-warning" />
-          <div class="bg-warning-focus" />
-          <div class="bg-warning-content" />
+          <div class="bg-warning"></div>
+          <div class="bg-warning-focus"></div>
+          <div class="bg-warning-content"></div>
         </div>
       </div>
       <div class="color-sample">
         <h2>error</h2>
         <div>
-          <div class="bg-error" />
-          <div class="bg-error-focus" />
-          <div class="bg-error-content" />
+          <div class="bg-error"></div>
+          <div class="bg-error-focus"></div>
+          <div class="bg-error-content"></div>
         </div>
       </div>
       <div class="color-sample">
         <h2>link</h2>
         <div>
-          <div class="bg-link" />
-          <div class="bg-link-visited" />
+          <div class="bg-link"></div>
+          <div class="bg-link-visited"></div>
         </div>
       </div>
     </div>
