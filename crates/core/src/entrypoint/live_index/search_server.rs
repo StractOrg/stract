@@ -216,7 +216,9 @@ impl LiveIndexService {
             )
             .await?,
         );
-        let local_searcher = LocalSearcher::new(index.clone());
+        let local_searcher = LocalSearcher::builder(index.clone())
+            .set_collector_config(config.collector)
+            .build();
 
         let temp_wal = Arc::new(Mutex::new(Some(Wal::open(index_path.join("wal.temp"))?)));
 

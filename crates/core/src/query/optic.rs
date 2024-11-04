@@ -248,6 +248,8 @@ impl AsTantivyQuery for Matching {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use optics::{HostRankings, Optic};
 
     use crate::{
@@ -320,7 +322,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -441,7 +443,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let _ = searcher
             .search_sync(&SearchQuery {
@@ -565,7 +567,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -733,7 +735,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
         let searcher: ApiSearcher<_, LiveSearcher, _> = ApiSearcher::new(
-            LocalSearchClient::from(LocalSearcher::from(index)),
+            LocalSearchClient::from(LocalSearcher::builder(Arc::new(index)).build()),
             Bangs::empty(),
             Config::default(),
         )
@@ -849,7 +851,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().unwrap();
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -978,7 +980,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -1068,7 +1070,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -1131,7 +1133,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
         let res = searcher
             .search_sync(&SearchQuery {
                 query: "example".to_string(),
@@ -1287,7 +1289,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -1355,7 +1357,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -1435,7 +1437,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -1531,7 +1533,7 @@ mod tests {
         index.insert(&page).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -1627,7 +1629,7 @@ mod tests {
         index.insert(&page).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -1706,7 +1708,7 @@ mod tests {
         index.insert(&page).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -1820,7 +1822,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -1908,7 +1910,7 @@ mod tests {
         index.insert(&page).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -1950,7 +1952,7 @@ mod tests {
         index.insert(&page).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {

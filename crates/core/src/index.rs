@@ -145,6 +145,8 @@ impl Index {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::{
         ranking,
         searcher::{LocalSearcher, SearchQuery},
@@ -224,7 +226,7 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
         let res = searcher
             .search_sync(&SearchQuery {
                 query: "test".to_string(),

@@ -1,17 +1,12 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use stract::{
-    index::Index,
-    query::Query,
-    searcher::{SearchGuard, SearchQuery, SearchableIndex},
-};
+use stract::{index::Index, query::Query, searcher::SearchQuery};
 
 fuzz_target!(|query: &str| {
     let index = Index::open("/tmp/stract/fuzz-index").unwrap();
 
-    let guard = stract::block_on(index.guard());
-    let ctx = guard.inverted_index().local_search_ctx();
+    let ctx = index.inverted_index.local_search_ctx();
 
     let _ = Query::parse(
         &ctx,

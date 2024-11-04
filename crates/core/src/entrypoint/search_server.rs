@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use tracing::info;
 use url::Url;
@@ -30,7 +30,7 @@ use crate::{
     inverted_index::{self, KeyPhrase, RetrievedWebpage},
     models::dual_encoder::DualEncoder,
     ranking::models::linear::LinearRegression,
-    searcher::{InitialWebsiteResult, LocalSearcher, SearchGuard, SearchQuery, SearchableIndex},
+    searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
     Result,
 };
 
@@ -50,7 +50,7 @@ sonic_service!(
 );
 
 pub struct SearchService {
-    local_searcher: LocalSearcher<Index>,
+    local_searcher: LocalSearcher<Arc<Index>>,
     // dropping the handle leaves the cluster
     #[allow(unused)]
     cluster_handle: Cluster,
@@ -58,20 +58,22 @@ pub struct SearchService {
 
 impl SearchService {
     async fn new(config: config::SearchServerConfig) -> Result<Self> {
-        let search_index = Index::open(config.index_path)?;
+        let mut search_index = Index::open(config.index_path)?;
+        search_index
+            .inverted_index
+            .set_snippet_config(config.snippet);
 
-        let mut local_searcher = LocalSearcher::new(search_index);
+        let mut local_searcher = LocalSearcher::builder(Arc::new(search_index));
 
         if let Some(model_path) = config.linear_model_path {
-            local_searcher.set_linear_model(LinearRegression::open(model_path)?);
+            local_searcher = local_searcher.set_linear_model(LinearRegression::open(model_path)?);
         }
 
         if let Some(model_path) = config.dual_encoder_model_path {
-            local_searcher.set_dual_encoder(DualEncoder::open(model_path)?);
+            local_searcher = local_searcher.set_dual_encoder(DualEncoder::open(model_path)?);
         }
 
-        local_searcher.set_collector_config(config.collector);
-        local_searcher.set_snippet_config(config.snippet).await;
+        local_searcher = local_searcher.set_collector_config(config.collector);
 
         let cluster_handle = Cluster::join(
             Member::new(Service::Searcher {
@@ -84,7 +86,7 @@ impl SearchService {
         .await?;
 
         Ok(SearchService {
-            local_searcher,
+            local_searcher: local_searcher.build(),
             cluster_handle,
         })
     }
@@ -182,13 +184,7 @@ impl sonic::service::Message<SearchService> for Size {
     type Response = SizeResponse;
     async fn handle(self, server: &SearchService) -> Self::Response {
         SizeResponse {
-            pages: server
-                .local_searcher
-                .index()
-                .guard()
-                .await
-                .inverted_index()
-                .num_documents(),
+            pages: server.local_searcher.num_documents().await,
         }
     }
 }

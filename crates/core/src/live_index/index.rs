@@ -20,7 +20,7 @@ use std::{
     sync::Arc,
 };
 
-use tokio::sync::{RwLock, RwLockReadGuard};
+use tokio::sync::{OwnedRwLockReadGuard, RwLock};
 
 use chrono::{DateTime, NaiveDate, Utc};
 use itertools::Itertools;
@@ -37,7 +37,6 @@ use crate::{
     entrypoint::indexer::{self, IndexableWebpage, IndexingWorker},
     inverted_index::InvertedIndex,
     live_index::{BATCH_SIZE, TTL},
-    searcher::SearchableIndex,
     Result,
 };
 
@@ -400,8 +399,8 @@ impl LiveIndex {
         self.inner.write().await.insert(pages)
     }
 
-    pub async fn read(&self) -> RwLockReadGuard<'_, InnerIndex> {
-        self.inner.read().await
+    pub async fn read(&self) -> OwnedRwLockReadGuard<InnerIndex> {
+        RwLock::read_owned(self.inner.clone()).await
     }
 
     pub async fn set_snippet_config(&self, config: SnippetConfig) {
@@ -409,8 +408,8 @@ impl LiveIndex {
             .write()
             .await
             .index
+            .inverted_index
             .set_snippet_config(config)
-            .await
     }
 
     pub async fn path(&self) -> PathBuf {

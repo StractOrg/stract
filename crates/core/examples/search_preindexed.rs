@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use optics::HostRankings;
 use rand::seq::SliceRandom;
 use stract::{
@@ -15,7 +17,7 @@ use stract::{
 
 #[tokio::main]
 pub async fn main() {
-    let index = Index::open("data/index").unwrap();
+    let mut index = Index::open("data/index").unwrap();
 
     let collector_conf = CollectorConfig {
         ..Default::default()
@@ -47,7 +49,15 @@ pub async fn main() {
         top_phrases_for_autosuggest: defaults::Api::top_phrases_for_autosuggest(),
     };
 
-    let mut searcher = LocalSearcher::new(index);
+    index.inverted_index.set_snippet_config(SnippetConfig {
+        num_words_for_lang_detection: Some(250),
+        max_considered_words: Some(10_000),
+        ..Default::default()
+    });
+
+    let searcher = LocalSearcher::builder(Arc::new(index))
+        .set_collector_config(collector_conf)
+        .build();
 
     let mut queries: Vec<_> = searcher
         .top_key_phrases(1_000_000)
@@ -57,14 +67,6 @@ pub async fn main() {
         .collect();
     queries.shuffle(&mut rand::thread_rng());
 
-    searcher.set_collector_config(collector_conf);
-    searcher
-        .set_snippet_config(SnippetConfig {
-            num_words_for_lang_detection: Some(250),
-            max_considered_words: Some(10_000),
-            ..Default::default()
-        })
-        .await;
     let bangs = Bangs::from_path(config.bangs_path.as_ref().unwrap());
 
     let searcher = stract::searcher::LocalSearchClient::from(searcher);

@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -456,9 +456,9 @@ impl SearchClient for DistributedSearcher {
 }
 
 /// This should only be used for testing and benchmarks.
-pub struct LocalSearchClient(LocalSearcher<Index>);
-impl From<LocalSearcher<Index>> for LocalSearchClient {
-    fn from(searcher: LocalSearcher<Index>) -> Self {
+pub struct LocalSearchClient(LocalSearcher<Arc<Index>>);
+impl From<LocalSearcher<Arc<Index>>> for LocalSearchClient {
+    fn from(searcher: LocalSearcher<Arc<Index>>) -> Self {
         Self(searcher)
     }
 }

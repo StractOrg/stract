@@ -349,6 +349,8 @@ pub fn generate(query: &Query, text: &str, region: &Region, config: SnippetConfi
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use crate::{
         index::Index,
@@ -413,7 +415,7 @@ Survey in 2016, 2017, and 2018."#;
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -452,7 +454,7 @@ Survey in 2016, 2017, and 2018."#;
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -491,7 +493,7 @@ Survey in 2016, 2017, and 2018."#;
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let result = searcher
             .search_sync(&SearchQuery {

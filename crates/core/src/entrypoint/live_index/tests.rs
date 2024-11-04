@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -491,7 +491,7 @@ async fn test_segment_compaction() -> Result<()> {
 
     assert_eq!(index.meta().await.segments().len(), 1);
 
-    let searcher = LocalSearcher::from(index.clone());
+    let searcher = LocalSearcher::builder(index.clone()).build();
 
     let res = searcher
         .search(&SearchQuery {

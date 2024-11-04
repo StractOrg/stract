@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -127,7 +127,7 @@ impl LocalRanker {
 #[cfg(test)]
 mod tests {
 
-    use std::path::Path;
+    use std::{path::Path, sync::Arc};
 
     use crate::{
         config::{IndexerConfig, IndexerDualEncoderConfig, WarcSource},
@@ -196,7 +196,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
         let result = searcher
             .search_sync(&SearchQuery {
                 query: "example".to_string(),
@@ -262,7 +262,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
         let result = searcher
             .search_sync(&SearchQuery {
                 query: "example".to_string(),
@@ -330,7 +330,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
         let result = searcher
             .search_sync(&SearchQuery {
                 query: "title".to_string(),
@@ -403,7 +403,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
         let result = searcher
             .search_sync(&SearchQuery {
                 query: "test".to_string(),
@@ -469,7 +469,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::from(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
         let result = searcher
             .search_sync(&SearchQuery {
                 query: "test".to_string(),
@@ -554,7 +554,7 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = LocalSearcher::new(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -640,7 +640,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::new(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -733,7 +733,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::new(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -854,9 +854,10 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let mut searcher = LocalSearcher::new(index);
-        searcher
+        let mut searcher = LocalSearcher::builder(Arc::new(index));
+        searcher = searcher
             .set_dual_encoder(DualEncoder::open(data_path).expect("failed to open dual encoder"));
+        let searcher = searcher.build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -942,9 +943,10 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let mut searcher = LocalSearcher::new(index);
-        searcher
+        let mut searcher = LocalSearcher::builder(Arc::new(index));
+        searcher = searcher
             .set_dual_encoder(DualEncoder::open(data_path).expect("failed to open dual encoder"));
+        let searcher = searcher.build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -991,7 +993,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::new(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -1071,7 +1073,7 @@ mod tests {
 
         index.insert(&page).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::new(index);
+        let searcher = LocalSearcher::builder(Arc::new(index)).build();
 
         let result = searcher
             .search_sync(&SearchQuery {

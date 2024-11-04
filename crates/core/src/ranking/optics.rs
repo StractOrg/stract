@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,8 @@
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use optics::HostRankings;
 
     use crate::{
@@ -187,7 +189,7 @@ mod tests {
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher: ApiSearcher<_, LiveSearcher, _> = ApiSearcher::new(
-            LocalSearchClient::from(LocalSearcher::new(index)),
+            LocalSearchClient::from(LocalSearcher::builder(Arc::new(index)).build()),
             Bangs::empty(),
             crate::searcher::api::Config::default(),
         )
