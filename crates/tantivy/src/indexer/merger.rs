@@ -6,6 +6,7 @@ use crate::columnar::{
 };
 use itertools::Itertools;
 use measure_time::debug_time;
+use rustc_hash::FxHashMap;
 
 use crate::columnfield::ColumnFieldNotAvailableError;
 use crate::directory::WritePtr;
@@ -18,9 +19,9 @@ use crate::indexer::SegmentSerializer;
 use crate::postings::{InvertedIndexSerializer, Postings, SegmentPostings};
 use crate::schema::{value_type_to_column_type, Field, FieldType, Schema};
 use crate::store::StoreWriter;
-use crate::termdict::{TermMerger, TermOrdinal};
+use crate::termdict::TermMerger;
 use crate::{
-    DocAddress, DocId, IndexSettings, IndexSortByField, InvertedIndexReader, Order, SegmentOrdinal,
+    DocAddress, IndexSettings, IndexSortByField, InvertedIndexReader, Order, SegmentOrdinal,
 };
 
 /// Segment's max doc must be `< MAX_DOC_LIMIT`.
@@ -399,38 +400,19 @@ impl IndexMerger {
         let mut positions_buffer: Vec<u32> = Vec::with_capacity(1_000);
         let mut delta_computer = DeltaComputer::new();
 
-        let mut max_term_ords: Vec<TermOrdinal> = Vec::new();
-
         let field_readers: Vec<Arc<InvertedIndexReader>> = self
             .readers
             .iter()
             .map(|reader| reader.inverted_index(indexed_field))
             .collect::<crate::Result<Vec<_>>>()?;
 
-        let mut field_term_streams = Vec::new();
+        let mut field_term_streams = Vec::with_capacity(field_readers.len());
         for field_reader in &field_readers {
             let terms = field_reader.terms();
             field_term_streams.push(terms.stream()?);
-            max_term_ords.push(terms.num_terms() as u64);
         }
 
         let mut merged_terms = TermMerger::new(field_term_streams);
-
-        // map from segment doc ids to the resulting merged segment doc id.
-
-        let mut merged_doc_id_map: Vec<Vec<Option<DocId>>> = self
-            .readers
-            .iter()
-            .map(|reader| {
-                let mut segment_local_map = vec![];
-                segment_local_map.resize(reader.max_doc() as usize, None);
-                segment_local_map
-            })
-            .collect();
-        for (new_doc_id, old_doc_addr) in doc_id_mapping.iter_old_doc_addrs().enumerate() {
-            let segment_map = &mut merged_doc_id_map[old_doc_addr.segment_ord as usize];
-            segment_map[old_doc_addr.doc_id as usize] = Some(new_doc_id as DocId);
-        }
 
         // Note that the total number of tokens is not exact.
         // It is only used as a parameter in the BM25 formula.
@@ -459,8 +441,8 @@ impl IndexMerger {
                          indexed. Have you modified the schema?",
         );
 
-        let mut segment_postings_containing_the_term: Vec<(usize, SegmentPostings)> = vec![];
-        let mut doc_id_and_positions = vec![];
+        let mut segment_postings_containing_the_term: FxHashMap<usize, SegmentPostings> =
+            FxHashMap::default();
 
         while merged_terms.advance() {
             segment_postings_containing_the_term.clear();
@@ -476,7 +458,7 @@ impl IndexMerger {
                 let doc_freq = segment_postings.doc_freq();
                 if doc_freq > 0u32 {
                     total_doc_freq += doc_freq;
-                    segment_postings_containing_the_term.push((segment_ord, segment_postings));
+                    segment_postings_containing_the_term.insert(segment_ord, segment_postings);
                 }
             }
 
@@ -494,12 +476,14 @@ impl IndexMerger {
             assert!(!segment_postings_containing_the_term.is_empty());
 
             let has_term_freq = {
-                let has_term_freq = !segment_postings_containing_the_term[0]
-                    .1
+                let has_term_freq = !segment_postings_containing_the_term
+                    .values()
+                    .next()
+                    .unwrap()
                     .block_cursor
                     .freqs()
                     .is_empty();
-                for (_, postings) in &segment_postings_containing_the_term[1..] {
+                for postings in segment_postings_containing_the_term.values().skip(1) {
                     // This may look at a strange way to test whether we have term freq or not.
                     // With JSON object, the schema is not sufficient to know whether a term
                     // has its term frequency encoded or not:
@@ -528,59 +512,45 @@ impl IndexMerger {
 
             // We can now serialize this postings, by pushing each document to the
             // postings serializer.
-            for (segment_ord, mut segment_postings) in
-                segment_postings_containing_the_term.drain(..)
-            {
-                let old_to_new_doc_id = &merged_doc_id_map[segment_ord];
 
-                let mut doc = segment_postings.doc();
-                while doc != TERMINATED {
-                    // deleted doc are skipped as they do not have a `remapped_doc_id`.
-                    if let Some(remapped_doc_id) = old_to_new_doc_id[doc as usize] {
-                        // we make sure to only write the term if
-                        // there is at least one document.
-                        let term_freq = if has_term_freq {
-                            segment_postings.positions(&mut positions_buffer);
-                            segment_postings.term_freq()
-                        } else {
-                            // The positions_buffer may contain positions from the previous term
-                            // Existence of positions depend on the value type in JSON fields.
-                            // https://github.com/quickwit-oss/tantivy/issues/2283
-                            positions_buffer.clear();
-                            0u32
-                        };
-
-                        // if doc_id_mapping exists, the doc_ids are reordered, they are
-                        // not just stacked. The field serializer expects monotonically increasing
-                        // doc_ids, so we collect and sort them first, before writing.
-                        //
-                        // I think this is not strictly necessary, it would be possible to
-                        // avoid the loading into a vec via some form of kmerge, but then the merge
-                        // logic would deviate much more from the stacking case (unsorted index)
-                        if !doc_id_mapping.is_trivial() {
-                            doc_id_and_positions.push((
-                                remapped_doc_id,
-                                term_freq,
-                                positions_buffer.to_vec(),
-                            ));
-                        } else {
-                            let delta_positions = delta_computer.compute_delta(&positions_buffer);
-                            field_serializer.write_doc(remapped_doc_id, term_freq, delta_positions);
-                        }
+            // Each segment_postings is already sorted by their new doc_id's
+            // (if a new_doc_id(a) < new_doc_id(b), then old_doc_id(a) < old_doc_id(b)).
+            // We can therefore just iterate over the doc_id_mapping and write the term for each
+            // document.
+            for (remapped_doc_id, old_doc_addr) in doc_id_mapping.iter_old_doc_addrs().enumerate() {
+                if let Some(segment_postings) = segment_postings_containing_the_term
+                    .get_mut(&(old_doc_addr.segment_ord as usize))
+                {
+                    if segment_postings.doc() == TERMINATED {
+                        continue;
                     }
 
-                    doc = segment_postings.advance();
-                }
-            }
-            if !doc_id_mapping.is_trivial() {
-                doc_id_and_positions.sort_unstable_by_key(|&(doc_id, _, _)| doc_id);
+                    assert!(old_doc_addr.doc_id <= segment_postings.doc());
+                    if old_doc_addr.doc_id < segment_postings.doc() {
+                        // The doc doesn't contain the term for this posting list.
+                        continue;
+                    }
+                    // we make sure to only write the term if
+                    // there is at least one document.
+                    let term_freq = if has_term_freq {
+                        segment_postings.positions(&mut positions_buffer);
+                        segment_postings.term_freq()
+                    } else {
+                        // The positions_buffer may contain positions from the previous term
+                        // Existence of positions depend on the value type in JSON fields.
+                        // https://github.com/quickwit-oss/tantivy/issues/2283
+                        positions_buffer.clear();
+                        0u32
+                    };
 
-                for (doc_id, term_freq, positions) in &doc_id_and_positions {
-                    let delta_positions = delta_computer.compute_delta(positions);
-                    field_serializer.write_doc(*doc_id, *term_freq, delta_positions);
+                    let delta_positions = delta_computer.compute_delta(&positions_buffer);
+                    field_serializer.write_doc(remapped_doc_id as u32, term_freq, delta_positions);
+
+                    segment_postings.advance();
                 }
-                doc_id_and_positions.clear();
             }
+            segment_postings_containing_the_term.clear();
+
             // closing the term.
             field_serializer.close_term()?;
         }

@@ -24,7 +24,7 @@ impl<'a> TermMerger<'a> {
     /// Stream of merged term dictionary
     pub fn new(streams: Vec<TermStreamer<'a>>) -> TermMerger<'a> {
         let mut op_builder = OpBuilder::new();
-        let mut dictionaries = vec![];
+        let mut dictionaries = Vec::with_capacity(streams.len());
         for streamer in streams {
             op_builder.push(streamer.stream);
             dictionaries.push(streamer.fst_map);
