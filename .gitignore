@@ -16,3 +16,4 @@ proptest-regressions
 .ipynb_checkpoints
 .zed
 rustc-ice-*
+*.pdf
