@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::numericalfield_reader::NumericalFieldReader;
+use crate::{ampc::dht::ShardId, numericalfield_reader::NumericalFieldReader};
 
 #[derive(Clone)]
 pub struct Ctx {
     pub tv_searcher: tantivy::Searcher,
     pub columnfield_reader: NumericalFieldReader,
+    pub shard_id: ShardId,
 }

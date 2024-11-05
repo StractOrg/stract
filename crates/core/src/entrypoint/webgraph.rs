@@ -182,7 +182,7 @@ impl Webgraph {
         let mut handlers = Vec::new();
         let graph_path = &config.graph_base_path;
 
-        const MAX_FINALIZE_CONCURRENT: usize = 8;
+        const MAX_FINALIZE_CONCURRENT: usize = 2;
         let (s, r) = crossbeam_channel::bounded(MAX_FINALIZE_CONCURRENT);
 
         for _ in 0..MAX_FINALIZE_CONCURRENT {

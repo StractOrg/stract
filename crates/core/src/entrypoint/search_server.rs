@@ -26,6 +26,7 @@ use crate::{
         member::{Member, Service},
         sonic::{self, service::sonic_service},
     },
+    generic_query,
     index::Index,
     inverted_index::{self, KeyPhrase, RetrievedWebpage},
     models::dual_encoder::DualEncoder,
@@ -36,18 +37,98 @@ use crate::{
 
 use super::api::{Size, SizeResponse};
 
-sonic_service!(
-    SearchService,
-    [
-        RetrieveWebsites,
-        Search,
-        GetWebpage,
-        GetHomepageDescriptions,
-        TopKeyPhrases,
-        Size,
-        GetSiteUrls,
-    ]
-);
+pub trait RetrieveReq: bincode::Encode + bincode::Decode + Clone {
+    type Query: generic_query::GenericQuery + bincode::Encode + bincode::Decode;
+    fn new(
+        query: Self::Query,
+        fruit: <<Self::Query as generic_query::GenericQuery>::Collector as generic_query::Collector>::Fruit,
+    ) -> Self;
+}
+
+pub trait Query
+where
+    Self: generic_query::GenericQuery
+        + bincode::Encode
+        + bincode::Decode
+        + sonic::service::Wrapper<SearchService>,
+{
+    type RetrieveReq: RetrieveReq<Query = Self>;
+}
+
+#[derive(bincode::Encode, bincode::Decode, Clone)]
+pub struct EncodedError {
+    pub msg: String,
+}
+
+impl std::fmt::Display for EncodedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+macro_rules! impl_search {
+    ([$($q:ident),*$(,)?]) => {
+        $(
+            impl Message<SearchService> for $q {
+                type Response = Result<<<$q as generic_query::GenericQuery>::Collector as generic_query::Collector>::Fruit, EncodedError>;
+
+                async fn handle(self, server: &SearchService) -> Self::Response {
+                    server.local_searcher.search_initial_generic(self).await.map_err(|e| EncodedError { msg: e.to_string() })
+                }
+            }
+
+            paste::item! {
+                #[derive(bincode::Encode, bincode::Decode, Clone)]
+                pub struct [<$q Retrieve>] {
+                    pub query: $q,
+                    #[bincode(with_serde)]
+                    pub fruit: <<$q as generic_query::GenericQuery>::Collector as generic_query::Collector>::Fruit,
+                }
+
+                impl Message<SearchService> for [<$q Retrieve>] {
+                    type Response = Result<<$q as generic_query::GenericQuery>::IntermediateOutput, EncodedError>;
+                    async fn handle(self, server: &SearchService) -> Self::Response {
+                        server
+                            .local_searcher
+                            .retrieve_generic(self.query, self.fruit)
+                            .await
+                            .map_err(|e| EncodedError { msg: e.to_string() })
+                    }
+                }
+
+                impl Query for $q {
+                    type RetrieveReq = [<$q Retrieve>];
+                }
+
+                impl RetrieveReq for [<$q Retrieve>] {
+                    type Query = $q;
+                    fn new(query: Self::Query, fruit: <<Self::Query as generic_query::GenericQuery>::Collector as generic_query::Collector>::Fruit) -> Self {
+                        Self { query, fruit }
+                    }
+                }
+            }
+        )*
+
+        paste::item! {
+            sonic_service!(SearchService, [
+                RetrieveWebsites,
+                Search,
+                GetWebpage,
+                GetHomepageDescriptions,
+                TopKeyPhrases,
+                Size,
+                GetSiteUrls,
+                $(
+                    $q,
+                    [<$q Retrieve>],
+                )*
+            ]);
+        }
+
+    }
+}
+
+impl_search!([]);
 
 pub struct SearchService {
     local_searcher: LocalSearcher<Arc<Index>>,
@@ -62,6 +143,7 @@ impl SearchService {
         search_index
             .inverted_index
             .set_snippet_config(config.snippet);
+        search_index.inverted_index.set_shard_id(config.shard);
 
         let mut local_searcher = LocalSearcher::builder(Arc::new(search_index));
 

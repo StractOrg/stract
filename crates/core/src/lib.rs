@@ -97,6 +97,8 @@ pub mod webgraph;
 pub mod webpage;
 mod widgets;
 
+pub mod generic_query;
+
 pub use block_on::block_on;
 
 #[derive(Error, Debug)]

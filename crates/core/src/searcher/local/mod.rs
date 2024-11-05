@@ -14,26 +14,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+mod guard;
+use guard::{LiveIndexSearchGuard, NormalIndexSearchGuard, SearchGuard};
+
+mod inner;
+use inner::InnerLocalSearcher;
+
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
-use tokio::sync::OwnedRwLockReadGuard;
 
 use itertools::Itertools;
 use url::Url;
 
 use crate::collector::approx_count;
 use crate::config::CollectorConfig;
+use crate::generic_query::{self, GenericQuery};
 use crate::index::Index;
-use crate::inverted_index::{InvertedIndex, KeyPhrase, RetrievedWebpage};
+use crate::inverted_index::{KeyPhrase, RetrievedWebpage};
 use crate::models::dual_encoder::DualEncoder;
-use crate::query::Query;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{
     LocalRecallRankingWebpage, PrecisionRankingWebpage, RankableWebpage, RecallRankingWebpage,
 };
-use crate::ranking::{LocalRanker, SignalComputer, SignalEnum, SignalScore};
-use crate::search_ctx::Ctx;
+use crate::ranking::{SignalEnum, SignalScore};
 use crate::search_prettifier::DisplayedWebpage;
 use crate::{inverted_index, live_index, Result};
 
@@ -46,30 +50,11 @@ pub trait SearchableIndex: Send + Sync + 'static {
     fn guard(&self) -> impl Future<Output = Self::SearchGuard>;
 }
 
-pub trait SearchGuard: Send + Sync {
-    fn search_index(&self) -> &Index;
-    fn inverted_index(&self) -> &InvertedIndex {
-        &self.search_index().inverted_index
-    }
-}
-
 impl SearchableIndex for Arc<Index> {
     type SearchGuard = NormalIndexSearchGuard;
 
     async fn guard(&self) -> Self::SearchGuard {
-        NormalIndexSearchGuard {
-            search_index: self.clone(),
-        }
-    }
-}
-
-pub struct NormalIndexSearchGuard {
-    search_index: Arc<Index>,
-}
-
-impl SearchGuard for NormalIndexSearchGuard {
-    fn search_index(&self) -> &Index {
-        self.search_index.as_ref()
+        NormalIndexSearchGuard::new(self.clone())
     }
 }
 
@@ -77,19 +62,7 @@ impl SearchableIndex for Arc<live_index::LiveIndex> {
     type SearchGuard = LiveIndexSearchGuard;
 
     async fn guard(&self) -> Self::SearchGuard {
-        LiveIndexSearchGuard {
-            lock_guard: self.read().await,
-        }
-    }
-}
-
-pub struct LiveIndexSearchGuard {
-    lock_guard: OwnedRwLockReadGuard<live_index::index::InnerIndex>,
-}
-
-impl SearchGuard for LiveIndexSearchGuard {
-    fn search_index(&self) -> &Index {
-        self.lock_guard.index()
+        LiveIndexSearchGuard::new(self.read().await)
     }
 }
 
@@ -270,162 +243,34 @@ where
     pub async fn num_documents(&self) -> u64 {
         self.inner.guard().await.inverted_index().num_documents()
     }
-}
 
-struct InnerLocalSearcher<I: SearchableIndex> {
-    index: I,
-    linear_regression: Option<Arc<LinearRegression>>,
-    dual_encoder: Option<Arc<DualEncoder>>,
-    collector_config: CollectorConfig,
+    pub async fn search_initial_generic<Q: GenericQuery + 'static>(
+        &self,
+        query: Q,
+    ) -> Result<<Q::Collector as generic_query::Collector>::Fruit> {
+        let inner = self.inner.clone();
+        let guard = inner.guard().await;
+        tokio::task::spawn_blocking(move || inner.search_initial_generic(&query, &guard))
+            .await
+            .unwrap()
+    }
+
+    pub async fn retrieve_generic<Q: GenericQuery + 'static>(
+        &self,
+        query: Q,
+        fruit: <Q::Collector as generic_query::Collector>::Fruit,
+    ) -> Result<Q::IntermediateOutput> {
+        let inner = self.inner.clone();
+        let guard = inner.guard().await;
+        tokio::task::spawn_blocking(move || inner.retrieve_generic(&query, fruit, &guard))
+            .await
+            .unwrap()
+    }
 }
 
 struct InvertedIndexResult {
     webpages: Vec<LocalRecallRankingWebpage>,
     num_hits: approx_count::Count,
-}
-
-impl<I> InnerLocalSearcher<I>
-where
-    I: SearchableIndex,
-{
-    pub fn new(index: I) -> Self {
-        Self {
-            index,
-            linear_regression: None,
-            dual_encoder: None,
-            collector_config: CollectorConfig::default(),
-        }
-    }
-
-    async fn guard(&self) -> I::SearchGuard {
-        self.index.guard().await
-    }
-
-    pub fn set_linear_model(&mut self, model: LinearRegression) {
-        self.linear_regression = Some(Arc::new(model));
-    }
-
-    pub fn set_dual_encoder(&mut self, dual_encoder: DualEncoder) {
-        self.dual_encoder = Some(Arc::new(dual_encoder));
-    }
-
-    pub fn set_collector_config(&mut self, config: CollectorConfig) {
-        self.collector_config = config;
-    }
-
-    fn parse_query<G: SearchGuard>(
-        &self,
-        ctx: &Ctx,
-        guard: &G,
-        query: &SearchQuery,
-    ) -> Result<Query> {
-        Query::parse(ctx, query, guard.inverted_index())
-    }
-
-    fn ranker<G: SearchGuard>(
-        &self,
-        query: &Query,
-        guard: &G,
-        de_rank_similar: bool,
-        computer: SignalComputer,
-    ) -> Result<LocalRanker> {
-        let mut ranker = LocalRanker::new(
-            computer,
-            guard.inverted_index().columnfield_reader(),
-            self.collector_config.clone(),
-        );
-
-        ranker.de_rank_similar(de_rank_similar);
-
-        Ok(ranker
-            .with_max_docs(
-                self.collector_config.max_docs_considered,
-                guard.inverted_index().num_segments(),
-            )
-            .with_num_results(query.num_results())
-            .with_offset(query.offset()))
-    }
-
-    fn search_inverted_index<G: SearchGuard>(
-        &self,
-        ctx: &Ctx,
-        guard: &G,
-        query: &SearchQuery,
-        de_rank_similar: bool,
-    ) -> Result<InvertedIndexResult> {
-        let parsed_query = self.parse_query(ctx, guard, query)?;
-
-        let mut computer = SignalComputer::new(Some(&parsed_query));
-
-        computer.set_region_count(
-            guard
-                .search_index()
-                .region_count
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .clone(),
-        );
-
-        if let Some(model) = self.linear_regression.as_ref() {
-            computer.set_linear_model(model.clone());
-        }
-
-        let ranker = self.ranker(&parsed_query, guard, de_rank_similar, computer)?;
-
-        let res = guard.inverted_index().search_initial(
-            &parsed_query,
-            ctx,
-            ranker.collector(ctx.clone()),
-        )?;
-
-        let columnfield_reader = guard.inverted_index().columnfield_reader();
-
-        let ranking_websites = guard.inverted_index().retrieve_ranking_websites(
-            ctx,
-            res.top_websites,
-            ranker.computer(),
-            &columnfield_reader,
-        )?;
-
-        Ok(InvertedIndexResult {
-            webpages: ranking_websites,
-            num_hits: res.num_websites,
-        })
-    }
-
-    fn search_initial(
-        &self,
-        query: &SearchQuery,
-        guard: &I::SearchGuard,
-        de_rank_similar: bool,
-    ) -> Result<InitialWebsiteResult> {
-        let query = query.clone();
-
-        let ctx = guard.inverted_index().local_search_ctx();
-        let inverted_index_result =
-            self.search_inverted_index(&ctx, guard, &query, de_rank_similar)?;
-
-        Ok(InitialWebsiteResult {
-            websites: inverted_index_result.webpages,
-            num_websites: inverted_index_result.num_hits,
-        })
-    }
-
-    fn retrieve_websites(
-        &self,
-        websites: &[inverted_index::WebpagePointer],
-        query: &str,
-        guard: &I::SearchGuard,
-    ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
-        let ctx = guard.inverted_index().local_search_ctx();
-        let query = SearchQuery {
-            query: query.to_string(),
-            ..Default::default()
-        };
-        let query = Query::parse(&ctx, &query, guard.inverted_index())?;
-
-        guard.inverted_index().retrieve_websites(websites, &query)
-    }
 }
 
 #[cfg(test)]

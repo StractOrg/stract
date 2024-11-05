@@ -279,20 +279,34 @@ impl EdgeStore {
     pub fn iter_pages_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
         let searcher = self.reader.searcher();
         let segment_readers: Vec<_> = searcher.segment_readers().to_vec();
+        let warm_column_fields = self.warmed_column_fields.clone();
 
-        segment_readers.into_iter().flat_map(|segment| {
-            SmallSegmentEdgesIter::new(&segment, FromId, ToId, 0..segment.max_doc())
+        segment_readers.into_iter().flat_map(move |segment| {
+            SmallSegmentEdgesIter::new(
+                &segment,
+                &warm_column_fields,
+                FromId,
+                ToId,
+                0..segment.max_doc(),
+            )
         })
     }
 
     pub fn iter_hosts_small(&self) -> impl Iterator<Item = SmallEdge> + '_ {
         let searcher = self.reader.searcher();
         let segment_readers: Vec<_> = searcher.segment_readers().to_vec();
+        let warm_column_fields = self.warmed_column_fields.clone();
 
         segment_readers
             .into_iter()
-            .flat_map(|segment| {
-                SmallSegmentEdgesIter::new(&segment, FromHostId, ToHostId, 0..segment.max_doc())
+            .flat_map(move |segment| {
+                SmallSegmentEdgesIter::new(
+                    &segment,
+                    &warm_column_fields,
+                    FromHostId,
+                    ToHostId,
+                    0..segment.max_doc(),
+                )
             })
             .unique_by(|e| (e.from, e.to))
     }
@@ -300,13 +314,20 @@ impl EdgeStore {
     pub fn iter_page_node_ids(&self, offset: u32, limit: u32) -> impl Iterator<Item = NodeID> + '_ {
         let searcher = self.reader.searcher();
         let segment_readers: Vec<_> = searcher.segment_readers().to_vec();
+        let warm_column_fields = self.warmed_column_fields.clone();
 
         let range = offset..limit;
 
         segment_readers
             .into_iter()
             .flat_map(move |segment| {
-                SmallSegmentEdgesIter::new(&segment, FromId, ToId, range.clone())
+                SmallSegmentEdgesIter::new(
+                    &segment,
+                    &warm_column_fields,
+                    FromId,
+                    ToId,
+                    range.clone(),
+                )
             })
             .flat_map(|e| [e.from, e.to])
             .unique()
@@ -315,13 +336,19 @@ impl EdgeStore {
     pub fn iter_host_node_ids(&self, offset: u32, limit: u32) -> impl Iterator<Item = NodeID> + '_ {
         let searcher = self.reader.searcher();
         let segment_readers: Vec<_> = searcher.segment_readers().to_vec();
-
+        let warm_column_fields = self.warmed_column_fields.clone();
         let range = offset..limit;
 
         segment_readers
             .into_iter()
             .flat_map(move |segment| {
-                SmallSegmentEdgesIter::new(&segment, FromHostId, ToHostId, range.clone())
+                SmallSegmentEdgesIter::new(
+                    &segment,
+                    &warm_column_fields,
+                    FromHostId,
+                    ToHostId,
+                    range.clone(),
+                )
             })
             .flat_map(|e| [e.from, e.to])
             .unique()
@@ -339,6 +366,7 @@ pub struct SmallSegmentEdgesIter {
 impl SmallSegmentEdgesIter {
     fn new<F1, F2>(
         segment: &SegmentReader,
+        warm_column_fields: &WarmedColumnFields,
         from_id: F1,
         to_id: F2,
         mut doc_range: Range<DocId>,
@@ -347,16 +375,16 @@ impl SmallSegmentEdgesIter {
         F1: Field,
         F2: Field,
     {
-        let columns = segment.column_fields();
+        let columns = warm_column_fields.segment(&segment.segment_id());
 
         if doc_range.end > segment.max_doc() {
             doc_range.end = segment.max_doc();
         }
 
         Self {
-            from_id: columns.u64(from_id.name()).unwrap(),
-            to_id: columns.u64(to_id.name()).unwrap(),
-            rel_flags: columns.u64(schema::RelFlags.name()).unwrap(),
+            from_id: columns.u64(from_id).unwrap(),
+            to_id: columns.u64(to_id).unwrap(),
+            rel_flags: columns.u64(schema::RelFlags).unwrap(),
             current_doc: doc_range.start,
             doc_range,
         }

@@ -33,6 +33,7 @@ use tantivy::{
 use std::collections::{HashMap, HashSet};
 
 use crate::{
+    ampc::dht::ShardId,
     config::SnippetConfig,
     entrypoint::indexer::{self, IndexableWebpage, IndexingWorker},
     inverted_index::InvertedIndex,
@@ -118,10 +119,12 @@ pub struct InnerIndex {
 impl InnerIndex {
     pub async fn new<P: AsRef<Path>>(
         path: P,
+        shard_id: ShardId,
         indexer_worker_config: indexer::worker::Config,
     ) -> Result<Self> {
         let mut index = crate::index::Index::open(path.as_ref())?;
         index.prepare_writer()?;
+        index.inverted_index.set_shard_id(shard_id);
 
         let write_ahead_log = Wal::open(path.as_ref().join("wal"))?;
         let wal_count = write_ahead_log.iter()?.count();
@@ -354,11 +357,12 @@ pub struct LiveIndex {
 impl LiveIndex {
     pub async fn new<P: AsRef<Path>>(
         path: P,
+        shard_id: ShardId,
         indexer_worker_config: indexer::worker::Config,
     ) -> Result<Self> {
         Ok(Self {
             inner: Arc::new(RwLock::new(
-                InnerIndex::new(path, indexer_worker_config).await?,
+                InnerIndex::new(path, shard_id, indexer_worker_config).await?,
             )),
         })
     }

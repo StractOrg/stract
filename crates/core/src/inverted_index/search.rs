@@ -24,9 +24,11 @@ use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 use url::Url;
 
+use crate::ampc::dht::ShardId;
 use crate::collector::approx_count::ApproxCount;
 use crate::collector::{approx_count, MainCollector};
 
+use crate::generic_query::{self, Collector as _, GenericQuery};
 use crate::highlighted::HighlightedFragment;
 use crate::numericalfield_reader::NumericalFieldReader;
 use crate::query::Query;
@@ -97,6 +99,7 @@ impl InvertedIndex {
     pub fn local_search_ctx(&self) -> Ctx {
         let tv_searcher = self.tv_searcher();
         Ctx {
+            shard_id: self.shard_id.unwrap_or(ShardId::new(u64::MAX)),
             columnfield_reader: self.columnfield_reader.clone(),
             tv_searcher,
         }
@@ -346,5 +349,40 @@ impl InvertedIndex {
                 .collect(),
             Err(_) => vec![],
         }
+    }
+
+    pub fn search_initial_generic<Q: GenericQuery>(
+        &self,
+        query: &Q,
+    ) -> Result<<Q::Collector as generic_query::Collector>::Fruit> {
+        let ctx = self.local_search_ctx();
+
+        let res = ctx.tv_searcher.search(
+            &query.tantivy_query(&ctx),
+            &generic_query::collector::TantivyCollector::from(&query.collector(&ctx)),
+        )?;
+
+        Ok(res)
+    }
+
+    pub fn retrieve_generic<Q: GenericQuery>(
+        &self,
+        query: &Q,
+        fruit: <Q::Collector as generic_query::Collector>::Fruit,
+    ) -> Result<Q::IntermediateOutput> {
+        let ctx = self.local_search_ctx();
+        query.retrieve(&ctx, fruit)
+    }
+
+    pub fn search_generic<Q>(&self, query: &Q) -> Result<Q::Output>
+    where
+        Q: GenericQuery,
+        <<Q::Collector as generic_query::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit:
+            From<<Q::Collector as generic_query::Collector>::Fruit>,
+    {
+        let fruit = self.search_initial_generic(query)?;
+        let fruit = query.remote_collector().merge_fruits(vec![fruit.into()])?;
+        let res = self.retrieve_generic(query, fruit)?;
+        Ok(Q::merge_results(vec![res]))
     }
 }

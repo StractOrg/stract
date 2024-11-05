@@ -204,6 +204,7 @@ impl LiveIndexService {
         let index = Arc::new(
             LiveIndex::new(
                 index_path,
+                config.shard_id,
                 indexer::worker::Config {
                     host_centrality_store_path: config.host_centrality_store_path.clone(),
                     page_centrality_store_path: config.page_centrality_store_path.clone(),

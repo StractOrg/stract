@@ -42,6 +42,7 @@ use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{IndexReader, IndexWriter};
 
+use crate::ampc::dht::ShardId;
 use crate::collector::{approx_count, Hashes};
 use crate::config::SnippetConfig;
 use crate::numericalfield_reader::NumericalFieldReader;
@@ -140,6 +141,7 @@ pub struct InvertedIndex {
     schema: Arc<Schema>,
     snippet_config: SnippetConfig,
     columnfield_reader: NumericalFieldReader,
+    shard_id: Option<ShardId>,
 }
 
 impl InvertedIndex {
@@ -180,7 +182,12 @@ impl InvertedIndex {
             tantivy_index,
             snippet_config: SnippetConfig::default(),
             columnfield_reader,
+            shard_id: None,
         })
+    }
+
+    pub fn set_shard_id(&mut self, shard_id: ShardId) {
+        self.shard_id = Some(shard_id);
     }
 
     pub fn re_open(&mut self) -> Result<()> {

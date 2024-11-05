@@ -414,7 +414,7 @@ async fn test_meta_segments() -> Result<()> {
         dual_encoder: None,
     };
 
-    let index = LiveIndex::new(&config.index_path, indexer_config.clone()).await?;
+    let index = LiveIndex::new(&config.index_path, ShardId::new(0), indexer_config.clone()).await?;
     assert!(index.meta().await.segments().is_empty());
 
     index
@@ -436,7 +436,7 @@ async fn test_meta_segments() -> Result<()> {
 
     assert_eq!(index.meta().await.segments().len(), 1);
 
-    let copy_index = LiveIndex::new(&config.index_path, indexer_config).await?;
+    let copy_index = LiveIndex::new(&config.index_path, ShardId::new(0), indexer_config).await?;
 
     assert_eq!(copy_index.meta().await.segments().len(), 1);
 
@@ -455,7 +455,8 @@ async fn test_segment_compaction() -> Result<()> {
         dual_encoder: None,
     };
 
-    let index = Arc::new(LiveIndex::new(&config.index_path, indexer_config).await?);
+    let index =
+        Arc::new(LiveIndex::new(&config.index_path, ShardId::new(0), indexer_config).await?);
 
     index
         .insert(&[IndexableWebpage {

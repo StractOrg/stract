@@ -677,6 +677,7 @@ mod tests {
                     "https://www.a.com/this/is/a/pattern",
                 )
                 .unwrap(),
+                host_centrality: 0.0001,
                 fetch_time_ms: 500,
                 node_id: Some(Node::from("www.a.com").into_host().id()),
                 ..Default::default()
