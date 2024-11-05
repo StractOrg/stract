@@ -8,6 +8,7 @@ use stract::{
         defaults, ApiConfig, ApiThresholds, CollectorConfig, CorrectionConfig, SnippetConfig,
         WidgetsConfig,
     },
+    generic_query::TopKeyPhrasesQuery,
     index::Index,
     searcher::{
         api::ApiSearcher, live::LiveSearcher, LocalSearchClient, LocalSearcher, SearchQuery,
@@ -59,9 +60,10 @@ pub async fn main() {
         .set_collector_config(collector_conf)
         .build();
 
-    let mut queries: Vec<_> = searcher
-        .top_key_phrases(1_000_000)
+    let mut queries: Vec<String> = searcher
+        .search_generic(TopKeyPhrasesQuery { top_n: 1_000_000 })
         .await
+        .unwrap()
         .into_iter()
         .map(|phrase| phrase.text().to_string())
         .collect();

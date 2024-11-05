@@ -196,4 +196,15 @@ where
     ) -> Result<Q::IntermediateOutput> {
         guard.inverted_index().retrieve_generic(query, fruit)
     }
+
+    pub fn search_generic<Q: GenericQuery>(
+        &self,
+        query: Q,
+        guard: &I::SearchGuard,
+    ) -> Result<Q::Output> {
+        let fruit = self.search_initial_generic(&query, guard)?;
+        Ok(Q::merge_results(vec![
+            self.retrieve_generic(&query, fruit, guard)?
+        ]))
+    }
 }

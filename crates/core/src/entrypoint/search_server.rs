@@ -26,9 +26,9 @@ use crate::{
         member::{Member, Service},
         sonic::{self, service::sonic_service},
     },
-    generic_query,
+    generic_query::{self, TopKeyPhrasesQuery},
     index::Index,
-    inverted_index::{self, KeyPhrase, RetrievedWebpage},
+    inverted_index::{self, RetrievedWebpage},
     models::dual_encoder::DualEncoder,
     ranking::models::linear::LinearRegression,
     searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
@@ -74,7 +74,7 @@ impl std::fmt::Display for EncodedError {
 macro_rules! impl_search {
     ([$($q:ident),*$(,)?]) => {
         $(
-            impl Message<SearchService> for $q {
+            impl sonic::service::Message<SearchService> for $q {
                 type Response = Result<<<$q as generic_query::GenericQuery>::Collector as generic_query::Collector>::Fruit, EncodedError>;
 
                 async fn handle(self, server: &SearchService) -> Self::Response {
@@ -90,7 +90,7 @@ macro_rules! impl_search {
                     pub fruit: <<$q as generic_query::GenericQuery>::Collector as generic_query::Collector>::Fruit,
                 }
 
-                impl Message<SearchService> for [<$q Retrieve>] {
+                impl sonic::service::Message<SearchService> for [<$q Retrieve>] {
                     type Response = Result<<$q as generic_query::GenericQuery>::IntermediateOutput, EncodedError>;
                     async fn handle(self, server: &SearchService) -> Self::Response {
                         server
@@ -118,10 +118,9 @@ macro_rules! impl_search {
             sonic_service!(SearchService, [
                 RetrieveWebsites,
                 Search,
+                Size,
                 GetWebpage,
                 GetHomepageDescriptions,
-                TopKeyPhrases,
-                Size,
                 GetSiteUrls,
                 $(
                     $q,
@@ -133,7 +132,7 @@ macro_rules! impl_search {
     }
 }
 
-impl_search!([]);
+impl_search!([TopKeyPhrasesQuery,]);
 
 pub struct SearchService {
     local_searcher: LocalSearcher<Arc<Index>>,
@@ -240,17 +239,6 @@ impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
         }
 
         crate::bincode_utils::SerdeCompat(result)
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct TopKeyPhrases {
-    pub top_n: usize,
-}
-impl sonic::service::Message<SearchService> for TopKeyPhrases {
-    type Response = Vec<KeyPhrase>;
-    async fn handle(self, server: &SearchService) -> Self::Response {
-        server.local_searcher.top_key_phrases(self.top_n).await
     }
 }
 

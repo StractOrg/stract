@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+mod top_key_phrases;
+pub use top_key_phrases::TopKeyPhrasesCollector;
+
 use tantivy::{
     collector::{Fruit, SegmentCollector},
     query::Weight,

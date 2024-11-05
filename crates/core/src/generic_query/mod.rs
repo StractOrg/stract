@@ -16,6 +16,9 @@
 
 use crate::{ampc::dht::ShardId, search_ctx, Result};
 
+pub mod top_key_phrases;
+pub use top_key_phrases::TopKeyPhrasesQuery;
+
 pub mod collector;
 pub use collector::Collector;
 

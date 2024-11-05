@@ -31,7 +31,7 @@ use crate::collector::approx_count;
 use crate::config::CollectorConfig;
 use crate::generic_query::{self, GenericQuery};
 use crate::index::Index;
-use crate::inverted_index::{KeyPhrase, RetrievedWebpage};
+use crate::inverted_index::RetrievedWebpage;
 use crate::models::dual_encoder::DualEncoder;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{
@@ -224,14 +224,6 @@ where
         self.inner.guard().await.inverted_index().get_homepage(url)
     }
 
-    pub async fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
-        self.inner
-            .guard()
-            .await
-            .inverted_index()
-            .top_key_phrases(top_n)
-    }
-
     pub async fn get_site_urls(&self, site: &str, offset: usize, limit: usize) -> Vec<Url> {
         self.inner
             .guard()
@@ -263,6 +255,14 @@ where
         let inner = self.inner.clone();
         let guard = inner.guard().await;
         tokio::task::spawn_blocking(move || inner.retrieve_generic(&query, fruit, &guard))
+            .await
+            .unwrap()
+    }
+
+    pub async fn search_generic<Q: GenericQuery + 'static>(&self, query: Q) -> Result<Q::Output> {
+        let inner = self.inner.clone();
+        let guard = inner.guard().await;
+        tokio::task::spawn_blocking(move || inner.search_generic(query, &guard))
             .await
             .unwrap()
     }

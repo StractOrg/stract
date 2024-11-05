@@ -36,12 +36,12 @@ use crate::{
     generic_query::{self, Collector},
     image_store::Image,
     index::Index,
-    inverted_index::{KeyPhrase, RetrievedWebpage, WebpagePointer},
+    inverted_index::{RetrievedWebpage, WebpagePointer},
     ranking::pipeline::{PrecisionRankingWebpage, RecallRankingWebpage},
     Result,
 };
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 
 use fnv::FnvHashMap;
 use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
@@ -97,8 +97,6 @@ pub trait SearchClient {
         max_height: Option<u64>,
         max_width: Option<u64>,
     ) -> impl Future<Output = Result<Option<Image>>> + Send;
-
-    fn top_key_phrases(&self, top_n: usize) -> impl Future<Output = Vec<KeyPhrase>> + Send;
 
     fn search_initial_generic<Q>(
         &self,
@@ -182,7 +180,6 @@ pub trait SearchClient {
         where
             Q: search_server::Query,
             Self: Send + Sync,
-            
             Result<<<Q::Collector as generic_query::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit, search_server::EncodedError>:
                 From<<Q as sonic::service::Message<SearchService>>::Response>,
             Result<Q::IntermediateOutput, search_server::EncodedError>: From<
@@ -519,45 +516,6 @@ impl SearchClient for DistributedSearcher {
             .and_then(|(_, v)| v)
     }
 
-    async fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
-        let client = self.conn().await;
-
-        let res = client
-            .send_with_timeout(
-                search_server::TopKeyPhrases { top_n },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-                Duration::from_secs(60 * 60),
-            )
-            .await;
-
-        match res {
-            Ok(res) => {
-                let mut phrases = HashMap::new();
-
-                for (_, v) in res.into_iter().flatten() {
-                    for (_, v) in v {
-                        for phrase in v {
-                            *phrases.entry(phrase.text().to_string()).or_default() +=
-                                phrase.score();
-                        }
-                    }
-                }
-
-                phrases
-                    .into_iter()
-                    .map(|(phrase, score)| KeyPhrase::new(phrase, score))
-                    .sorted_by(|a, b| b.score().partial_cmp(&a.score()).unwrap())
-                    .take(top_n)
-                    .collect()
-            }
-            Err(e) => {
-                tracing::error!("failed to get key phrases: {:?}", e);
-                Vec::new()
-            }
-        }
-    }
-    
     async fn search_initial_generic<Q>(
         &self,
         query: Q,
@@ -814,10 +772,6 @@ impl SearchClient for LocalSearchClient {
         None
     }
 
-    async fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
-        self.0.top_key_phrases(top_n).await
-    }
-    
     async fn search_initial_generic<Q>(
         &self,
         query: Q,

@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use super::key_phrase::KeyPhrase;
 use super::{DocAddress, InitialSearchResult, InvertedIndex, RetrievedWebpage, WebpagePointer};
 use itertools::Itertools;
 use tantivy::collector::Count;
@@ -319,10 +318,6 @@ impl InvertedIndex {
 
         res.pop()
             .map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).unwrap())
-    }
-
-    pub(crate) fn top_key_phrases(&self, top_n: usize) -> Vec<KeyPhrase> {
-        KeyPhrase::compute_top(&self.reader, top_n)
     }
 
     pub(crate) fn get_site_urls(&self, site: &str, offset: usize, limit: usize) -> Vec<Url> {

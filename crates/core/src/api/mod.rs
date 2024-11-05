@@ -27,6 +27,7 @@ use crate::{
     bangs::Bangs,
     config::ApiConfig,
     distributed::cluster::Cluster,
+    generic_query::TopKeyPhrasesQuery,
     improvement::{store_improvements_loop, ImprovementEvent},
     leaky_queue::LeakyQueue,
     models::dual_encoder::DualEncoder,
@@ -195,8 +196,9 @@ pub async fn router(
     log::info!("Building autosuggest");
     let autosuggest = Autosuggest::from_key_phrases(
         dist_searcher
-            .top_key_phrases(config.top_phrases_for_autosuggest)
-            .await,
+            .search_generic(TopKeyPhrasesQuery::new(config.top_phrases_for_autosuggest))
+            .await
+            .unwrap_or_default(),
     )?;
 
     let state = {

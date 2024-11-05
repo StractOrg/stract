@@ -29,6 +29,7 @@ use crate::{
         member::{Member, Service},
         sonic::{self, service::sonic_service},
     },
+    generic_query::TopKeyPhrasesQuery,
     inverted_index::KeyPhrase,
     metrics::Label,
     searcher::{DistributedSearcher, SearchClient},
@@ -117,7 +118,11 @@ pub struct TopKeyphrases {
 impl sonic::service::Message<ManagementService> for TopKeyphrases {
     type Response = Vec<KeyPhrase>;
     async fn handle(self, server: &ManagementService) -> Self::Response {
-        server.searcher.top_key_phrases(self.top).await
+        server
+            .searcher
+            .search_generic(TopKeyPhrasesQuery::new(self.top))
+            .await
+            .unwrap_or_default()
     }
 }
 
