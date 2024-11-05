@@ -32,8 +32,8 @@ pub trait Service: Sized + Send + Sync + 'static {
     ) -> impl std::future::Future<Output = Self::Response> + Send + '_;
 }
 
-pub trait Message<S: Service> {
-    type Response;
+pub trait Message<S: Service>: Send + Sync {
+    type Response: Send + Sync;
     fn handle(self, server: &S) -> impl std::future::Future<Output = Self::Response>;
 }
 pub trait Wrapper<S: Service>: Message<S> {

@@ -105,8 +105,8 @@ pub trait SearchClient {
         query: Q,
     ) -> impl Future<Output = Result<<Q::Collector as generic_query::Collector>::Fruit>> + Send
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as sonic::service::Message<SearchService>>::Response: Send + Sync,
+        Q: search_server::Query,
+        
         Result<
             <Q::Collector as generic_query::Collector>::Fruit,
             search_server::EncodedError,
@@ -120,11 +120,8 @@ pub trait SearchClient {
         fruit: <Q::Collector as generic_query::Collector>::Fruit,
     ) -> impl Future<Output = Result<Vec<Q::IntermediateOutput>>> + Send
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as search_server::Query>::RetrieveReq: Send + Sync,
+        Q: search_server::Query,
         <Q::Collector as generic_query::Collector>::Fruit: Clone,
-        <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<SearchService>>::Response: Send + Sync,
-        <Q as search_server::Query>::RetrieveReq: sonic::service::Wrapper<SearchService>,
         Result<Q::IntermediateOutput, search_server::EncodedError>:
             From<
                 <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<
@@ -135,10 +132,7 @@ pub trait SearchClient {
     fn search_generic<Q>(&self, query: Q) -> impl Future<Output = Result<Q::Output>> + Send
     where
         Self: Send + Sync,
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as search_server::Query>::RetrieveReq: Send + Sync,
-        <Q as sonic::service::Message<SearchService>>::Response: Send + Sync,
-        <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<SearchService>>::Response: Send + Sync,
+        Q: search_server::Query,
         Result<
         <Q::Collector as generic_query::Collector>::Fruit,
         search_server::EncodedError,
@@ -146,7 +140,6 @@ pub trait SearchClient {
     <<Q::Collector as generic_query::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit:
         From<<Q::Collector as generic_query::Collector>::Fruit>,
         <Q::Collector as generic_query::Collector>::Fruit: Clone,
-        <Q as search_server::Query>::RetrieveReq: sonic::service::Wrapper<SearchService>,
         Result<Q::IntermediateOutput, search_server::EncodedError>:
             From<
                 <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<
@@ -167,8 +160,8 @@ pub trait SearchClient {
         queries: Vec<Q>,
     ) -> impl Future<Output = Result<Vec<<Q::Collector as generic_query::Collector>::Fruit>>> + Send
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as sonic::service::Message<SearchService>>::Response: Send + Sync,
+        Q: search_server::Query,
+        
         Result<<<Q::Collector as generic_query::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit, search_server::EncodedError>:
             From<<Q as sonic::service::Message<SearchService>>::Response>;
 
@@ -177,9 +170,7 @@ pub trait SearchClient {
         queries: Vec<(Q, <Q::Collector as generic_query::Collector>::Fruit)>,
     ) -> impl Future<Output = Result<Vec<Vec<Q::IntermediateOutput>>>> + Send
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as search_server::Query>::RetrieveReq: sonic::service::Wrapper<SearchService> + Send + Sync,
-        <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<search_server::SearchService>>::Response: Send + Sync,
+        Q: search_server::Query,
         Result<Q::IntermediateOutput, search_server::EncodedError>: From<
             <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<
                 SearchService,
@@ -189,13 +180,11 @@ pub trait SearchClient {
 
     fn batch_search_generic<Q>(&self, queries: Vec<Q>) -> impl Future<Output = Result<Vec<Q::Output>>> + Send
         where
-            Q: search_server::Query + Send + Sync + 'static,
+            Q: search_server::Query,
             Self: Send + Sync,
-            <Q as sonic::service::Message<SearchService>>::Response: Send + Sync,
+            
             Result<<<Q::Collector as generic_query::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit, search_server::EncodedError>:
                 From<<Q as sonic::service::Message<SearchService>>::Response>,
-            <Q as search_server::Query>::RetrieveReq: sonic::service::Wrapper<SearchService> + Send + Sync,
-            <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<search_server::SearchService>>::Response: Send + Sync,
             Result<Q::IntermediateOutput, search_server::EncodedError>: From<
                 <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<
                     SearchService,
@@ -574,8 +563,7 @@ impl SearchClient for DistributedSearcher {
         query: Q,
     ) -> Result<<Q::Collector as generic_query::Collector>::Fruit>
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as sonic::service::Message<SearchService>>::Response: Send + Sync,
+        Q: search_server::Query,
         Result<
             <Q::Collector as generic_query::Collector>::Fruit,
             search_server::EncodedError,
@@ -615,11 +603,8 @@ impl SearchClient for DistributedSearcher {
         fruit: <Q::Collector as generic_query::Collector>::Fruit,
     ) -> Result<Vec<Q::IntermediateOutput>>
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as search_server::Query>::RetrieveReq: Send + Sync,
+        Q: search_server::Query,
         <Q::Collector as generic_query::Collector>::Fruit: Clone,
-        <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<SearchService>>::Response: Send + Sync,
-        <Q as search_server::Query>::RetrieveReq: sonic::service::Wrapper<SearchService>,
         Result<Q::IntermediateOutput, search_server::EncodedError>:
             From<
                 <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<
@@ -656,8 +641,7 @@ impl SearchClient for DistributedSearcher {
         queries: Vec<Q>,
     ) -> Result<Vec<<Q::Collector as generic_query::Collector>::Fruit>>
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as sonic::service::Message<SearchService>>::Response: Send + Sync,
+        Q: search_server::Query,
         Result<<<Q::Collector as generic_query::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit, search_server::EncodedError>:
             From<<Q as sonic::service::Message<SearchService>>::Response>,
         {
@@ -699,9 +683,7 @@ impl SearchClient for DistributedSearcher {
         queries: Vec<(Q, <Q::Collector as generic_query::Collector>::Fruit)>,
     ) -> Result<Vec<Vec<Q::IntermediateOutput>>>
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as search_server::Query>::RetrieveReq: sonic::service::Wrapper<SearchService> + Send + Sync,
-        <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<search_server::SearchService>>::Response: Send + Sync,
+        Q: search_server::Query,
         Result<Q::IntermediateOutput, search_server::EncodedError>: From<
             <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<
                 SearchService,
@@ -857,10 +839,8 @@ impl SearchClient for LocalSearchClient {
         fruit: <Q::Collector as generic_query::Collector>::Fruit,
     ) -> Result<Vec<Q::IntermediateOutput>>
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as search_server::Query>::RetrieveReq: Send + Sync,
+        Q: search_server::Query,
         <Q::Collector as generic_query::Collector>::Fruit: Clone,
-        <Q as search_server::Query>::RetrieveReq: sonic::service::Wrapper<SearchService>,
         Result<Q::IntermediateOutput, search_server::EncodedError>:
             From<
                 <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<
@@ -875,8 +855,7 @@ impl SearchClient for LocalSearchClient {
         queries: Vec<Q>,
     ) -> Result<Vec<<Q::Collector as generic_query::Collector>::Fruit>>
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as sonic::service::Message<SearchService>>::Response: Send + Sync,
+        Q: search_server::Query,
         Result<<<Q::Collector as generic_query::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit, search_server::EncodedError>:
             From<<Q as sonic::service::Message<SearchService>>::Response> {
         let mut res = Vec::new();
@@ -893,9 +872,7 @@ impl SearchClient for LocalSearchClient {
         queries: Vec<(Q, <Q::Collector as generic_query::Collector>::Fruit)>,
     ) -> Result<Vec<Vec<Q::IntermediateOutput>>>
     where
-        Q: search_server::Query + Send + Sync + 'static,
-        <Q as search_server::Query>::RetrieveReq: sonic::service::Wrapper<SearchService> + Send + Sync,
-        <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<search_server::SearchService>>::Response: Send + Sync,
+        Q: search_server::Query,
         Result<Q::IntermediateOutput, search_server::EncodedError>: From<
             <<Q as search_server::Query>::RetrieveReq as sonic::service::Message<
                 SearchService,

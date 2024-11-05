@@ -37,7 +37,9 @@ use crate::{
 
 use super::api::{Size, SizeResponse};
 
-pub trait RetrieveReq: bincode::Encode + bincode::Decode + Clone {
+pub trait RetrieveReq:
+    bincode::Encode + bincode::Decode + Clone + sonic::service::Wrapper<SearchService>
+{
     type Query: generic_query::GenericQuery + bincode::Encode + bincode::Decode;
     fn new(
         query: Self::Query,
@@ -50,7 +52,10 @@ where
     Self: generic_query::GenericQuery
         + bincode::Encode
         + bincode::Decode
-        + sonic::service::Wrapper<SearchService>,
+        + sonic::service::Wrapper<SearchService>
+        + Send
+        + Sync
+        + 'static,
 {
     type RetrieveReq: RetrieveReq<Query = Self>;
 }
