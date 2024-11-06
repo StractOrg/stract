@@ -19,7 +19,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{distributed::sonic, entrypoint::api, Result};
+use crate::{distributed::sonic, entrypoint::api, generic_query, Result};
 
 const CONFIG_FOLDER: &str = "~/.config/stract";
 const CONFIG_NAME: &str = "admin.toml";
@@ -120,7 +120,7 @@ pub async fn index_size() -> Result<()> {
     let mut conn: sonic::service::Connection<api::ManagementService> =
         sonic::service::Connection::create(config.host).await?;
 
-    let size: api::SizeResponse = conn.send_without_timeout(api::Size).await?;
+    let size: generic_query::size::SizeResponse = conn.send_without_timeout(api::Size).await?;
 
     println!("Number of pages in index: {}", size.pages);
 

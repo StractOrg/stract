@@ -17,6 +17,9 @@
 mod top_key_phrases;
 pub use top_key_phrases::TopKeyPhrasesCollector;
 
+mod size;
+pub use size::SizeCollector;
+
 use tantivy::{
     collector::{Fruit, SegmentCollector},
     query::Weight,

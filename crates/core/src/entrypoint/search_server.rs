@@ -26,7 +26,7 @@ use crate::{
         member::{Member, Service},
         sonic::{self, service::sonic_service},
     },
-    generic_query::{self, TopKeyPhrasesQuery},
+    generic_query::{self, SizeQuery, TopKeyPhrasesQuery},
     index::Index,
     inverted_index::{self, RetrievedWebpage},
     models::dual_encoder::DualEncoder,
@@ -34,8 +34,6 @@ use crate::{
     searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
     Result,
 };
-
-use super::api::{Size, SizeResponse};
 
 pub trait RetrieveReq:
     bincode::Encode + bincode::Decode + Clone + sonic::service::Wrapper<SearchService>
@@ -118,7 +116,6 @@ macro_rules! impl_search {
             sonic_service!(SearchService, [
                 RetrieveWebsites,
                 Search,
-                Size,
                 GetWebpage,
                 GetHomepageDescriptions,
                 GetSiteUrls,
@@ -132,7 +129,7 @@ macro_rules! impl_search {
     }
 }
 
-impl_search!([TopKeyPhrasesQuery,]);
+impl_search!([TopKeyPhrasesQuery, SizeQuery,]);
 
 pub struct SearchService {
     local_searcher: LocalSearcher<Arc<Index>>,
@@ -251,15 +248,6 @@ pub async fn run(config: config::SearchServerConfig) -> Result<()> {
     loop {
         if let Err(e) = server.accept().await {
             tracing::error!("{:?}", e);
-        }
-    }
-}
-
-impl sonic::service::Message<SearchService> for Size {
-    type Response = SizeResponse;
-    async fn handle(self, server: &SearchService) -> Self::Response {
-        SizeResponse {
-            pages: server.local_searcher.num_documents().await,
         }
     }
 }

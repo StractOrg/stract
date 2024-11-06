@@ -29,13 +29,11 @@ use crate::{
         member::{Member, Service},
         sonic::{self, service::sonic_service},
     },
-    generic_query::TopKeyPhrasesQuery,
+    generic_query::{self, TopKeyPhrasesQuery},
     inverted_index::KeyPhrase,
     metrics::Label,
     searcher::{DistributedSearcher, SearchClient},
 };
-
-use super::search_server::SearchService;
 
 fn counters(registry: &mut crate::metrics::PrometheusRegistry) -> Result<Counters> {
     let search_counter_success = crate::metrics::Counter::default();
@@ -145,49 +143,14 @@ impl sonic::service::Message<ManagementService> for ClusterStatus {
 #[derive(Debug, Clone, Copy, bincode::Encode, bincode::Decode)]
 pub struct Size;
 
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct SizeResponse {
-    pub pages: u64,
-}
-
-impl std::ops::Add for SizeResponse {
-    type Output = Self;
-    fn add(mut self, other: Self) -> Self {
-        self += other;
-        self
-    }
-}
-
-impl std::ops::AddAssign for SizeResponse {
-    fn add_assign(&mut self, other: Self) {
-        self.pages += other.pages;
-    }
-}
-
 impl sonic::service::Message<ManagementService> for Size {
-    type Response = SizeResponse;
+    type Response = generic_query::size::SizeResponse;
     async fn handle(self, server: &ManagementService) -> Self::Response {
-        let mut res = SizeResponse { pages: 0 };
-
-        let mut checked_shards = std::collections::HashSet::new();
-
-        for member in server.cluster.members().await {
-            if let Service::Searcher { host, shard } = member.service {
-                if checked_shards.contains(&shard) {
-                    continue;
-                }
-
-                let mut client: sonic::service::Connection<SearchService> =
-                    sonic::service::Connection::create(host).await.unwrap();
-                let size = client.send_without_timeout(Size).await.unwrap();
-
-                res += size;
-
-                checked_shards.insert(shard);
-            }
-        }
-
-        res
+        server
+            .searcher
+            .search_generic(generic_query::SizeQuery)
+            .await
+            .unwrap()
     }
 }
 
