@@ -49,7 +49,6 @@ use itertools::Itertools;
 use std::future::Future;
 use thiserror::Error;
 use tokio::sync::Mutex;
-use url::Url;
 
 use super::{InitialWebsiteResult, LocalSearcher, SearchQuery};
 
@@ -80,11 +79,6 @@ pub trait SearchClient {
     ) -> impl Future<Output = Vec<(usize, PrecisionRankingWebpage)>> + Send;
 
     fn search_entity(&self, query: &str) -> impl Future<Output = Option<EntityMatch>> + Send;
-
-    fn get_homepage_descriptions(
-        &self,
-        urls: &[Url],
-    ) -> impl Future<Output = HashMap<Url, String>> + Send;
 
     fn get_entity_image(
         &self,
@@ -410,33 +404,6 @@ impl SearchClient for DistributedSearcher {
         retrieved_webpages
     }
 
-    async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
-        let client = self.conn().await;
-
-        let res = client
-            .send(
-                search_server::GetHomepageDescriptions {
-                    urls: urls.to_vec(),
-                },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await;
-
-        match res {
-            Ok(v) => v
-                .into_iter()
-                .flatten()
-                .flat_map(|(_, v)| {
-                    v.into_iter()
-                        .map(|(_, crate::bincode_utils::SerdeCompat(v))| v)
-                })
-                .flatten()
-                .collect(),
-            _ => HashMap::new(),
-        }
-    }
-
     async fn get_entity_image(
         &self,
         image_id: &str,
@@ -702,23 +669,6 @@ impl SearchClient for LocalSearchClient {
             .zip(top_websites.iter().map(|(i, p)| (*i, p.website.clone())))
             .map(|(ret, (i, ran))| (i, PrecisionRankingWebpage::new(ret, ran)))
             .collect::<Vec<_>>();
-
-        res
-    }
-
-    async fn get_homepage_descriptions(
-        &self,
-        urls: &[url::Url],
-    ) -> std::collections::HashMap<url::Url, String> {
-        let mut res = std::collections::HashMap::new();
-
-        for url in urls {
-            if let Some(homepage) = self.0.get_homepage(url).await {
-                if let Some(desc) = homepage.description() {
-                    res.insert(url.clone(), desc.clone());
-                }
-            }
-        }
 
         res
     }

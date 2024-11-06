@@ -25,6 +25,9 @@ pub use size::SizeQuery;
 pub mod get_webpage;
 pub use get_webpage::GetWebpageQuery;
 
+pub mod get_homepage;
+pub use get_homepage::GetHomepageQuery;
+
 pub mod collector;
 pub use collector::Collector;
 

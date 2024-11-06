@@ -33,7 +33,7 @@ use crate::numericalfield_reader::NumericalFieldReader;
 use crate::query::Query;
 use crate::ranking::pipeline::LocalRecallRankingWebpage;
 use crate::ranking::SignalComputer;
-use crate::schema::{numerical_field, text_field, Field, NumericalFieldEnum, TextFieldEnum};
+use crate::schema::{numerical_field, text_field, Field, NumericalFieldEnum};
 use crate::search_ctx::Ctx;
 use crate::snippet;
 use crate::snippet::TextSnippet;
@@ -275,37 +275,6 @@ impl InvertedIndex {
     ) -> Result<RetrievedWebpage> {
         let doc: TantivyDocument = searcher.doc(doc_address.into())?;
         Ok(RetrievedWebpage::from(doc))
-    }
-
-    pub(crate) fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
-        let tv_searcher = self.reader.searcher();
-        let field = tv_searcher
-            .schema()
-            .get_field(
-                Field::Text(TextFieldEnum::from(text_field::SiteIfHomepageNoTokenizer)).name(),
-            )
-            .unwrap();
-
-        let host = url.normalized_host().unwrap_or_default();
-
-        let term = tantivy::Term::from_field_text(field, host);
-
-        let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
-
-        let mut res = tv_searcher
-            .search(&query, &tantivy::collector::TopDocs::with_limit(1))
-            .unwrap();
-
-        res.pop().map(|(_, doc)| {
-            self.retrieve_doc(
-                DocAddress::from_tantivy(
-                    doc,
-                    self.shard_id.expect("Shard ID should be set for searches"),
-                ),
-                &tv_searcher,
-            )
-            .unwrap()
-        })
     }
 
     pub(crate) fn get_site_urls(&self, site: &str, offset: usize, limit: usize) -> Vec<Url> {

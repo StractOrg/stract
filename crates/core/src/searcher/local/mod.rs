@@ -31,7 +31,6 @@ use crate::collector::approx_count;
 use crate::config::CollectorConfig;
 use crate::generic_query::{self, GenericQuery};
 use crate::index::Index;
-use crate::inverted_index::RetrievedWebpage;
 use crate::models::dual_encoder::DualEncoder;
 use crate::ranking::models::linear::LinearRegression;
 use crate::ranking::pipeline::{
@@ -214,10 +213,6 @@ where
     /// This function is mainly used for tests and benchmarks
     pub fn search_sync(&self, query: &SearchQuery) -> Result<WebsitesResult> {
         crate::block_on(self.search(query))
-    }
-
-    pub async fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
-        self.inner.guard().await.inverted_index().get_homepage(url)
     }
 
     pub async fn get_site_urls(&self, site: &str, offset: usize, limit: usize) -> Vec<Url> {

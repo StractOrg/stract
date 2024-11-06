@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use tracing::info;
 use url::Url;
@@ -26,7 +26,7 @@ use crate::{
         member::{Member, Service},
         sonic::{self, service::sonic_service},
     },
-    generic_query::{self, GetWebpageQuery, SizeQuery, TopKeyPhrasesQuery},
+    generic_query::{self, GetHomepageQuery, GetWebpageQuery, SizeQuery, TopKeyPhrasesQuery},
     index::Index,
     inverted_index,
     models::dual_encoder::DualEncoder,
@@ -116,7 +116,6 @@ macro_rules! impl_search {
             sonic_service!(SearchService, [
                 RetrieveWebsites,
                 Search,
-                GetHomepageDescriptions,
                 GetSiteUrls,
                 $(
                     $q,
@@ -128,7 +127,12 @@ macro_rules! impl_search {
     }
 }
 
-impl_search!([TopKeyPhrasesQuery, SizeQuery, GetWebpageQuery]);
+impl_search!([
+    TopKeyPhrasesQuery,
+    SizeQuery,
+    GetWebpageQuery,
+    GetHomepageQuery,
+]);
 
 pub struct SearchService {
     local_searcher: LocalSearcher<Arc<Index>>,
@@ -202,28 +206,6 @@ impl sonic::service::Message<SearchService> for Search {
             .search_initial(&self.query, true)
             .await
             .ok()
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct GetHomepageDescriptions {
-    #[bincode(with_serde)]
-    pub urls: Vec<Url>,
-}
-impl sonic::service::Message<SearchService> for GetHomepageDescriptions {
-    type Response = crate::bincode_utils::SerdeCompat<HashMap<Url, String>>;
-    async fn handle(self, server: &SearchService) -> Self::Response {
-        let mut result = HashMap::with_capacity(self.urls.len());
-
-        for url in &self.urls {
-            if let Some(homepage) = server.local_searcher.get_homepage(url).await {
-                if let Some(desc) = homepage.description() {
-                    result.insert(url.clone(), desc.clone());
-                }
-            }
-        }
-
-        crate::bincode_utils::SerdeCompat(result)
     }
 }
 

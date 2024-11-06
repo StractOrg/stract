@@ -255,12 +255,11 @@ pub struct SearchResult {
 mod tests {
     use candle_core::Tensor;
     use maplit::hashmap;
-    use url::Url;
 
     use crate::{
         collector::MainCollector,
         config::CollectorConfig,
-        generic_query::GetWebpageQuery,
+        generic_query::{GetHomepageQuery, GetWebpageQuery},
         query::Query,
         ranking::{LocalRanker, SignalComputer},
         search_ctx::Ctx,
@@ -1009,7 +1008,8 @@ mod tests {
         index.commit().expect("failed to commit index");
 
         let webpage = index
-            .get_homepage(&Url::parse("https://www.example.com").unwrap())
+            .search_generic(&GetHomepageQuery::new("https://www.example.com"))
+            .unwrap()
             .unwrap();
         assert_eq!(webpage.title, "News website".to_string());
         assert_eq!(webpage.url, "https://www.example.com/".to_string());
