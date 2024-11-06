@@ -26,9 +26,9 @@ use crate::{
         member::{Member, Service},
         sonic::{self, service::sonic_service},
     },
-    generic_query::{self, SizeQuery, TopKeyPhrasesQuery},
+    generic_query::{self, GetWebpageQuery, SizeQuery, TopKeyPhrasesQuery},
     index::Index,
-    inverted_index::{self, RetrievedWebpage},
+    inverted_index,
     models::dual_encoder::DualEncoder,
     ranking::models::linear::LinearRegression,
     searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
@@ -116,7 +116,6 @@ macro_rules! impl_search {
             sonic_service!(SearchService, [
                 RetrieveWebsites,
                 Search,
-                GetWebpage,
                 GetHomepageDescriptions,
                 GetSiteUrls,
                 $(
@@ -129,7 +128,7 @@ macro_rules! impl_search {
     }
 }
 
-impl_search!([TopKeyPhrasesQuery, SizeQuery,]);
+impl_search!([TopKeyPhrasesQuery, SizeQuery, GetWebpageQuery]);
 
 pub struct SearchService {
     local_searcher: LocalSearcher<Arc<Index>>,
@@ -203,17 +202,6 @@ impl sonic::service::Message<SearchService> for Search {
             .search_initial(&self.query, true)
             .await
             .ok()
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct GetWebpage {
-    pub url: String,
-}
-impl sonic::service::Message<SearchService> for GetWebpage {
-    type Response = Option<RetrievedWebpage>;
-    async fn handle(self, server: &SearchService) -> Self::Response {
-        server.local_searcher.get_webpage(&self.url).await
     }
 }
 

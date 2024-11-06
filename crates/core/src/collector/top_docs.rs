@@ -25,6 +25,7 @@ use tantivy::{
 };
 
 use crate::{
+    ampc::dht::ShardId,
     config::CollectorConfig,
     inverted_index::{DocAddress, WebpagePointer},
     numericalfield_reader,
@@ -43,6 +44,7 @@ pub struct TopDocs {
     columnfield_reader: numericalfield_reader::NumericalFieldReader,
     de_rank_similar: bool,
     collector_config: CollectorConfig,
+    shard_id: Option<ShardId>,
 }
 
 impl TopDocs {
@@ -57,6 +59,7 @@ impl TopDocs {
             de_rank_similar: false,
             columnfield_reader,
             collector_config: CollectorConfig::default(),
+            shard_id: None,
         }
     }
 
@@ -81,6 +84,11 @@ impl TopDocs {
 
     pub fn and_collector_config(mut self, collector_config: CollectorConfig) -> Self {
         self.collector_config = collector_config;
+        self
+    }
+
+    pub fn and_shard_id(mut self, shard_id: ShardId) -> Self {
+        self.shard_id = Some(shard_id);
         self
     }
 
@@ -112,6 +120,7 @@ impl TopDocs {
                 self.top_n + self.offset,
                 self.collector_config.clone(),
             ),
+            shard_id: self.shard_id,
         })
     }
 }
@@ -122,6 +131,7 @@ pub struct TopSegmentCollector {
     num_docs_taken: usize,
     segment_ord: SegmentOrdinal,
     bucket_collector: BucketCollector<SegmentDoc>,
+    shard_id: Option<ShardId>,
 }
 
 impl TopSegmentCollector {
@@ -190,6 +200,7 @@ impl TopSegmentCollector {
             },
             id: doc,
             segment: self.segment_ord,
+            shard_id: self.shard_id.expect("Shard ID should be set for searches"),
             score,
         });
     }
@@ -357,6 +368,7 @@ pub struct SegmentDoc {
     id: DocId,
     segment: SegmentOrdinal,
     score: Score,
+    shard_id: ShardId,
 }
 
 impl Doc for SegmentDoc {
@@ -443,10 +455,7 @@ where
             .map(|doc| WebpagePointer {
                 score: doc.score,
                 hashes: doc.hashes,
-                address: DocAddress {
-                    segment: doc.segment,
-                    doc_id: doc.id,
-                },
+                address: DocAddress::new(doc.segment, doc.id, doc.shard_id),
             })
             .collect())
     }
@@ -494,6 +503,7 @@ mod tests {
                 id: doc.1,
                 score: Score { total: doc.2 },
                 segment: 0,
+                shard_id: ShardId::new(0),
             });
         }
 

@@ -20,6 +20,9 @@ pub use top_key_phrases::TopKeyPhrasesCollector;
 mod size;
 pub use size::SizeCollector;
 
+mod first_doc;
+pub use first_doc::FirstDocCollector;
+
 use tantivy::{
     collector::{Fruit, SegmentCollector},
     query::Weight,

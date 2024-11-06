@@ -87,13 +87,23 @@ pub struct WebpagePointer {
 pub struct DocAddress {
     pub segment: u32,
     pub doc_id: u32,
+    pub shard_id: ShardId,
 }
 
-impl From<tantivy::DocAddress> for DocAddress {
-    fn from(address: tantivy::DocAddress) -> Self {
+impl DocAddress {
+    pub fn new(segment: u32, doc_id: u32, shard_id: ShardId) -> Self {
+        Self {
+            segment,
+            doc_id,
+            shard_id,
+        }
+    }
+
+    pub fn from_tantivy(address: tantivy::DocAddress, shard_id: ShardId) -> Self {
         Self {
             segment: address.segment_ord,
             doc_id: address.doc_id,
+            shard_id,
         }
     }
 }
@@ -227,6 +237,7 @@ impl InvertedIndex {
     pub fn temporary() -> Result<(Self, file_store::temp::TempDir)> {
         let dir = crate::gen_temp_dir()?;
         let mut s = Self::open(dir.as_ref().join("index"))?;
+        s.set_shard_id(ShardId::new(0));
 
         s.prepare_writer()?;
 
@@ -249,6 +260,7 @@ mod tests {
     use crate::{
         collector::MainCollector,
         config::CollectorConfig,
+        generic_query::GetWebpageQuery,
         query::Query,
         ranking::{LocalRanker, SignalComputer},
         search_ctx::Ctx,
@@ -957,7 +969,11 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let webpage = index.get_webpage("https://www.example.com").unwrap();
+        let webpage = index
+            .search_generic(&GetWebpageQuery::new("https://www.example.com"))
+            .unwrap()
+            .unwrap();
+
         assert_eq!(webpage.title, "News website".to_string());
         assert_eq!(webpage.url, "https://www.example.com/".to_string());
     }

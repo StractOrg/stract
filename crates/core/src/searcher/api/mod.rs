@@ -31,7 +31,6 @@ use crate::collector::{self, approx_count};
 use crate::config::{ApiConfig, ApiSpellCheck, ApiThresholds, CollectorConfig, WidgetsConfig};
 use crate::enum_map::EnumMap;
 use crate::image_store::Image;
-use crate::inverted_index::RetrievedWebpage;
 use crate::models::dual_encoder::DualEncoder;
 use crate::ranking::models::cross_encoder::CrossEncoderModel;
 use crate::ranking::pipeline::{PrecisionRankingWebpage, RankableWebpage, RecallRankingWebpage};
@@ -771,10 +770,6 @@ where
         }
 
         Ok(SearchResult::Websites(self.search_websites(query).await?))
-    }
-
-    pub async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        self.distributed_searcher.get_webpage(url).await
     }
 
     pub async fn get_entity_image(

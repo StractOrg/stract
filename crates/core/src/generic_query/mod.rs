@@ -22,6 +22,9 @@ pub use top_key_phrases::TopKeyPhrasesQuery;
 pub mod size;
 pub use size::SizeQuery;
 
+pub mod get_webpage;
+pub use get_webpage::GetWebpageQuery;
+
 pub mod collector;
 pub use collector::Collector;
 

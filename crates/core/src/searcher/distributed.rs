@@ -81,11 +81,6 @@ pub trait SearchClient {
 
     fn search_entity(&self, query: &str) -> impl Future<Output = Option<EntityMatch>> + Send;
 
-    fn get_webpage(
-        &self,
-        url: &str,
-    ) -> impl Future<Output = Result<Option<RetrievedWebpage>>> + Send;
-
     fn get_homepage_descriptions(
         &self,
         urls: &[Url],
@@ -415,33 +410,6 @@ impl SearchClient for DistributedSearcher {
         retrieved_webpages
     }
 
-    async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        let client = self.conn().await;
-
-        let res = client
-            .send(
-                search_server::GetWebpage {
-                    url: url.to_string(),
-                },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await
-            .map_err(|_| Error::SearchFailed)?;
-
-        if let Some(res) = res
-            .into_iter()
-            .flatten()
-            .flat_map(|(_, v)| v.into_iter().map(|(_, v)| v))
-            .flatten()
-            .next()
-        {
-            Ok(Some(res))
-        } else {
-            Err(Error::WebpageNotFound.into())
-        }
-    }
-
     async fn get_homepage_descriptions(&self, urls: &[Url]) -> HashMap<Url, String> {
         let client = self.conn().await;
 
@@ -736,10 +704,6 @@ impl SearchClient for LocalSearchClient {
             .collect::<Vec<_>>();
 
         res
-    }
-
-    async fn get_webpage(&self, url: &str) -> Result<Option<RetrievedWebpage>> {
-        Ok(self.0.get_webpage(url).await)
     }
 
     async fn get_homepage_descriptions(

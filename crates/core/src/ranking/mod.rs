@@ -118,7 +118,9 @@ impl LocalRanker {
             collector = collector.and_max_docs(max_docs.clone());
         }
 
-        collector = collector.and_collector_config(self.collector_config.clone());
+        collector = collector
+            .and_collector_config(self.collector_config.clone())
+            .and_shard_id(ctx.shard_id);
 
         collector.main_collector(score_tweaker)
     }

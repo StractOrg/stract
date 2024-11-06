@@ -277,26 +277,6 @@ impl InvertedIndex {
         Ok(RetrievedWebpage::from(doc))
     }
 
-    pub(crate) fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
-        let url = Url::parse(url).ok()?;
-        let tv_searcher = self.reader.searcher();
-        let field = tv_searcher
-            .schema()
-            .get_field(Field::Text(TextFieldEnum::from(text_field::UrlNoTokenizer)).name())
-            .unwrap();
-
-        let term = tantivy::Term::from_field_text(field, url.as_str());
-
-        let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
-
-        let mut res = tv_searcher
-            .search(&query, &tantivy::collector::TopDocs::with_limit(1))
-            .unwrap();
-
-        res.pop()
-            .map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).unwrap())
-    }
-
     pub(crate) fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
         let tv_searcher = self.reader.searcher();
         let field = tv_searcher
@@ -316,8 +296,16 @@ impl InvertedIndex {
             .search(&query, &tantivy::collector::TopDocs::with_limit(1))
             .unwrap();
 
-        res.pop()
-            .map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).unwrap())
+        res.pop().map(|(_, doc)| {
+            self.retrieve_doc(
+                DocAddress::from_tantivy(
+                    doc,
+                    self.shard_id.expect("Shard ID should be set for searches"),
+                ),
+                &tv_searcher,
+            )
+            .unwrap()
+        })
     }
 
     pub(crate) fn get_site_urls(&self, site: &str, offset: usize, limit: usize) -> Vec<Url> {
@@ -339,7 +327,16 @@ impl InvertedIndex {
         ) {
             Ok(res) => res
                 .into_iter()
-                .filter_map(|(_, doc)| self.retrieve_doc(doc.into(), &tv_searcher).ok())
+                .filter_map(|(_, doc)| {
+                    self.retrieve_doc(
+                        DocAddress::from_tantivy(
+                            doc,
+                            self.shard_id.expect("Shard ID should be set for searches"),
+                        ),
+                        &tv_searcher,
+                    )
+                    .ok()
+                })
                 .filter_map(|page| Url::parse(&page.url).ok())
                 .collect(),
             Err(_) => vec![],
@@ -376,7 +373,12 @@ impl InvertedIndex {
             From<<Q::Collector as generic_query::Collector>::Fruit>,
     {
         let fruit = self.search_initial_generic(query)?;
-        let fruit = query.remote_collector().merge_fruits(vec![fruit.into()])?;
+        let mut fruit = query.remote_collector().merge_fruits(vec![fruit.into()])?;
+
+        if let Some(shard_id) = self.shard_id {
+            fruit = query.filter_fruit_shards(shard_id, fruit);
+        }
+
         let res = self.retrieve_generic(query, fruit)?;
         Ok(Q::merge_results(vec![res]))
     }

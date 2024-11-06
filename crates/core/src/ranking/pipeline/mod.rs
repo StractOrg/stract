@@ -195,10 +195,7 @@ mod tests {
                         url_without_tld: Prehashed(0),
                         simhash: 0,
                     },
-                    address: DocAddress {
-                        segment: 0,
-                        doc_id: i as u32,
-                    },
+                    address: DocAddress::new(0, i as u32, ShardId::new(0)),
                 };
 
                 let mut signals = EnumMap::new();

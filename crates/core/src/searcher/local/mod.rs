@@ -216,10 +216,6 @@ where
         crate::block_on(self.search(query))
     }
 
-    pub async fn get_webpage(&self, url: &str) -> Option<RetrievedWebpage> {
-        self.inner.guard().await.inverted_index().get_webpage(url)
-    }
-
     pub async fn get_homepage(&self, url: &Url) -> Option<RetrievedWebpage> {
         self.inner.guard().await.inverted_index().get_homepage(url)
     }
