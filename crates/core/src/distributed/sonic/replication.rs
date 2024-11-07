@@ -511,6 +511,19 @@ where
     last_client_update: std::time::Instant,
 }
 
+impl<M> Clone for ReusableShardedClient<M>
+where
+    M: ReusableClientManager,
+{
+    fn clone(&self) -> Self {
+        Self {
+            cluster: self.cluster.clone(),
+            client: self.client.clone(),
+            last_client_update: self.last_client_update,
+        }
+    }
+}
+
 impl<M> ReusableShardedClient<M>
 where
     M: ReusableClientManager,

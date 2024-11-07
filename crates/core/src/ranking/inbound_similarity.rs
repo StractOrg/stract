@@ -364,9 +364,11 @@ mod tests {
 
         let searcher: ApiSearcher<_, LiveSearcher, _> = ApiSearcher::new(
             LocalSearchClient::from(LocalSearcher::builder(Arc::new(index)).build()),
+            None,
             Bangs::empty(),
             crate::searcher::api::Config::default(),
         )
+        .await
         .with_webgraph(graph);
 
         let res = searcher

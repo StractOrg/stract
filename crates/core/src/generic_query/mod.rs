@@ -28,6 +28,9 @@ pub use get_webpage::GetWebpageQuery;
 pub mod get_homepage;
 pub use get_homepage::GetHomepageQuery;
 
+pub mod get_site_urls;
+pub use get_site_urls::GetSiteUrlsQuery;
+
 pub mod collector;
 pub use collector::Collector;
 

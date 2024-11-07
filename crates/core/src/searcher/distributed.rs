@@ -27,14 +27,12 @@ use crate::{
             },
         },
     },
-    entity_index::EntityMatch,
     entrypoint::{
         entity_search_server,
         live_index::LiveIndexService,
         search_server::{self, SearchService, RetrieveReq},
     },
     generic_query::{self, Collector},
-    image_store::Image,
     index::Index,
     inverted_index::{RetrievedWebpage, WebpagePointer},
     ranking::pipeline::{PrecisionRankingWebpage, RecallRankingWebpage},
@@ -77,15 +75,6 @@ pub trait SearchClient {
         top_websites: &[(usize, ScoredWebpagePointer)],
         query: &str,
     ) -> impl Future<Output = Vec<(usize, PrecisionRankingWebpage)>> + Send;
-
-    fn search_entity(&self, query: &str) -> impl Future<Output = Option<EntityMatch>> + Send;
-
-    fn get_entity_image(
-        &self,
-        image_id: &str,
-        max_height: Option<u64>,
-        max_width: Option<u64>,
-    ) -> impl Future<Output = Result<Option<Image>>> + Send;
 
     fn search_initial_generic<Q>(
         &self,
@@ -285,23 +274,21 @@ impl ReusableClientManager for LiveIndexService {
 
 pub struct DistributedSearcher {
     client: Mutex<ReusableShardedClient<SearchService>>,
-    entiy_client: Mutex<ReusableShardedClient<entity_search_server::SearchService>>,
 }
 
 impl DistributedSearcher {
     pub async fn new(cluster: Arc<Cluster>) -> Self {
+        Self::from_client(ReusableShardedClient::new(cluster.clone()).await)
+    }
+
+    pub fn from_client(client: ReusableShardedClient<SearchService>) -> Self {
         Self {
-            client: Mutex::new(ReusableShardedClient::new(cluster.clone()).await),
-            entiy_client: Mutex::new(ReusableShardedClient::new(cluster).await),
+            client: Mutex::new(client),
         }
     }
 
     async fn conn(&self) -> Arc<ShardedClient<SearchService, ShardId>> {
         self.client.lock().await.conn().await
-    }
-
-    async fn entity_conn(&self) -> Arc<ShardedClient<entity_search_server::SearchService, ()>> {
-        self.entiy_client.lock().await.conn().await
     }
 
     async fn retrieve_webpages_from_shard(
@@ -402,53 +389,6 @@ impl SearchClient for DistributedSearcher {
         retrieved_webpages.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         retrieved_webpages
-    }
-
-    async fn get_entity_image(
-        &self,
-        image_id: &str,
-        max_height: Option<u64>,
-        max_width: Option<u64>,
-    ) -> Result<Option<Image>> {
-        let client = self.entity_conn().await;
-
-        Ok(client
-            .send(
-                entity_search_server::GetEntityImage {
-                    image_id: image_id.to_string(),
-                    max_height,
-                    max_width,
-                },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await
-            .map_err(|_| Error::SearchFailed)?
-            .into_iter()
-            .flatten()
-            .next()
-            .and_then(|(_, mut v)| v.pop())
-            .and_then(|(_, v)| v))
-    }
-
-    async fn search_entity(&self, query: &str) -> Option<EntityMatch> {
-        let client = self.entity_conn().await;
-
-        client
-            .send(
-                entity_search_server::Search {
-                    query: query.to_string(),
-                },
-                &AllShardsSelector,
-                &RandomReplicaSelector,
-            )
-            .await
-            .ok()?
-            .into_iter()
-            .flatten()
-            .next()
-            .and_then(|(_, mut v)| v.pop())
-            .and_then(|(_, v)| v)
     }
 
     async fn search_initial_generic<Q>(
@@ -671,19 +611,6 @@ impl SearchClient for LocalSearchClient {
             .collect::<Vec<_>>();
 
         res
-    }
-
-    async fn get_entity_image(
-        &self,
-        _image_id: &str,
-        _max_height: Option<u64>,
-        _max_width: Option<u64>,
-    ) -> Result<Option<Image>> {
-        Ok(None)
-    }
-
-    async fn search_entity(&self, _query: &str) -> Option<EntityMatch> {
-        None
     }
 
     async fn search_initial_generic<Q>(

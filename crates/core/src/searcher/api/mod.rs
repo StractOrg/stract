@@ -29,6 +29,7 @@ use ahash::AHashMap as HashMap;
 use crate::bangs::{Bang, BangHit};
 use crate::collector::{self, approx_count};
 use crate::config::{ApiConfig, ApiSpellCheck, ApiThresholds, CollectorConfig, WidgetsConfig};
+use crate::distributed::cluster::Cluster;
 use crate::enum_map::EnumMap;
 use crate::image_store::Image;
 use crate::models::dual_encoder::DualEncoder;
@@ -244,7 +245,7 @@ where
 
 pub struct ApiSearcher<S, L, G> {
     distributed_searcher: Arc<S>,
-    sidebar_manager: SidebarManager<S>,
+    sidebar_manager: Option<SidebarManager>,
     live_searcher: Option<L>,
     cross_encoder: Option<Arc<CrossEncoderModel>>,
     lambda_model: Option<Arc<LambdaMART>>,
@@ -262,14 +263,21 @@ where
     L: live::SearchClient,
     G: Graph,
 {
-    pub fn new<C>(dist_searcher: S, bangs: Bangs, config: C) -> Self
+    pub async fn new<C>(
+        dist_searcher: S,
+        cluster: Option<Arc<Cluster>>,
+        bangs: Bangs,
+        config: C,
+    ) -> Self
     where
         C: Into<Config>,
     {
         let config: Config = config.into();
         let dist_searcher = Arc::new(dist_searcher);
-        let sidebar_manager =
-            SidebarManager::new(Arc::clone(&dist_searcher), config.thresholds.clone());
+        let sidebar_manager = match cluster {
+            Some(cluster) => Some(SidebarManager::new(cluster, config.thresholds.clone()).await),
+            None => None,
+        };
 
         let widget_manager = WidgetManager::new(Widgets::new(config.widgets).unwrap());
 
@@ -358,7 +366,10 @@ where
     }
 
     pub async fn sidebar(&self, query: &str) -> Option<DisplayedSidebar> {
-        self.sidebar_manager.sidebar(query).await
+        match &self.sidebar_manager {
+            Some(sidebar_manager) => sidebar_manager.sidebar(query).await,
+            None => None,
+        }
     }
 
     pub fn spell_check(&self, query: &str) -> Option<HighlightedSpellCorrection> {
@@ -778,9 +789,14 @@ where
         max_height: Option<u64>,
         max_width: Option<u64>,
     ) -> Result<Option<Image>> {
-        self.distributed_searcher
-            .get_entity_image(image_id, max_height, max_width)
-            .await
+        match &self.sidebar_manager {
+            Some(sidebar_manager) => {
+                sidebar_manager
+                    .get_entity_image(image_id, max_height, max_width)
+                    .await
+            }
+            None => Ok(None),
+        }
     }
 
     pub async fn warmup(&self, queries: impl Iterator<Item = String>) {

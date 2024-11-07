@@ -83,6 +83,9 @@ pub struct WebpagePointer {
     Clone,
     Copy,
     PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
 )]
 pub struct DocAddress {
     pub segment: u32,

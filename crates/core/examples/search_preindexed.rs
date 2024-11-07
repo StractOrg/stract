@@ -76,7 +76,9 @@ pub async fn main() {
     let webgraph = Webgraph::open("data/webgraph", 0u64.into()).unwrap();
 
     let searcher: ApiSearcher<LocalSearchClient, LiveSearcher, Webgraph> =
-        ApiSearcher::new(searcher, bangs, config).with_webgraph(webgraph);
+        ApiSearcher::new(searcher, None, bangs, config)
+            .await
+            .with_webgraph(webgraph);
 
     for query in queries {
         let mut desc = "search '".to_string();

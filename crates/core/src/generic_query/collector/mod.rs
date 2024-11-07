@@ -23,6 +23,9 @@ pub use size::SizeCollector;
 mod first_doc;
 pub use first_doc::FirstDocCollector;
 
+mod top_docs;
+pub use top_docs::TopDocsCollector;
+
 use tantivy::{
     collector::{Fruit, SegmentCollector},
     query::Weight,

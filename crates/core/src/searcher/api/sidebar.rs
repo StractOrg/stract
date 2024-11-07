@@ -14,10 +14,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{config::ApiThresholds, ranking::pipeline::RecallRankingWebpage, Result};
+use crate::{
+    config::ApiThresholds,
+    distributed::{
+        cluster::Cluster,
+        sonic::replication::{
+            AllShardsSelector, RandomReplicaSelector, ReusableShardedClient, ShardedClient,
+        },
+    },
+    entity_index::EntityMatch,
+    entrypoint::entity_search_server,
+    image_store::Image,
+    ranking::pipeline::RecallRankingWebpage,
+    searcher::{DistributedSearcher, SearchClient},
+    Result,
+};
 use std::{cmp::Ordering, sync::Arc};
 
 use optics::Optic;
+use tokio::sync::Mutex;
 use url::Url;
 
 use crate::{
@@ -25,20 +40,70 @@ use crate::{
     searcher::{distributed, SearchQuery},
 };
 
-pub struct SidebarManager<S> {
-    distributed_searcher: Arc<S>,
+pub struct SidebarManager {
+    distributed_searcher: DistributedSearcher,
+    entity_searcher: Mutex<ReusableShardedClient<entity_search_server::SearchService>>,
     thresholds: ApiThresholds,
 }
 
-impl<S> SidebarManager<S>
-where
-    S: distributed::SearchClient,
-{
-    pub fn new(distributed_searcher: Arc<S>, thresholds: ApiThresholds) -> SidebarManager<S> {
+impl SidebarManager {
+    pub async fn new(cluster: Arc<Cluster>, thresholds: ApiThresholds) -> Self {
         Self {
-            distributed_searcher,
+            distributed_searcher: DistributedSearcher::new(cluster.clone()).await,
+            entity_searcher: Mutex::new(ReusableShardedClient::new(cluster.clone()).await),
             thresholds,
         }
+    }
+
+    async fn entity_conn(&self) -> Arc<ShardedClient<entity_search_server::SearchService, ()>> {
+        self.entity_searcher.lock().await.conn().await
+    }
+
+    pub async fn get_entity_image(
+        &self,
+        image_id: &str,
+        max_height: Option<u64>,
+        max_width: Option<u64>,
+    ) -> Result<Option<Image>> {
+        let client = self.entity_conn().await;
+
+        Ok(client
+            .send(
+                entity_search_server::GetEntityImage {
+                    image_id: image_id.to_string(),
+                    max_height,
+                    max_width,
+                },
+                &AllShardsSelector,
+                &RandomReplicaSelector,
+            )
+            .await
+            .map_err(|_| anyhow::anyhow!("Failed to get entity image"))?
+            .into_iter()
+            .flatten()
+            .next()
+            .and_then(|(_, mut v)| v.pop())
+            .and_then(|(_, v)| v))
+    }
+
+    async fn search_entity(&self, query: &str) -> Option<EntityMatch> {
+        let client = self.entity_conn().await;
+
+        client
+            .send(
+                entity_search_server::Search {
+                    query: query.to_string(),
+                },
+                &AllShardsSelector,
+                &RandomReplicaSelector,
+            )
+            .await
+            .ok()?
+            .into_iter()
+            .flatten()
+            .next()
+            .and_then(|(_, mut v)| v.pop())
+            .and_then(|(_, v)| v)
     }
 
     pub async fn stackoverflow(&self, query: &str) -> Result<Option<DisplayedSidebar>> {
@@ -93,10 +158,8 @@ where
     }
 
     pub async fn sidebar(&self, query: &str) -> Option<DisplayedSidebar> {
-        let (entity, stackoverflow) = futures::join!(
-            self.distributed_searcher.search_entity(query),
-            self.stackoverflow(query)
-        );
+        let (entity, stackoverflow) =
+            futures::join!(self.search_entity(query), self.stackoverflow(query));
 
         if let Some(entity) = entity {
             if entity.score as f64 > self.thresholds.entity_sidebar {

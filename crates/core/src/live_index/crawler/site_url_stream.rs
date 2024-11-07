@@ -16,83 +16,45 @@
 
 const SITE_URL_BATCH_SIZE: usize = 100;
 
-use std::sync::Arc;
-
 use url::Url;
 
 use crate::{
-    ampc::dht::ShardId,
     distributed::{
-        sonic::{
-            replication::{AllShardsSelector, RandomReplicaSelector, ShardedClient},
-            service::Service,
-        },
-        streaming_response::StreamingResponse,
+        sonic::replication::ReusableShardedClient, streaming_response::StreamingResponse,
     },
-    entrypoint::{live_index, search_server},
+    entrypoint::search_server,
+    generic_query::GetSiteUrlsQuery,
+    searcher::{DistributedSearcher, SearchClient},
     Result,
 };
 
-pub struct SiteUrlStream<S: Service> {
+pub struct SiteUrlStream {
     site: String,
     offset: usize,
-    conn: Arc<ShardedClient<S, ShardId>>,
+    searcher: DistributedSearcher,
 }
 
-impl<S: Service> SiteUrlStream<S> {
-    pub fn new(site: String, conn: Arc<ShardedClient<S, ShardId>>) -> Self {
+impl SiteUrlStream {
+    pub fn new(site: String, conn: ReusableShardedClient<search_server::SearchService>) -> Self {
         Self {
             site,
             offset: 0,
-            conn,
+            searcher: DistributedSearcher::from_client(conn),
         }
     }
 }
 
-impl StreamingResponse for SiteUrlStream<search_server::SearchService> {
+impl StreamingResponse for SiteUrlStream {
     type Item = Url;
 
     async fn next_batch(&mut self) -> Result<Vec<Self::Item>> {
-        let req = search_server::GetSiteUrls {
-            site: self.site.clone(),
-            offset: self.offset as u64,
-            limit: SITE_URL_BATCH_SIZE as u64,
-        };
-
-        self.offset += SITE_URL_BATCH_SIZE;
-
-        let res = self
-            .conn
-            .send(req, &AllShardsSelector, &RandomReplicaSelector)
-            .await?;
-
-        Ok(res
-            .into_iter()
-            .flatten()
-            .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v.urls))
-            .collect())
-    }
-}
-
-impl StreamingResponse for SiteUrlStream<live_index::LiveIndexService> {
-    type Item = Url;
-
-    async fn next_batch(&mut self) -> Result<Vec<Self::Item>> {
-        let req = search_server::GetSiteUrls {
-            site: self.site.clone(),
-            offset: self.offset as u64,
-            limit: SITE_URL_BATCH_SIZE as u64,
-        };
-
-        let res = self
-            .conn
-            .send(req, &AllShardsSelector, &RandomReplicaSelector)
-            .await?;
-
-        Ok(res
-            .into_iter()
-            .flatten()
-            .flat_map(|(_, v)| v.into_iter().flat_map(|(_, v)| v.urls))
-            .collect())
+        self.searcher
+            .search_generic(GetSiteUrlsQuery {
+                site: self.site.clone(),
+                offset: Some(self.offset as u64),
+                limit: SITE_URL_BATCH_SIZE as u64,
+            })
+            .await
+            .map(|res| res.urls)
     }
 }

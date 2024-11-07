@@ -82,10 +82,6 @@ impl Client {
         self.live_index.lock().await.conn().await
     }
 
-    async fn search_conn(&self) -> Arc<ShardedClient<search_server::SearchService, ShardId>> {
-        self.search.lock().await.conn().await
-    }
-
     pub async fn index(&self, pages: Vec<IndexableWebpage>) -> Result<()> {
         let mut conn = self.live_conn().await;
 
@@ -112,36 +108,14 @@ impl Client {
         Ok(())
     }
 
-    async fn get_site_urls_from_backbone(&self, site: &str) -> Vec<Url> {
-        let mut res = Vec::new();
-        let conn = self.search_conn().await;
-        let mut stream = SiteUrlStream::new(site.to_string(), conn).stream();
-
-        while let Some(url) = stream.next().await {
-            res.push(url);
-        }
-
-        res
-    }
-
-    async fn get_site_urls_from_live(&self, site: &str) -> Vec<Url> {
-        let mut res = Vec::new();
-        let conn = self.live_conn().await;
-
-        let mut stream = SiteUrlStream::new(site.to_string(), conn).stream();
-
-        while let Some(url) = stream.next().await {
-            res.push(url);
-        }
-
-        res
-    }
-
     pub async fn get_site_urls(&self, site: &str) -> Vec<Url> {
         let mut res = Vec::new();
+        let mut stream =
+            SiteUrlStream::new(site.to_string(), self.search.lock().await.clone()).stream();
 
-        res.extend(self.get_site_urls_from_backbone(site).await);
-        res.extend(self.get_site_urls_from_live(site).await);
+        while let Some(url) = stream.next().await {
+            res.push(url);
+        }
 
         res
     }

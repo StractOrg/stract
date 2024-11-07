@@ -737,9 +737,11 @@ mod tests {
         index.commit().expect("failed to commit index");
         let searcher: ApiSearcher<_, LiveSearcher, _> = ApiSearcher::new(
             LocalSearchClient::from(LocalSearcher::builder(Arc::new(index)).build()),
+            None,
             Bangs::empty(),
             Config::default(),
         )
+        .await
         .with_webgraph(graph);
 
         let res = searcher

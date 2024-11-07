@@ -209,7 +209,9 @@ pub async fn router(
         }
 
         let mut searcher =
-            ApiSearcher::new(dist_searcher, bangs, config.clone()).with_live(live_searcher);
+            ApiSearcher::new(dist_searcher, Some(cluster.clone()), bangs, config.clone())
+                .await
+                .with_live(live_searcher);
 
         if let Some(cross_encoder) = cross_encoder {
             searcher = searcher.with_cross_encoder(cross_encoder);

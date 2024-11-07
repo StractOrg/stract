@@ -17,7 +17,6 @@
 use std::sync::Arc;
 
 use tracing::info;
-use url::Url;
 
 use crate::{
     config,
@@ -26,7 +25,9 @@ use crate::{
         member::{Member, Service},
         sonic::{self, service::sonic_service},
     },
-    generic_query::{self, GetHomepageQuery, GetWebpageQuery, SizeQuery, TopKeyPhrasesQuery},
+    generic_query::{
+        self, GetHomepageQuery, GetSiteUrlsQuery, GetWebpageQuery, SizeQuery, TopKeyPhrasesQuery,
+    },
     index::Index,
     inverted_index,
     models::dual_encoder::DualEncoder,
@@ -116,7 +117,6 @@ macro_rules! impl_search {
             sonic_service!(SearchService, [
                 RetrieveWebsites,
                 Search,
-                GetSiteUrls,
                 $(
                     $q,
                     [<$q Retrieve>],
@@ -132,6 +132,7 @@ impl_search!([
     SizeQuery,
     GetWebpageQuery,
     GetHomepageQuery,
+    GetSiteUrlsQuery,
 ]);
 
 pub struct SearchService {
@@ -219,30 +220,5 @@ pub async fn run(config: config::SearchServerConfig) -> Result<()> {
         if let Err(e) = server.accept().await {
             tracing::error!("{:?}", e);
         }
-    }
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct GetSiteUrls {
-    pub site: String,
-    pub offset: u64,
-    pub limit: u64,
-}
-
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
-pub struct SiteUrls {
-    #[bincode(with_serde)]
-    pub urls: Vec<Url>,
-}
-
-impl sonic::service::Message<SearchService> for GetSiteUrls {
-    type Response = SiteUrls;
-    async fn handle(self, server: &SearchService) -> Self::Response {
-        let urls = server
-            .local_searcher
-            .get_site_urls(&self.site, self.offset as usize, self.limit as usize)
-            .await;
-
-        SiteUrls { urls }
     }
 }
