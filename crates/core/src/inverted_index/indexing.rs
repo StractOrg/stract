@@ -132,6 +132,7 @@ impl InvertedIndex {
 
     #[must_use]
     pub fn merge(mut self, mut other: InvertedIndex) -> Self {
+        let shard_id = self.shard_id();
         self.prepare_writer().expect("failed to prepare writer");
         other.prepare_writer().expect("failed to prepare writer");
 
@@ -202,6 +203,9 @@ impl InvertedIndex {
         let mut res = Self::open(path).expect("failed to open index");
 
         res.prepare_writer().expect("failed to prepare writer");
+        if let Some(shard_id) = shard_id {
+            res.set_shard_id(shard_id);
+        }
 
         res
     }

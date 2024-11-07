@@ -18,7 +18,7 @@ use tantivy::TantivyDocument;
 use url::Url;
 
 use crate::{
-    inverted_index::RetrievedWebpage,
+    inverted_index::{RetrievedWebpage, ShardId},
     schema::text_field::{self, TextField},
     search_ctx,
     webpage::url_ext::UrlExt,
@@ -74,7 +74,7 @@ impl GenericQuery for GetWebpageQuery {
 
     fn filter_fruit_shards(
         &self,
-        shard_id: crate::ampc::dht::ShardId,
+        shard_id: ShardId,
         fruit: <Self::Collector as super::Collector>::Fruit,
     ) -> <Self::Collector as super::Collector>::Fruit {
         match fruit {

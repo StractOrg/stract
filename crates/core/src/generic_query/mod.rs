@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{ampc::dht::ShardId, search_ctx, Result};
+use crate::{inverted_index::ShardId, search_ctx, Result};
 
 pub mod top_key_phrases;
 pub use top_key_phrases::TopKeyPhrasesQuery;

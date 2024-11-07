@@ -339,7 +339,7 @@ impl Default for SnippetConfig {
 pub struct SearchServerConfig {
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
-    pub shard: ShardId,
+    pub shard: u64,
     pub index_path: String,
     pub linear_model_path: Option<String>,
     pub dual_encoder_model_path: Option<String>,
@@ -608,7 +608,7 @@ pub struct LiveIndexConfig {
     pub minimum_clean_words: Option<usize>,
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
     pub gossip_addr: SocketAddr,
-    pub shard_id: ShardId,
+    pub shard_id: u64,
     pub index_path: String,
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,

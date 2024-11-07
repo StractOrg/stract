@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{ampc::dht::ShardId, numericalfield_reader::NumericalFieldReader};
+use crate::{inverted_index::ShardId, numericalfield_reader::NumericalFieldReader};
 
 #[derive(Clone)]
 pub struct Ctx {

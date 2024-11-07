@@ -17,7 +17,7 @@
 use tantivy::{collector::SegmentCollector, DocId, SegmentOrdinal};
 
 use super::Collector;
-use crate::{ampc::dht::ShardId, inverted_index::DocAddress};
+use crate::inverted_index::{DocAddress, ShardId};
 
 pub struct FirstDocCollector {
     shard_id: Option<ShardId>,

@@ -17,7 +17,7 @@
 use crate::{
     config::LiveIndexConfig,
     entrypoint::search_server,
-    inverted_index,
+    inverted_index::{self, ShardId},
     live_index::LiveIndex,
     searcher::{LocalSearcher, SearchQuery},
     Result,
@@ -27,7 +27,6 @@ use std::{net::SocketAddr, path::Path, sync::Arc};
 use file_store::{gen_temp_dir, temp::TempDir};
 
 use crate::{
-    ampc::dht::ShardId,
     distributed::{
         cluster::Cluster,
         member::{LiveIndexState, Service},
@@ -53,7 +52,7 @@ fn config<P: AsRef<Path>>(path: P) -> LiveIndexConfig {
         minimum_clean_words: None,
         gossip_seed_nodes: None,
         gossip_addr: free_socket_addr(),
-        shard_id: ShardId::new(0),
+        shard_id: 0,
         index_path: path.as_ref().join("index").to_str().unwrap().to_string(),
         linear_model_path: None,
         lambda_model_path: None,
@@ -73,7 +72,7 @@ struct RemoteIndex {
 }
 
 impl RemoteIndex {
-    async fn start(shard: ShardId, gossip_seed: Vec<SocketAddr>) -> Result<Self> {
+    async fn start(shard: u64, gossip_seed: Vec<SocketAddr>) -> Result<Self> {
         let dir = gen_temp_dir()?;
         let mut config = config(&dir);
 
@@ -103,7 +102,7 @@ impl RemoteIndex {
 
         Ok(Self {
             host,
-            shard,
+            shard: ShardId::Live(shard),
             gossip_addr,
             underlying_index: index,
             cluster,
@@ -183,8 +182,8 @@ impl RemoteIndex {
 
 #[tokio::test]
 async fn test_shard_without_replica() -> Result<()> {
-    let shard1 = RemoteIndex::start(ShardId::new(1), vec![]).await?;
-    let shard2 = RemoteIndex::start(ShardId::new(2), vec![shard1.gossip_addr]).await?;
+    let shard1 = RemoteIndex::start(1, vec![]).await?;
+    let shard2 = RemoteIndex::start(2, vec![shard1.gossip_addr]).await?;
 
     let cluster = Cluster::join_as_spectator(free_socket_addr(), vec![shard1.gossip_addr]).await?;
 
@@ -237,8 +236,8 @@ async fn test_shard_without_replica() -> Result<()> {
 
 #[tokio::test]
 async fn test_replica_no_fails() -> Result<()> {
-    let rep1 = RemoteIndex::start(ShardId::new(1), vec![]).await?;
-    let rep2 = RemoteIndex::start(ShardId::new(1), vec![rep1.gossip_addr]).await?;
+    let rep1 = RemoteIndex::start(1, vec![]).await?;
+    let rep2 = RemoteIndex::start(1, vec![rep1.gossip_addr]).await?;
 
     let cluster = Cluster::join_as_spectator(free_socket_addr(), vec![rep1.gossip_addr]).await?;
 
@@ -287,7 +286,7 @@ async fn test_replica_no_fails() -> Result<()> {
 
 #[tokio::test]
 async fn test_replica_setup_after_inserts() -> Result<()> {
-    let rep1 = RemoteIndex::start(ShardId::new(1), vec![]).await?;
+    let rep1 = RemoteIndex::start(1, vec![]).await?;
 
     let cluster = Cluster::join_as_spectator(free_socket_addr(), vec![rep1.gossip_addr]).await?;
 
@@ -322,7 +321,7 @@ async fn test_replica_setup_after_inserts() -> Result<()> {
 
     rep1.commit_underlying().await;
 
-    let rep2 = RemoteIndex::start(ShardId::new(1), vec![rep1.gossip_addr]).await?;
+    let rep2 = RemoteIndex::start(1, vec![rep1.gossip_addr]).await?;
     rep2.await_ready(&cluster).await;
 
     rep2.commit_underlying().await;
@@ -339,8 +338,8 @@ async fn test_replica_setup_after_inserts() -> Result<()> {
 
 #[tokio::test]
 async fn test_replica_recovery() -> Result<()> {
-    let rep1 = RemoteIndex::start(ShardId::new(1), vec![]).await?;
-    let rep2 = RemoteIndex::start(ShardId::new(1), vec![rep1.gossip_addr]).await?;
+    let rep1 = RemoteIndex::start(1, vec![]).await?;
+    let rep2 = RemoteIndex::start(1, vec![rep1.gossip_addr]).await?;
 
     let cluster = Cluster::join_as_spectator(free_socket_addr(), vec![rep1.gossip_addr]).await?;
 
@@ -387,7 +386,7 @@ async fn test_replica_recovery() -> Result<()> {
 
     rep1.commit_underlying().await;
 
-    let rep2 = RemoteIndex::start(ShardId::new(1), vec![rep1.gossip_addr]).await?;
+    let rep2 = RemoteIndex::start(1, vec![rep1.gossip_addr]).await?;
     rep2.await_ready(&cluster).await;
 
     rep2.commit_underlying().await;
@@ -414,7 +413,7 @@ async fn test_meta_segments() -> Result<()> {
         dual_encoder: None,
     };
 
-    let index = LiveIndex::new(&config.index_path, ShardId::new(0), indexer_config.clone()).await?;
+    let index = LiveIndex::new(&config.index_path, 0, indexer_config.clone()).await?;
     assert!(index.meta().await.segments().is_empty());
 
     index
@@ -436,7 +435,7 @@ async fn test_meta_segments() -> Result<()> {
 
     assert_eq!(index.meta().await.segments().len(), 1);
 
-    let copy_index = LiveIndex::new(&config.index_path, ShardId::new(0), indexer_config).await?;
+    let copy_index = LiveIndex::new(&config.index_path, 0, indexer_config.clone()).await?;
 
     assert_eq!(copy_index.meta().await.segments().len(), 1);
 
@@ -455,8 +454,7 @@ async fn test_segment_compaction() -> Result<()> {
         dual_encoder: None,
     };
 
-    let index =
-        Arc::new(LiveIndex::new(&config.index_path, ShardId::new(0), indexer_config).await?);
+    let index = Arc::new(LiveIndex::new(&config.index_path, 0, indexer_config).await?);
 
     index
         .insert(&[IndexableWebpage {

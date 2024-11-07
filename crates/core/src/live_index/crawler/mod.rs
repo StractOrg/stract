@@ -24,7 +24,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::ampc::dht::ShardId;
 use crate::config::{CheckIntervals, CrawlerConfig, LiveCrawlerConfig};
 use crate::crawler::robot_client::RobotClient;
 use crate::distributed::cluster::Cluster;
@@ -34,6 +33,7 @@ use crate::distributed::sonic::replication::{
 use crate::distributed::streaming_response::StreamingResponse;
 use crate::entrypoint::search_server;
 use crate::entrypoint::site_stats::FinalSiteStats;
+use crate::inverted_index::ShardId;
 use crate::Result;
 use crate::{
     distributed::sonic::replication::ReusableShardedClient,

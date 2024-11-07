@@ -17,7 +17,7 @@
 use crate::{
     distributed::{
         cluster::Cluster,
-        member::{LiveIndexState, Service, ShardId},
+        member::{LiveIndexState, Service},
         sonic::{
             self,
             replication::{
@@ -30,11 +30,11 @@ use crate::{
     entrypoint::{
         entity_search_server,
         live_index::LiveIndexService,
-        search_server::{self, SearchService, RetrieveReq},
+        search_server::{self, RetrieveReq, SearchService},
     },
     generic_query::{self, Collector},
     index::Index,
-    inverted_index::{RetrievedWebpage, WebpagePointer},
+    inverted_index::{RetrievedWebpage, ShardId, WebpagePointer},
     ranking::pipeline::{PrecisionRankingWebpage, RecallRankingWebpage},
     Result,
 };
@@ -586,7 +586,7 @@ impl SearchClient for LocalSearchClient {
 
         vec![InitialSearchResultShard {
             local_result: res,
-            shard: ShardId::new(0),
+            shard: ShardId::Backbone(0),
         }]
     }
 

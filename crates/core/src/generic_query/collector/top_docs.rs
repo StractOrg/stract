@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{distributed::member::ShardId, inverted_index::DocAddress};
+use crate::inverted_index::{DocAddress, ShardId};
 use tantivy::{
     collector::{SegmentCollector, TopNComputer},
     DocId, SegmentOrdinal,

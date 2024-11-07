@@ -16,7 +16,10 @@
 
 use rustc_hash::FxHashMap;
 
-use crate::generic_query::{Collector, GenericQuery};
+use crate::{
+    generic_query::{Collector, GenericQuery},
+    inverted_index::ShardId,
+};
 
 use super::collector::SizeCollector;
 
@@ -73,7 +76,7 @@ impl GenericQuery for SizeQuery {
 
     fn filter_fruit_shards(
         &self,
-        shard_id: crate::ampc::dht::ShardId,
+        shard_id: ShardId,
         fruit: <Self::Collector as Collector>::Fruit,
     ) -> <Self::Collector as Collector>::Fruit {
         let mut map = FxHashMap::default();

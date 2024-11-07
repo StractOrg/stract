@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{ampc::dht::ShardId, Result, SortableFloat};
+use crate::{inverted_index::ShardId, Result, SortableFloat};
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, HashMap},

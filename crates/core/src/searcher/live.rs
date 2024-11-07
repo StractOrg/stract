@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    ampc::dht::ShardId,
     distributed::{
         cluster::Cluster,
         member::{LiveIndexState, Service},
@@ -25,7 +24,7 @@ use crate::{
         },
     },
     entrypoint::search_server::{self, SearchService},
-    inverted_index::{RetrievedWebpage, WebpagePointer},
+    inverted_index::{RetrievedWebpage, ShardId, WebpagePointer},
     ranking::pipeline::{PrecisionRankingWebpage, RecallRankingWebpage},
 };
 

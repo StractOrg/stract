@@ -22,9 +22,10 @@ use tokio::sync::Mutex;
 use url::Url;
 
 use crate::{
+    ampc::dht::ShardId,
     distributed::{
         cluster::Cluster,
-        member::{Service, ShardId},
+        member::Service,
         sonic::{
             self,
             replication::{
@@ -40,6 +41,8 @@ use crate::{
 
 use super::{query::BacklinksQuery, EdgeLimit, Node, NodeID};
 use crate::webgraph;
+
+impl sonic::replication::ShardIdentifier for ShardId {}
 
 struct WebgraphClientManager;
 

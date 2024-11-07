@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use crate::collector::MainCollector;
-use crate::inverted_index::{self, InvertedIndex};
+use crate::inverted_index::{self, InvertedIndex, ShardId};
 use crate::query::Query;
 use crate::search_ctx::Ctx;
 use crate::webgraph::NodeID;
@@ -63,10 +63,19 @@ impl Index {
         self.inverted_index.set_auto_merge_policy();
     }
 
+    pub fn set_shard_id(&mut self, shard_id: ShardId) {
+        self.inverted_index.set_shard_id(shard_id);
+    }
+
+    pub fn shard_id(&self) -> Option<ShardId> {
+        self.inverted_index.shard_id()
+    }
+
     #[cfg(test)]
     pub fn temporary() -> Result<(Self, file_store::temp::TempDir)> {
         let dir = crate::gen_temp_dir()?;
         let mut s = Self::open(&dir)?;
+        s.set_shard_id(ShardId::Backbone(0));
 
         s.prepare_writer()?;
 

@@ -33,10 +33,9 @@ use tantivy::{
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    ampc::dht::ShardId,
     config::SnippetConfig,
     entrypoint::indexer::{self, IndexableWebpage, IndexingWorker},
-    inverted_index::InvertedIndex,
+    inverted_index::{InvertedIndex, ShardId},
     live_index::{BATCH_SIZE, TTL},
     Result,
 };
@@ -124,7 +123,7 @@ impl InnerIndex {
     ) -> Result<Self> {
         let mut index = crate::index::Index::open(path.as_ref())?;
         index.prepare_writer()?;
-        index.inverted_index.set_shard_id(shard_id);
+        index.set_shard_id(shard_id);
 
         let write_ahead_log = Wal::open(path.as_ref().join("wal"))?;
         let wal_count = write_ahead_log.iter()?.count();
@@ -245,6 +244,10 @@ impl InnerIndex {
     fn re_open(&mut self) {
         self.index.inverted_index.re_open().unwrap();
         self.index.prepare_writer().unwrap();
+
+        if let Some(shard_id) = self.index.shard_id() {
+            self.index.set_shard_id(shard_id);
+        }
     }
 
     fn sync_meta_with_index(&mut self) {
@@ -357,12 +360,12 @@ pub struct LiveIndex {
 impl LiveIndex {
     pub async fn new<P: AsRef<Path>>(
         path: P,
-        shard_id: ShardId,
+        shard_id: u64,
         indexer_worker_config: indexer::worker::Config,
     ) -> Result<Self> {
         Ok(Self {
             inner: Arc::new(RwLock::new(
-                InnerIndex::new(path, shard_id, indexer_worker_config).await?,
+                InnerIndex::new(path, ShardId::Live(shard_id), indexer_worker_config).await?,
             )),
         })
     }

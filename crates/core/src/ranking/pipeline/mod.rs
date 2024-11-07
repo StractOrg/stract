@@ -167,9 +167,8 @@ mod tests {
     use scorers::term_distance;
 
     use crate::{
-        ampc::dht::ShardId,
         collector::Hashes,
-        inverted_index::{DocAddress, WebpagePointer},
+        inverted_index::{DocAddress, ShardId, WebpagePointer},
         prehashed::Prehashed,
         ranking::{self, bitvec_similarity::BitVec, initial::Score},
         searcher::api,
@@ -195,7 +194,7 @@ mod tests {
                         url_without_tld: Prehashed(0),
                         simhash: 0,
                     },
-                    address: DocAddress::new(0, i as u32, ShardId::new(0)),
+                    address: DocAddress::new(0, i as u32, ShardId::Backbone(0)),
                 };
 
                 let mut signals = EnumMap::new();
@@ -211,7 +210,7 @@ mod tests {
                 api::ScoredWebpagePointer::Normal(
                     crate::searcher::distributed::ScoredWebpagePointer {
                         website: RecallRankingWebpage::new(local, BitVec::new(vec![])),
-                        shard: ShardId::new(0),
+                        shard: ShardId::Backbone(0),
                     },
                 )
             })

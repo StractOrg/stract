@@ -29,7 +29,7 @@ use crate::{
         self, GetHomepageQuery, GetSiteUrlsQuery, GetWebpageQuery, SizeQuery, TopKeyPhrasesQuery,
     },
     index::Index,
-    inverted_index,
+    inverted_index::{self, ShardId},
     models::dual_encoder::DualEncoder,
     ranking::models::linear::LinearRegression,
     searcher::{InitialWebsiteResult, LocalSearcher, SearchQuery},
@@ -144,11 +144,12 @@ pub struct SearchService {
 
 impl SearchService {
     async fn new(config: config::SearchServerConfig) -> Result<Self> {
+        let shard = ShardId::Backbone(config.shard);
         let mut search_index = Index::open(config.index_path)?;
         search_index
             .inverted_index
             .set_snippet_config(config.snippet);
-        search_index.inverted_index.set_shard_id(config.shard);
+        search_index.set_shard_id(shard);
 
         let mut local_searcher = LocalSearcher::builder(Arc::new(search_index));
 
@@ -165,7 +166,7 @@ impl SearchService {
         let cluster_handle = Cluster::join(
             Member::new(Service::Searcher {
                 host: config.host,
-                shard: config.shard,
+                shard,
             }),
             config.gossip_addr,
             config.gossip_seed_nodes.unwrap_or_default(),

@@ -23,7 +23,6 @@ use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 use url::Url;
 
-use crate::ampc::dht::ShardId;
 use crate::collector::approx_count::ApproxCount;
 use crate::collector::{approx_count, MainCollector};
 
@@ -98,7 +97,7 @@ impl InvertedIndex {
     pub fn local_search_ctx(&self) -> Ctx {
         let tv_searcher = self.tv_searcher();
         Ctx {
-            shard_id: self.shard_id.unwrap_or(ShardId::new(u64::MAX)),
+            shard_id: self.shard_id.expect("Shard ID should be set for searches"),
             columnfield_reader: self.columnfield_reader.clone(),
             tv_searcher,
         }

@@ -99,14 +99,14 @@ impl std::fmt::Display for LiveIndexState {
 pub enum Service {
     Searcher {
         host: SocketAddr,
-        shard: ShardId,
+        shard: crate::inverted_index::ShardId,
     },
     EntitySearcher {
         host: SocketAddr,
     },
     LiveIndex {
         host: SocketAddr,
-        shard: ShardId,
+        shard: crate::inverted_index::ShardId,
         state: LiveIndexState,
     },
     Api {

@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
-use crate::{ampc::dht::ShardId, inverted_index::KeyPhrase};
+use crate::inverted_index::{KeyPhrase, ShardId};
 
 use super::{collector::TopKeyPhrasesCollector, GenericQuery};
 
@@ -53,7 +53,7 @@ impl GenericQuery for TopKeyPhrasesQuery {
 
     fn filter_fruit_shards(
         &self,
-        shard_id: crate::ampc::dht::ShardId,
+        shard_id: ShardId,
         fruit: <Self::Collector as super::Collector>::Fruit,
     ) -> <Self::Collector as super::Collector>::Fruit {
         fruit

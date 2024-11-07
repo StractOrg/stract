@@ -16,7 +16,7 @@
 
 use rustc_hash::FxHashMap;
 
-use crate::{ampc::dht::ShardId, generic_query::size::SizeResponse};
+use crate::{generic_query::size::SizeResponse, inverted_index::ShardId};
 
 use super::Collector;
 

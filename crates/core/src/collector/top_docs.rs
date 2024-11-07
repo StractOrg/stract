@@ -25,9 +25,8 @@ use tantivy::{
 };
 
 use crate::{
-    ampc::dht::ShardId,
     config::CollectorConfig,
-    inverted_index::{DocAddress, WebpagePointer},
+    inverted_index::{DocAddress, ShardId, WebpagePointer},
     numericalfield_reader,
     prehashed::Prehashed,
     ranking::initial::{InitialScoreTweaker, Score},
@@ -503,7 +502,7 @@ mod tests {
                 id: doc.1,
                 score: Score { total: doc.2 },
                 segment: 0,
-                shard_id: ShardId::new(0),
+                shard_id: ShardId::Backbone(0),
             });
         }
 

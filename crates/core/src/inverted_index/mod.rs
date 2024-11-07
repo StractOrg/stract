@@ -42,7 +42,6 @@ use tantivy::schema::Schema;
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{IndexReader, IndexWriter};
 
-use crate::ampc::dht::ShardId;
 use crate::collector::{approx_count, Hashes};
 use crate::config::SnippetConfig;
 use crate::numericalfield_reader::NumericalFieldReader;
@@ -72,6 +71,34 @@ pub struct WebpagePointer {
     pub score: Score,
     pub hashes: Hashes,
     pub address: DocAddress,
+}
+
+#[derive(
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+)]
+pub enum ShardId {
+    Live(u64),
+    Backbone(u64),
+}
+
+impl std::fmt::Display for ShardId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Live(shard) => write!(f, "Live {}", shard),
+            Self::Backbone(shard) => write!(f, "Backbone {}", shard),
+        }
+    }
 }
 
 #[derive(
@@ -204,8 +231,18 @@ impl InvertedIndex {
     }
 
     pub fn re_open(&mut self) -> Result<()> {
+        let shard_id = self.shard_id();
         *self = Self::open(self.path.clone())?;
+
+        if let Some(shard_id) = shard_id {
+            self.set_shard_id(shard_id);
+        }
+
         Ok(())
+    }
+
+    pub fn shard_id(&self) -> Option<ShardId> {
+        self.shard_id
     }
 
     pub fn columnfield_reader(&self) -> NumericalFieldReader {
@@ -240,7 +277,7 @@ impl InvertedIndex {
     pub fn temporary() -> Result<(Self, file_store::temp::TempDir)> {
         let dir = crate::gen_temp_dir()?;
         let mut s = Self::open(dir.as_ref().join("index"))?;
-        s.set_shard_id(ShardId::new(0));
+        s.set_shard_id(ShardId::Live(0));
 
         s.prepare_writer()?;
 

@@ -22,7 +22,6 @@ use std::{
 };
 
 use crate::{
-    ampc::dht::ShardId,
     config::LiveIndexConfig,
     distributed::{
         cluster::Cluster,
@@ -30,7 +29,7 @@ use crate::{
         remote_cp,
         sonic::{self, service::sonic_service},
     },
-    inverted_index,
+    inverted_index::{self, ShardId},
     live_index::{IndexManager, LiveIndex},
     searcher::{InitialWebsiteResult, LocalSearcher},
 };
@@ -190,7 +189,7 @@ impl LiveIndexService {
             Cluster::join(
                 Member::new(Service::LiveIndex {
                     host: config.host,
-                    shard: config.shard_id,
+                    shard: ShardId::Live(config.shard_id),
                     state: crate::distributed::member::LiveIndexState::InSetup,
                 }),
                 config.gossip_addr,
