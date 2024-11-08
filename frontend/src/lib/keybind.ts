@@ -31,6 +31,7 @@ export interface KeybindCallback {
   shift?: boolean;
   ctrl?: boolean;
   alt?: boolean;
+  meta?: boolean;
 }
 
 /**
@@ -84,9 +85,16 @@ export class Keybind {
     const shift = e.shiftKey ? true : undefined;
     const ctrl = e.ctrlKey ? true : undefined;
     const alt = e.altKey ? true : undefined;
+    const meta = e.metaKey ? true : undefined;
 
     const binding = this.bindings.find((binding) => binding.key === key);
-    if (binding && binding.alt == alt && binding.shift == shift && binding.ctrl == ctrl) {
+    if (
+      binding &&
+      binding.alt == alt &&
+      binding.shift == shift &&
+      binding.ctrl == ctrl &&
+      binding.meta == meta
+    ) {
       e.preventDefault();
       binding.callback(context);
     }
