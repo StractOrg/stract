@@ -113,7 +113,7 @@ impl EdgeStore {
         let mut segments_to_merge = Vec::new();
 
         for segment in segments {
-            if num_docs.saturating_add(segment.max_doc()) > tantivy::TERMINATED {
+            if num_docs.saturating_add(segment.max_doc()) >= tantivy::TERMINATED {
                 let segments_to_merge = std::mem::take(&mut segments_to_merge);
                 num_docs = 0;
 
@@ -127,10 +127,10 @@ impl EdgeStore {
                         1,
                     )?;
                 }
-            } else {
-                num_docs += segment.max_doc();
-                segments_to_merge.push(segment);
             }
+
+            num_docs = num_docs.saturating_add(segment.max_doc());
+            segments_to_merge.push(segment);
         }
 
         if !segments_to_merge.is_empty() {

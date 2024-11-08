@@ -171,18 +171,18 @@ mod tests {
         inverted_index::{DocAddress, ShardId, WebpagePointer},
         prehashed::Prehashed,
         ranking::{self, bitvec_similarity::BitVec, initial::Score},
-        searcher::api,
+        searcher::ScoredWebpagePointer,
     };
 
     use super::*;
 
-    fn pipeline() -> RankingPipeline<api::ScoredWebpagePointer> {
+    fn pipeline() -> RankingPipeline<ScoredWebpagePointer> {
         RankingPipeline::new()
             .add_stage(term_distance::TitleDistanceScorer)
             .add_stage(term_distance::BodyDistanceScorer)
     }
 
-    fn sample_websites(n: usize) -> Vec<api::ScoredWebpagePointer> {
+    fn sample_websites(n: usize) -> Vec<ScoredWebpagePointer> {
         (0..n)
             .map(|i| -> LocalRecallRankingWebpage {
                 let pointer = WebpagePointer {
@@ -206,13 +206,9 @@ mod tests {
                 signals.insert(ranking::signals::HostCentrality.into(), calc);
                 LocalRecallRankingWebpage::new_testing(pointer, signals, calc.score)
             })
-            .map(|local| {
-                api::ScoredWebpagePointer::Normal(
-                    crate::searcher::distributed::ScoredWebpagePointer {
-                        website: RecallRankingWebpage::new(local, BitVec::new(vec![])),
-                        shard: ShardId::Backbone(0),
-                    },
-                )
+            .map(|local| ScoredWebpagePointer {
+                website: RecallRankingWebpage::new(local, BitVec::new(vec![])),
+                shard: ShardId::Backbone(0),
             })
             .collect()
     }

@@ -18,7 +18,7 @@ use itertools::Itertools;
 
 use crate::ranking::pipeline::RankableWebpage;
 use crate::ranking::{self, SignalCalculation, SignalEnum};
-use crate::searcher::api;
+use crate::searcher::ScoredWebpagePointer;
 
 fn min_slop_two_positions(pos_a: &[u32], pos_b: &[u32]) -> u32 {
     let mut cur_min = u32::MAX;
@@ -61,7 +61,7 @@ fn score_slop(slop: f64) -> f64 {
 pub struct TitleDistanceScorer;
 
 impl super::RankingStage for TitleDistanceScorer {
-    type Webpage = api::ScoredWebpagePointer;
+    type Webpage = ScoredWebpagePointer;
 
     fn compute(&self, webpage: &Self::Webpage) -> (SignalEnum, SignalCalculation) {
         let min_slop = min_slop(webpage.as_local_recall().iter_title_positions()) as f64;
@@ -81,7 +81,7 @@ impl super::RankingStage for TitleDistanceScorer {
 pub struct BodyDistanceScorer;
 
 impl super::RankingStage for BodyDistanceScorer {
-    type Webpage = api::ScoredWebpagePointer;
+    type Webpage = ScoredWebpagePointer;
 
     fn compute(&self, webpage: &Self::Webpage) -> (SignalEnum, SignalCalculation) {
         let min_slop = min_slop(webpage.as_local_recall().iter_clean_body_positions()) as f64;

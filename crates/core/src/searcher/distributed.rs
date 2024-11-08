@@ -28,9 +28,7 @@ use crate::{
         },
     },
     entrypoint::{
-        entity_search_server,
-        live_index::LiveIndexService,
-        search_server::{self, RetrieveReq, SearchService},
+        entity_search_server, live_index::LiveIndexService, search_server::{self, RetrieveReq, SearchService}
     },
     generic_query::{self, Collector},
     index::Index,
@@ -46,7 +44,7 @@ use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
 use itertools::Itertools;
 use std::future::Future;
 use thiserror::Error;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 use super::{InitialWebsiteResult, LocalSearcher, SearchQuery};
 
@@ -72,9 +70,9 @@ pub trait SearchClient {
 
     fn retrieve_webpages(
         &self,
-        top_websites: &[(usize, ScoredWebpagePointer)],
+        top_websites: &[ScoredWebpagePointer],
         query: &str,
-    ) -> impl Future<Output = Vec<(usize, PrecisionRankingWebpage)>> + Send;
+    ) -> impl Future<Output = Vec<PrecisionRankingWebpage>> + Send;
 
     fn search_initial_generic<Q>(
         &self,
@@ -183,6 +181,16 @@ pub struct ScoredWebpagePointer {
     pub shard: ShardId,
 }
 
+impl ScoredWebpagePointer {
+    pub fn as_ranking(&self) -> &RecallRankingWebpage {
+        &self.website
+    }
+
+    pub fn as_ranking_mut(&mut self) -> &mut RecallRankingWebpage {
+        &mut self.website
+    }
+}
+
 impl ShardIdentifier for ShardId {}
 
 #[derive(Debug)]
@@ -202,6 +210,10 @@ impl ReusableClientManager for SearchService {
         for member in cluster.members().await {
             if let Service::Searcher { host, shard } = member.service {
                 shards.entry(shard).or_insert_with(Vec::new).push(host);
+            } else if let Service::LiveIndex { search_host, shard, state, .. } = member.service {
+                if state == LiveIndexState::Ready {
+                    shards.entry(shard).or_insert_with(Vec::new).push(search_host);
+                }
             }
         }
 
@@ -252,7 +264,7 @@ impl ReusableClientManager for LiveIndexService {
     async fn new_client(cluster: &Cluster) -> ShardedClient<Self::Service, Self::ShardId> {
         let mut shards = HashMap::new();
         for member in cluster.members().await {
-            if let Service::LiveIndex { host, shard, state } = member.service {
+            if let Service::LiveIndex { host, shard, state, .. } = member.service {
                 if state == LiveIndexState::Ready {
                     shards.entry(shard).or_insert_with(Vec::new).push(host);
                 }
@@ -355,19 +367,19 @@ impl SearchClient for DistributedSearcher {
 
     async fn retrieve_webpages(
         &self,
-        top_websites: &[(usize, ScoredWebpagePointer)],
+        top_websites: &[ScoredWebpagePointer],
         query: &str,
-    ) -> Vec<(usize, PrecisionRankingWebpage)> {
+    ) -> Vec<PrecisionRankingWebpage> {
         let mut rankings = FnvHashMap::default();
         let mut pointers: HashMap<_, Vec<_>> = HashMap::new();
 
-        for (i, pointer) in top_websites {
+        for (i, pointer) in top_websites.iter().enumerate() {
             pointers
                 .entry(pointer.shard)
                 .or_default()
-                .push((*i, pointer.website.pointer().clone()));
+                .push((i, pointer.website.pointer().clone()));
 
-            rankings.insert(*i, pointer.website.clone());
+            rankings.insert(i, pointer.website.clone());
         }
 
         let client = self.conn().await;
@@ -387,8 +399,7 @@ impl SearchClient for DistributedSearcher {
         debug_assert_eq!(retrieved_webpages.len(), top_websites.len());
 
         retrieved_webpages.sort_by(|(a, _), (b, _)| a.cmp(b));
-
-        retrieved_webpages
+        retrieved_webpages.into_iter().map(|(_, v)| v).collect()
     }
 
     async fn search_initial_generic<Q>(
@@ -573,9 +584,9 @@ impl SearchClient for DistributedSearcher {
 }
 
 /// This should only be used for testing and benchmarks.
-pub struct LocalSearchClient(LocalSearcher<Arc<Index>>);
-impl From<LocalSearcher<Arc<Index>>> for LocalSearchClient {
-    fn from(searcher: LocalSearcher<Arc<Index>>) -> Self {
+pub struct LocalSearchClient(LocalSearcher<Arc<RwLock<Index>>>);
+impl From<LocalSearcher<Arc<RwLock<Index>>>> for LocalSearchClient {
+    fn from(searcher: LocalSearcher<Arc<RwLock<Index>>>) -> Self {
         Self(searcher)
     }
 }
@@ -592,12 +603,12 @@ impl SearchClient for LocalSearchClient {
 
     async fn retrieve_webpages(
         &self,
-        top_websites: &[(usize, ScoredWebpagePointer)],
+        top_websites: &[ScoredWebpagePointer],
         query: &str,
-    ) -> Vec<(usize, PrecisionRankingWebpage)> {
+    ) -> Vec<PrecisionRankingWebpage> {
         let pointers = top_websites
             .iter()
-            .map(|(_, p)| p.website.pointer().clone())
+            .map(|p| p.website.pointer().clone())
             .collect::<Vec<_>>();
 
         let res = self
@@ -606,8 +617,8 @@ impl SearchClient for LocalSearchClient {
             .await
             .unwrap()
             .into_iter()
-            .zip(top_websites.iter().map(|(i, p)| (*i, p.website.clone())))
-            .map(|(ret, (i, ran))| (i, PrecisionRankingWebpage::new(ret, ran)))
+            .zip(top_websites.iter().map(|p| p.website.clone()))
+            .map(|(ret, ran)| PrecisionRankingWebpage::new(ret, ran))
             .collect::<Vec<_>>();
 
         res

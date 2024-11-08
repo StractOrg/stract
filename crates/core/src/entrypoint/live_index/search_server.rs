@@ -29,9 +29,9 @@ use crate::{
         remote_cp,
         sonic::{self, service::sonic_service},
     },
-    inverted_index::{self, ShardId},
+    entrypoint::search_server::SearchService,
+    inverted_index::ShardId,
     live_index::{IndexManager, LiveIndex},
-    searcher::{InitialWebsiteResult, LocalSearcher},
 };
 use anyhow::{Context, Result};
 use futures::stream::FuturesUnordered;
@@ -41,23 +41,14 @@ use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tracing::info;
 
-use crate::entrypoint::{
-    indexer::{self, IndexableWebpage},
-    search_server::{RetrieveWebsites, Search},
-};
+use crate::entrypoint::indexer::{self, IndexableWebpage};
 
 const INDEXING_TIMEOUT: Duration = Duration::from_secs(60);
 const INDEXING_RETRIES: usize = 3;
 
 sonic_service!(
     LiveIndexService,
-    [
-        RetrieveWebsites,
-        Search,
-        IndexWebpages,
-        GetIndexPath,
-        RemoteDownload
-    ]
+    [IndexWebpages, GetIndexPath, RemoteDownload]
 );
 
 fn start_manager(index: Arc<LiveIndex>) {
@@ -95,6 +86,7 @@ async fn other_replicas(
             if member.id != id {
                 if let Service::LiveIndex {
                     host: member_host,
+                    search_host: _,
                     shard: member_shard,
                     state,
                 } = member.service
@@ -120,6 +112,7 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
 
     let Service::LiveIndex {
         host,
+        search_host,
         shard,
         state: _,
     } = self_node.service.clone()
@@ -167,6 +160,7 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
         .set_service(Service::LiveIndex {
             host,
             shard,
+            search_host,
             state: LiveIndexState::Ready,
         })
         .await?;
@@ -177,7 +171,6 @@ async fn setup(index: Arc<LiveIndex>, cluster: Arc<Cluster>, temp_wal: TempWal) 
 type TempWal = Arc<Mutex<Option<Wal<IndexableWebpage>>>>;
 
 pub struct LiveIndexService {
-    local_searcher: LocalSearcher<Arc<LiveIndex>>,
     temp_wal: TempWal,
     index: Arc<LiveIndex>,
     cluster_handle: Arc<Cluster>,
@@ -189,6 +182,7 @@ impl LiveIndexService {
             Cluster::join(
                 Member::new(Service::LiveIndex {
                     host: config.host,
+                    search_host: config.search_host,
                     shard: ShardId::Live(config.shard_id),
                     state: crate::distributed::member::LiveIndexState::InSetup,
                 }),
@@ -215,14 +209,10 @@ impl LiveIndexService {
             )
             .await?,
         );
-        let local_searcher = LocalSearcher::builder(index.clone())
-            .set_collector_config(config.collector)
-            .build();
 
         let temp_wal = Arc::new(Mutex::new(Some(Wal::open(index_path.join("wal.temp"))?)));
 
         Ok(Self {
-            local_searcher,
             cluster_handle,
             index,
             temp_wal,
@@ -260,6 +250,7 @@ impl LiveIndexService {
         let self_id = self_member.id.clone();
         let Service::LiveIndex {
             host: self_host,
+            search_host: _,
             shard: self_shard,
             state: _,
         } = self_member.service
@@ -273,7 +264,13 @@ impl LiveIndexService {
             .await
             .into_iter()
             .filter_map(|member| {
-                if let Service::LiveIndex { host, shard, state } = member.service {
+                if let Service::LiveIndex {
+                    host,
+                    search_host: _,
+                    shard,
+                    state,
+                } = member.service
+                {
                     if member.id != self_id && shard == self_shard && host != self_host {
                         Some(RemoteIndex { host, state })
                     } else {
@@ -324,28 +321,6 @@ impl LiveIndexService {
         }
 
         Ok(())
-    }
-}
-
-impl sonic::service::Message<LiveIndexService> for RetrieveWebsites {
-    type Response = Option<Vec<inverted_index::RetrievedWebpage>>;
-    async fn handle(self, server: &LiveIndexService) -> Self::Response {
-        server
-            .local_searcher
-            .retrieve_websites(&self.websites, &self.query)
-            .await
-            .ok()
-    }
-}
-
-impl sonic::service::Message<LiveIndexService> for Search {
-    type Response = Option<InitialWebsiteResult>;
-    async fn handle(self, server: &LiveIndexService) -> Self::Response {
-        server
-            .local_searcher
-            .search_initial(&self.query, true)
-            .await
-            .ok()
     }
 }
 
@@ -442,17 +417,39 @@ impl sonic::service::Message<LiveIndexService> for RemoteDownload {
 pub async fn serve(config: LiveIndexConfig) -> Result<()> {
     let addr = config.host;
 
-    let service = LiveIndexService::new(config).await?;
+    let service = LiveIndexService::new(config.clone()).await?;
+    let index = service.index().index().await;
+    let cluster = service.cluster_handle();
 
     service.background_setup();
 
     let server = service.bind(&addr).await.unwrap();
 
+    let search_addr = config.search_host;
+    let search_server =
+        SearchService::new_from_existing(config.into(), cluster.clone(), index).await?;
+
+    let search_server = search_server.bind(&search_addr).await.unwrap();
+
+    let search_server_handle = tokio::spawn(async move {
+        loop {
+            if let Err(e) = search_server.accept().await {
+                tracing::error!("{:?}", e);
+            }
+        }
+    });
+
+    let live_index_handle = tokio::spawn(async move {
+        loop {
+            if let Err(e) = server.accept().await {
+                tracing::error!("{:?}", e);
+            }
+        }
+    });
+
     info!("live index is ready to accept requests on {}", addr);
 
-    loop {
-        if let Err(e) = server.accept().await {
-            tracing::error!("{:?}", e);
-        }
-    }
+    tokio::try_join!(live_index_handle, search_server_handle)?;
+
+    Ok(())
 }

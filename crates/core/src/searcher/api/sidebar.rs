@@ -137,14 +137,13 @@ impl SidebarManager {
             tracing::debug!(?score, ?self.thresholds.stackoverflow, "stackoverflow score");
             if website.score() > self.thresholds.stackoverflow {
                 let website = RecallRankingWebpage::new(website, Default::default());
-                let scored_websites =
-                    vec![(0, distributed::ScoredWebpagePointer { website, shard })];
+                let scored_websites = vec![distributed::ScoredWebpagePointer { website, shard }];
                 let mut retrieved = self
                     .distributed_searcher
                     .retrieve_webpages(&scored_websites, &query.query)
                     .await;
 
-                if let Some((_, res)) = retrieved.pop() {
+                if let Some(res) = retrieved.pop() {
                     let res = res.into_retrieved_webpage();
                     return Ok(Some(create_stackoverflow_sidebar(
                         res.schema_org,

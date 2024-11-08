@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -106,6 +106,7 @@ pub enum Service {
     },
     LiveIndex {
         host: SocketAddr,
+        search_host: SocketAddr,
         shard: crate::inverted_index::ShardId,
         state: LiveIndexState,
     },
@@ -141,8 +142,13 @@ impl std::fmt::Display for Service {
         match self {
             Self::Searcher { host, shard } => write!(f, "Searcher {} {}", host, shard),
             Self::EntitySearcher { host } => write!(f, "EntitySearcher {}", host),
-            Self::LiveIndex { host, shard, state } => {
-                write!(f, "LiveIndex {} {} {}", host, shard, state)
+            Self::LiveIndex {
+                host,
+                search_host,
+                shard,
+                state,
+            } => {
+                write!(f, "LiveIndex {} {} {} {}", host, search_host, shard, state)
             }
             Self::Api { host } => write!(f, "Api {}", host),
             Self::Webgraph { host, shard } => {

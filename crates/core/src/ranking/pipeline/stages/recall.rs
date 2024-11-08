@@ -37,7 +37,7 @@ use crate::{
         SignalCalculation, SignalComputer, SignalEnum,
     },
     schema::{numerical_field, text_field},
-    searcher::{api, SearchQuery},
+    searcher::{ScoredWebpagePointer, SearchQuery},
     webgraph,
 };
 
@@ -296,7 +296,7 @@ impl collector::Doc for LocalRecallRankingWebpage {
     }
 }
 
-impl RankingPipeline<api::ScoredWebpagePointer> {
+impl RankingPipeline<ScoredWebpagePointer> {
     pub fn recall_stage(
         query: &SearchQuery,
         inbound: inbound_similarity::Scorer,
@@ -307,15 +307,17 @@ impl RankingPipeline<api::ScoredWebpagePointer> {
             .add_stage(term_distance::TitleDistanceScorer)
             .add_stage(term_distance::BodyDistanceScorer)
             .add_stage(
-                EmbeddingScorer::<api::ScoredWebpagePointer, TitleEmbeddings>::new(
+                EmbeddingScorer::<ScoredWebpagePointer, TitleEmbeddings>::new(
                     query.text().to_string(),
                     dual_encoder.clone(),
                 ),
             )
-            .add_stage(EmbeddingScorer::<
-                api::ScoredWebpagePointer,
-                KeywordEmbeddings,
-            >::new(query.text().to_string(), dual_encoder))
+            .add_stage(
+                EmbeddingScorer::<ScoredWebpagePointer, KeywordEmbeddings>::new(
+                    query.text().to_string(),
+                    dual_encoder,
+                ),
+            )
             .add_stage(InboundScorer::new(inbound))
             .add_modifier(modifiers::InboundSimilarity);
 

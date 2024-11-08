@@ -21,6 +21,7 @@ use std::{
 
 use crate::gen_temp_path;
 
+#[derive(Debug)]
 pub struct TempDir {
     path: std::path::PathBuf,
 }

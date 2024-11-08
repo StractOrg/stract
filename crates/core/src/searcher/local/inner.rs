@@ -28,7 +28,7 @@ use crate::{
     ranking::models::linear::LinearRegression, search_ctx::Ctx, searcher::SearchQuery,
 };
 
-use super::{InvertedIndexResult, SearchGuard, SearchableIndex};
+use super::{InvertedIndexResult, ReadGuard, SearchableIndex};
 
 pub struct InnerLocalSearcher<I: SearchableIndex> {
     index: I,
@@ -50,8 +50,8 @@ where
         }
     }
 
-    pub async fn guard(&self) -> I::SearchGuard {
-        self.index.guard().await
+    pub async fn guard(&self) -> I::ReadGuard {
+        self.index.read_guard().await
     }
 
     pub fn set_linear_model(&mut self, model: LinearRegression) {
@@ -66,7 +66,7 @@ where
         self.collector_config = config;
     }
 
-    fn parse_query<G: SearchGuard>(
+    fn parse_query<G: ReadGuard>(
         &self,
         ctx: &Ctx,
         guard: &G,
@@ -75,7 +75,7 @@ where
         Query::parse(ctx, query, guard.inverted_index())
     }
 
-    fn ranker<G: SearchGuard>(
+    fn ranker<G: ReadGuard>(
         &self,
         query: &Query,
         guard: &G,
@@ -99,7 +99,7 @@ where
             .with_offset(query.offset()))
     }
 
-    fn search_inverted_index<G: SearchGuard>(
+    fn search_inverted_index<G: ReadGuard>(
         &self,
         ctx: &Ctx,
         guard: &G,
@@ -149,7 +149,7 @@ where
     pub fn search_initial(
         &self,
         query: &SearchQuery,
-        guard: &I::SearchGuard,
+        guard: &I::ReadGuard,
         de_rank_similar: bool,
     ) -> Result<InitialWebsiteResult> {
         let query = query.clone();
@@ -168,7 +168,7 @@ where
         &self,
         websites: &[inverted_index::WebpagePointer],
         query: &str,
-        guard: &I::SearchGuard,
+        guard: &I::ReadGuard,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
         let ctx = guard.inverted_index().local_search_ctx();
         let query = SearchQuery {
@@ -183,7 +183,7 @@ where
     pub fn search_initial_generic<Q: GenericQuery>(
         &self,
         query: &Q,
-        guard: &I::SearchGuard,
+        guard: &I::ReadGuard,
     ) -> Result<<Q::Collector as generic_query::Collector>::Fruit> {
         guard.inverted_index().search_initial_generic(query)
     }
@@ -192,7 +192,7 @@ where
         &self,
         query: &Q,
         fruit: <Q::Collector as generic_query::Collector>::Fruit,
-        guard: &I::SearchGuard,
+        guard: &I::ReadGuard,
     ) -> Result<Q::IntermediateOutput> {
         guard.inverted_index().retrieve_generic(query, fruit)
     }
@@ -200,7 +200,7 @@ where
     pub fn search_generic<Q: GenericQuery>(
         &self,
         query: Q,
-        guard: &I::SearchGuard,
+        guard: &I::ReadGuard,
     ) -> Result<Q::Output> {
         let fruit = self.search_initial_generic(&query, guard)?;
         Ok(Q::merge_results(vec![

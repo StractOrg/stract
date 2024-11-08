@@ -18,7 +18,7 @@ use std::sync::Mutex;
 
 use crate::{
     ranking::{self, inbound_similarity, pipeline::RankableWebpage},
-    searcher::api::ScoredWebpagePointer,
+    searcher::ScoredWebpagePointer,
 };
 
 use super::FullRankingStage;

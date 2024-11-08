@@ -16,7 +16,7 @@
 
 use crate::{
     ranking::{self, pipeline::RankableWebpage},
-    searcher::api,
+    searcher::ScoredWebpagePointer,
 };
 
 use super::Modifier;
@@ -26,7 +26,7 @@ const INBOUND_SIMILARITY_SMOOTHING: f64 = 8.0;
 pub struct InboundSimilarity;
 
 impl Modifier for InboundSimilarity {
-    type Webpage = api::ScoredWebpagePointer;
+    type Webpage = ScoredWebpagePointer;
 
     fn boost(&self, webpage: &Self::Webpage) -> f64 {
         webpage

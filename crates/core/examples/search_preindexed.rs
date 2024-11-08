@@ -10,11 +10,10 @@ use stract::{
     },
     generic_query::TopKeyPhrasesQuery,
     index::Index,
-    searcher::{
-        api::ApiSearcher, live::LiveSearcher, LocalSearchClient, LocalSearcher, SearchQuery,
-    },
+    searcher::{api::ApiSearcher, LocalSearchClient, LocalSearcher, SearchQuery},
     webgraph::Webgraph,
 };
+use tokio::sync::RwLock;
 
 #[tokio::main]
 pub async fn main() {
@@ -56,7 +55,7 @@ pub async fn main() {
         ..Default::default()
     });
 
-    let searcher = LocalSearcher::builder(Arc::new(index))
+    let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index)))
         .set_collector_config(collector_conf)
         .build();
 
@@ -75,7 +74,7 @@ pub async fn main() {
 
     let webgraph = Webgraph::open("data/webgraph", 0u64.into()).unwrap();
 
-    let searcher: ApiSearcher<LocalSearchClient, LiveSearcher, Webgraph> =
+    let searcher: ApiSearcher<LocalSearchClient, Webgraph> =
         ApiSearcher::new(searcher, None, bangs, config)
             .await
             .with_webgraph(webgraph);

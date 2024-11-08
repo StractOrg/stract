@@ -352,6 +352,22 @@ pub struct SearchServerConfig {
     pub snippet: SnippetConfig,
 }
 
+impl From<LiveIndexConfig> for SearchServerConfig {
+    fn from(config: LiveIndexConfig) -> Self {
+        Self {
+            host: config.search_host,
+            gossip_seed_nodes: config.gossip_seed_nodes,
+            gossip_addr: config.gossip_addr,
+            shard: config.shard_id,
+            index_path: config.index_path,
+            linear_model_path: config.linear_model_path,
+            dual_encoder_model_path: config.lambda_model_path,
+            collector: config.collector,
+            snippet: config.snippet,
+        }
+    }
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct EntitySearchServerConfig {
     pub gossip_seed_nodes: Option<Vec<SocketAddr>>,
@@ -613,6 +629,7 @@ pub struct LiveIndexConfig {
     pub linear_model_path: Option<String>,
     pub lambda_model_path: Option<String>,
     pub host: SocketAddr,
+    pub search_host: SocketAddr,
     #[serde(default)]
     pub collector: CollectorConfig,
     #[serde(default)]

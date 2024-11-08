@@ -142,14 +142,13 @@ mod tests {
     use std::sync::Arc;
 
     use optics::HostRankings;
+    use tokio::sync::RwLock;
 
     use crate::{
         bangs::Bangs,
         index::Index,
         rand_words,
-        searcher::{
-            api::ApiSearcher, live::LiveSearcher, LocalSearchClient, LocalSearcher, SearchQuery,
-        },
+        searcher::{api::ApiSearcher, LocalSearchClient, LocalSearcher, SearchQuery},
         webgraph::{Edge, EdgeLimit, Node, Webgraph},
         webpage::{html::links::RelFlags, Html, Webpage},
     };
@@ -362,8 +361,8 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher: ApiSearcher<_, LiveSearcher, _> = ApiSearcher::new(
-            LocalSearchClient::from(LocalSearcher::builder(Arc::new(index)).build()),
+        let searcher: ApiSearcher<_, _> = ApiSearcher::new(
+            LocalSearchClient::from(LocalSearcher::builder(Arc::new(RwLock::new(index))).build()),
             None,
             Bangs::empty(),
             crate::searcher::api::Config::default(),

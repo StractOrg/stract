@@ -85,9 +85,8 @@ pub struct WalIterator<T> {
 
 impl<T> WalIterator<T> {
     pub fn open<P: AsRef<Path>>(file: P) -> Result<Self> {
-        Ok(Self {
-            iter: file_store::iterable::IterableStoreReader::open(file)?,
-        })
+        let iter = file_store::iterable::IterableStoreReader::open(file)?;
+        Ok(Self { iter })
     }
 }
 

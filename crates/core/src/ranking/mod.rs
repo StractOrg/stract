@@ -131,6 +131,8 @@ mod tests {
 
     use std::{path::Path, sync::Arc};
 
+    use tokio::sync::RwLock;
+
     use crate::{
         config::{IndexerConfig, IndexerDualEncoderConfig, WarcSource},
         entrypoint::indexer::IndexingWorker,
@@ -198,7 +200,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
         let result = searcher
             .search_sync(&SearchQuery {
                 query: "example".to_string(),
@@ -264,7 +266,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
         let result = searcher
             .search_sync(&SearchQuery {
                 query: "example".to_string(),
@@ -332,7 +334,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
         let result = searcher
             .search_sync(&SearchQuery {
                 query: "title".to_string(),
@@ -405,7 +407,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
         let result = searcher
             .search_sync(&SearchQuery {
                 query: "test".to_string(),
@@ -471,7 +473,7 @@ mod tests {
             .expect("failed to insert webpage");
 
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
         let result = searcher
             .search_sync(&SearchQuery {
                 query: "test".to_string(),
@@ -556,7 +558,7 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
 
         let res = searcher
             .search_sync(&SearchQuery {
@@ -642,7 +644,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -735,7 +737,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -856,7 +858,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let mut searcher = LocalSearcher::builder(Arc::new(index));
+        let mut searcher = LocalSearcher::builder(Arc::new(RwLock::new(index)));
         searcher = searcher
             .set_dual_encoder(DualEncoder::open(data_path).expect("failed to open dual encoder"));
         let searcher = searcher.build();
@@ -945,7 +947,7 @@ mod tests {
 
         index.commit().expect("failed to commit index");
 
-        let mut searcher = LocalSearcher::builder(Arc::new(index));
+        let mut searcher = LocalSearcher::builder(Arc::new(RwLock::new(index)));
         searcher = searcher
             .set_dual_encoder(DualEncoder::open(data_path).expect("failed to open dual encoder"));
         let searcher = searcher.build();
@@ -995,7 +997,7 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -1075,7 +1077,7 @@ mod tests {
 
         index.insert(&page).expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
 
         let result = searcher
             .search_sync(&SearchQuery {

@@ -20,7 +20,7 @@ use crate::{
         pipeline::{PrecisionRankingWebpage, RankableWebpage, Top},
         SignalCalculation, SignalEnum,
     },
-    searcher::api::ScoredWebpagePointer,
+    searcher::ScoredWebpagePointer,
 };
 use std::sync::Arc;
 

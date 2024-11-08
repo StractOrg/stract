@@ -20,7 +20,7 @@ use std::{
     sync::Arc,
 };
 
-use tokio::sync::{OwnedRwLockReadGuard, RwLock};
+use tokio::sync::RwLock;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use itertools::Itertools;
@@ -107,7 +107,7 @@ impl Meta {
 }
 
 pub struct InnerIndex {
-    index: crate::index::Index,
+    index: Arc<RwLock<crate::index::Index>>,
     write_ahead_log: Wal<crate::entrypoint::indexer::IndexableWebpage>,
     has_inserts: bool,
     indexing_worker: IndexingWorker,
@@ -133,7 +133,7 @@ impl InnerIndex {
         let meta = Meta::open_or_create(path.as_ref().join("meta.json"));
 
         Ok(Self {
-            index,
+            index: Arc::new(RwLock::new(index)),
             write_ahead_log,
             indexing_worker: worker,
             has_inserts: wal_count > 0,
@@ -142,7 +142,7 @@ impl InnerIndex {
         })
     }
 
-    pub fn prune_segments(&mut self) {
+    pub async fn prune_segments(&mut self) {
         let old_segments: Vec<_> = self
             .meta
             .segments
@@ -157,12 +157,14 @@ impl InnerIndex {
             .collect();
 
         self.index
+            .write()
+            .await
             .inverted_index
             .delete_segments_by_id(&old_segments)
             .unwrap();
 
-        self.sync_meta_with_index();
-        self.re_open();
+        self.sync_meta_with_index().await;
+        self.re_open().await;
     }
 
     pub async fn start_compact_segments_by_date(&self) -> Result<Vec<CompactOperation>> {
@@ -179,6 +181,8 @@ impl InnerIndex {
 
             let (entry, merge_op) = self
                 .index
+                .write()
+                .await
                 .inverted_index
                 .start_merge_segments_by_id(&segment_ids)
                 .await?;
@@ -193,12 +197,18 @@ impl InnerIndex {
         Ok(operations)
     }
 
-    fn end_compact_segments_by_date(&mut self, operations: Vec<CompactOperation>) -> Result<()> {
+    async fn end_compact_segments_by_date(
+        &mut self,
+        operations: Vec<CompactOperation>,
+    ) -> Result<()> {
         for op in operations {
             let newest_creation_date = op.segments.iter().map(|s| s.created).max().unwrap();
             let segment_ids: Vec<SegmentId> = op.segments.iter().map(|s| s.id).collect();
 
-            if let Ok(Some(new_segment_id)) = op.end(&mut self.index.inverted_index) {
+            let mut index = self.index.write().await;
+            if let Ok(Some(new_segment_id)) = op.end(&mut index.inverted_index) {
+                drop(index);
+
                 self.update_meta_after_compaction(
                     segment_ids,
                     new_segment_id,
@@ -208,7 +218,7 @@ impl InnerIndex {
         }
 
         self.save_meta();
-        self.re_open();
+        self.re_open().await;
 
         Ok(())
     }
@@ -241,18 +251,22 @@ impl InnerIndex {
         });
     }
 
-    fn re_open(&mut self) {
-        self.index.inverted_index.re_open().unwrap();
-        self.index.prepare_writer().unwrap();
+    async fn re_open(&mut self) {
+        let mut index = self.index.write().await;
+        let shard_id = index.shard_id();
+        index.inverted_index.re_open().unwrap();
+        index.prepare_writer().unwrap();
 
-        if let Some(shard_id) = self.index.shard_id() {
-            self.index.set_shard_id(shard_id);
+        if let Some(shard_id) = shard_id {
+            index.set_shard_id(shard_id);
         }
     }
 
-    fn sync_meta_with_index(&mut self) {
+    async fn sync_meta_with_index(&mut self) {
         let segments_in_index: HashSet<_> = self
             .index
+            .write()
+            .await
             .inverted_index
             .segment_ids()
             .into_iter()
@@ -298,20 +312,18 @@ impl InnerIndex {
         self.meta.save(self.path.join("meta.json"));
     }
 
-    pub fn index(&self) -> &crate::index::Index {
-        &self.index
-    }
-
-    pub fn delete_all_pages(&mut self) {
-        let segments = self.index.inverted_index.segment_ids();
-        self.index
+    pub async fn delete_all_pages(&mut self) {
+        let mut index = self.index.write().await;
+        let segments = index.inverted_index.segment_ids();
+        index
             .inverted_index
             .delete_segments_by_id(&segments)
             .unwrap();
+        drop(index);
 
         self.meta = Meta::default();
         self.save_meta();
-        self.re_open();
+        self.re_open().await;
     }
 
     pub fn insert(&mut self, pages: &[IndexableWebpage]) {
@@ -320,6 +332,7 @@ impl InnerIndex {
     }
 
     pub async fn commit(&mut self) {
+        let mut index = self.index.write().await;
         for batch in self
             .write_ahead_log
             .iter()
@@ -330,26 +343,20 @@ impl InnerIndex {
         {
             let batch: Vec<_> = batch.collect();
             for webpage in self.indexing_worker.prepare_webpages(&batch).await {
-                self.index.insert(&webpage).unwrap();
+                index.insert(&webpage).unwrap();
             }
         }
-        self.index.commit().unwrap();
+        index.commit().unwrap();
+        drop(index);
+
         self.write_ahead_log.clear().unwrap();
-        self.sync_meta_with_index();
+        self.sync_meta_with_index().await;
         self.has_inserts = false;
-        self.re_open();
+        self.re_open().await;
     }
 
     pub fn has_inserts(&self) -> bool {
         self.has_inserts
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    pub fn meta(&self) -> &Meta {
-        &self.meta
     }
 }
 
@@ -377,7 +384,7 @@ impl LiveIndex {
 
     pub async fn prune_segments(&self) {
         tracing::debug!("pruning segments");
-        self.inner.write().await.prune_segments()
+        self.inner.write().await.prune_segments().await
     }
 
     pub async fn has_inserts(&self) -> bool {
@@ -396,9 +403,14 @@ impl LiveIndex {
         self.inner
             .write()
             .await
-            .end_compact_segments_by_date(operations)?;
+            .end_compact_segments_by_date(operations)
+            .await?;
 
         Ok(())
+    }
+
+    pub async fn index(&self) -> Arc<RwLock<crate::index::Index>> {
+        self.inner.read().await.index.clone()
     }
 
     pub async fn insert(&self, pages: &[IndexableWebpage]) {
@@ -406,15 +418,13 @@ impl LiveIndex {
         self.inner.write().await.insert(pages)
     }
 
-    pub async fn read(&self) -> OwnedRwLockReadGuard<InnerIndex> {
-        RwLock::read_owned(self.inner.clone()).await
-    }
-
     pub async fn set_snippet_config(&self, config: SnippetConfig) {
         self.inner
             .write()
             .await
             .index
+            .write()
+            .await
             .inverted_index
             .set_snippet_config(config)
     }
@@ -424,11 +434,11 @@ impl LiveIndex {
     }
 
     pub async fn delete_all_pages(&self) {
-        self.inner.write().await.delete_all_pages();
+        self.inner.write().await.delete_all_pages().await
     }
 
     pub async fn re_open(&self) -> Result<()> {
-        self.inner.write().await.re_open();
+        self.inner.write().await.re_open().await;
 
         Ok(())
     }

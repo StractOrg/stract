@@ -359,6 +359,7 @@ mod tests {
         webpage::Webpage,
     };
     use proptest::prelude::*;
+    use tokio::sync::RwLock;
 
     const TEST_TEXT: &str = r#"Rust is a systems programming language sponsored by
 Mozilla which describes it as a "safe, concurrent, practical language", supporting functional and
@@ -415,7 +416,7 @@ Survey in 2016, 2017, and 2018."#;
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -454,7 +455,7 @@ Survey in 2016, 2017, and 2018."#;
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
 
         let result = searcher
             .search_sync(&SearchQuery {
@@ -493,7 +494,7 @@ Survey in 2016, 2017, and 2018."#;
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
 
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
 
         let result = searcher
             .search_sync(&SearchQuery {

@@ -16,6 +16,7 @@
 
 use std::sync::Arc;
 
+use tokio::sync::RwLock;
 use tracing::info;
 
 use crate::{
@@ -136,22 +137,19 @@ impl_search!([
 ]);
 
 pub struct SearchService {
-    local_searcher: LocalSearcher<Arc<Index>>,
+    local_searcher: LocalSearcher<Arc<RwLock<Index>>>,
     // dropping the handle leaves the cluster
     #[allow(unused)]
-    cluster_handle: Cluster,
+    cluster_handle: Arc<Cluster>,
 }
 
 impl SearchService {
-    async fn new(config: config::SearchServerConfig) -> Result<Self> {
-        let shard = ShardId::Backbone(config.shard);
-        let mut search_index = Index::open(config.index_path)?;
-        search_index
-            .inverted_index
-            .set_snippet_config(config.snippet);
-        search_index.set_shard_id(shard);
-
-        let mut local_searcher = LocalSearcher::builder(Arc::new(search_index));
+    pub async fn new_from_existing(
+        config: config::SearchServerConfig,
+        cluster: Arc<Cluster>,
+        index: Arc<RwLock<Index>>,
+    ) -> Result<Self> {
+        let mut local_searcher = LocalSearcher::builder(index);
 
         if let Some(model_path) = config.linear_model_path {
             local_searcher = local_searcher.set_linear_model(LinearRegression::open(model_path)?);
@@ -163,20 +161,35 @@ impl SearchService {
 
         local_searcher = local_searcher.set_collector_config(config.collector);
 
-        let cluster_handle = Cluster::join(
-            Member::new(Service::Searcher {
-                host: config.host,
-                shard,
-            }),
-            config.gossip_addr,
-            config.gossip_seed_nodes.unwrap_or_default(),
-        )
-        .await?;
-
         Ok(SearchService {
             local_searcher: local_searcher.build(),
-            cluster_handle,
+            cluster_handle: cluster,
         })
+    }
+
+    pub async fn new(config: config::SearchServerConfig, shard: ShardId) -> Result<Self> {
+        let host = config.host;
+        let gossip_addr = config.gossip_addr;
+        let gossip_seed_nodes = config.gossip_seed_nodes.clone().unwrap_or_default();
+
+        let mut search_index = Index::open(&config.index_path)?;
+        search_index
+            .inverted_index
+            .set_snippet_config(config.snippet.clone());
+        search_index.set_shard_id(shard);
+
+        let search_index = Arc::new(RwLock::new(search_index));
+
+        let cluster = Arc::new(
+            Cluster::join(
+                Member::new(Service::Searcher { host, shard }),
+                gossip_addr,
+                gossip_seed_nodes,
+            )
+            .await?,
+        );
+
+        Self::new_from_existing(config, cluster, search_index).await
     }
 }
 
@@ -213,7 +226,12 @@ impl sonic::service::Message<SearchService> for Search {
 
 pub async fn run(config: config::SearchServerConfig) -> Result<()> {
     let addr = config.host;
-    let server = SearchService::new(config).await?.bind(addr).await.unwrap();
+    let shard = ShardId::Backbone(config.shard);
+    let server = SearchService::new(config, shard)
+        .await?
+        .bind(addr)
+        .await
+        .unwrap();
 
     info!("search server is ready to accept requests on {}", addr);
 

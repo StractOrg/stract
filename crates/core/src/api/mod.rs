@@ -32,7 +32,7 @@ use crate::{
     leaky_queue::LeakyQueue,
     models::dual_encoder::DualEncoder,
     ranking::models::lambdamart::LambdaMART,
-    searcher::{api::ApiSearcher, live::LiveSearcher, DistributedSearcher, SearchClient},
+    searcher::{api::ApiSearcher, DistributedSearcher, SearchClient},
     similar_hosts::SimilarHostsFinder,
     webgraph::remote::RemoteWebgraph,
 };
@@ -73,7 +73,7 @@ pub struct Counters {
 
 pub struct State {
     pub config: ApiConfig,
-    pub searcher: Arc<ApiSearcher<DistributedSearcher, LiveSearcher, Arc<RemoteWebgraph>>>,
+    pub searcher: Arc<ApiSearcher<DistributedSearcher, Arc<RemoteWebgraph>>>,
     pub webgraph: Arc<RemoteWebgraph>,
     pub autosuggest: Autosuggest,
     pub counters: Counters,
@@ -180,7 +180,6 @@ pub async fn router(
     let webgraph = RemoteWebgraph::new(cluster.clone()).await;
 
     let dist_searcher = DistributedSearcher::new(Arc::clone(&cluster)).await;
-    let live_searcher = LiveSearcher::new(Arc::clone(&cluster));
 
     if !cluster
         .members()
@@ -209,9 +208,7 @@ pub async fn router(
         }
 
         let mut searcher =
-            ApiSearcher::new(dist_searcher, Some(cluster.clone()), bangs, config.clone())
-                .await
-                .with_live(live_searcher);
+            ApiSearcher::new(dist_searcher, Some(cluster.clone()), bangs, config.clone()).await;
 
         if let Some(cross_encoder) = cross_encoder {
             searcher = searcher.with_cross_encoder(cross_encoder);

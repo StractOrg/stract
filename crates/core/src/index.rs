@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -14,16 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use crate::collector::MainCollector;
 use crate::inverted_index::{self, InvertedIndex, ShardId};
 use crate::query::Query;
-use crate::search_ctx::Ctx;
-use crate::webgraph::NodeID;
 use crate::webpage::region::{Region, RegionCount};
 use crate::webpage::Webpage;
 use crate::Result;
@@ -100,26 +96,6 @@ impl Index {
         Ok(())
     }
 
-    pub fn top_nodes(
-        &self,
-        query: &Query,
-        ctx: &Ctx,
-        collector: MainCollector,
-    ) -> Result<Vec<NodeID>> {
-        let websites = self
-            .inverted_index
-            .search_initial(query, ctx, collector)?
-            .top_websites;
-
-        let mut hosts = HashSet::with_capacity(websites.len());
-        for website in &websites {
-            if let Some(id) = self.inverted_index.website_host_node(website)? {
-                hosts.insert(id);
-            }
-        }
-        Ok(hosts.into_iter().collect())
-    }
-
     pub fn retrieve_websites(
         &self,
         websites: &[inverted_index::WebpagePointer],
@@ -155,6 +131,8 @@ impl Index {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+
+    use tokio::sync::RwLock;
 
     use crate::{
         ranking,
@@ -235,7 +213,7 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
         let res = searcher
             .search_sync(&SearchQuery {
                 query: "test".to_string(),

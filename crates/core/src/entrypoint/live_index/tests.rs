@@ -59,11 +59,13 @@ fn config<P: AsRef<Path>>(path: P) -> LiveIndexConfig {
         host: free_socket_addr(),
         collector: Default::default(),
         snippet: Default::default(),
+        search_host: free_socket_addr(),
     }
 }
 
 struct RemoteIndex {
     host: SocketAddr,
+    search_host: SocketAddr,
     shard: ShardId,
     gossip_addr: SocketAddr,
     underlying_index: Arc<LiveIndex>,
@@ -78,17 +80,28 @@ impl RemoteIndex {
 
         config.shard_id = shard;
         let host = config.host;
+        let search_host = config.search_host;
         let gossip_addr = config.gossip_addr;
 
         if !gossip_seed.is_empty() {
             config.gossip_seed_nodes = Some(gossip_seed);
         }
 
-        let service = LiveIndexService::new(config).await?;
+        let service = LiveIndexService::new(config.clone()).await?;
         let cluster = service.cluster_handle();
         let index = service.index();
 
         service.background_setup();
+
+        let shard = ShardId::Live(config.shard_id);
+        let search_server = search_server::SearchService::new_from_existing(
+            config.into(),
+            cluster.clone(),
+            index.index().await,
+        )
+        .await?;
+
+        let search_server = search_server.bind(&search_host).await.unwrap();
 
         let server = service.bind(&host).await.unwrap();
 
@@ -100,14 +113,29 @@ impl RemoteIndex {
             }
         });
 
+        tokio::task::spawn(async move {
+            loop {
+                if let Err(e) = search_server.accept().await {
+                    tracing::error!("{:?}", e);
+                }
+            }
+        });
+
         Ok(Self {
             host,
-            shard: ShardId::Live(shard),
+            search_host,
+            shard,
             gossip_addr,
             underlying_index: index,
             cluster,
             _temp_dir: dir,
         })
+    }
+
+    async fn search_conn(
+        &self,
+    ) -> Result<sonic::service::Connection<search_server::SearchService>> {
+        Ok(sonic::service::Connection::create(self.search_host).await?)
     }
 
     async fn conn(&self) -> Result<sonic::service::Connection<LiveIndexService>> {
@@ -133,10 +161,17 @@ impl RemoteIndex {
     async fn await_ready(&self, cluster: &Cluster) {
         cluster
             .await_member(|member| {
-                if let Service::LiveIndex { host, shard, state } = member.service.clone() {
+                if let Service::LiveIndex {
+                    host,
+                    search_host,
+                    shard,
+                    state,
+                } = member.service.clone()
+                {
                     self.shard == shard
                         && matches!(state, LiveIndexState::Ready)
                         && host == self.host
+                        && search_host == self.search_host
                 } else {
                     false
                 }
@@ -145,7 +180,7 @@ impl RemoteIndex {
     }
 
     async fn search(&self, query: &str) -> Result<Vec<inverted_index::RetrievedWebpage>> {
-        let mut conn = self.conn().await?;
+        let mut conn = self.search_conn().await?;
 
         let websites: Vec<inverted_index::WebpagePointer> = conn
             .send(search_server::Search {
@@ -490,7 +525,7 @@ async fn test_segment_compaction() -> Result<()> {
 
     assert_eq!(index.meta().await.segments().len(), 1);
 
-    let searcher = LocalSearcher::builder(index.clone()).build();
+    let searcher = LocalSearcher::builder(index.index().await).build();
 
     let res = searcher
         .search(&SearchQuery {

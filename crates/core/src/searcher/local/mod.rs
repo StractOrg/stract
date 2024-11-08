@@ -15,10 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod guard;
-use guard::{LiveIndexSearchGuard, NormalIndexSearchGuard, SearchGuard};
+use guard::ReadGuard;
 
 mod inner;
 use inner::InnerLocalSearcher;
+use tokio::sync::{OwnedRwLockReadGuard, RwLock};
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -38,30 +39,22 @@ use crate::ranking::pipeline::{
 };
 use crate::ranking::{SignalEnum, SignalScore};
 use crate::search_prettifier::DisplayedWebpage;
-use crate::{inverted_index, live_index, Result};
+use crate::{inverted_index, Result};
 
 use super::WebsitesResult;
 use super::{InitialWebsiteResult, SearchQuery};
 
 pub trait SearchableIndex: Send + Sync + 'static {
-    type SearchGuard: SearchGuard;
+    type ReadGuard: ReadGuard;
 
-    fn guard(&self) -> impl Future<Output = Self::SearchGuard>;
+    fn read_guard(&self) -> impl Future<Output = Self::ReadGuard>;
 }
 
-impl SearchableIndex for Arc<Index> {
-    type SearchGuard = NormalIndexSearchGuard;
+impl SearchableIndex for Arc<RwLock<Index>> {
+    type ReadGuard = OwnedRwLockReadGuard<Index>;
 
-    async fn guard(&self) -> Self::SearchGuard {
-        NormalIndexSearchGuard::new(self.clone())
-    }
-}
-
-impl SearchableIndex for Arc<live_index::LiveIndex> {
-    type SearchGuard = LiveIndexSearchGuard;
-
-    async fn guard(&self) -> Self::SearchGuard {
-        LiveIndexSearchGuard::new(self.read().await)
+    async fn read_guard(&self) -> Self::ReadGuard {
+        self.clone().read_owned().await
     }
 }
 
@@ -306,7 +299,7 @@ mod tests {
 
         index.commit().unwrap();
 
-        let searcher = LocalSearcher::builder(Arc::new(index)).build();
+        let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
 
         for p in 0..NUM_PAGES {
             let urls: Vec<_> = searcher

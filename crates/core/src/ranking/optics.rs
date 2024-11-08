@@ -19,13 +19,12 @@ mod tests {
     use std::sync::Arc;
 
     use optics::HostRankings;
+    use tokio::sync::RwLock;
 
     use crate::{
         bangs::Bangs,
         index::Index,
-        searcher::{
-            api::ApiSearcher, live::LiveSearcher, LocalSearchClient, LocalSearcher, SearchQuery,
-        },
+        searcher::{api::ApiSearcher, LocalSearchClient, LocalSearcher, SearchQuery},
         webgraph::{Edge, Node, Webgraph},
         webpage::{html::links::RelFlags, Html, Webpage},
     };
@@ -188,8 +187,8 @@ mod tests {
             })
             .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
-        let searcher: ApiSearcher<_, LiveSearcher, _> = ApiSearcher::new(
-            LocalSearchClient::from(LocalSearcher::builder(Arc::new(index)).build()),
+        let searcher: ApiSearcher<_, _> = ApiSearcher::new(
+            LocalSearchClient::from(LocalSearcher::builder(Arc::new(RwLock::new(index))).build()),
             None,
             Bangs::empty(),
             crate::searcher::api::Config::default(),

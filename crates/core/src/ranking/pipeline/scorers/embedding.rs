@@ -25,7 +25,7 @@ use crate::{
         pipeline::{stages::StoredEmbeddings, RankableWebpage},
         SignalEnum,
     },
-    searcher::api::ScoredWebpagePointer,
+    searcher::ScoredWebpagePointer,
     Result,
 };
 
