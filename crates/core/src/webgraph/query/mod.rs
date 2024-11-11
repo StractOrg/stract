@@ -18,6 +18,9 @@ use super::searcher::Searcher;
 use crate::{ampc::dht::ShardId, Result};
 pub use collector::Collector;
 
+pub mod filter;
+pub use filter::*;
+
 pub mod backlink;
 pub use backlink::*;
 

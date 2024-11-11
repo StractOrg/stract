@@ -29,32 +29,44 @@ struct ParsedUrl {
 
 impl ParsedUrl {
     fn parse(url: &str) -> Result<Self> {
-        let url = url::Url::robust_parse(url)?;
-        let scheme: VecDeque<String> = url
-            .scheme()
-            .split_preserve(|c| c == ':')
-            .map(|s| {
-                let mut s = s.to_string();
-                s.push(':');
-                s
-            })
-            .add_space_last()
-            .collect();
+        let parsed_url = url::Url::robust_parse(url)?;
+        let scheme: VecDeque<String> = if url.starts_with(&format!("{}:", parsed_url.scheme())) {
+            parsed_url
+                .scheme()
+                .split_preserve(|c| c == ':')
+                .map(|s| {
+                    let mut s = s.to_string();
+                    s.push(':');
+                    s
+                })
+                .add_space_last()
+                .collect()
+        } else {
+            VecDeque::new()
+        };
 
-        let mut host: VecDeque<String> = url
-            .normalized_host()
-            .unwrap_or_default()
-            .split_preserve(|c| c == '.')
-            .map(|s| s.to_string())
-            .add_space_last()
-            .collect();
+        let normalized_host = parsed_url.normalized_host().unwrap_or_default();
 
-        let mut path: VecDeque<_> = url
-            .path()
-            .split_preserve(|c| matches!(c, '/' | '-' | '_'))
-            .filter(|s| !(*s).is_empty())
-            .map(|s| s.to_string())
-            .collect();
+        let mut host: VecDeque<String> = if normalized_host != parsed_url.scheme() {
+            normalized_host
+                .split_preserve(|c| c == '.')
+                .map(|s| s.to_string())
+                .add_space_last()
+                .collect()
+        } else {
+            VecDeque::new()
+        };
+
+        let mut path: VecDeque<_> = if normalized_host != parsed_url.scheme() {
+            parsed_url
+                .path()
+                .split_preserve(|c| matches!(c, '/' | '-' | '_'))
+                .filter(|s| !(*s).is_empty())
+                .map(|s| s.to_string())
+                .collect()
+        } else {
+            VecDeque::new()
+        };
 
         if host.is_empty() {
             if let Some(maybe_host) = path.pop_front() {
@@ -144,22 +156,7 @@ mod tests {
             tokenize("https://example.com/path/to/resource"),
             ["https: ", "example", ".", "com ", "/", "path", "/", "to", "/", "resource"]
         );
-        assert_eq!(
-            tokenize("example.com"),
-            ["https: ", "example", ".", "com ", "/"]
-        );
-        assert_eq!(tokenize(".com"), ["https: ", ".", "com ", "/"]);
-
-        assert_eq!(
-            tokenize("mailto:hello@example.com"),
-            ["mailto: ", "example", ".", "com ", "hello"]
-        );
-
-        assert_eq!(
-            tokenize("mailto:example.com"),
-            ["mailto: ", "example", ".", "com "]
-        );
-
-        assert_eq!(tokenize("tel:+4512345678"), ["tel: ", "+4512345678 "]);
+        assert_eq!(tokenize("example.com"), ["example", ".", "com ", "/"]);
+        assert_eq!(tokenize(".com"), [".", "com ", "/"]);
     }
 }

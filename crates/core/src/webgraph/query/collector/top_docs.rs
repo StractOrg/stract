@@ -26,7 +26,10 @@ use tantivy::{
 
 use crate::webgraph::{
     doc_address::DocAddress,
-    query::document_scorer::{DefaultDocumentScorer, DocumentScorer},
+    query::{
+        document_scorer::{DefaultDocumentScorer, DocumentScorer},
+        ColumnFieldFilter, SegmentColumnFieldFilter,
+    },
     schema::{Field, FieldEnum},
     EdgeLimit,
 };
@@ -157,6 +160,7 @@ pub struct TopDocsCollector<S = DefaultDocumentScorer, D = NoDeduplicator> {
     perform_offset: bool,
     deduplicator: D,
     column_fields: Option<ColumnFields>,
+    filter: Option<Box<dyn ColumnFieldFilter>>,
     _phantom: PhantomData<S>,
 }
 
@@ -192,12 +196,14 @@ impl<S> TopDocsCollector<S, NoDeduplicator> {
             perform_offset: true,
             deduplicator: NoDeduplicator,
             column_fields: None,
+            filter: None,
             _phantom: PhantomData,
         }
     }
 }
 
 impl<S, D> TopDocsCollector<S, D> {
+    #[must_use]
     pub fn with_shard_id(self, shard_id: ShardId) -> Self {
         Self {
             shard_id: Some(shard_id),
@@ -205,6 +211,7 @@ impl<S, D> TopDocsCollector<S, D> {
         }
     }
 
+    #[must_use]
     pub fn with_offset(self, offset: usize) -> Self {
         Self {
             offset: Some(offset),
@@ -212,6 +219,7 @@ impl<S, D> TopDocsCollector<S, D> {
         }
     }
 
+    #[must_use]
     pub fn with_limit(self, limit: usize) -> Self {
         Self {
             limit: Some(limit),
@@ -219,6 +227,7 @@ impl<S, D> TopDocsCollector<S, D> {
         }
     }
 
+    #[must_use]
     pub fn enable_offset(self) -> Self {
         Self {
             perform_offset: true,
@@ -226,6 +235,7 @@ impl<S, D> TopDocsCollector<S, D> {
         }
     }
 
+    #[must_use]
     pub fn disable_offset(self) -> Self {
         Self {
             perform_offset: false,
@@ -233,6 +243,7 @@ impl<S, D> TopDocsCollector<S, D> {
         }
     }
 
+    #[must_use]
     pub fn with_deduplicator<D2: Deduplicator>(self, deduplicator: D2) -> TopDocsCollector<S, D2> {
         TopDocsCollector {
             deduplicator,
@@ -241,10 +252,12 @@ impl<S, D> TopDocsCollector<S, D> {
             offset: self.offset,
             perform_offset: self.perform_offset,
             column_fields: self.column_fields,
+            filter: self.filter,
             _phantom: PhantomData,
         }
     }
 
+    #[must_use]
     pub fn with_column_fields(self, warmed_column_fields: WarmedColumnFields) -> Self {
         Self {
             column_fields: Some(ColumnFields::new(warmed_column_fields)),
@@ -252,9 +265,18 @@ impl<S, D> TopDocsCollector<S, D> {
         }
     }
 
+    #[must_use]
     pub fn with_host_field<F: Field>(self, host_field: F) -> Self {
         Self {
             column_fields: Some(self.column_fields.unwrap().with_host_field(host_field)),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_filter(self, filter: Box<dyn ColumnFieldFilter>) -> Self {
+        Self {
+            filter: Some(filter),
             ..self
         }
     }
@@ -304,6 +326,10 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> Collector for TopDo
                     .u64_by_enum(host_field)
                     .unwrap()
             }),
+            filter: self
+                .filter
+                .as_ref()
+                .map(|f| f.for_segment(&column_fields.warmed_column_fields)),
             _deduplicator: PhantomData,
         })
     }
@@ -394,6 +420,7 @@ pub struct TopDocsSegmentCollector<S: DocumentScorer, D: Deduplicator> {
     segment_ord: SegmentOrdinal,
     scorer: S,
     host_column: Option<Column<u64>>,
+    filter: Option<Box<dyn SegmentColumnFieldFilter>>,
     _deduplicator: PhantomData<D>,
 }
 
@@ -405,6 +432,12 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> SegmentCollector
     fn collect(&mut self, doc: DocId, _: tantivy::Score) {
         if doc == tantivy::TERMINATED {
             return;
+        }
+
+        if let Some(filter) = self.filter.as_ref() {
+            if filter.should_skip(doc) {
+                return;
+            }
         }
 
         let score = self.scorer.score(doc);

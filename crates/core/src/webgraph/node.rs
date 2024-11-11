@@ -169,12 +169,7 @@ impl Node {
 #[cfg(test)]
 impl From<String> for Node {
     fn from(name: String) -> Self {
-        let url = if name.contains("://") {
-            Url::parse(&name).unwrap()
-        } else {
-            Url::parse(&("http://".to_string() + name.as_str())).unwrap()
-        };
-
+        let url = Url::robust_parse(&name).unwrap();
         Node::from(&url)
     }
 }
@@ -204,6 +199,11 @@ pub fn normalize_url(url: &Url) -> String {
     url.normalize_in_place();
 
     let scheme = url.scheme();
+
+    if scheme != "http" && scheme != "https" {
+        return url.to_string();
+    }
+
     let mut normalized = url
         .as_str()
         .strip_prefix(scheme)
@@ -221,4 +221,29 @@ pub fn normalize_url(url: &Url) -> String {
     }
 
     normalized.to_lowercase()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_url() {
+        assert_eq!(
+            normalize_url(&Url::robust_parse("https://www.example.com/").unwrap()),
+            "example.com"
+        );
+    }
+
+    #[test]
+    fn test_host_node() {
+        assert_eq!(
+            Node::from("example.com").into_host(),
+            Node::from("example.com")
+        );
+        assert_eq!(
+            Node::from("https://example.com/123").into_host(),
+            Node::from("example.com")
+        );
+    }
 }

@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::query::ShortCircuitQuery;
+use tantivy::query::{BooleanQuery, Occur, ShortCircuitQuery};
 
 use super::{
     collector::{top_docs, HostDeduplicator, TopDocsCollector},
     document_scorer::DefaultDocumentScorer,
     raw::{HostLinksQuery, LinksQuery},
-    Query,
+    AndFilter, Filter, FilterEnum, Query,
 };
 use crate::{
     ampc::dht::ShardId,
@@ -97,6 +97,7 @@ pub fn fetch_edges(searcher: &Searcher, mut doc_ids: Vec<DocAddress>) -> Result<
 pub struct BacklinksQuery {
     node: NodeID,
     limit: EdgeLimit,
+    filters: Vec<FilterEnum>,
 }
 
 impl BacklinksQuery {
@@ -104,6 +105,7 @@ impl BacklinksQuery {
         Self {
             node,
             limit: EdgeLimit::Unlimited,
+            filters: Vec::new(),
         }
     }
 
@@ -111,6 +113,26 @@ impl BacklinksQuery {
         Self {
             node: self.node,
             limit,
+            filters: self.filters,
+        }
+    }
+
+    pub fn filter<F: Filter>(mut self, filter: F) -> Self {
+        self.filters.push(filter.into());
+        self
+    }
+
+    fn filter_as_and(&self) -> Option<AndFilter> {
+        if self.filters.is_empty() {
+            None
+        } else {
+            let mut filter = AndFilter::new();
+
+            for f in self.filters.clone() {
+                filter = filter.and(f);
+            }
+
+            Some(filter)
         }
     }
 }
@@ -121,25 +143,40 @@ impl Query for BacklinksQuery {
     type IntermediateOutput = Vec<(f64, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
-    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
+    fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
+        let mut raw = Box::new(LinksQuery::new(self.node, ToId)) as Box<dyn tantivy::query::Query>;
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
+            let filter = filter.query(searcher);
+            let mut queries = vec![(Occur::Must, raw)];
+            queries.extend(filter);
+            raw = Box::new(BooleanQuery::new(queries));
+        }
+
         match self.limit {
-            EdgeLimit::Unlimited => Box::new(LinksQuery::new(self.node, ToId)),
+            EdgeLimit::Unlimited => raw,
             EdgeLimit::Limit(limit) => Box::new(ShortCircuitQuery::new(
-                Box::new(LinksQuery::new(self.node, ToId)),
+                raw,
                 (limit + top_docs::DEDUPLICATION_BUFFER) as u64,
             )),
             EdgeLimit::LimitAndOffset { limit, offset } => Box::new(ShortCircuitQuery::new(
-                Box::new(LinksQuery::new(self.node, ToId)),
+                raw,
                 (limit + offset + top_docs::DEDUPLICATION_BUFFER) as u64,
             )),
         }
     }
 
     fn collector(&self, searcher: &Searcher) -> Self::Collector {
-        TopDocsCollector::from(self.limit)
+        let mut collector = TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
-            .with_column_fields(searcher.warmed_column_fields().clone())
+            .with_column_fields(searcher.warmed_column_fields().clone());
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.column_field_filter()) {
+            collector = collector.with_filter(filter);
+        }
+
+        collector
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -190,6 +227,7 @@ impl Query for BacklinksQuery {
 pub struct HostBacklinksQuery {
     node: NodeID,
     limit: EdgeLimit,
+    filters: Vec<FilterEnum>,
 }
 
 impl HostBacklinksQuery {
@@ -197,12 +235,32 @@ impl HostBacklinksQuery {
         Self {
             node,
             limit: EdgeLimit::Unlimited,
+            filters: Vec::new(),
         }
     }
 
     pub fn with_limit(mut self, limit: EdgeLimit) -> Self {
         self.limit = limit;
         self
+    }
+
+    pub fn filter<F: Filter>(mut self, filter: F) -> Self {
+        self.filters.push(filter.into());
+        self
+    }
+
+    fn filter_as_and(&self) -> Option<AndFilter> {
+        if self.filters.is_empty() {
+            None
+        } else {
+            let mut filter = AndFilter::new();
+
+            for f in self.filters.clone() {
+                filter = filter.and(f);
+            }
+
+            Some(filter)
+        }
     }
 }
 
@@ -213,41 +271,46 @@ impl Query for HostBacklinksQuery {
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
+        let mut raw = Box::new(HostLinksQuery::new(
+            self.node,
+            ToHostId,
+            FromHostId,
+            searcher.warmed_column_fields().clone(),
+        )) as Box<dyn tantivy::query::Query>;
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
+            let filter = filter.query(searcher);
+            let mut queries = vec![(Occur::Must, raw)];
+            queries.extend(filter);
+            raw = Box::new(BooleanQuery::new(queries));
+        }
+
         match self.limit {
-            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(
-                self.node,
-                ToHostId,
-                FromHostId,
-                searcher.warmed_column_fields().clone(),
-            )),
+            EdgeLimit::Unlimited => raw,
             EdgeLimit::Limit(limit) => Box::new(ShortCircuitQuery::new(
-                Box::new(HostLinksQuery::new(
-                    self.node,
-                    ToHostId,
-                    FromHostId,
-                    searcher.warmed_column_fields().clone(),
-                )),
+                raw,
                 (limit + top_docs::DEDUPLICATION_BUFFER) as u64,
             )),
             EdgeLimit::LimitAndOffset { limit, offset } => Box::new(ShortCircuitQuery::new(
-                Box::new(HostLinksQuery::new(
-                    self.node,
-                    ToHostId,
-                    FromHostId,
-                    searcher.warmed_column_fields().clone(),
-                )),
+                raw,
                 (limit + offset + top_docs::DEDUPLICATION_BUFFER) as u64,
             )),
         }
     }
 
     fn collector(&self, searcher: &Searcher) -> Self::Collector {
-        TopDocsCollector::from(self.limit)
+        let mut collector = TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
             .with_deduplicator(HostDeduplicator)
             .with_column_fields(searcher.warmed_column_fields().clone())
-            .with_host_field(FromHostId)
+            .with_host_field(FromHostId);
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.column_field_filter()) {
+            collector = collector.with_filter(filter);
+        }
+
+        collector
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -300,6 +363,7 @@ impl Query for HostBacklinksQuery {
 pub struct FullBacklinksQuery {
     node: Node,
     limit: EdgeLimit,
+    filters: Vec<FilterEnum>,
 }
 
 impl FullBacklinksQuery {
@@ -307,6 +371,7 @@ impl FullBacklinksQuery {
         Self {
             node,
             limit: EdgeLimit::Unlimited,
+            filters: Vec::new(),
         }
     }
 
@@ -314,6 +379,26 @@ impl FullBacklinksQuery {
         Self {
             node: self.node,
             limit,
+            filters: self.filters,
+        }
+    }
+
+    pub fn filter<F: Filter>(mut self, filter: F) -> Self {
+        self.filters.push(filter.into());
+        self
+    }
+
+    fn filter_as_and(&self) -> Option<AndFilter> {
+        if self.filters.is_empty() {
+            None
+        } else {
+            let mut filter = AndFilter::new();
+
+            for f in self.filters.clone() {
+                filter = filter.and(f);
+            }
+
+            Some(filter)
         }
     }
 }
@@ -324,25 +409,41 @@ impl Query for FullBacklinksQuery {
     type IntermediateOutput = Vec<Edge>;
     type Output = Vec<Edge>;
 
-    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
+    fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
+        let mut raw =
+            Box::new(LinksQuery::new(self.node.id(), ToId)) as Box<dyn tantivy::query::Query>;
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
+            let filter = filter.query(searcher);
+            let mut queries = vec![(Occur::Must, raw)];
+            queries.extend(filter);
+            raw = Box::new(BooleanQuery::new(queries));
+        }
+
         match self.limit {
-            EdgeLimit::Unlimited => Box::new(LinksQuery::new(self.node.id(), ToId)),
+            EdgeLimit::Unlimited => raw,
             EdgeLimit::Limit(limit) => Box::new(ShortCircuitQuery::new(
-                Box::new(LinksQuery::new(self.node.id(), ToId)),
+                raw,
                 (limit + top_docs::DEDUPLICATION_BUFFER) as u64,
             )),
             EdgeLimit::LimitAndOffset { limit, offset } => Box::new(ShortCircuitQuery::new(
-                Box::new(LinksQuery::new(self.node.id(), ToId)),
+                raw,
                 (limit + offset + top_docs::DEDUPLICATION_BUFFER) as u64,
             )),
         }
     }
 
     fn collector(&self, searcher: &Searcher) -> Self::Collector {
-        TopDocsCollector::from(self.limit)
+        let mut collector = TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
-            .with_column_fields(searcher.warmed_column_fields().clone())
+            .with_column_fields(searcher.warmed_column_fields().clone());
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.column_field_filter()) {
+            collector = collector.with_filter(filter);
+        }
+
+        collector
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -381,6 +482,9 @@ impl Query for FullBacklinksQuery {
 pub struct FullHostBacklinksQuery {
     node: Node,
     limit: EdgeLimit,
+    filters: Vec<FilterEnum>,
+    nodes_as_host: bool,
+    skip_self_links: bool,
 }
 
 impl FullHostBacklinksQuery {
@@ -388,13 +492,42 @@ impl FullHostBacklinksQuery {
         Self {
             node,
             limit: EdgeLimit::Unlimited,
+            filters: Vec::new(),
+            nodes_as_host: true,
+            skip_self_links: true,
         }
     }
 
     pub fn with_limit(self, limit: EdgeLimit) -> Self {
-        Self {
-            node: self.node,
-            limit,
+        Self { limit, ..self }
+    }
+
+    pub fn nodes_as_host(mut self, nodes_as_host: bool) -> Self {
+        self.nodes_as_host = nodes_as_host;
+        self
+    }
+
+    pub fn skip_self_links(mut self, skip_self_links: bool) -> Self {
+        self.skip_self_links = skip_self_links;
+        self
+    }
+
+    pub fn filter<F: Filter>(mut self, filter: F) -> Self {
+        self.filters.push(filter.into());
+        self
+    }
+
+    fn filter_as_and(&self) -> Option<AndFilter> {
+        if self.filters.is_empty() {
+            None
+        } else {
+            let mut filter = AndFilter::new();
+
+            for f in self.filters.clone() {
+                filter = filter.and(f);
+            }
+
+            Some(filter)
         }
     }
 }
@@ -406,41 +539,51 @@ impl Query for FullHostBacklinksQuery {
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
-        match self.limit {
-            EdgeLimit::Unlimited => Box::new(HostLinksQuery::new(
+        let mut raw = Box::new(
+            HostLinksQuery::new(
                 self.node.clone().into_host().id(),
                 ToHostId,
                 FromHostId,
                 searcher.warmed_column_fields().clone(),
-            )),
+            )
+            .skip_self_links(self.skip_self_links),
+        ) as Box<dyn tantivy::query::Query>;
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
+            let filter = filter.query(searcher);
+
+            let mut queries = vec![(Occur::Must, raw)];
+            queries.extend(filter);
+
+            raw = Box::new(BooleanQuery::new(queries));
+        }
+
+        match self.limit {
+            EdgeLimit::Unlimited => raw,
             EdgeLimit::Limit(limit) => Box::new(ShortCircuitQuery::new(
-                Box::new(HostLinksQuery::new(
-                    self.node.clone().into_host().id(),
-                    ToHostId,
-                    FromHostId,
-                    searcher.warmed_column_fields().clone(),
-                )),
+                raw,
                 (limit + top_docs::DEDUPLICATION_BUFFER) as u64,
             )),
             EdgeLimit::LimitAndOffset { limit, offset } => Box::new(ShortCircuitQuery::new(
-                Box::new(HostLinksQuery::new(
-                    self.node.clone().into_host().id(),
-                    ToHostId,
-                    FromHostId,
-                    searcher.warmed_column_fields().clone(),
-                )),
+                raw,
                 (limit + offset + top_docs::DEDUPLICATION_BUFFER) as u64,
             )),
         }
     }
 
     fn collector(&self, searcher: &Searcher) -> Self::Collector {
-        TopDocsCollector::from(self.limit)
+        let mut collector = TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
             .with_deduplicator(HostDeduplicator)
             .with_column_fields(searcher.warmed_column_fields().clone())
-            .with_host_field(FromHostId)
+            .with_host_field(FromHostId);
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.column_field_filter()) {
+            collector = collector.with_filter(filter);
+        }
+
+        collector
     }
 
     fn remote_collector(&self) -> Self::Collector {
@@ -456,6 +599,10 @@ impl Query for FullHostBacklinksQuery {
     ) -> Result<Self::IntermediateOutput> {
         let docs: Vec<_> = fruit.into_iter().map(|(_, doc)| doc.address).collect();
         let edges = fetch_edges(searcher, docs)?;
+
+        if !self.nodes_as_host {
+            return Ok(edges);
+        }
 
         Ok(edges
             .into_iter()
@@ -484,10 +631,12 @@ impl Query for FullHostBacklinksQuery {
         edges
     }
 }
+
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct BacklinksWithLabelsQuery {
     node: NodeID,
     limit: EdgeLimit,
+    filters: Vec<FilterEnum>,
 }
 
 impl BacklinksWithLabelsQuery {
@@ -495,6 +644,7 @@ impl BacklinksWithLabelsQuery {
         Self {
             node,
             limit: EdgeLimit::Unlimited,
+            filters: Vec::new(),
         }
     }
 
@@ -502,6 +652,26 @@ impl BacklinksWithLabelsQuery {
         Self {
             node: self.node,
             limit,
+            filters: self.filters,
+        }
+    }
+
+    pub fn filter<F: Filter>(mut self, filter: F) -> Self {
+        self.filters.push(filter.into());
+        self
+    }
+
+    fn filter_as_and(&self) -> Option<AndFilter> {
+        if self.filters.is_empty() {
+            None
+        } else {
+            let mut filter = AndFilter::new();
+
+            for f in self.filters.clone() {
+                filter = filter.and(f);
+            }
+
+            Some(filter)
         }
     }
 }
@@ -512,15 +682,30 @@ impl Query for BacklinksWithLabelsQuery {
     type IntermediateOutput = Vec<(f64, SmallEdgeWithLabel)>;
     type Output = Vec<SmallEdgeWithLabel>;
 
-    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
-        Box::new(LinksQuery::new(self.node, ToId))
+    fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
+        let mut raw = Box::new(LinksQuery::new(self.node, ToId)) as Box<dyn tantivy::query::Query>;
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
+            let filter = filter.query(searcher);
+            let mut queries = vec![(Occur::Must, raw)];
+            queries.extend(filter);
+            raw = Box::new(BooleanQuery::new(queries));
+        }
+
+        raw
     }
 
     fn collector(&self, searcher: &Searcher) -> Self::Collector {
-        TopDocsCollector::from(self.limit)
+        let mut collector = TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
-            .with_column_fields(searcher.warmed_column_fields().clone())
+            .with_column_fields(searcher.warmed_column_fields().clone());
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.column_field_filter()) {
+            collector = collector.with_filter(filter);
+        }
+
+        collector
     }
 
     fn remote_collector(&self) -> Self::Collector {

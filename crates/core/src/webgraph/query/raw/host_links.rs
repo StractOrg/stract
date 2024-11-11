@@ -28,6 +28,7 @@ pub struct HostLinksQuery {
     field: FieldEnum,
     deduplication_field: FieldEnum,
     warmed_column_fields: WarmedColumnFields,
+    skip_self_links: bool,
 }
 
 impl HostLinksQuery {
@@ -42,7 +43,13 @@ impl HostLinksQuery {
             field: lookup_field.into(),
             deduplication_field: deduplication_field.into(),
             warmed_column_fields,
+            skip_self_links: true,
         }
+    }
+
+    pub fn skip_self_links(mut self, skip_self_links: bool) -> Self {
+        self.skip_self_links = skip_self_links;
+        self
     }
 }
 
@@ -56,6 +63,7 @@ impl tantivy::query::Query for HostLinksQuery {
             field: self.field,
             deduplication_field: self.deduplication_field,
             warmed_column_fields: self.warmed_column_fields.clone(),
+            skip_self_links: self.skip_self_links,
         }))
     }
 }
@@ -65,6 +73,7 @@ struct HostLinksWeight {
     field: FieldEnum,
     deduplication_field: FieldEnum,
     warmed_column_fields: WarmedColumnFields,
+    skip_self_links: bool,
 }
 
 impl tantivy::query::Weight for HostLinksWeight {
@@ -83,6 +92,7 @@ impl tantivy::query::Weight for HostLinksWeight {
             self.deduplication_field,
             &self.warmed_column_fields,
             self.node.as_u64(),
+            self.skip_self_links,
         ) {
             Ok(Some(scorer)) => Ok(Box::new(scorer)),
             _ => Ok(Box::new(tantivy::query::EmptyScorer)),
@@ -103,6 +113,7 @@ struct HostLinksScorer {
     host_id_column: Column<u64>,
     last_host_id: Option<u64>,
     self_host_id: u64,
+    skip_self_links: bool,
 }
 
 impl HostLinksScorer {
@@ -112,6 +123,7 @@ impl HostLinksScorer {
         deduplication_field: FieldEnum,
         warmed_column_fields: &WarmedColumnFields,
         self_host_id: u64,
+        skip_self_links: bool,
     ) -> tantivy::Result<Option<Self>> {
         let host_id_column = warmed_column_fields
             .segment(&reader.segment_id())
@@ -143,6 +155,7 @@ impl HostLinksScorer {
                     host_id_column,
                     postings,
                     self_host_id,
+                    skip_self_links,
                 }
             }))
     }
@@ -163,8 +176,8 @@ impl HostLinksScorer {
             .unwrap_or(false)
     }
 
-    fn is_self_host(&self, doc: tantivy::DocId) -> bool {
-        self.host_id(doc) == Some(self.self_host_id)
+    fn skip_self(&self, doc: tantivy::DocId) -> bool {
+        self.skip_self_links && self.host_id(doc) == Some(self.self_host_id)
     }
 }
 
@@ -188,7 +201,7 @@ impl tantivy::DocSet for HostLinksScorer {
             self.postings.reset_cursor_start_block();
         }
 
-        while (self.has_seen_host(self.doc()) || self.is_self_host(self.doc()))
+        while (self.has_seen_host(self.doc()) || self.skip_self(self.doc()))
             && self.doc() != tantivy::TERMINATED
         {
             self.postings.advance();
