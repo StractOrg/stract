@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use rustc_hash::{FxHashMap, FxHashSet};
+use tantivy::query::{BooleanQuery, Occur};
 
 use crate::{
     hyperloglog::HyperLogLog,
@@ -26,7 +27,7 @@ use crate::{
 
 use super::{
     collector::{GroupExactCollector, GroupSketchCollector},
-    raw, Query,
+    raw, AndFilter, Filter, FilterEnum, Query,
 };
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
@@ -40,6 +41,7 @@ pub struct HostGroupSketchQuery {
     node: LinksDirection,
     group: FieldEnum,
     value: FieldEnum,
+    filters: Vec<FilterEnum>,
 }
 
 impl HostGroupSketchQuery {
@@ -52,6 +54,7 @@ impl HostGroupSketchQuery {
             node,
             group: group.into(),
             value: value.into(),
+            filters: Vec::new(),
         }
     }
 
@@ -66,29 +69,57 @@ impl HostGroupSketchQuery {
     ) -> Self {
         Self::new(LinksDirection::From(node), group, value)
     }
+
+    pub fn filter<F: Filter>(mut self, filter: F) -> Self {
+        self.filters.push(filter.into());
+        self
+    }
+
+    fn filter_as_and(&self) -> Option<AndFilter> {
+        if self.filters.is_empty() {
+            None
+        } else {
+            let mut filter = AndFilter::new();
+
+            for f in self.filters.clone() {
+                filter = filter.and(f);
+            }
+
+            Some(filter)
+        }
+    }
 }
 
 impl Query for HostGroupSketchQuery {
     type Collector = GroupSketchCollector;
-    type TantivyQuery = raw::HostLinksQuery;
+    type TantivyQuery = Box<dyn tantivy::query::Query>;
     type IntermediateOutput = FxHashMap<u64, HyperLogLog<4069>>;
     type Output = FxHashMap<u64, HyperLogLog<4069>>;
 
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
-        match self.node {
-            LinksDirection::From(node) => raw::HostLinksQuery::new(
+        let mut raw: Self::TantivyQuery = match self.node {
+            LinksDirection::From(node) => Box::new(raw::HostLinksQuery::new(
                 node,
                 FromHostId,
                 ToHostId,
                 searcher.warmed_column_fields().clone(),
-            ),
-            LinksDirection::To(node) => raw::HostLinksQuery::new(
+            )),
+            LinksDirection::To(node) => Box::new(raw::HostLinksQuery::new(
                 node,
                 ToHostId,
                 FromHostId,
                 searcher.warmed_column_fields().clone(),
-            ),
+            )),
+        };
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
+            let filter = filter.query(searcher);
+            let mut queries = vec![(Occur::Must, raw)];
+            queries.extend(filter);
+            raw = Box::new(BooleanQuery::new(queries));
         }
+
+        raw
     }
 
     fn collector(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::Collector {
@@ -126,6 +157,7 @@ pub struct HostGroupQuery {
     node: LinksDirection,
     group: FieldEnum,
     value: FieldEnum,
+    filters: Vec<FilterEnum>,
 }
 
 impl HostGroupQuery {
@@ -138,6 +170,7 @@ impl HostGroupQuery {
             node,
             group: group.into(),
             value: value.into(),
+            filters: Vec::new(),
         }
     }
 
@@ -152,29 +185,57 @@ impl HostGroupQuery {
     ) -> Self {
         Self::new(LinksDirection::From(node), group, value)
     }
+
+    pub fn filter<F: Filter>(mut self, filter: F) -> Self {
+        self.filters.push(filter.into());
+        self
+    }
+
+    fn filter_as_and(&self) -> Option<AndFilter> {
+        if self.filters.is_empty() {
+            None
+        } else {
+            let mut filter = AndFilter::new();
+
+            for f in self.filters.clone() {
+                filter = filter.and(f);
+            }
+
+            Some(filter)
+        }
+    }
 }
 
 impl Query for HostGroupQuery {
     type Collector = GroupExactCollector;
-    type TantivyQuery = raw::HostLinksQuery;
+    type TantivyQuery = Box<dyn tantivy::query::Query>;
     type IntermediateOutput = FxHashMap<u64, FxHashSet<u64>>;
     type Output = FxHashMap<u64, FxHashSet<u64>>;
 
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
-        match self.node {
-            LinksDirection::From(node) => raw::HostLinksQuery::new(
+        let mut raw: Self::TantivyQuery = match self.node {
+            LinksDirection::From(node) => Box::new(raw::HostLinksQuery::new(
                 node,
                 FromHostId,
                 ToHostId,
                 searcher.warmed_column_fields().clone(),
-            ),
-            LinksDirection::To(node) => raw::HostLinksQuery::new(
+            )),
+            LinksDirection::To(node) => Box::new(raw::HostLinksQuery::new(
                 node,
                 ToHostId,
                 FromHostId,
                 searcher.warmed_column_fields().clone(),
-            ),
+            )),
+        };
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
+            let filter = filter.query(searcher);
+            let mut queries = vec![(Occur::Must, raw)];
+            queries.extend(filter);
+            raw = Box::new(BooleanQuery::new(queries));
         }
+
+        raw
     }
 
     fn collector(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::Collector {
