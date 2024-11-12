@@ -123,8 +123,14 @@ impl Query for HostGroupSketchQuery {
     }
 
     fn collector(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::Collector {
-        GroupSketchCollector::new(self.group, self.value)
-            .with_column_fields(searcher.warmed_column_fields().clone())
+        let mut collector = GroupSketchCollector::new(self.group, self.value)
+            .with_column_fields(searcher.warmed_column_fields().clone());
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.column_field_filter()) {
+            collector = collector.with_filter(filter);
+        }
+
+        collector
     }
 
     fn remote_collector(&self) -> Self::Collector {

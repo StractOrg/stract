@@ -26,6 +26,12 @@ use super::{ColumnFieldFilter, Filter, FilterEnum, InvertedIndexFilter, SegmentC
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct RelFlagsFilter(RelFlags);
 
+impl From<RelFlags> for RelFlagsFilter {
+    fn from(rel_flags: RelFlags) -> Self {
+        RelFlagsFilter(rel_flags)
+    }
+}
+
 impl Filter for RelFlagsFilter {
     fn column_field_filter(&self) -> Option<Box<dyn ColumnFieldFilter>> {
         Some(Box::new(RelFlagsColumnFieldFilter(self.0)))
