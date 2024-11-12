@@ -93,8 +93,8 @@ impl HostGroupSketchQuery {
 impl Query for HostGroupSketchQuery {
     type Collector = GroupSketchCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
-    type IntermediateOutput = FxHashMap<u64, HyperLogLog<4069>>;
-    type Output = FxHashMap<u64, HyperLogLog<4069>>;
+    type IntermediateOutput = FxHashMap<u64, HyperLogLog<4096>>;
+    type Output = FxHashMap<u64, HyperLogLog<4096>>;
 
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
         let mut raw: Self::TantivyQuery = match self.node {

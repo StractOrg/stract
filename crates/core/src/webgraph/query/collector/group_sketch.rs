@@ -60,7 +60,7 @@ impl GroupSketchCollector {
 }
 
 impl Collector for GroupSketchCollector {
-    type Fruit = FxHashMap<u64, HyperLogLog<4069>>;
+    type Fruit = FxHashMap<u64, HyperLogLog<4096>>;
     type Child = GroupSketchSegmentCollector;
 
     fn for_segment(
@@ -99,7 +99,7 @@ impl Collector for GroupSketchCollector {
         &self,
         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
     ) -> crate::Result<Self::Fruit> {
-        let mut groups: FxHashMap<u64, HyperLogLog<4069>> = FxHashMap::default();
+        let mut groups: FxHashMap<u64, HyperLogLog<4096>> = FxHashMap::default();
 
         for fruit in segment_fruits {
             for (group, hll) in fruit {
@@ -114,12 +114,12 @@ impl Collector for GroupSketchCollector {
 pub struct GroupSketchSegmentCollector {
     group: Column<u64>,
     value: Column<u64>,
-    groups: FxHashMap<u64, HyperLogLog<4069>>,
+    groups: FxHashMap<u64, HyperLogLog<4096>>,
     filter: Option<Box<dyn SegmentColumnFieldFilter>>,
 }
 
 impl tantivy::collector::SegmentCollector for GroupSketchSegmentCollector {
-    type Fruit = FxHashMap<u64, HyperLogLog<4069>>;
+    type Fruit = FxHashMap<u64, HyperLogLog<4096>>;
 
     fn collect(&mut self, doc: tantivy::DocId, _: tantivy::Score) {
         if let Some(filter) = &self.filter {
