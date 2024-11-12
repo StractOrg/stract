@@ -14,39 +14,60 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::query::BooleanQuery;
+use tantivy::query::{BooleanQuery, Occur};
 
 use crate::{
     ampc::dht::ShardId,
     webgraph::{
-        schema::{FromUrl, ToUrl},
+        schema::{FromHostId, ToHostId},
         searcher::Searcher,
         Edge, EdgeLimit, Node, Query,
     },
     Result,
 };
 
-use super::{collector::TopDocsCollector, fetch_edges, raw::PhraseOrTermQuery};
+use super::{
+    collector::TopDocsCollector, fetch_edges, raw::HostLinksQuery, AndFilter, Filter, FilterEnum,
+};
 
 #[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct FullLinksBetweenQuery {
     from: Node,
     to: Node,
     limit: EdgeLimit,
+    filters: Vec<FilterEnum>,
 }
 
 impl FullLinksBetweenQuery {
     pub fn new(from: Node, to: Node) -> Self {
         Self {
-            from,
-            to,
+            from: from.into_host(),
+            to: to.into_host(),
             limit: EdgeLimit::Unlimited,
+            filters: Vec::new(),
         }
     }
 
     pub fn with_limit(mut self, limit: EdgeLimit) -> Self {
         self.limit = limit;
         self
+    }
+
+    pub fn filter<F: Filter>(mut self, filter: F) -> Self {
+        self.filters.push(filter.into());
+        self
+    }
+
+    fn filter_as_and(&self) -> Option<AndFilter> {
+        if self.filters.is_empty() {
+            None
+        } else {
+            let mut filter = AndFilter::new();
+            for f in self.filters.clone() {
+                filter = filter.and(f);
+            }
+            Some(filter)
+        }
     }
 }
 
@@ -56,18 +77,40 @@ impl Query for FullLinksBetweenQuery {
     type IntermediateOutput = Vec<Edge>;
     type Output = Vec<Edge>;
 
-    fn tantivy_query(&self, _: &Searcher) -> Self::TantivyQuery {
-        let from_query = PhraseOrTermQuery::new(self.from.as_str().to_string(), FromUrl);
-        let to_query = PhraseOrTermQuery::new(self.to.as_str().to_string(), ToUrl);
+    fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
+        let from_query = Box::new(HostLinksQuery::new(
+            self.from.id(),
+            FromHostId,
+            searcher.warmed_column_fields().clone(),
+        )) as Box<dyn tantivy::query::Query>;
+        let to_query = Box::new(HostLinksQuery::new(
+            self.to.id(),
+            ToHostId,
+            searcher.warmed_column_fields().clone(),
+        )) as Box<dyn tantivy::query::Query>;
 
-        BooleanQuery::intersection(vec![Box::new(from_query), Box::new(to_query)])
+        let mut queries = vec![(Occur::Must, from_query), (Occur::Must, to_query)];
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
+            for (occur, q) in filter.query(searcher) {
+                queries.push((occur, q));
+            }
+        }
+
+        BooleanQuery::new(queries)
     }
 
     fn collector(&self, searcher: &Searcher) -> Self::Collector {
-        TopDocsCollector::from(self.limit)
+        let mut collector = TopDocsCollector::from(self.limit)
             .with_shard_id(searcher.shard())
             .disable_offset()
-            .with_column_fields(searcher.warmed_column_fields().clone())
+            .with_column_fields(searcher.warmed_column_fields().clone());
+
+        if let Some(filter) = self.filter_as_and().and_then(|f| f.column_field_filter()) {
+            collector = collector.with_filter(filter);
+        }
+
+        collector
     }
 
     fn remote_collector(&self) -> Self::Collector {

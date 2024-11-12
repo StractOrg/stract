@@ -98,18 +98,14 @@ impl Query for HostGroupSketchQuery {
 
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
         let mut raw: Self::TantivyQuery = match self.node {
-            LinksDirection::From(node) => Box::new(raw::HostLinksQuery::new(
-                node,
-                FromHostId,
-                ToHostId,
-                searcher.warmed_column_fields().clone(),
-            )),
-            LinksDirection::To(node) => Box::new(raw::HostLinksQuery::new(
-                node,
-                ToHostId,
-                FromHostId,
-                searcher.warmed_column_fields().clone(),
-            )),
+            LinksDirection::From(node) => Box::new(
+                raw::HostLinksQuery::new(node, FromHostId, searcher.warmed_column_fields().clone())
+                    .with_deduplication_field(ToHostId),
+            ),
+            LinksDirection::To(node) => Box::new(
+                raw::HostLinksQuery::new(node, ToHostId, searcher.warmed_column_fields().clone())
+                    .with_deduplication_field(FromHostId),
+            ),
         };
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
@@ -220,18 +216,14 @@ impl Query for HostGroupQuery {
 
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
         let mut raw: Self::TantivyQuery = match self.node {
-            LinksDirection::From(node) => Box::new(raw::HostLinksQuery::new(
-                node,
-                FromHostId,
-                ToHostId,
-                searcher.warmed_column_fields().clone(),
-            )),
-            LinksDirection::To(node) => Box::new(raw::HostLinksQuery::new(
-                node,
-                ToHostId,
-                FromHostId,
-                searcher.warmed_column_fields().clone(),
-            )),
+            LinksDirection::From(node) => Box::new(
+                raw::HostLinksQuery::new(node, FromHostId, searcher.warmed_column_fields().clone())
+                    .with_deduplication_field(ToHostId),
+            ),
+            LinksDirection::To(node) => Box::new(
+                raw::HostLinksQuery::new(node, ToHostId, searcher.warmed_column_fields().clone())
+                    .with_deduplication_field(FromHostId),
+            ),
         };
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {

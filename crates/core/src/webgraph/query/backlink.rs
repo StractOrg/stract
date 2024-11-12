@@ -271,12 +271,10 @@ impl Query for HostBacklinksQuery {
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
-        let mut raw = Box::new(HostLinksQuery::new(
-            self.node,
-            ToHostId,
-            FromHostId,
-            searcher.warmed_column_fields().clone(),
-        )) as Box<dyn tantivy::query::Query>;
+        let mut raw = Box::new(
+            HostLinksQuery::new(self.node, ToHostId, searcher.warmed_column_fields().clone())
+                .with_deduplication_field(FromHostId),
+        ) as Box<dyn tantivy::query::Query>;
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
             let filter = filter.query(searcher);
@@ -543,10 +541,10 @@ impl Query for FullHostBacklinksQuery {
             HostLinksQuery::new(
                 self.node.clone().into_host().id(),
                 ToHostId,
-                FromHostId,
                 searcher.warmed_column_fields().clone(),
             )
-            .skip_self_links(self.skip_self_links),
+            .skip_self_links(self.skip_self_links)
+            .with_deduplication_field(FromHostId),
         ) as Box<dyn tantivy::query::Query>;
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {

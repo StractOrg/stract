@@ -26,22 +26,21 @@ use crate::webgraph::{
 pub struct HostLinksQuery {
     node: NodeID,
     field: FieldEnum,
-    deduplication_field: FieldEnum,
+    deduplication_field: Option<FieldEnum>,
     warmed_column_fields: WarmedColumnFields,
     skip_self_links: bool,
 }
 
 impl HostLinksQuery {
-    pub fn new<F: Field, FDedup: Field>(
+    pub fn new<F: Field>(
         node: NodeID,
         lookup_field: F,
-        deduplication_field: FDedup,
         warmed_column_fields: WarmedColumnFields,
     ) -> Self {
         Self {
             node,
             field: lookup_field.into(),
-            deduplication_field: deduplication_field.into(),
+            deduplication_field: None,
             warmed_column_fields,
             skip_self_links: true,
         }
@@ -49,6 +48,11 @@ impl HostLinksQuery {
 
     pub fn skip_self_links(mut self, skip_self_links: bool) -> Self {
         self.skip_self_links = skip_self_links;
+        self
+    }
+
+    pub fn with_deduplication_field<F: Field>(mut self, deduplication_field: F) -> Self {
+        self.deduplication_field = Some(deduplication_field.into());
         self
     }
 }
@@ -71,7 +75,7 @@ impl tantivy::query::Query for HostLinksQuery {
 struct HostLinksWeight {
     node: NodeID,
     field: FieldEnum,
-    deduplication_field: FieldEnum,
+    deduplication_field: Option<FieldEnum>,
     warmed_column_fields: WarmedColumnFields,
     skip_self_links: bool,
 }
@@ -110,7 +114,7 @@ impl tantivy::query::Weight for HostLinksWeight {
 
 struct HostLinksScorer {
     postings: SegmentPostings,
-    host_id_column: Column<u64>,
+    host_id_column: Option<Column<u64>>,
     last_host_id: Option<u64>,
     self_host_id: u64,
     skip_self_links: bool,
@@ -120,15 +124,17 @@ impl HostLinksScorer {
     fn new(
         reader: &tantivy::SegmentReader,
         term: tantivy::Term,
-        deduplication_field: FieldEnum,
+        deduplication_field: Option<FieldEnum>,
         warmed_column_fields: &WarmedColumnFields,
         self_host_id: u64,
         skip_self_links: bool,
     ) -> tantivy::Result<Option<Self>> {
-        let host_id_column = warmed_column_fields
-            .segment(&reader.segment_id())
-            .u64(deduplication_field)
-            .unwrap();
+        let host_id_column = deduplication_field.map(|f| {
+            warmed_column_fields
+                .segment(&reader.segment_id())
+                .u64(f)
+                .unwrap()
+        });
 
         Ok(reader
             .inverted_index(term.field())?
@@ -137,14 +143,18 @@ impl HostLinksScorer {
                 let mut last_host_id = None;
 
                 if postings.doc() != tantivy::TERMINATED {
-                    last_host_id = host_id_column.first(postings.doc());
+                    last_host_id = host_id_column
+                        .as_ref()
+                        .map(|c| c.first(postings.doc()).unwrap());
                 }
 
                 while postings.doc() != tantivy::TERMINATED && last_host_id == Some(self_host_id) {
                     postings.advance();
 
                     if postings.doc() != tantivy::TERMINATED {
-                        last_host_id = host_id_column.first(postings.doc());
+                        last_host_id = host_id_column
+                            .as_ref()
+                            .map(|c| c.first(postings.doc()).unwrap());
                     } else {
                         last_host_id = None;
                     }
@@ -167,7 +177,7 @@ impl HostLinksScorer {
             return None;
         }
 
-        self.host_id_column.first(doc)
+        self.host_id_column.as_ref().map(|c| c.first(doc).unwrap())
     }
 
     fn has_seen_host(&self, doc: tantivy::DocId) -> bool {
