@@ -44,6 +44,7 @@ impl Query for Id2NodeQuery {
 
     fn collector(&self, searcher: &Searcher) -> Self::Collector {
         FirstDocCollector::with_shard_id(searcher.shard())
+            .with_column_fields(searcher.warmed_column_fields().clone())
     }
 
     fn retrieve(

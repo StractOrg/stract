@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::webgraph::{searcher::Searcher, warmed_column_fields::WarmedColumnFields};
+use crate::webgraph::{searcher::Searcher, warmed_column_fields::SegmentColumnFields};
 
 use super::{Filter, FilterEnum};
 use tantivy::{query::Occur, DocId};
@@ -57,7 +57,7 @@ struct NotColumnFieldFilter {
 impl super::ColumnFieldFilter for NotColumnFieldFilter {
     fn for_segment(
         &self,
-        column_fields: &WarmedColumnFields,
+        column_fields: &SegmentColumnFields,
     ) -> Box<dyn super::SegmentColumnFieldFilter> {
         let filter = self.filter.for_segment(column_fields);
         Box::new(NotSegmentColumnFieldFilter { filter })
@@ -69,8 +69,8 @@ struct NotSegmentColumnFieldFilter {
 }
 
 impl super::SegmentColumnFieldFilter for NotSegmentColumnFieldFilter {
-    fn should_skip(&self, doc_id: DocId) -> bool {
-        !self.filter.should_skip(doc_id)
+    fn should_keep(&self, doc_id: DocId) -> bool {
+        !self.filter.should_keep(doc_id)
     }
 }
 

@@ -17,21 +17,54 @@
 use tantivy::{collector::SegmentCollector, DocId, SegmentOrdinal};
 
 use super::Collector;
-use crate::{ampc::dht::ShardId, webgraph::doc_address::DocAddress};
+use crate::{
+    ampc::dht::ShardId,
+    webgraph::{
+        doc_address::DocAddress,
+        query::{ColumnFieldFilter, SegmentColumnFieldFilter},
+        warmed_column_fields::WarmedColumnFields,
+    },
+};
 
 pub struct FirstDocCollector {
     shard_id: Option<ShardId>,
+    column_fields: Option<WarmedColumnFields>,
+    filter: Option<Box<dyn ColumnFieldFilter>>,
 }
 
 impl FirstDocCollector {
+    #[must_use]
     pub fn with_shard_id(shard_id: ShardId) -> Self {
         Self {
             shard_id: Some(shard_id),
+            filter: None,
+            column_fields: None,
         }
     }
 
+    #[must_use]
     pub fn without_shard_id() -> Self {
-        Self { shard_id: None }
+        Self {
+            shard_id: None,
+            filter: None,
+            column_fields: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_column_fields(self, warmed_column_fields: WarmedColumnFields) -> Self {
+        Self {
+            column_fields: Some(warmed_column_fields),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_filter(self, filter: Box<dyn ColumnFieldFilter>) -> Self {
+        Self {
+            filter: Some(filter),
+            ..self
+        }
     }
 }
 
@@ -42,10 +75,19 @@ impl Collector for FirstDocCollector {
     fn for_segment(
         &self,
         segment_id: SegmentOrdinal,
-        _: &tantivy::SegmentReader,
+        segment: &tantivy::SegmentReader,
     ) -> crate::Result<Self::Child> {
+        let column_fields = self
+            .column_fields
+            .as_ref()
+            .expect("Column fields are required to perform search")
+            .segment(&segment.segment_id());
+
+        let filter = self.filter.as_ref().map(|f| f.for_segment(column_fields));
+
         Ok(FirstDocSegmentCollector::new(
             segment_id,
+            filter,
             self.shard_id.unwrap(),
         ))
     }
@@ -61,14 +103,20 @@ impl Collector for FirstDocCollector {
 pub struct FirstDocSegmentCollector {
     first_doc: Option<DocAddress>,
     segment_id: SegmentOrdinal,
+    filter: Option<Box<dyn SegmentColumnFieldFilter>>,
     shard_id: ShardId,
 }
 
 impl FirstDocSegmentCollector {
-    pub fn new(segment_id: SegmentOrdinal, shard_id: ShardId) -> Self {
+    pub fn new(
+        segment_id: SegmentOrdinal,
+        filter: Option<Box<dyn SegmentColumnFieldFilter>>,
+        shard_id: ShardId,
+    ) -> Self {
         Self {
             first_doc: None,
             segment_id,
+            filter,
             shard_id,
         }
     }
@@ -78,6 +126,12 @@ impl SegmentCollector for FirstDocSegmentCollector {
     type Fruit = Option<DocAddress>;
 
     fn collect(&mut self, doc: DocId, _: tantivy::Score) {
+        if let Some(filter) = &self.filter {
+            if filter.should_skip(doc) {
+                return;
+            }
+        }
+
         if self.first_doc.is_none() {
             self.first_doc = Some(DocAddress::new(self.shard_id, self.segment_id, doc));
         }

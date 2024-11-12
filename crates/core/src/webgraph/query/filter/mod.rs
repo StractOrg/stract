@@ -26,9 +26,12 @@ pub use not::NotFilter;
 mod text;
 pub use text::TextFilter;
 
+mod rel_flag;
+pub use rel_flag::RelFlagsFilter;
+
 use tantivy::{query::Occur, DocId};
 
-use crate::webgraph::{searcher::Searcher, warmed_column_fields::WarmedColumnFields};
+use crate::webgraph::{searcher::Searcher, warmed_column_fields::SegmentColumnFields};
 
 pub trait Filter:
     Send
@@ -50,6 +53,7 @@ pub enum FilterEnum {
     OrFilter(OrFilter),
     NotFilter(Box<NotFilter>),
     TextFilter(TextFilter),
+    RelFlags(RelFlagsFilter),
 }
 
 impl Filter for FilterEnum {
@@ -59,6 +63,7 @@ impl Filter for FilterEnum {
             FilterEnum::OrFilter(filter) => filter.column_field_filter(),
             FilterEnum::NotFilter(filter) => filter.column_field_filter(),
             FilterEnum::TextFilter(filter) => filter.column_field_filter(),
+            FilterEnum::RelFlags(filter) => filter.column_field_filter(),
         }
     }
 
@@ -68,16 +73,21 @@ impl Filter for FilterEnum {
             FilterEnum::OrFilter(filter) => filter.inverted_index_filter(),
             FilterEnum::NotFilter(filter) => filter.inverted_index_filter(),
             FilterEnum::TextFilter(filter) => filter.inverted_index_filter(),
+            FilterEnum::RelFlags(filter) => filter.inverted_index_filter(),
         }
     }
 }
 
 pub trait ColumnFieldFilter: Send + Sync + 'static {
-    fn for_segment(&self, column_fields: &WarmedColumnFields) -> Box<dyn SegmentColumnFieldFilter>;
+    fn for_segment(&self, column_fields: &SegmentColumnFields)
+        -> Box<dyn SegmentColumnFieldFilter>;
 }
 
 pub trait SegmentColumnFieldFilter {
-    fn should_skip(&self, doc_id: DocId) -> bool;
+    fn should_keep(&self, doc_id: DocId) -> bool;
+    fn should_skip(&self, doc_id: DocId) -> bool {
+        !self.should_keep(doc_id)
+    }
 }
 
 pub trait InvertedIndexFilter {

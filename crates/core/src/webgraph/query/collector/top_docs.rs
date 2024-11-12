@@ -313,23 +313,20 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> Collector for TopDo
         let scorer = S::for_segment(segment, &column_fields.warmed_column_fields)?;
 
         let segment_id = segment.segment_id();
+        let segment_column_fields = column_fields.warmed_column_fields.segment(&segment_id);
 
         Ok(TopDocsSegmentCollector {
             shard_id: self.shard_id.unwrap(),
             computer: self.computer(),
             segment_ord,
             scorer,
-            host_column: column_fields.host_field.map(|host_field| {
-                column_fields
-                    .warmed_column_fields
-                    .segment(&segment_id)
-                    .u64_by_enum(host_field)
-                    .unwrap()
-            }),
+            host_column: column_fields
+                .host_field
+                .map(|host_field| segment_column_fields.u64_by_enum(host_field).unwrap()),
             filter: self
                 .filter
                 .as_ref()
-                .map(|f| f.for_segment(&column_fields.warmed_column_fields)),
+                .map(|f| f.for_segment(segment_column_fields)),
             _deduplicator: PhantomData,
         })
     }

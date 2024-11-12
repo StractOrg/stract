@@ -19,7 +19,7 @@ use tantivy::{
     DocId,
 };
 
-use crate::webgraph::{searcher::Searcher, warmed_column_fields::WarmedColumnFields};
+use crate::webgraph::{searcher::Searcher, warmed_column_fields::SegmentColumnFields};
 
 use super::{Filter, FilterEnum};
 
@@ -85,7 +85,7 @@ pub struct OrColumnFieldFilter {
 impl super::ColumnFieldFilter for OrColumnFieldFilter {
     fn for_segment(
         &self,
-        column_fields: &WarmedColumnFields,
+        column_fields: &SegmentColumnFields,
     ) -> Box<dyn super::SegmentColumnFieldFilter> {
         let mut filters = Vec::with_capacity(self.filters.len());
         for filter in self.filters.iter() {
@@ -101,14 +101,8 @@ pub struct OrSegmentColumnFieldFilter {
 }
 
 impl super::SegmentColumnFieldFilter for OrSegmentColumnFieldFilter {
-    fn should_skip(&self, doc_id: DocId) -> bool {
-        for filter in self.filters.iter() {
-            if !filter.should_skip(doc_id) {
-                return false;
-            }
-        }
-
-        true
+    fn should_keep(&self, doc_id: DocId) -> bool {
+        self.filters.iter().any(|filter| filter.should_keep(doc_id))
     }
 }
 

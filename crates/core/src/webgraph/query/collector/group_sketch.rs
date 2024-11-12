@@ -21,6 +21,7 @@ use tantivy::columnar::Column;
 use crate::{
     hyperloglog::HyperLogLog,
     webgraph::{
+        query::{ColumnFieldFilter, SegmentColumnFieldFilter},
         schema::{Field, FieldEnum},
         warmed_column_fields::WarmedColumnFields,
     },
@@ -32,6 +33,7 @@ pub struct GroupSketchCollector {
     group_field: FieldEnum,
     value_field: FieldEnum,
     warmed_column_fields: Option<WarmedColumnFields>,
+    filter: Option<Box<dyn ColumnFieldFilter>>,
 }
 
 impl GroupSketchCollector {
@@ -40,11 +42,19 @@ impl GroupSketchCollector {
             group_field: group_field.into(),
             value_field: value_field.into(),
             warmed_column_fields: None,
+            filter: None,
         }
     }
 
+    #[must_use]
     pub fn with_column_fields(mut self, warmed_column_fields: WarmedColumnFields) -> Self {
         self.warmed_column_fields = Some(warmed_column_fields);
+        self
+    }
+
+    #[must_use]
+    pub fn with_filter(mut self, filter: Box<dyn ColumnFieldFilter>) -> Self {
+        self.filter = Some(filter);
         self
     }
 }
@@ -72,10 +82,16 @@ impl Collector for GroupSketchCollector {
             .u64(self.value_field)
             .ok_or(anyhow!("Value field missing from index"))?;
 
+        let filter = self
+            .filter
+            .as_ref()
+            .map(|f| f.for_segment(warmed_column_fields.segment(&segment.segment_id())));
+
         Ok(GroupSketchSegmentCollector {
             group,
             value,
             groups: FxHashMap::default(),
+            filter,
         })
     }
 
@@ -99,12 +115,19 @@ pub struct GroupSketchSegmentCollector {
     group: Column<u64>,
     value: Column<u64>,
     groups: FxHashMap<u64, HyperLogLog<4069>>,
+    filter: Option<Box<dyn SegmentColumnFieldFilter>>,
 }
 
 impl tantivy::collector::SegmentCollector for GroupSketchSegmentCollector {
     type Fruit = FxHashMap<u64, HyperLogLog<4069>>;
 
     fn collect(&mut self, doc: tantivy::DocId, _: tantivy::Score) {
+        if let Some(filter) = &self.filter {
+            if filter.should_skip(doc) {
+                return;
+            }
+        }
+
         let group = self.group.first(doc).unwrap();
         let value = self.value.first(doc).unwrap();
 
