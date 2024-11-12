@@ -18,7 +18,7 @@ use super::{
     backlink::{fetch_edges, fetch_small_edges},
     collector::{top_docs, HostDeduplicator, TopDocsCollector},
     document_scorer::DefaultDocumentScorer,
-    raw::{host_links::HostLinksQuery, links::LinksQuery},
+    raw::LinksQuery,
     AndFilter, Filter, FilterEnum, Query,
 };
 use crate::{
@@ -83,8 +83,11 @@ impl Query for ForwardlinksQuery {
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
-        let mut raw =
-            Box::new(LinksQuery::new(self.node, FromId)) as Box<dyn tantivy::query::Query>;
+        let mut raw = Box::new(LinksQuery::new(
+            self.node,
+            FromId,
+            searcher.warmed_column_fields().clone(),
+        )) as Box<dyn tantivy::query::Query>;
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
             let filter = filter.query(searcher);
@@ -213,7 +216,7 @@ impl Query for HostForwardlinksQuery {
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
         let mut raw = Box::new(
-            HostLinksQuery::new(
+            LinksQuery::new(
                 self.node,
                 FromHostId,
                 searcher.warmed_column_fields().clone(),
@@ -351,8 +354,14 @@ impl Query for FullForwardlinksQuery {
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
-        let mut raw =
-            Box::new(LinksQuery::new(self.node.id(), FromId)) as Box<dyn tantivy::query::Query>;
+        let mut raw = Box::new(
+            LinksQuery::new(
+                self.node.id(),
+                FromId,
+                searcher.warmed_column_fields().clone(),
+            )
+            .with_deduplication_field(ToId),
+        ) as Box<dyn tantivy::query::Query>;
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
             let filter = filter.query(searcher);
@@ -469,7 +478,7 @@ impl Query for FullHostForwardlinksQuery {
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
         let mut raw = Box::new(
-            HostLinksQuery::new(
+            LinksQuery::new(
                 self.node.clone().into_host().id(),
                 FromHostId,
                 searcher.warmed_column_fields().clone(),

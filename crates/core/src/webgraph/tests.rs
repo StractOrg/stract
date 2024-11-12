@@ -277,7 +277,7 @@ fn merge_cycle() {
     let temp_dir = crate::gen_temp_dir().unwrap();
     for (i, (from, to, label)) in (0..).zip([
         (Node::from("A"), Node::from("B"), String::new()),
-        (Node::from("B"), Node::from("B"), String::new()),
+        (Node::from("B"), Node::from("A"), String::new()),
         (Node::from("B"), Node::from("C"), String::new()),
         (Node::from("C"), Node::from("A"), String::new()),
     ]) {

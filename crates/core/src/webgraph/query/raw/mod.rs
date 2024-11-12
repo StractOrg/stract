@@ -17,12 +17,10 @@
 pub mod dummy;
 pub use dummy::DummyQuery;
 
-pub mod host_links;
 pub mod id2node;
 pub mod links;
 pub mod phrase_or_term;
 
-pub use host_links::HostLinksQuery;
 pub use id2node::Id2NodeQuery;
 pub use links::LinksQuery;
 pub use phrase_or_term::PhraseOrTermQuery;

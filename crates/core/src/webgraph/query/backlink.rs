@@ -19,7 +19,7 @@ use tantivy::query::{BooleanQuery, Occur, ShortCircuitQuery};
 use super::{
     collector::{top_docs, HostDeduplicator, TopDocsCollector},
     document_scorer::DefaultDocumentScorer,
-    raw::{HostLinksQuery, LinksQuery},
+    raw::LinksQuery,
     AndFilter, Filter, FilterEnum, Query,
 };
 use crate::{
@@ -144,7 +144,10 @@ impl Query for BacklinksQuery {
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
-        let mut raw = Box::new(LinksQuery::new(self.node, ToId)) as Box<dyn tantivy::query::Query>;
+        let mut raw = Box::new(
+            LinksQuery::new(self.node, ToId, searcher.warmed_column_fields().clone())
+                .with_deduplication_field(FromId),
+        ) as Box<dyn tantivy::query::Query>;
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
             let filter = filter.query(searcher);
@@ -272,7 +275,7 @@ impl Query for HostBacklinksQuery {
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
         let mut raw = Box::new(
-            HostLinksQuery::new(self.node, ToHostId, searcher.warmed_column_fields().clone())
+            LinksQuery::new(self.node, ToHostId, searcher.warmed_column_fields().clone())
                 .with_deduplication_field(FromHostId),
         ) as Box<dyn tantivy::query::Query>;
 
@@ -408,8 +411,14 @@ impl Query for FullBacklinksQuery {
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
-        let mut raw =
-            Box::new(LinksQuery::new(self.node.id(), ToId)) as Box<dyn tantivy::query::Query>;
+        let mut raw = Box::new(
+            LinksQuery::new(
+                self.node.id(),
+                ToId,
+                searcher.warmed_column_fields().clone(),
+            )
+            .with_deduplication_field(FromId),
+        ) as Box<dyn tantivy::query::Query>;
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
             let filter = filter.query(searcher);
@@ -538,7 +547,7 @@ impl Query for FullHostBacklinksQuery {
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
         let mut raw = Box::new(
-            HostLinksQuery::new(
+            LinksQuery::new(
                 self.node.clone().into_host().id(),
                 ToHostId,
                 searcher.warmed_column_fields().clone(),
@@ -681,7 +690,10 @@ impl Query for BacklinksWithLabelsQuery {
     type Output = Vec<SmallEdgeWithLabel>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
-        let mut raw = Box::new(LinksQuery::new(self.node, ToId)) as Box<dyn tantivy::query::Query>;
+        let mut raw = Box::new(
+            LinksQuery::new(self.node, ToId, searcher.warmed_column_fields().clone())
+                .with_deduplication_field(FromId),
+        ) as Box<dyn tantivy::query::Query>;
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
             let filter = filter.query(searcher);

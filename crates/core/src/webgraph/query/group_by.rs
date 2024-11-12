@@ -99,11 +99,11 @@ impl Query for HostGroupSketchQuery {
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
         let mut raw: Self::TantivyQuery = match self.node {
             LinksDirection::From(node) => Box::new(
-                raw::HostLinksQuery::new(node, FromHostId, searcher.warmed_column_fields().clone())
+                raw::LinksQuery::new(node, FromHostId, searcher.warmed_column_fields().clone())
                     .with_deduplication_field(ToHostId),
             ),
             LinksDirection::To(node) => Box::new(
-                raw::HostLinksQuery::new(node, ToHostId, searcher.warmed_column_fields().clone())
+                raw::LinksQuery::new(node, ToHostId, searcher.warmed_column_fields().clone())
                     .with_deduplication_field(FromHostId),
             ),
         };
@@ -217,11 +217,11 @@ impl Query for HostGroupQuery {
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
         let mut raw: Self::TantivyQuery = match self.node {
             LinksDirection::From(node) => Box::new(
-                raw::HostLinksQuery::new(node, FromHostId, searcher.warmed_column_fields().clone())
+                raw::LinksQuery::new(node, FromHostId, searcher.warmed_column_fields().clone())
                     .with_deduplication_field(ToHostId),
             ),
             LinksDirection::To(node) => Box::new(
-                raw::HostLinksQuery::new(node, ToHostId, searcher.warmed_column_fields().clone())
+                raw::LinksQuery::new(node, ToHostId, searcher.warmed_column_fields().clone())
                     .with_deduplication_field(FromHostId),
             ),
         };
