@@ -115,11 +115,21 @@ impl super::InvertedIndexFilter for OrInvertedIndexFilter {
         let mut queries = Vec::with_capacity(self.filters.len());
         for filter in self.filters.iter() {
             for (occur, query) in filter.query(searcher) {
-                queries.push((Occur::compose(Occur::Should, occur), query));
+                let occur = match occur {
+                    Occur::Should => Occur::Should,
+                    Occur::Must => Occur::Should,
+                    Occur::MustNot => Occur::MustNot,
+                };
+
+                queries.push((occur, query));
             }
         }
 
-        vec![(Occur::Should, Box::new(BooleanQuery::new(queries)))]
+        if queries.iter().all(|(occur, _)| *occur == Occur::Should) {
+            vec![(Occur::Should, Box::new(BooleanQuery::new(queries)))]
+        } else {
+            queries
+        }
     }
 }
 

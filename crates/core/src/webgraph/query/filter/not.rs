@@ -95,7 +95,7 @@ mod tests {
 
     use crate::{
         webgraph::{
-            query::{FullForwardlinksQuery, TextFilter},
+            query::{FullForwardlinksQuery, OrFilter, TextFilter},
             schema::ToUrl,
             Edge, Node, Webgraph,
         },
@@ -108,6 +108,7 @@ mod tests {
         vec![
             (Node::from("a.com"), Node::from("b.com/123"), String::new()),
             (Node::from("a.com"), Node::from("b.dk/123"), String::new()),
+            (Node::from("a.com"), Node::from("b.se/123"), String::new()),
             (Node::from("a.com"), Node::from("b.com/321"), String::new()),
             (Node::from("a.com"), Node::from("c.com"), String::new()),
         ]
@@ -146,7 +147,26 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(res.len(), 3);
+        assert_eq!(res.len(), 4);
         assert!(res.iter().all(|r| !r.to.as_str().contains(".dk")));
+    }
+
+    #[test]
+    fn test_not_inside_or() {
+        let (graph, _temp_dir) = test_graph();
+        let node = Node::from("a.com");
+
+        let res = graph
+            .search(
+                &FullForwardlinksQuery::new(node).filter(
+                    OrFilter::new()
+                        .or(NotFilter::new(TextFilter::new(".dk".to_string(), ToUrl)))
+                        .or(TextFilter::new(".com".to_string(), ToUrl)),
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(res.len(), 3);
+        assert!(res.iter().all(|r| r.to.as_str().contains(".com")));
     }
 }
