@@ -29,7 +29,20 @@ struct ParsedUrl {
 
 impl ParsedUrl {
     fn parse(url: &str) -> Result<Self> {
-        let parsed_url = url::Url::robust_parse(url)?;
+        let url = url.replace(" ", "%20");
+
+        if !url.contains('.') {
+            let mut host = VecDeque::new();
+            host.push_back(url.to_string());
+
+            return Ok(Self {
+                scheme: VecDeque::new(),
+                host,
+                path: VecDeque::new(),
+            });
+        }
+
+        let parsed_url = url::Url::robust_parse(&url)?;
         let scheme: VecDeque<String> = if url.starts_with(&format!("{}:", parsed_url.scheme())) {
             parsed_url
                 .scheme()
@@ -158,5 +171,7 @@ mod tests {
         );
         assert_eq!(tokenize("example.com"), ["example", ".", "com ", "/"]);
         assert_eq!(tokenize(".com"), [".", "com ", "/"]);
+        assert_eq!(tokenize("example"), ["example"]);
+        assert_eq!(tokenize("example-site"), ["example-site"]);
     }
 }
