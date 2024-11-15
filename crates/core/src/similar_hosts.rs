@@ -24,7 +24,10 @@ use url::Url;
 use crate::{
     ranking::{bitvec_similarity, inbound_similarity},
     webgraph::{
-        query::{HostBacklinksQuery, HostForwardlinksQuery, Id2NodeQuery},
+        query::{
+            HostBacklinksQuery, HostForwardlinksQuery, Id2NodeQuery, NotFilter, OrFilter,
+            RelFlagsFilter, TextFilter,
+        },
         remote::RemoteWebgraph,
         EdgeLimit, Node, NodeID, SmallEdge,
     },
@@ -61,13 +64,17 @@ impl SimilarHostsFinder {
     }
 
     async fn batch_ingoing_edges(&self, nodes: &[NodeID], limit: EdgeLimit) -> Vec<Vec<SmallEdge>> {
+        let queries: Vec<_> = nodes
+            .iter()
+            .map(|n| {
+                HostBacklinksQuery::new(*n)
+                    .with_limit(limit)
+                    .filter(NotFilter::new(RelFlagsFilter::from(RelFlags::NOFOLLOW)))
+            })
+            .collect();
+
         self.webgraph
-            .batch_search(
-                nodes
-                    .iter()
-                    .map(|n| HostBacklinksQuery::new(*n).with_limit(limit))
-                    .collect(),
-            )
+            .batch_search(queries)
             .await
             .unwrap_or_default()
     }
@@ -76,19 +83,39 @@ impl SimilarHostsFinder {
         &self,
         nodes: &[NodeID],
         limit: EdgeLimit,
+        filters: &[String],
     ) -> Vec<Vec<SmallEdge>> {
+        let queries: Vec<_> = nodes
+            .iter()
+            .map(|n| {
+                let mut query = HostForwardlinksQuery::new(*n)
+                    .with_limit(limit)
+                    .filter(NotFilter::new(RelFlagsFilter::from(RelFlags::NOFOLLOW)));
+
+                if !filters.is_empty() {
+                    let mut or_filter = OrFilter::new();
+
+                    for filter in filters {
+                        or_filter = or_filter.or(TextFilter::new(
+                            filter.clone(),
+                            crate::webgraph::schema::ToUrl,
+                        ));
+                    }
+
+                    query = query.filter(or_filter);
+                }
+
+                query
+            })
+            .collect();
+
         self.webgraph
-            .batch_search(
-                nodes
-                    .iter()
-                    .map(|n| HostForwardlinksQuery::new(*n).with_limit(limit))
-                    .collect(),
-            )
+            .batch_search(queries)
             .await
             .unwrap_or_default()
     }
 
-    async fn potential_nodes(&self, nodes: &[NodeID]) -> Vec<NodeID> {
+    async fn potential_nodes(&self, nodes: &[NodeID], filters: &[String]) -> Vec<NodeID> {
         let in_edges = self.batch_ingoing_edges(nodes, EdgeLimit::Limit(128)).await;
 
         let backlink_nodes = in_edges
@@ -102,7 +129,7 @@ impl SimilarHostsFinder {
         let num_backlink_nodes = backlink_nodes.len();
 
         let outgoing_edges = self
-            .batch_outgoing_edges(&backlink_nodes, EdgeLimit::Limit(512))
+            .batch_outgoing_edges(&backlink_nodes, EdgeLimit::Limit(512), filters)
             .await;
 
         let mut counts = FnvHashMap::default();
@@ -137,9 +164,14 @@ impl SimilarHostsFinder {
             .collect()
     }
 
-    async fn scored_nodes(&self, nodes: &[NodeID], limit: usize) -> Vec<(NodeID, SortableFloat)> {
+    async fn scored_nodes(
+        &self,
+        nodes: &[NodeID],
+        limit: usize,
+        filters: &[String],
+    ) -> Vec<(NodeID, SortableFloat)> {
         let mut scorer = self.scorer(nodes).await;
-        let potential_nodes = self.potential_nodes(nodes).await;
+        let potential_nodes = self.potential_nodes(nodes, filters).await;
 
         let inbounds = bitvec_similarity::BitVec::batch_new_for(&potential_nodes, &self.webgraph)
             .await
@@ -159,7 +191,12 @@ impl SimilarHostsFinder {
         .collect()
     }
 
-    pub async fn find_similar_hosts(&self, nodes: &[String], limit: usize) -> Vec<ScoredNode> {
+    pub async fn find_similar_hosts(
+        &self,
+        nodes: Vec<String>,
+        limit: usize,
+        filters: Vec<String>,
+    ) -> Vec<ScoredNode> {
         const DEAD_LINKS_BUFFER: usize = 30;
         let orig_limit = limit.min(self.max_similar_hosts);
         let limit = orig_limit + nodes.len() + DEAD_LINKS_BUFFER;
@@ -181,7 +218,7 @@ impl SimilarHostsFinder {
 
         let nodes = nodes.into_iter().map(|node| node.id()).collect::<Vec<_>>();
 
-        let scored_nodes = self.scored_nodes(&nodes, limit).await;
+        let scored_nodes = self.scored_nodes(&nodes, limit, &filters).await;
 
         let potential_nodes = scored_nodes
             .iter()

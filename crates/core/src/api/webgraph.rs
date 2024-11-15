@@ -46,6 +46,7 @@ pub mod host {
     pub struct SimilarHostsQuery {
         pub hosts: Vec<String>,
         pub top_n: usize,
+        pub filters: Option<Vec<String>>,
     }
 
     #[derive(serde::Serialize, serde::Deserialize, IntoParams)]
@@ -78,7 +79,7 @@ pub mod host {
         Ok(Json(
             state
                 .similar_hosts
-                .find_similar_hosts(&hosts, params.top_n)
+                .find_similar_hosts(hosts, params.top_n, params.filters.unwrap_or_default())
                 .await
                 .into_iter()
                 .map(|node| ScoredHost {
