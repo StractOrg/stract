@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,7 @@
 
 use std::{cmp::Reverse, sync::Arc};
 
+use fnv::FnvHashMap;
 use hashbrown::HashSet;
 use itertools::Itertools;
 use url::Url;
@@ -30,6 +31,11 @@ use crate::{
     webpage::{html::links::RelFlags, url_ext::UrlExt},
     SortableFloat,
 };
+
+const NUM_BACKLINK_APPROXIMATION_THRESHOLD: usize = 32;
+const NUM_BACKLINK_APPROXIMATION_FRACTION: f64 = 0.25;
+const APPROXIMATION_CANDIDATES: usize = 256;
+const CANDIDATES_LIMIT: usize = 1024;
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug)]
 pub struct ScoredNode {
@@ -93,20 +99,40 @@ impl SimilarHostsFinder {
             .unique()
             .collect::<Vec<_>>();
 
+        let num_backlink_nodes = backlink_nodes.len();
+
         let outgoing_edges = self
             .batch_outgoing_edges(&backlink_nodes, EdgeLimit::Limit(512))
             .await;
 
-        outgoing_edges
+        let mut counts = FnvHashMap::default();
+
+        for e in outgoing_edges
             .iter()
             .flatten()
             .filter(|e| !e.rel_flags.contains(RelFlags::NOFOLLOW))
-            .map(|e| (e.to, 1))
-            .into_group_map()
+        {
+            *counts.entry(e.to).or_insert(0) += 1;
+        }
+
+        let apply_filter = num_backlink_nodes > NUM_BACKLINK_APPROXIMATION_THRESHOLD;
+        let num_candidates = if apply_filter {
+            APPROXIMATION_CANDIDATES
+        } else {
+            CANDIDATES_LIMIT
+        };
+
+        counts
             .into_iter()
-            .sorted_by_key(|(_, c)| Reverse(c.len()))
+            .filter(|(_, c)| {
+                !apply_filter
+                    || (*c as usize)
+                        <= (num_backlink_nodes as f64 * NUM_BACKLINK_APPROXIMATION_FRACTION).ceil()
+                            as usize
+            })
+            .sorted_by_key(|(_, c)| Reverse(*c))
             .map(|(n, _)| n)
-            .take(1024)
+            .take(num_candidates)
             .filter(|n| !nodes.contains(n))
             .collect()
     }
