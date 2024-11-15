@@ -83,7 +83,7 @@ use utoipa_swagger_ui::SwaggerUi;
                 crate::bangs::BangHit,
                 crate::bangs::Bang,
 
-                webgraph::host::SimilarHostsParams,
+                webgraph::host::SimilarHostsQuery,
                 webgraph::KnowsHost,
                 crate::entrypoint::webgraph_server::ScoredHost,
 

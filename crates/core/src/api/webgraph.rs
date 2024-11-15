@@ -43,33 +43,33 @@ pub mod host {
 
     #[derive(serde::Serialize, serde::Deserialize, ToSchema)]
     #[serde(rename_all = "camelCase")]
-    pub struct SimilarHostsParams {
+    pub struct SimilarHostsQuery {
         pub hosts: Vec<String>,
         pub top_n: usize,
     }
 
     #[derive(serde::Serialize, serde::Deserialize, IntoParams)]
     #[serde(rename_all = "camelCase")]
-    pub struct KnowsHostParams {
+    pub struct KnowsHostQuery {
         pub host: String,
     }
 
     #[derive(serde::Serialize, serde::Deserialize, IntoParams)]
     #[serde(rename_all = "camelCase")]
-    pub struct HostLinksParams {
+    pub struct HostLinksQuery {
         pub host: String,
     }
 
     #[utoipa::path(post,
         path = "/beta/api/webgraph/host/similar",
-        request_body(content = SimilarHostsParams),
+        request_body(content = SimilarHostsQuery),
         responses(
             (status = 200, description = "List of similar hosts", body = Vec<ScoredHost>),
         )
     )]
     pub async fn similar(
         extract::State(state): extract::State<Arc<State>>,
-        extract::Json(params): extract::Json<SimilarHostsParams>,
+        extract::Json(params): extract::Json<SimilarHostsQuery>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         state.counters.explore_counter.inc();
 
@@ -92,14 +92,14 @@ pub mod host {
 
     #[utoipa::path(post,
         path = "/beta/api/webgraph/host/knows",
-        params(KnowsHostParams),
+        params(KnowsHostQuery),
         responses(
             (status = 200, description = "Whether the host is known", body = KnowsHost)
         )
     )]
     pub async fn knows(
         extract::State(state): extract::State<Arc<State>>,
-        extract::Query(params): extract::Query<KnowsHostParams>,
+        extract::Query(params): extract::Query<KnowsHostQuery>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         match Url::robust_parse(&params.host) {
             Ok(url) => match url.tld() {
@@ -123,14 +123,14 @@ pub mod host {
 
     #[utoipa::path(post,
         path = "/beta/api/webgraph/host/ingoing",
-        params(HostLinksParams),
+        params(HostLinksQuery),
         responses(
             (status = 200, description = "Incoming links for a particular host", body = Vec<PrettyEdge>),
         )
     )]
     pub async fn ingoing_hosts(
         extract::State(state): extract::State<Arc<State>>,
-        extract::Query(params): extract::Query<HostLinksParams>,
+        extract::Query(params): extract::Query<HostLinksQuery>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         let url = Url::parse(&("http://".to_string() + params.host.as_str()))
             .map_err(|_| StatusCode::BAD_REQUEST)?;
@@ -147,14 +147,14 @@ pub mod host {
 
     #[utoipa::path(post,
         path = "/beta/api/webgraph/host/outgoing",
-        params(HostLinksParams),
+        params(HostLinksQuery),
         responses(
             (status = 200, description = "Outgoing links for a particular host", body = Vec<PrettyEdge>),
         )
     )]
     pub async fn outgoing_hosts(
         extract::State(state): extract::State<Arc<State>>,
-        extract::Query(params): extract::Query<HostLinksParams>,
+        extract::Query(params): extract::Query<HostLinksQuery>,
     ) -> std::result::Result<impl IntoResponse, StatusCode> {
         let url = Url::parse(&("http://".to_string() + params.host.as_str()))
             .map_err(|_| StatusCode::BAD_REQUEST)?;

@@ -155,7 +155,7 @@ export const api = {
       `/beta/api/webgraph/host/outgoing?${new URLSearchParams(query)}`,
       options,
     ),
-  webgraphHostSimilar: (body: SimilarHostsParams, options?: ApiOptions) =>
+  webgraphHostSimilar: (body: SimilarHostsQuery, options?: ApiOptions) =>
     requestJson<ScoredHost[]>('POST', `/beta/api/webgraph/host/similar`, body, options),
   webgraphPageIngoing: (
     query: {
@@ -516,7 +516,7 @@ export type SignalScore = {
   coefficient: number;
   value: number;
 };
-export type SimilarHostsParams = {
+export type SimilarHostsQuery = {
   hosts: string[];
   topN: number;
 };
