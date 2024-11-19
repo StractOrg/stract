@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,8 @@ use crate::{
     config::defaults,
     enum_map::EnumMap,
     ranking::{SignalCoefficients, SignalEnum, SignalEnumDiscriminants},
+    search_prettifier::{DisplayedSidebar, HighlightedSpellCorrection},
+    widgets::Widget,
 };
 use http::StatusCode;
 use optics::{HostRankings, Optic};

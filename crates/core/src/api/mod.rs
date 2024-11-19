@@ -111,7 +111,7 @@ fn build_router(state: Arc<State>) -> Router {
                 .layer(cors_layer()),
         )
         .layer(CompressionLayer::new())
-        .merge(docs::router())
+        .merge(docs::router().into().layer(cors_layer()))
         .nest(
             "/beta",
             Router::new()

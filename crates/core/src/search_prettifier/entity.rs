@@ -32,8 +32,9 @@ pub struct DisplayedEntity {
     pub title: String,
     pub small_abstract: EntitySnippet,
     pub image_id: Option<String>,
-    pub related_entities: Vec<DisplayedEntity>,
     pub info: Vec<(String, EntitySnippet)>,
+    #[schema(no_recursion)]
+    pub related_entities: Vec<DisplayedEntity>,
     pub match_score: f32,
 }
 

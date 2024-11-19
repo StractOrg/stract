@@ -94,12 +94,14 @@ const config: Config = {
         configuration: {
           spec: {
             // Put the URL to your OpenAPI document here:
-            url: 'https://stract.com/beta/api/docs/openapi.json',
+            // url: 'https://stract.com/beta/api/docs/openapi.json',
+            url: 'http://localhost:3000/beta/api/docs/openapi.json',
           },
           layout: 'modern',
           hideModels: true,
           baseServerURL: 'https://stract.com',
           servers: [{ url: 'https://stract.com', description: 'Production server' }],
+          theme: 'kepler',
         },
       } as ScalarOptions,
     ],

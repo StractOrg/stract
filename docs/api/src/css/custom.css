@@ -41,3 +41,16 @@
 #sidebar-models {
   display: none;
 }
+
+.navbar {
+  display: none;
+}
+
+.t-doc__sidebar {
+  top: 0 !important;
+  max-height: 100vh !important;
+}
+
+.introduction-section {
+  padding-top: 50px !important;
+}
