@@ -46,6 +46,7 @@ use utoipa_swagger_ui::SwaggerUi;
                 search::SidebarQuery,
                 search::SpellcheckQuery,
                 search::ReturnBody,
+                autosuggest::AutosuggestQuery,
                 crate::searcher::WebsitesResult,
                 crate::search_prettifier::HighlightedSpellCorrection,
                 crate::search_prettifier::DisplayedWebpage,
@@ -138,7 +139,7 @@ fn mark_internal(path: &mut utoipa::openapi::path::PathItem) {
 impl Modify for ApiModifier {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         openapi.info.description = Some(
-            "Stract is an open source web search engine. The API is totally free while in beta, but some endpoints will most likely be paid by consumption in the future.
+            "Stract is an open source web search engine. The API is totally free while in beta, but some endpoints will be paid by consumption in the future.
 The API might also change quite a bit during the beta period, but we will try to keep it as stable as possible. We look forward to see what you will build!
 
 Remember to always give proper attributions to the sources you use from the search results.".to_string(),

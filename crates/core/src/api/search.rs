@@ -61,28 +61,47 @@ pub enum ReturnBody {
 #[serde(rename_all = "camelCase")]
 #[schema(title = "SearchQuery", example = json!({"query": "hello world"}))]
 pub struct ApiSearchQuery {
+    /// The search query string
     pub query: String,
+
+    /// The page number to return
     pub page: Option<usize>,
+
+    /// The number of results to return per page (max: 100)
     pub num_results: Option<usize>,
+
+    /// Prioritize results for a specific geographic region
     pub selected_region: Option<Region>,
+
+    /// Apply an `optic` to the query
     pub optic: Option<String>,
+
+    /// Custom host ranking preferences
     pub host_rankings: Option<HostRankings>,
+
+    /// Enable/disable nsfw filtering
     pub safe_search: Option<bool>,
 
+    /// Custom weights for ranking signals
     pub signal_coefficients: Option<HashMap<SignalEnumDiscriminants, f64>>,
 
+    /// Include ranking signal scores in results
     #[serde(default = "defaults::SearchQuery::return_ranking_signals")]
     pub return_ranking_signals: bool,
 
+    /// Return flattened result format
     #[serde(default = "defaults::SearchQuery::flatten_response")]
     pub flatten_response: bool,
 
+    /// Get exact vs estimated result count
     #[serde(default = "defaults::SearchQuery::count_results_exact")]
     pub count_results_exact: bool,
 
+    /// Include structured schema.org data in results
     #[serde(default = "defaults::SearchQuery::return_structured_data")]
     pub return_structured_data: bool,
 
+    /// Control whether or not the page content is returned
     #[cfg(feature = "return_body")]
     pub return_body: Option<ReturnBody>,
 }
@@ -146,6 +165,18 @@ impl From<SearchResult> for ApiSearchResult {
     }
 }
 
+/// Web Search
+///
+/// The main search endpoint that powers Stract's web search functionality. It performs a full-text search
+/// across all pages in the index and returns the most relevant results.
+///
+/// The endpoint supports the [optic syntax](https://github.com/StractOrg/sample-optics/blob/main/quickstart.optic)
+/// that can be used to customize the search results and perform advanced filtering.
+/// If the query matches the bang prefix `!`, the result will be a redirect to the bang target.
+/// For example, `!w cats` redirects to Wikipedia's page on cats.
+///
+/// Results are paginated and can be flattened into a simpler format if desired. The response includes
+/// rich metadata like snippets, titles, and ranking signal scores (when enabled).
 #[debug_handler]
 #[utoipa::path(
     post,
@@ -197,10 +228,20 @@ pub async fn search(
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
 )]
+#[schema(title = "WidgetQuery", example = json!({"query": "2+2"}))]
 pub struct WidgetQuery {
+    /// The query string to search for
     pub query: String,
 }
 
+/// Widgets
+///
+/// The widget endpoint returns a widget that matches the query. Widgets are special UI components
+/// that provide direct answers or interactive functionality for certain types of queries at the top of the search results.
+/// A widget could for example be a calculator for math expressions, or a thesaurus for word definitions.
+///
+/// The endpoint returns an empty response if no widget matches the given query. When a widget does match,
+/// it returns a structured response containing the widget type and its specific data needed to render it.
 #[debug_handler]
 #[utoipa::path(
     post,
@@ -220,10 +261,23 @@ pub async fn widget(
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
 )]
+#[schema(title = "SidebarQuery", example = json!({"query": "Aristotle"}))]
 pub struct SidebarQuery {
+    /// The query string to search for
     pub query: String,
 }
 
+/// Sidebar
+///
+/// The sidebar endpoint returns a sidebar that matches the query. The sidebar is a UI component
+/// that provides additional information or navigation options related to the query at the top of the search results.
+///
+/// The endpoint returns an empty response if no relevant sidebar content is found for the given query.
+/// When content is found, it returns a structured response containing the sidebar data needed
+/// to render the component.
+///
+/// For example, a query for "Aristotle" might return a sidebar with biographical information,
+/// key philosophical concepts, and links to related ancient Greek philosophers.
 #[debug_handler]
 #[utoipa::path(
     post,
@@ -243,17 +297,30 @@ pub async fn sidebar(
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, ToSchema,
 )]
+#[schema(title = "SpellcheckQuery", example = json!({"query": "hwllo eorld"}))]
 pub struct SpellcheckQuery {
+    /// The query string to possibly correct
     pub query: String,
 }
 
+/// Spellcheck
+///
+/// The spellcheck endpoint checks a query string for spelling errors and returns a corrected version if needed.
+/// The correction is returned with highlighting to show what was changed.
+///
+/// For example, given the query "hwllo eorld", it might return "hello world" with "hello" and "world"
+/// highlighted to show the corrections.
+///
+/// The corrections aim to preserve the user's intent while fixing obvious mistakes.
+///
+/// The correction dictionary has been trained on common words and phrases on the web, so it might make mistakes itself.
 #[debug_handler]
 #[utoipa::path(
     post,
     path = "/beta/api/search/spellcheck",
     request_body(content = SpellcheckQuery),
     responses(
-        (status = 200, description = "The corrected string with the changes highlighted using <b>...<\\b> elements. Returns empty response if there is no correction to be made.", body = Option<HighlightedSpellCorrection>),
+        (status = 200, description = "The corrected string or an empty response if there is no correction to be made.", body = Option<HighlightedSpellCorrection>),
     )
 )]
 pub async fn spellcheck(

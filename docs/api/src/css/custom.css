@@ -54,3 +54,7 @@
 .introduction-section {
   padding-top: 50px !important;
 }
+
+.navbar {
+  display: none;
+}

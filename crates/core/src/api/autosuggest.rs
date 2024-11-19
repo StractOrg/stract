@@ -50,22 +50,43 @@ pub struct Suggestion {
 }
 
 #[derive(
-    Debug, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, IntoParams,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    IntoParams,
+    ToSchema,
 )]
 #[serde(rename_all = "camelCase")]
+#[schema(title = "AutosuggestQuery", example = json!({"q": "shortest p"}))]
 pub struct AutosuggestQuery {
+    /// The prefix query to generate suggestions for
     q: String,
 }
 
+/// Autosuggest
+///
+/// Given a partial query string, returns a list of suggested completions that the user might be typing.
+/// Each suggestion is returned with two forms:
+/// - `raw`: The complete suggestion text
+/// - `highlighted`: The suggestion broken into fragments, with the matching prefix unhighlighted and
+///   the completion portion highlighted
+///
+/// For example, given the prefix query "shor", a suggestion might be:
+/// - raw: "shortest path algorithm"
+/// - highlighted: [<b>"shor"</b>, "test path algorithm"]
+///
+/// The suggestions are ranked by relevance and limited to a reasonable number of results.
+/// All returned suggestions will have the original query as a case-insensitive prefix.
 #[utoipa::path(
     post,
     path = "/beta/api/autosuggest",
     params(AutosuggestQuery),
     responses(
-        (status = 200, description = "Autosuggest", body = Vec<Suggestion>),
+        (status = 200, description = "suggestions for what the user might be typing", body = Vec<Suggestion>),
     )
 )]
-
 pub async fn route(
     extract::State(state): extract::State<Arc<State>>,
     extract::Query(params): extract::Query<HashMap<String, String>>,

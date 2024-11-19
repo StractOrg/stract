@@ -102,6 +102,7 @@ const config: Config = {
           baseServerURL: 'https://stract.com',
           servers: [{ url: 'https://stract.com', description: 'Production server' }],
           theme: 'kepler',
+          defaultOpenAllTags: true,
         },
       } as ScalarOptions,
     ],
