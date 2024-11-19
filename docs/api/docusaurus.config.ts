@@ -93,9 +93,8 @@ const config: Config = {
         route: '/api',
         configuration: {
           spec: {
-            // Put the URL to your OpenAPI document here:
-            // url: 'https://stract.com/beta/api/docs/openapi.json',
-            url: 'http://localhost:3000/beta/api/docs/openapi.json',
+            url: 'https://stract.com/beta/api/docs/openapi.json',
+            // url: 'http://localhost:3000/beta/api/docs/openapi.json',
           },
           layout: 'modern',
           hideModels: true,
