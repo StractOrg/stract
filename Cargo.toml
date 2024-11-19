@@ -178,8 +178,8 @@ tracing-test = "0.2.4"
 unicode-normalization = "0.1.23"
 unicode-segmentation = "1.11.0"
 url = { version = "2.4.0", features = ["serde"] }
-utoipa = { version = "4.2.3", features = ["axum_extras"] }
-utoipa-swagger-ui = { version = "7.0.0", features = ["axum"] }
+utoipa = { version = "5.2.0", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "8.0.0", features = ["axum"] }
 uuid = { version = "1.1.2", features = ["serde", "v4"] }
 wasm-bindgen = "0.2.83"
 whatlang = { version = "0.16.0", features = ["serde"] }

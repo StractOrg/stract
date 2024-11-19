@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 type Method = 'DELETE' | 'GET' | 'PUT' | 'POST' | 'HEAD' | 'TRACE' | 'PATCH';
 
 let GLOBAL_API_BASE = '';
@@ -117,11 +119,16 @@ export const api = {
   search: (body: ApiSearchQuery, options?: ApiOptions) =>
     requestJson<ApiSearchResult>('POST', `/beta/api/search`, body, options),
   searchSidebar: (body: SidebarQuery, options?: ApiOptions) =>
-    requestJson<DisplayedSidebar>('POST', `/beta/api/search/sidebar`, body, options),
+    requestJson<null | DisplayedSidebar>('POST', `/beta/api/search/sidebar`, body, options),
   searchSpellcheck: (body: SpellcheckQuery, options?: ApiOptions) =>
-    requestJson<HighlightedSpellCorrection>('POST', `/beta/api/search/spellcheck`, body, options),
+    requestJson<null | HighlightedSpellCorrection>(
+      'POST',
+      `/beta/api/search/spellcheck`,
+      body,
+      options,
+    ),
   searchWidget: (body: WidgetQuery, options?: ApiOptions) =>
-    requestJson<Widget>('POST', `/beta/api/search/widget`, body, options),
+    requestJson<null | Widget>('POST', `/beta/api/search/widget`, body, options),
   webgraphHostIngoing: (
     query: {
       host: string;
@@ -184,7 +191,7 @@ export const api = {
 export type ApiSearchQuery = {
   countResultsExact?: boolean;
   flattenResponse?: boolean;
-  hostRankings?: HostRankings;
+  hostRankings?: null | HostRankings;
   numResults?: number;
   optic?: string;
   page?: number;
@@ -192,7 +199,7 @@ export type ApiSearchQuery = {
   returnRankingSignals?: boolean;
   returnStructuredData?: boolean;
   safeSearch?: boolean;
-  selectedRegion?: Region;
+  selectedRegion?: null | Region;
   signalCoefficients?: {};
 };
 export type ApiSearchResult =
@@ -247,7 +254,12 @@ export type DisplayedAnswer = {
 };
 export type DisplayedEntity = {
   imageId?: string;
-  info: string & EntitySnippet[][];
+  info: [
+    string,
+    {
+      fragments: EntitySnippetFragment[];
+    },
+  ][];
   matchScore: number;
   relatedEntities: DisplayedEntity[];
   smallAbstract: EntitySnippet;
@@ -271,7 +283,7 @@ export type DisplayedWebpage = {
   likelyHasPaywall: boolean;
   prettyUrl: string;
   rankingSignals?: {};
-  richSnippet?: RichSnippet;
+  richSnippet?: null | RichSnippet;
   site: string;
   snippet: Snippet;
   structuredData?: StructuredData[];
@@ -517,6 +529,7 @@ export type SignalScore = {
   value: number;
 };
 export type SimilarHostsQuery = {
+  filters?: string[];
   hosts: string[];
   topN: number;
 };
@@ -538,7 +551,7 @@ export type StackOverflowQuestion = {
   body: CodeOrText[];
 };
 export type StructuredData = {
-  _type?: OneOrManyString;
+  _type?: null | OneOrManyString;
 };
 export type Suggestion = {
   highlighted: HighlightedFragment[];

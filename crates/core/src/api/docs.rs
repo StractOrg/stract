@@ -46,6 +46,7 @@ use utoipa_swagger_ui::SwaggerUi;
                 search::SidebarQuery,
                 search::SpellcheckQuery,
                 search::ReturnBody,
+                autosuggest::AutosuggestQuery,
                 crate::searcher::WebsitesResult,
                 crate::search_prettifier::HighlightedSpellCorrection,
                 crate::search_prettifier::DisplayedWebpage,
@@ -113,19 +114,45 @@ struct ApiDoc;
 
 struct ApiModifier;
 
+fn mark_internal(path: &mut utoipa::openapi::path::PathItem) {
+        let internal_extensions = utoipa::openapi::extensions::ExtensionsBuilder::new()
+            .add("x-internal", true)
+            .build();
+
+    let mut current_extensions = path.extensions.clone().unwrap_or_default();
+    current_extensions.merge(internal_extensions.clone());
+    path.extensions = Some(current_extensions);
+
+    if let Some(operation) = path.post.as_mut() {
+        let mut current_extensions = operation.extensions.clone().unwrap_or_default();
+        current_extensions.merge(internal_extensions.clone());
+        operation.extensions = Some(current_extensions);
+    }
+
+    if let Some(operation) = path.get.as_mut() {
+        let mut current_extensions = operation.extensions.clone().unwrap_or_default();
+        current_extensions.merge(internal_extensions.clone());
+        operation.extensions = Some(current_extensions);
+    }
+}
+
 impl Modify for ApiModifier {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         openapi.info.description = Some(
-            "Stract is an open source web search engine. The API is totally free while in beta, but some endpoints will most likely be paid by consumption in the future.
+            "Stract is an open source web search engine. The API is totally free while in beta, but some endpoints will be paid by consumption in the future.
 The API might also change quite a bit during the beta period, but we will try to keep it as stable as possible. We look forward to see what you will build!
 
 Remember to always give proper attributions to the sources you use from the search results.".to_string(),
         );
+
+        mark_internal(openapi.paths.paths.get_mut("/beta/api/explore/export").unwrap());
+        mark_internal(openapi.paths.paths.get_mut("/beta/api/hosts/export").unwrap());
+        mark_internal(openapi.paths.paths.get_mut("/beta/api/webgraph/host/knows").unwrap());
     }
 }
 
 pub fn router<S: Clone + Send + Sync + 'static>() -> impl Into<Router<S>> {
-    SwaggerUi::new("/beta/api/docs")
+    SwaggerUi::new("/beta/api/docs/swagger")
         .url("/beta/api/docs/openapi.json", ApiDoc::openapi())
         .config(
             utoipa_swagger_ui::Config::default()

@@ -63,6 +63,7 @@ impl From<crate::webpage::schema_org::Property> for Property {
 #[serde(untagged, rename_all = "camelCase")]
 pub enum OneOrManyProperty {
     One(Property),
+    #[schema(no_recursion)]
     Many(Vec<Property>),
 }
 

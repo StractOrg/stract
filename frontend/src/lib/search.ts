@@ -156,10 +156,10 @@ export const search = async (params: SearchParams, options: ApiOptions) => {
     websites._type == 'websites'
       ? {
           ...websites,
-          widget,
-          sidebar,
+          widget: widget ?? undefined,
+          sidebar: sidebar ?? undefined,
           discussions,
-          spellCorrection,
+          spellCorrection: spellCorrection ?? undefined,
         }
       : {
           ...websites,

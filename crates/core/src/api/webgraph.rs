@@ -44,23 +44,22 @@ pub mod host {
     #[derive(serde::Serialize, serde::Deserialize, ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub struct SimilarHostsQuery {
+        /// The hosts to find similar hosts for
         pub hosts: Vec<String>,
+        /// The number of similar hosts to return
         pub top_n: usize,
+        /// Filters the similar hosts to only include those that match the given filters
         pub filters: Option<Vec<String>>,
     }
 
-    #[derive(serde::Serialize, serde::Deserialize, IntoParams)]
-    #[serde(rename_all = "camelCase")]
-    pub struct KnowsHostQuery {
-        pub host: String,
-    }
-
-    #[derive(serde::Serialize, serde::Deserialize, IntoParams)]
-    #[serde(rename_all = "camelCase")]
-    pub struct HostLinksQuery {
-        pub host: String,
-    }
-
+    /// Similar Hosts
+    ///
+    /// Returns a list of hosts similar to the given hosts. The similarity between hosts is calculated
+    /// based on how similar their inbound edges are - hosts that tend to be linked to by the
+    /// same other hosts are considered more similar.
+    ///
+    /// For example, two news websites might be considered similar because they are both frequently
+    /// linked to from social media sites, news aggregators, and blogs discussing current events.
     #[utoipa::path(post,
         path = "/beta/api/webgraph/host/similar",
         request_body(content = SimilarHostsQuery),
@@ -89,6 +88,12 @@ pub mod host {
                 })
                 .collect::<Vec<_>>(),
         ))
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize, IntoParams)]
+    #[serde(rename_all = "camelCase")]
+    pub struct KnowsHostQuery {
+        pub host: String,
     }
 
     #[utoipa::path(post,
@@ -122,11 +127,25 @@ pub mod host {
         }
     }
 
+    #[derive(serde::Serialize, serde::Deserialize, IntoParams)]
+    #[serde(rename_all = "camelCase")]
+    pub struct HostLinksQuery {
+        /// The host to get edges for
+        pub host: String,
+    }
+
+    /// Ingoing Edges
+    ///
+    /// Returns the incoming edges (backlinks) for a particular host. For example, if site A links to site B,
+    /// then site A would appear in the ingoing edges for site B.
+    ///
+    /// The results are limited to a reasonable number of the most important inbound edges.
+    /// Edges are considered more important if they come from authoritative sites.
     #[utoipa::path(post,
         path = "/beta/api/webgraph/host/ingoing",
         params(HostLinksQuery),
         responses(
-            (status = 200, description = "Incoming links for a particular host", body = Vec<PrettyEdge>),
+            (status = 200, description = "Incoming edges for a particular host", body = Vec<PrettyEdge>),
         )
     )]
     pub async fn ingoing_hosts(
@@ -146,11 +165,17 @@ pub mod host {
         Ok(Json(links))
     }
 
+    /// Outgoing Edges
+    ///
+    /// Returns the outgoing edges (forwardlinks) for a particular host. For example, if site A links to site B,
+    /// then site B would appear in the outgoing edges for site A.
+    ///
+    /// The results are limited to a reasonable number of the most important outbound edges.
     #[utoipa::path(post,
         path = "/beta/api/webgraph/host/outgoing",
         params(HostLinksQuery),
         responses(
-            (status = 200, description = "Outgoing links for a particular host", body = Vec<PrettyEdge>),
+            (status = 200, description = "Outgoing edges for a particular host", body = Vec<PrettyEdge>),
         )
     )]
     pub async fn outgoing_hosts(
@@ -184,11 +209,18 @@ pub mod page {
         pub page: String,
     }
 
+    /// Ingoing Edges
+    ///
+    /// Returns the incoming edges (backlinks) for a particular page. For example, if page A links to page B,
+    /// then page A would appear in the ingoing edges for page B.
+    ///
+    /// The results are limited to a reasonable number of the most important inbound edges.
+    /// Edges are considered more important if they come from authoritative sites.
     #[utoipa::path(post,
         path = "/beta/api/webgraph/page/ingoing",
         params(PageLinksParams),
         responses(
-            (status = 200, description = "Incoming links for a particular page", body = Vec<PrettyEdge>),
+            (status = 200, description = "Incoming edges for a particular page", body = Vec<PrettyEdge>),
         )
     )]
     pub async fn ingoing_pages(
@@ -207,11 +239,17 @@ pub mod page {
         Ok(Json(links))
     }
 
+    /// Outgoing Edges
+    ///
+    /// Returns the outgoing edges (forwardlinks) for a particular page. For example, if page A links to page B,
+    /// then page A would appear in the outgoing edges for page B.
+    ///
+    /// The results are limited to a reasonable number of the most important outbound edges.
     #[utoipa::path(post,
         path = "/beta/api/webgraph/page/outgoing",
         params(PageLinksParams),
         responses(
-            (status = 200, description = "Outgoing links for a particular page", body = Vec<PrettyEdge>),
+            (status = 200, description = "Outgoing edges for a particular page", body = Vec<PrettyEdge>),
         )
     )]
     pub async fn outgoing_pages(
