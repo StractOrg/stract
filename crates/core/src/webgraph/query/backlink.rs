@@ -492,6 +492,7 @@ pub struct FullHostBacklinksQuery {
     filters: Vec<FilterEnum>,
     nodes_as_host: bool,
     skip_self_links: bool,
+    deduplicate: bool,
 }
 
 impl FullHostBacklinksQuery {
@@ -502,6 +503,7 @@ impl FullHostBacklinksQuery {
             filters: Vec::new(),
             nodes_as_host: true,
             skip_self_links: true,
+            deduplicate: true,
         }
     }
 
@@ -516,6 +518,11 @@ impl FullHostBacklinksQuery {
 
     pub fn skip_self_links(mut self, skip_self_links: bool) -> Self {
         self.skip_self_links = skip_self_links;
+        self
+    }
+
+    pub fn deduplicate(mut self, deduplicate: bool) -> Self {
+        self.deduplicate = deduplicate;
         self
     }
 
@@ -546,15 +553,18 @@ impl Query for FullHostBacklinksQuery {
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
-        let mut raw = Box::new(
-            LinksQuery::new(
-                self.node.clone().into_host().id(),
-                ToHostId,
-                searcher.warmed_column_fields().clone(),
-            )
-            .skip_self_links(self.skip_self_links)
-            .with_deduplication_field(FromHostId),
-        ) as Box<dyn tantivy::query::Query>;
+        let mut query = LinksQuery::new(
+            self.node.clone().into_host().id(),
+            ToHostId,
+            searcher.warmed_column_fields().clone(),
+        )
+        .skip_self_links(self.skip_self_links);
+
+        if self.deduplicate {
+            query = query.with_deduplication_field(FromHostId);
+        }
+
+        let mut raw = Box::new(query) as Box<dyn tantivy::query::Query>;
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
             let filter = filter.query(searcher);
