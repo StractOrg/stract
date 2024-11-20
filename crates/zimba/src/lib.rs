@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -21,9 +21,15 @@ pub mod wiki;
 
 pub use wiki::{Article, ArticleIterator, Image, ImageIterator};
 
+use nom::{
+    bytes::complete::{take, take_while},
+    combinator::map,
+    IResult,
+};
+
 use std::{
     fs::File,
-    io::{BufReader, Read},
+    io::{self, BufReader, Read},
     path::Path,
 };
 
@@ -48,16 +54,62 @@ pub enum Error {
     Lzma(#[from] lzma::Error),
 }
 
-fn read_zero_terminated(bytes: &[u8]) -> Result<String, Error> {
-    let mut string = String::new();
+fn read_zero_terminated(bytes: &[u8]) -> IResult<&[u8], String> {
+    let (remaining, string) = map(take_while(|b| b != 0), |bytes: &[u8]| {
+        String::from_utf8_lossy(bytes).into_owned()
+    })(bytes)?;
 
-    let mut i = 0;
-    while i < bytes.len() && bytes[i] != 0 {
-        string.push(bytes[i] as char);
-        i += 1;
+    let (remaining, zero) = take(1usize)(remaining)?;
+    if zero != [0] {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            remaining,
+            nom::error::ErrorKind::Tag,
+        )));
     }
 
-    Ok(string)
+    Ok((remaining, string))
+}
+
+trait NomParseNumber: Sized {
+    fn nom_parse_le(bytes: &[u8]) -> IResult<&[u8], Self>;
+}
+
+macro_rules! read_u {
+    ($type:ty) => {
+        impl NomParseNumber for $type {
+            fn nom_parse_le(bytes: &[u8]) -> IResult<&[u8], Self> {
+                let (remaining, bytes) = take(std::mem::size_of::<$type>())(bytes)?;
+
+                if bytes.len() < std::mem::size_of::<$type>() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        remaining,
+                        nom::error::ErrorKind::Eof,
+                    )));
+                }
+
+                Ok((remaining, Self::from_le_bytes(bytes.try_into().unwrap())))
+            }
+        }
+    };
+}
+
+read_u!(u16);
+read_u!(u32);
+read_u!(u64);
+read_u!(u128);
+
+impl NomParseNumber for char {
+    fn nom_parse_le(bytes: &[u8]) -> IResult<&[u8], Self> {
+        let (remaining, byte) = take(1usize)(bytes)?;
+        Ok((remaining, byte[0] as char))
+    }
+}
+
+impl NomParseNumber for u8 {
+    fn nom_parse_le(bytes: &[u8]) -> IResult<&[u8], Self> {
+        let (remaining, byte) = take(1usize)(bytes)?;
+        Ok((remaining, byte[0]))
+    }
 }
 
 #[derive(Debug)]
@@ -66,7 +118,7 @@ struct Header {
     magic: u32,
     major_version: u16,
     minor_version: u16,
-    uuid: [u8; 16],
+    uuid: u128,
     entry_count: u32,
     cluster_count: u32,
     url_ptr_pos: u64,
@@ -84,46 +136,58 @@ impl Header {
             return Err(Error::UnexpectedEndOfBytes);
         }
 
-        let header = Header {
-            magic: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
-            major_version: u16::from_le_bytes([bytes[4], bytes[5]]),
-            minor_version: u16::from_le_bytes([bytes[6], bytes[7]]),
-            uuid: [
-                bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14],
-                bytes[15], bytes[16], bytes[17], bytes[18], bytes[19], bytes[20], bytes[21],
-                bytes[22], bytes[23],
-            ],
-            entry_count: u32::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]),
-            cluster_count: u32::from_le_bytes([bytes[28], bytes[29], bytes[30], bytes[31]]),
-            url_ptr_pos: u64::from_le_bytes([
-                bytes[32], bytes[33], bytes[34], bytes[35], bytes[36], bytes[37], bytes[38],
-                bytes[39],
-            ]),
-            title_ptr_pos: u64::from_le_bytes([
-                bytes[40], bytes[41], bytes[42], bytes[43], bytes[44], bytes[45], bytes[46],
-                bytes[47],
-            ]),
-            cluster_ptr_pos: u64::from_le_bytes([
-                bytes[48], bytes[49], bytes[50], bytes[51], bytes[52], bytes[53], bytes[54],
-                bytes[55],
-            ]),
-            mime_list_pos: u64::from_le_bytes([
-                bytes[56], bytes[57], bytes[58], bytes[59], bytes[60], bytes[61], bytes[62],
-                bytes[63],
-            ]),
-            main_page: u32::from_le_bytes([bytes[64], bytes[65], bytes[66], bytes[67]]),
-            layout_page: u32::from_le_bytes([bytes[68], bytes[69], bytes[70], bytes[71]]),
-            checksum_pos: u64::from_le_bytes([
-                bytes[72], bytes[73], bytes[74], bytes[75], bytes[76], bytes[77], bytes[78],
-                bytes[79],
-            ]),
-        };
+        let (remaining, magic) =
+            u32::nom_parse_le(bytes).map_err(|_| Error::UnexpectedEndOfBytes)?;
 
-        if header.magic != 72_173_914 {
+        if magic != 72_173_914 {
             return Err(Error::InvalidMagicNumber);
         }
 
-        Ok(header)
+        let (remaining, major_version) =
+            u16::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (remaining, minor_version) =
+            u16::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+
+        let (remaining, uuid) =
+            u128::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+
+        let (remaining, entry_count) =
+            u32::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (remaining, cluster_count) =
+            u32::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+
+        let (remaining, url_ptr_pos) =
+            u64::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (remaining, title_ptr_pos) =
+            u64::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (remaining, cluster_ptr_pos) =
+            u64::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (remaining, mime_list_pos) =
+            u64::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+
+        let (remaining, main_page) =
+            u32::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (remaining, layout_page) =
+            u32::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+
+        let (_remaining, checksum_pos) =
+            u64::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+
+        Ok(Header {
+            magic,
+            major_version,
+            minor_version,
+            uuid,
+            entry_count,
+            cluster_count,
+            url_ptr_pos,
+            title_ptr_pos,
+            cluster_ptr_pos,
+            mime_list_pos,
+            main_page,
+            layout_page,
+            checksum_pos,
+        })
     }
 }
 
@@ -133,16 +197,18 @@ impl MimeTypes {
     fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
         let mut mime_types = Vec::new();
 
-        let mut i = 0;
-        while i < bytes.len() {
-            let mime_type = read_zero_terminated(&bytes[i..])?;
+        let mut bytes = bytes;
+        while !bytes.is_empty() {
+            let (remaining, mime_type) =
+                read_zero_terminated(bytes).map_err(|_| Error::UnexpectedEndOfBytes)?;
 
             if mime_type.is_empty() {
                 break;
             }
 
-            i += mime_type.len() + 1;
             mime_types.push(mime_type);
+
+            bytes = remaining;
         }
 
         Ok(Self(mime_types))
@@ -175,21 +241,15 @@ impl UrlPointerList {
     fn from_bytes(bytes: &[u8], num_urls: u32) -> Result<Self, Error> {
         let mut url_pointers = Vec::new();
 
-        let mut i = 0;
+        let mut bytes = bytes;
         for _ in 0..num_urls {
-            let url_pointer = UrlPointer(u64::from_le_bytes([
-                bytes[i],
-                bytes[i + 1],
-                bytes[i + 2],
-                bytes[i + 3],
-                bytes[i + 4],
-                bytes[i + 5],
-                bytes[i + 6],
-                bytes[i + 7],
-            ]));
+            let (remaining, url_pointer) =
+                u64::nom_parse_le(bytes).map_err(|_| Error::UnexpectedEndOfBytes)?;
 
+            let url_pointer = UrlPointer(url_pointer);
             url_pointers.push(url_pointer);
-            i += 8;
+
+            bytes = remaining;
         }
 
         Ok(Self(url_pointers))
@@ -215,17 +275,16 @@ impl TitlePointerList {
     fn from_bytes(bytes: &[u8], num_titles: u32) -> Result<Self, Error> {
         let mut title_pointers = Vec::new();
 
-        let mut i = 0;
+        let mut bytes = bytes;
         for _ in 0..num_titles {
-            let title_pointer = TitlePointer(u32::from_le_bytes([
-                bytes[i],
-                bytes[i + 1],
-                bytes[i + 2],
-                bytes[i + 3],
-            ]));
+            let (remaining, title_pointer) =
+                u32::nom_parse_le(bytes).map_err(|_| Error::UnexpectedEndOfBytes)?;
+
+            let title_pointer = TitlePointer(title_pointer);
 
             title_pointers.push(title_pointer);
-            i += 4;
+
+            bytes = remaining;
         }
 
         Ok(Self(title_pointers))
@@ -250,22 +309,16 @@ impl ClusterPointerList {
     fn from_bytes(bytes: &[u8], num_clusters: u32) -> Result<Self, Error> {
         let mut cluster_pointers = Vec::new();
 
-        let mut i = 0;
-
+        let mut bytes = bytes;
         for _ in 0..num_clusters {
-            let cluster_pointer = ClusterPointer(u64::from_le_bytes([
-                bytes[i],
-                bytes[i + 1],
-                bytes[i + 2],
-                bytes[i + 3],
-                bytes[i + 4],
-                bytes[i + 5],
-                bytes[i + 6],
-                bytes[i + 7],
-            ]));
+            let (remaining, cluster_pointer) =
+                u64::nom_parse_le(bytes).map_err(|_| Error::UnexpectedEndOfBytes)?;
+
+            let cluster_pointer = ClusterPointer(cluster_pointer);
 
             cluster_pointers.push(cluster_pointer);
-            i += 8;
+
+            bytes = remaining;
         }
 
         Ok(Self(cluster_pointers))
@@ -295,17 +348,54 @@ pub enum DirEntry {
     },
 }
 
+fn u8_reader_parser(bytes: &mut impl Iterator<Item = Result<u8, io::Error>>) -> Result<u8, Error> {
+    Ok(bytes.next().ok_or(Error::UnexpectedEndOfBytes)??)
+}
+
+fn u32_reader_parser(
+    bytes: &mut impl Iterator<Item = Result<u8, io::Error>>,
+) -> Result<u32, Error> {
+    Ok(u32::from_le_bytes([
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+    ]))
+}
+
+fn u64_reader_parser(
+    bytes: &mut impl Iterator<Item = Result<u8, io::Error>>,
+) -> Result<u64, Error> {
+    Ok(u64::from_le_bytes([
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+        bytes.next().ok_or(Error::UnexpectedEndOfBytes)??,
+    ]))
+}
+
 impl DirEntry {
     fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        let mime_type = u16::from_le_bytes([bytes[0], bytes[1]]);
-        let parameter_len = bytes[2];
-        let namespace = bytes[3] as char;
-        let revision = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+        let (remaining, mime_type) =
+            u16::nom_parse_le(bytes).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (remaining, parameter_len) =
+            u8::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (remaining, namespace) =
+            char::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (remaining, revision) =
+            u32::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
 
         if mime_type == 0xffff {
-            let redirect_index = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
-            let url = read_zero_terminated(&bytes[12..])?;
-            let title = read_zero_terminated(&bytes[12 + url.len() + 1..])?;
+            let (remaining, redirect_index) =
+                u32::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+            let (remaining, url) =
+                read_zero_terminated(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+            let (_, title) =
+                read_zero_terminated(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
             return Ok(Self::Redirect {
                 mime_type,
                 parameter_len,
@@ -317,15 +407,23 @@ impl DirEntry {
             });
         }
 
-        let url = read_zero_terminated(&bytes[16..])?;
-        let title = read_zero_terminated(&bytes[16 + url.len() + 1..])?;
+        let (remaining, cluster_number) =
+            u32::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (remaining, blob_number) =
+            u32::nom_parse_le(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+
+        let (remaining, url) =
+            read_zero_terminated(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+        let (_, title) =
+            read_zero_terminated(remaining).map_err(|_| Error::UnexpectedEndOfBytes)?;
+
         Ok(Self::Content {
             mime_type,
             parameter_len,
             namespace,
             revision,
-            cluster_number: u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
-            blob_number: u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
+            cluster_number,
+            blob_number,
             url,
             title,
         })
@@ -412,26 +510,12 @@ impl Cluster {
         match size {
             OffsetSize::U32 => {
                 blob_offsets.push(ClusterOffset {
-                    offset: u64::from(u32::from_le_bytes([
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                    ])),
+                    offset: u64::from(u32_reader_parser(&mut reader)?),
                 });
             }
             OffsetSize::U64 => {
                 blob_offsets.push(ClusterOffset {
-                    offset: u64::from_le_bytes([
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                    ]),
+                    offset: u64_reader_parser(&mut reader)?,
                 });
             }
         }
@@ -445,26 +529,12 @@ impl Cluster {
             match size {
                 OffsetSize::U32 => {
                     blob_offsets.push(ClusterOffset {
-                        offset: u64::from(u32::from_le_bytes([
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        ])),
+                        offset: u64::from(u32_reader_parser(&mut reader)?),
                     });
                 }
                 OffsetSize::U64 => {
                     blob_offsets.push(ClusterOffset {
-                        offset: u64::from_le_bytes([
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                            reader.next().ok_or(Error::UnexpectedEndOfBytes)??,
-                        ]),
+                        offset: u64_reader_parser(&mut reader)?,
                     });
                 }
             }
@@ -481,7 +551,7 @@ impl Cluster {
         let mut blobs = Vec::new();
 
         for _ in 0..missing_bytes {
-            blobs.push(reader.next().ok_or(Error::UnexpectedEndOfBytes)??);
+            blobs.push(u8_reader_parser(&mut reader)?);
         }
 
         Ok(Self {
