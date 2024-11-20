@@ -82,6 +82,7 @@ impl RelFlags {
                     "tag" => res |= RelFlags::TAG,
                     "terms-of-service" => res |= RelFlags::TERMS_OF_SERVICE,
                     "sponsored" => res |= RelFlags::SPONSORED,
+                    "ugc" => res |= RelFlags::UGC,
                     _ => {}
                 }
             }
@@ -135,6 +136,7 @@ bitflags! {
         const SCRIPT_TAG = 1 << 19;
         const META_TAG = 1 << 20;
         const SAME_ICANN_DOMAIN = 1 << 21;
+        const UGC = 1 << 22;
     }
 }
 

@@ -41,6 +41,7 @@ pub static SKIPPED_REL: std::sync::LazyLock<RelFlags> = std::sync::LazyLock::new
         | RelFlags::SEARCH
         | RelFlags::LINK_TAG
         | RelFlags::SCRIPT_TAG
+        | RelFlags::UGC
 });
 
 #[derive(Debug, Clone, bincode::Decode, bincode::Encode)]

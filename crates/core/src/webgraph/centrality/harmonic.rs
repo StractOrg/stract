@@ -45,6 +45,7 @@ pub static SKIPPED_REL: std::sync::LazyLock<RelFlags> = std::sync::LazyLock::new
         | RelFlags::LINK_TAG
         | RelFlags::SCRIPT_TAG
         | RelFlags::SAME_ICANN_DOMAIN
+        | RelFlags::UGC
 });
 
 type Counter = BTreeMap<NodeID, HyperLogLog<HYPERLOGLOG_COUNTERS>>;
