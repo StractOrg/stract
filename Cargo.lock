@@ -6516,6 +6516,7 @@ version = "0.1.0"
 dependencies = [
  "lzma",
  "memmap2",
+ "nom",
  "thiserror",
  "zstd 0.13.2",
 ]
