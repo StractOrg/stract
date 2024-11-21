@@ -19,11 +19,7 @@ pub fn serialize_column_mappable_to_u64<T: MonotonicallyMappableToU64>(
     output: &mut impl Write,
 ) -> io::Result<()> {
     let column_index_num_bytes = serialize_column_index(column_index, output)?;
-    serialize_u64_based_column_values(
-        column_values,
-        &[CodecType::Bitpacked, CodecType::BlockwiseLinear],
-        output,
-    )?;
+    serialize_u64_based_column_values(column_values, &[CodecType::Raw], output)?;
     output.write_all(&column_index_num_bytes.to_le_bytes())?;
     Ok(())
 }

@@ -315,7 +315,7 @@ fn test_column_field_codec_type_to_code() {
             count_codec += 1;
         }
     }
-    assert_eq!(count_codec, 3);
+    assert_eq!(count_codec, 4);
 }
 
 fn test_columnfield_gcd_i64_with_codec(codec_type: CodecType, num_vals: usize) -> io::Result<()> {
