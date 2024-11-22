@@ -14,7 +14,7 @@ use super::{ColumnCodec, ColumnCodecEstimator};
 
 pub struct RawCodec;
 
-impl ColumnCodec for RawCodec {
+impl ColumnCodec<u128> for RawCodec {
     type ColumnValues = RawReader;
     type Estimator = RawCodecEstimator;
 
@@ -24,8 +24,8 @@ impl ColumnCodec for RawCodec {
 }
 
 pub struct RawReader {
-    min_value: u64,
-    max_value: u64,
+    min_value: u128,
+    max_value: u128,
     num_rows: u32,
     data: OwnedBytes,
 }
@@ -35,8 +35,8 @@ impl RawReader {
         let mut bytes = bytes;
 
         let num_rows = u32::deserialize(&mut bytes)?;
-        let min_value = u64::deserialize(&mut bytes)?;
-        let max_value = u64::deserialize(&mut bytes)?;
+        let min_value = u128::deserialize(&mut bytes)?;
+        let max_value = u128::deserialize(&mut bytes)?;
 
         let data = bytes;
 
@@ -49,18 +49,18 @@ impl RawReader {
     }
 }
 
-impl ColumnValues for RawReader {
-    fn get_val(&self, idx: u32) -> u64 {
+impl ColumnValues<u128> for RawReader {
+    fn get_val(&self, idx: u32) -> u128 {
         let idx = idx as usize;
-        let mut bytes = &self.data[idx * 8..(idx + 1) * 8];
-        u64::deserialize(&mut bytes).unwrap()
+        let mut bytes = &self.data[idx * 16..(idx + 1) * 16];
+        u128::deserialize(&mut bytes).unwrap()
     }
 
-    fn min_value(&self) -> u64 {
+    fn min_value(&self) -> u128 {
         self.min_value
     }
 
-    fn max_value(&self) -> u64 {
+    fn max_value(&self) -> u128 {
         self.max_value
     }
 
@@ -72,30 +72,31 @@ impl ColumnValues for RawReader {
 #[derive(Default)]
 pub struct RawCodecEstimator {
     num_rows_collector: NumRowsCollector,
-    min_max_collector: MinMaxCollector,
+    min_max_collector: MinMaxCollector<u128>,
 }
 
-impl ColumnCodecEstimator for RawCodecEstimator {
-    fn collect(&mut self, value: u64) {
-        self.num_rows_collector.collect(value);
-        self.min_max_collector.collect(value);
+impl ColumnCodecEstimator<u128> for RawCodecEstimator {
+    fn collect(&mut self, val: u128) {
+        self.num_rows_collector.collect(val);
+        self.min_max_collector.collect(val);
     }
 
     fn estimate(&self) -> Option<u64> {
-        let num_rows = self.num_rows_collector.as_u64().finalize();
+        let num_rows = self.num_rows_collector.as_u128().finalize();
+
         Some(
-            self.min_max_collector.num_bytes()
-                + self.num_rows_collector.as_u64().num_bytes()
-                + num_rows as u64 * 8,
+            self.num_rows_collector.as_u128().num_bytes()
+                + self.min_max_collector.num_bytes()
+                + num_rows as u64 * 16,
         )
     }
 
     fn serialize(
         &self,
-        vals: &mut dyn Iterator<Item = u64>,
+        vals: &mut dyn Iterator<Item = u128>,
         wrt: &mut dyn Write,
     ) -> std::io::Result<()> {
-        let num_rows = self.num_rows_collector.as_u64().finalize();
+        let num_rows = self.num_rows_collector.as_u128().finalize();
         let (min_value, max_value) = self.min_max_collector.finalize();
 
         num_rows.serialize(wrt)?;
@@ -115,7 +116,7 @@ impl ColumnCodecEstimator for RawCodecEstimator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::columnar::column_values::u64_based::tests::create_and_validate;
+    use crate::columnar::column_values::u128_based::tests::create_and_validate;
 
     #[test]
     fn test_with_codec_data_sets_simple() {
@@ -124,7 +125,8 @@ mod tests {
 
     #[test]
     fn test_with_codec_data_sets() {
-        let data_sets = crate::columnar::column_values::u64_based::tests::get_codec_test_datasets();
+        let data_sets =
+            crate::columnar::column_values::u128_based::tests::get_codec_test_datasets();
         for (mut data, name) in data_sets {
             create_and_validate::<RawCodec>(&data, name);
             data.reverse();
@@ -136,7 +138,7 @@ mod tests {
     fn test_column_field_rand() {
         for _ in 0..500 {
             let mut data = (0..1 + rand::random::<u8>() as usize)
-                .map(|_| rand::random::<i64>() as u64 / 2)
+                .map(|_| rand::random::<i64>() as u128 / 2)
                 .collect::<Vec<_>>();
             create_and_validate::<RawCodec>(&data, "rand");
             data.reverse();

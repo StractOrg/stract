@@ -7,6 +7,7 @@
 //! - Monotonically map values to u64/u128
 
 use std::fmt::Debug;
+use std::io;
 use std::ops::{Range, RangeInclusive};
 use std::sync::Arc;
 
@@ -18,16 +19,21 @@ mod merge;
 pub(crate) mod monotonic_mapping;
 pub(crate) mod monotonic_mapping_u128;
 mod stats;
+mod u128_based;
 mod u64_based;
 mod vec_column;
 
 mod monotonic_column;
 
 pub(crate) use merge::MergedColumnValues;
-pub use stats::ColumnStats;
+use ownedbytes::OwnedBytes;
+pub use u128_based::{
+    load_u128_based_column_values, serialize_and_load_u128_based_column_values,
+    serialize_u128_based_column_values, CodecType as U128CodecType, ALL_U128_CODEC_TYPES,
+};
 pub use u64_based::{
     load_u64_based_column_values, serialize_and_load_u64_based_column_values,
-    serialize_u64_based_column_values, CodecType, ALL_U64_CODEC_TYPES,
+    serialize_u64_based_column_values, CodecType as U64CodecType, ALL_U64_CODEC_TYPES,
 };
 pub use vec_column::VecColumn;
 
@@ -168,6 +174,57 @@ pub trait ColumnValues<T: PartialOrd = u64>: Send + Sync + DowncastSync {
     }
 }
 downcast_rs::impl_downcast!(sync ColumnValues<T> where T: PartialOrd);
+
+/// A `ColumnCodecEstimator` is in charge of gathering all
+/// data required to serialize a column.
+///
+/// This happens during a first pass on data of the column elements.
+/// During that pass, all column estimators receive a call to their
+/// `.collect(el)`.
+///
+/// After this first pass, finalize is called.
+/// `.estimate(..)` then should return an accurate estimation of the
+/// size of the serialized column (were we to pick this codec.).
+/// `.serialize(..)` then serializes the column using this codec.
+pub trait ColumnCodecEstimator<T = u64>: 'static {
+    /// Records a new value for estimation.
+    /// This method will be called for each element of the column during
+    /// `estimation`.
+    fn collect(&mut self, value: T);
+    /// Finalizes the first pass phase.
+    fn finalize(&mut self) {}
+    /// Returns an accurate estimation of the number of bytes that will
+    /// be used to represent this column.
+    fn estimate(&self) -> Option<u64>;
+    /// Serializes the column using the given codec.
+    /// This constitutes a second pass over the columns values.
+    fn serialize(
+        &self,
+        vals: &mut dyn Iterator<Item = T>,
+        wrt: &mut dyn io::Write,
+    ) -> io::Result<()>;
+}
+
+/// A column codec describes a colunm serialization format.
+pub trait ColumnCodec<T: PartialOrd = u64> {
+    /// Specialized `ColumnValues` type.
+    type ColumnValues: ColumnValues<T> + 'static;
+    /// `Estimator` for the given codec.
+    type Estimator: ColumnCodecEstimator<T> + Default;
+
+    /// Loads a column that has been serialized using this codec.
+    fn load(bytes: OwnedBytes) -> io::Result<Self::ColumnValues>;
+
+    /// Returns an estimator.
+    fn estimator() -> Self::Estimator {
+        Self::Estimator::default()
+    }
+
+    /// Returns a boxed estimator.
+    fn boxed_estimator() -> Box<dyn ColumnCodecEstimator<T>> {
+        Box::new(Self::estimator())
+    }
+}
 
 /// Empty column of values.
 pub struct EmptyColumnValues;

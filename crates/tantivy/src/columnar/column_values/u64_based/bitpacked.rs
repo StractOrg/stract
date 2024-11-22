@@ -3,10 +3,13 @@ use std::num::NonZeroU64;
 use std::ops::{Range, RangeInclusive};
 
 use crate::bitpacker::{compute_num_bits, BitPacker, BitUnpacker};
+use crate::columnar::column_values::stats::{
+    ColumnStatsCollector, GcdCollector, MinMaxCollector, NumRowsCollector,
+};
 use crate::common::{BinarySerializable, OwnedBytes};
 use fastdivide::DividerU64;
 
-use crate::columnar::column_values::u64_based::{ColumnCodec, ColumnCodecEstimator, ColumnStats};
+use crate::columnar::column_values::u64_based::{ColumnCodec, ColumnCodecEstimator};
 use crate::columnar::{ColumnValues, RowId};
 
 /// Depending on the field type, a different
@@ -15,7 +18,10 @@ use crate::columnar::{ColumnValues, RowId};
 pub struct BitpackedReader {
     data: OwnedBytes,
     bit_unpacker: BitUnpacker,
-    stats: ColumnStats,
+    num_rows: RowId,
+    min_value: u64,
+    max_value: u64,
+    gcd: NonZeroU64,
 }
 
 #[inline(always)]
@@ -39,41 +45,43 @@ const fn div_ceil(n: u64, q: NonZeroU64) -> u64 {
 // [min_bipacked_value..max_bitpacked_value] such that
 // f(bitpacked) ∈ [min_value, max_value] <=> bitpacked ∈ [min_bitpacked_value, max_bitpacked_value]
 fn transform_range_before_linear_transformation(
-    stats: &ColumnStats,
+    min_value: u64,
+    max_value: u64,
+    gcd: NonZeroU64,
     range: RangeInclusive<u64>,
 ) -> Option<RangeInclusive<u64>> {
     if range.is_empty() {
         return None;
     }
-    if stats.min_value > *range.end() {
+    if min_value > *range.end() {
         return None;
     }
-    if stats.max_value < *range.start() {
+    if max_value < *range.start() {
         return None;
     }
     let shifted_range =
-        range.start().saturating_sub(stats.min_value)..=range.end().saturating_sub(stats.min_value);
-    let start_before_gcd_multiplication: u64 = div_ceil(*shifted_range.start(), stats.gcd);
-    let end_before_gcd_multiplication: u64 = *shifted_range.end() / stats.gcd;
+        range.start().saturating_sub(min_value)..=range.end().saturating_sub(min_value);
+    let start_before_gcd_multiplication: u64 = div_ceil(*shifted_range.start(), gcd);
+    let end_before_gcd_multiplication: u64 = *shifted_range.end() / gcd;
     Some(start_before_gcd_multiplication..=end_before_gcd_multiplication)
 }
 
 impl ColumnValues for BitpackedReader {
     #[inline(always)]
     fn get_val(&self, doc: u32) -> u64 {
-        self.stats.min_value + self.stats.gcd.get() * self.bit_unpacker.get(doc, &self.data)
+        self.min_value + self.gcd.get() * self.bit_unpacker.get(doc, &self.data)
     }
     #[inline]
     fn min_value(&self) -> u64 {
-        self.stats.min_value
+        self.min_value
     }
     #[inline]
     fn max_value(&self) -> u64 {
-        self.stats.max_value
+        self.max_value
     }
     #[inline]
     fn num_vals(&self) -> RowId {
-        self.stats.num_rows
+        self.num_rows
     }
 
     fn get_row_ids_for_value_range(
@@ -82,9 +90,12 @@ impl ColumnValues for BitpackedReader {
         mut doc_id_range: Range<u32>,
         positions: &mut Vec<u32>,
     ) {
-        let Some(transformed_range) =
-            transform_range_before_linear_transformation(&self.stats, range)
-        else {
+        let Some(transformed_range) = transform_range_before_linear_transformation(
+            self.min_value,
+            self.max_value,
+            self.gcd,
+            range,
+        ) else {
             positions.clear();
             return;
         };
@@ -99,33 +110,59 @@ impl ColumnValues for BitpackedReader {
     }
 }
 
-fn num_bits(stats: &ColumnStats) -> u8 {
-    compute_num_bits(stats.amplitude() / stats.gcd)
+fn num_bits(min_value: u64, max_value: u64, gcd: NonZeroU64) -> u8 {
+    compute_num_bits((max_value - min_value) / gcd)
 }
 
 #[derive(Default)]
-pub struct BitpackedCodecEstimator;
+pub struct BitpackedCodecEstimator {
+    num_rows_collector: NumRowsCollector,
+    min_max_collector: MinMaxCollector,
+    gcd_collector: GcdCollector,
+}
 
 impl ColumnCodecEstimator for BitpackedCodecEstimator {
-    fn collect(&mut self, _value: u64) {}
+    fn collect(&mut self, value: u64) {
+        self.num_rows_collector.collect(value);
+        self.min_max_collector.collect(value);
+        self.gcd_collector.collect(value);
+    }
 
-    fn estimate(&self, stats: &ColumnStats) -> Option<u64> {
-        let num_bits_per_value = num_bits(stats);
-        Some(stats.num_bytes() + (stats.num_rows as u64 * (num_bits_per_value as u64) + 7) / 8)
+    fn estimate(&self) -> Option<u64> {
+        let (min_value, max_value) = self.min_max_collector.finalize();
+        let gcd = self.gcd_collector.finalize();
+        let num_bits_per_value = num_bits(min_value, max_value, gcd);
+
+        Some(
+            (self.num_rows_collector.as_u64().num_bytes()
+                + self.min_max_collector.num_bytes()
+                + self.gcd_collector.num_bytes())
+                + (self.num_rows_collector.as_u64().finalize() as u64
+                    * (num_bits_per_value as u64)
+                    + 7)
+                    / 8,
+        )
     }
 
     fn serialize(
         &self,
-        stats: &ColumnStats,
         vals: &mut dyn Iterator<Item = u64>,
         wrt: &mut dyn Write,
     ) -> io::Result<()> {
-        stats.serialize(wrt)?;
-        let num_bits = num_bits(stats);
+        let (min_value, max_value) = self.min_max_collector.finalize();
+        let gcd = self.gcd_collector.finalize();
+        let num_rows = self.num_rows_collector.as_u64().finalize();
+
+        num_rows.serialize(wrt)?;
+        min_value.serialize(wrt)?;
+        max_value.serialize(wrt)?;
+        gcd.serialize(wrt)?;
+
+        let num_bits = num_bits(min_value, max_value, gcd);
         let mut bit_packer = BitPacker::new();
-        let divider = DividerU64::divide_by(stats.gcd.get());
+        let divider = DividerU64::divide_by(gcd.get());
         for val in vals {
-            bit_packer.write(divider.divide(val - stats.min_value), num_bits, wrt)?;
+            bit_packer.write(divider.divide(val - min_value), num_bits, wrt)?;
         }
         bit_packer.close(wrt)?;
         Ok(())
@@ -140,13 +177,20 @@ impl ColumnCodec for BitpackedCodec {
 
     /// Opens a columnar field given a file.
     fn load(mut data: OwnedBytes) -> io::Result<Self::ColumnValues> {
-        let stats = ColumnStats::deserialize(&mut data)?;
-        let num_bits = num_bits(&stats);
+        let num_rows = RowId::deserialize(&mut data)?;
+        let min_value = u64::deserialize(&mut data)?;
+        let max_value = u64::deserialize(&mut data)?;
+        let gcd = NonZeroU64::deserialize(&mut data)?;
+
+        let num_bits = num_bits(min_value, max_value, gcd);
         let bit_unpacker = BitUnpacker::new(num_bits);
         Ok(BitpackedReader {
             data,
             bit_unpacker,
-            stats,
+            num_rows,
+            min_value,
+            max_value,
+            gcd,
         })
     }
 }

@@ -156,6 +156,19 @@ impl SymbolValue for Ipv6Addr {
     }
 }
 
+impl SymbolValue for u128 {
+    fn serialize(self, buffer: &mut [u8]) -> u8 {
+        buffer[0..16].copy_from_slice(&self.to_le_bytes());
+        16
+    }
+
+    fn deserialize(bytes: &[u8]) -> Self {
+        let mut octet: [u8; 16] = [0u8; 16];
+        octet[..bytes.len()].copy_from_slice(bytes);
+        u128::from_le_bytes(octet)
+    }
+}
+
 #[derive(Default)]
 struct MiniBuffer {
     pub bytes: [u8; 17],
@@ -172,22 +185,32 @@ impl SymbolValue for NumericalValue {
     fn deserialize(mut bytes: &[u8]) -> Self {
         let type_code = pop_first_byte(&mut bytes).unwrap();
         let symbol_type = NumericalType::try_from_code(type_code).unwrap();
-        let mut octet: [u8; 8] = [0u8; 8];
-        octet[..bytes.len()].copy_from_slice(bytes);
         match symbol_type {
             NumericalType::U64 => {
+                let mut octet: [u8; 8] = [0u8; 8];
+                octet[..bytes.len()].copy_from_slice(bytes);
                 let val: u64 = u64::from_le_bytes(octet);
                 NumericalValue::U64(val)
             }
             NumericalType::I64 => {
+                let mut octet: [u8; 8] = [0u8; 8];
+                octet[..bytes.len()].copy_from_slice(bytes);
                 let encoded: u64 = u64::from_le_bytes(octet);
                 let val: i64 = decode_zig_zag(encoded);
                 NumericalValue::I64(val)
             }
             NumericalType::F64 => {
+                let mut octet: [u8; 8] = [0u8; 8];
+                octet[..bytes.len()].copy_from_slice(bytes);
                 debug_assert_eq!(bytes.len(), 8);
                 let val: f64 = f64::from_le_bytes(octet);
                 NumericalValue::F64(val)
+            }
+            NumericalType::U128 => {
+                let mut octet: [u8; 16] = [0u8; 16];
+                octet[..bytes.len()].copy_from_slice(bytes);
+                let val: u128 = u128::from_le_bytes(octet);
+                NumericalValue::U128(val)
             }
         }
     }
@@ -195,6 +218,7 @@ impl SymbolValue for NumericalValue {
     /// F64: Serialize with a fixed size of 9 bytes
     /// U64: Serialize without leading zeroes
     /// I64: ZigZag encoded and serialize without leading zeroes
+    /// U128: Serialize without leading zeroes
     fn serialize(self, output: &mut [u8]) -> u8 {
         match self {
             NumericalValue::F64(val) => {
@@ -213,6 +237,12 @@ impl SymbolValue for NumericalValue {
                 let len = compute_num_bytes_for_u64(zig_zag_encoded) as u8;
                 output[0] = NumericalType::I64 as u8;
                 output[1..9].copy_from_slice(&zig_zag_encoded.to_le_bytes());
+                len + 1u8
+            }
+            NumericalValue::U128(val) => {
+                let len = compute_num_bytes_for_u128(val) as u8;
+                output[0] = NumericalType::U128 as u8;
+                output[1..17].copy_from_slice(&val.to_le_bytes());
                 len + 1u8
             }
         }
@@ -245,6 +275,11 @@ impl SymbolValue for UnorderedId {
 
 fn compute_num_bytes_for_u64(val: u64) -> usize {
     let msb = (64u32 - val.leading_zeros()) as usize;
+    (msb + 7) / 8
+}
+
+fn compute_num_bytes_for_u128(val: u128) -> usize {
+    let msb = (128u32 - val.leading_zeros()) as usize;
     (msb + 7) / 8
 }
 

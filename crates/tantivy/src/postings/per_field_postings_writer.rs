@@ -45,6 +45,7 @@ fn posting_writer_from_field_entry(field_entry: &FieldEntry) -> Box<dyn Postings
             })
             .unwrap_or_else(|| SpecializedPostingsWriter::<DocIdRecorder>::default().into()),
         FieldType::U64(_)
+        | FieldType::U128(_)
         | FieldType::I64(_)
         | FieldType::F64(_)
         | FieldType::Bool(_)

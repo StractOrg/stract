@@ -20,7 +20,7 @@ use crate::columnar::columnar::writer::column_writers::{
 use crate::columnar::columnar::writer::value_index::{IndexBuilder, PreallocatedIndexBuilders};
 use crate::columnar::dictionary::{DictionaryBuilder, TermIdMapping, UnorderedId};
 use crate::columnar::value::{Coerce, NumericalType, NumericalValue};
-use crate::columnar::{Cardinality, RowId};
+use crate::columnar::{Cardinality, MonotonicallyMappableToU128, RowId};
 
 /// This is a set of buffers that are used to temporarily write the values into before passing them
 /// to the columnar field codecs.
@@ -28,6 +28,7 @@ use crate::columnar::{Cardinality, RowId};
 struct SpareBuffers {
     value_index_builders: PreallocatedIndexBuilders,
     u64_values: Vec<u64>,
+    u128_values: Vec<u128>,
 }
 
 /// Makes it possible to create a new columnar.
@@ -176,7 +177,7 @@ impl ColumnarWriter {
                     |column_opt: Option<ColumnWriter>| column_opt.unwrap_or_default(),
                 );
             }
-            ColumnType::I64 | ColumnType::F64 | ColumnType::U64 => {
+            ColumnType::I64 | ColumnType::F64 | ColumnType::U64 | ColumnType::U128 => {
                 let numerical_type = column_type.numerical_type().unwrap();
                 self.numerical_field_hash_map.mutate_or_create(
                     column_name.as_bytes(),
@@ -337,7 +338,7 @@ impl ColumnarWriter {
                     )?;
                     column_serializer.finalize()?;
                 }
-                ColumnType::F64 | ColumnType::I64 | ColumnType::U64 => {
+                ColumnType::F64 | ColumnType::I64 | ColumnType::U64 | ColumnType::U128 => {
                     let numerical_column_writer: NumericalColumnWriter =
                         self.numerical_field_hash_map.read(addr);
                     let cardinality = numerical_column_writer.cardinality();
@@ -396,7 +397,7 @@ fn serialize_bytes_or_str_column(
     let SpareBuffers {
         value_index_builders,
         u64_values,
-        ..
+        u128_values: _,
     } = buffers;
     let mut counting_writer = CountingWriter::wrap(wrt);
     let term_id_mapping: TermIdMapping =
@@ -434,7 +435,7 @@ fn serialize_numerical_column(
     let SpareBuffers {
         value_index_builders,
         u64_values,
-        ..
+        u128_values,
     } = buffers;
     match numerical_type {
         NumericalType::I64 => {
@@ -464,6 +465,15 @@ fn serialize_numerical_column(
                 wrt,
             )?;
         }
+        NumericalType::U128 => {
+            send_to_serialize_column_mappable_to_u128(
+                coerce_numerical_symbol_to_u128::<u128>(op_iterator),
+                cardinality,
+                value_index_builders,
+                u128_values,
+                wrt,
+            )?;
+        }
     };
     Ok(())
 }
@@ -477,7 +487,7 @@ fn serialize_bool_column(
     let SpareBuffers {
         value_index_builders,
         u64_values,
-        ..
+        u128_values: _,
     } = buffers;
     send_to_serialize_column_mappable_to_u64(
         column_operations_it.map(|bool_column_operation| match bool_column_operation {
@@ -518,6 +528,32 @@ fn send_to_serialize_column_mappable_to_u64(
     Ok(())
 }
 
+fn send_to_serialize_column_mappable_to_u128(
+    op_iterator: impl Iterator<Item = ColumnOperation<u128>>,
+    cardinality: Cardinality,
+    value_index_builders: &mut PreallocatedIndexBuilders,
+    values: &mut Vec<u128>,
+    mut wrt: impl io::Write,
+) -> io::Result<()> {
+    values.clear();
+    let serializable_column_index = match cardinality {
+        Cardinality::Full => {
+            consume_operation_iterator(
+                op_iterator,
+                value_index_builders.borrow_required_index_builder(),
+                values,
+            );
+            SerializableColumnIndex::Full
+        }
+    };
+    crate::columnar::column::serialize_column_mappable_to_u128(
+        serializable_column_index,
+        &&values[..],
+        &mut wrt,
+    )?;
+    Ok(())
+}
+
 fn coerce_numerical_symbol<T>(
     operation_iterator: impl Iterator<Item = ColumnOperation<NumericalValue>>,
 ) -> impl Iterator<Item = ColumnOperation<u64>>
@@ -528,6 +564,20 @@ where
         ColumnOperation::NewDoc(doc) => ColumnOperation::NewDoc(doc),
         ColumnOperation::Value(numerical_value) => {
             ColumnOperation::Value(T::coerce(numerical_value).to_u64())
+        }
+    })
+}
+
+fn coerce_numerical_symbol_to_u128<T>(
+    operation_iterator: impl Iterator<Item = ColumnOperation<NumericalValue>>,
+) -> impl Iterator<Item = ColumnOperation<u128>>
+where
+    T: Coerce + MonotonicallyMappableToU128,
+{
+    operation_iterator.map(|symbol| match symbol {
+        ColumnOperation::NewDoc(doc) => ColumnOperation::NewDoc(doc),
+        ColumnOperation::Value(numerical_value) => {
+            ColumnOperation::Value(T::coerce(numerical_value).to_u128())
         }
     })
 }

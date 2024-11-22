@@ -7,6 +7,7 @@ pub enum NumericalValue {
     I64(i64),
     U64(u64),
     F64(f64),
+    U128(u128),
 }
 
 impl NumericalValue {
@@ -15,6 +16,7 @@ impl NumericalValue {
             NumericalValue::I64(_) => NumericalType::I64,
             NumericalValue::U64(_) => NumericalType::U64,
             NumericalValue::F64(_) => NumericalType::F64,
+            NumericalValue::U128(_) => NumericalType::U128,
         }
     }
 }
@@ -37,6 +39,12 @@ impl From<f64> for NumericalValue {
     }
 }
 
+impl From<u128> for NumericalValue {
+    fn from(val: u128) -> Self {
+        NumericalValue::U128(val)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Hash, Eq, PartialEq)]
 #[repr(u8)]
 pub enum NumericalType {
@@ -44,6 +52,7 @@ pub enum NumericalType {
     I64 = 0,
     U64 = 1,
     F64 = 2,
+    U128 = 3,
 }
 
 impl NumericalType {
@@ -56,6 +65,7 @@ impl NumericalType {
             0 => Ok(NumericalType::I64),
             1 => Ok(NumericalType::U64),
             2 => Ok(NumericalType::F64),
+            3 => Ok(NumericalType::U128),
             _ => Err(InvalidData),
         }
     }
@@ -81,6 +91,7 @@ impl Coerce for i64 {
         match value {
             NumericalValue::I64(val) => val,
             NumericalValue::U64(val) => val as i64,
+            NumericalValue::U128(val) => val as i64,
             NumericalValue::F64(_) => unreachable!(),
         }
     }
@@ -92,6 +103,7 @@ impl Coerce for u64 {
             NumericalValue::I64(val) => val as u64,
             NumericalValue::U64(val) => val,
             NumericalValue::F64(_) => unreachable!(),
+            NumericalValue::U128(val) => val as u64,
         }
     }
 }
@@ -102,6 +114,7 @@ impl Coerce for f64 {
             NumericalValue::I64(val) => val as f64,
             NumericalValue::U64(val) => val as f64,
             NumericalValue::F64(val) => val,
+            NumericalValue::U128(val) => val as f64,
         }
     }
 }
@@ -110,6 +123,17 @@ impl Coerce for DateTime {
     fn coerce(value: NumericalValue) -> Self {
         let timestamp_micros = i64::coerce(value);
         DateTime::from_timestamp_nanos(timestamp_micros)
+    }
+}
+
+impl Coerce for u128 {
+    fn coerce(value: NumericalValue) -> Self {
+        match value {
+            NumericalValue::U128(val) => val,
+            NumericalValue::I64(val) => val as u128,
+            NumericalValue::U64(val) => val as u128,
+            NumericalValue::F64(_) => unreachable!(),
+        }
     }
 }
 
@@ -126,6 +150,6 @@ mod tests {
                 num_numerical_type += 1;
             }
         }
-        assert_eq!(num_numerical_type, 3);
+        assert_eq!(num_numerical_type, 4);
     }
 }

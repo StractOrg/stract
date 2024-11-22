@@ -1,14 +1,19 @@
 use std::io::Write;
+use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::{io, iter};
 
 use crate::bitpacker::{compute_num_bits, BitPacker, BitUnpacker};
+use crate::columnar::column_values::stats::{
+    ColumnStatsCollector, GcdCollector, MinMaxCollector, NumRowsCollector,
+};
+use crate::columnar::RowId;
 use crate::common::{BinarySerializable, CountingWriter, DeserializeFrom, OwnedBytes};
 use fastdivide::DividerU64;
 
 use super::MonotonicallyMappableToU64;
 use crate::columnar::column_values::u64_based::line::Line;
-use crate::columnar::column_values::u64_based::{ColumnCodec, ColumnCodecEstimator, ColumnStats};
+use crate::columnar::column_values::u64_based::{ColumnCodec, ColumnCodecEstimator};
 use crate::columnar::column_values::{ColumnValues, VecColumn};
 
 const BLOCK_SIZE: u32 = 512u32;
@@ -46,6 +51,9 @@ pub struct BlockwiseLinearEstimator {
     block: Vec<u64>,
     values_num_bytes: u64,
     meta_num_bytes: u64,
+    num_rows_collector: NumRowsCollector,
+    min_max_collector: MinMaxCollector,
+    gcd_collector: GcdCollector,
 }
 
 impl Default for BlockwiseLinearEstimator {
@@ -54,6 +62,9 @@ impl Default for BlockwiseLinearEstimator {
             block: Vec::with_capacity(BLOCK_SIZE as usize),
             values_num_bytes: 0u64,
             meta_num_bytes: 0u64,
+            num_rows_collector: NumRowsCollector::default(),
+            min_max_collector: MinMaxCollector::default(),
+            gcd_collector: GcdCollector::default(),
         }
     }
 }
@@ -86,12 +97,25 @@ impl ColumnCodecEstimator for BlockwiseLinearEstimator {
             self.flush_block_estimate();
             self.block.clear();
         }
+
+        self.num_rows_collector.collect(value);
+        self.min_max_collector.collect(value);
+        self.gcd_collector.collect(value);
     }
-    fn estimate(&self, stats: &ColumnStats) -> Option<u64> {
-        let mut estimate = 4 + stats.num_bytes() + self.meta_num_bytes + self.values_num_bytes;
-        if stats.gcd.get() > 1 {
+    fn estimate(&self) -> Option<u64> {
+        let num_rows = self.num_rows_collector.as_u64().finalize();
+        let gcd = self.gcd_collector.finalize();
+
+        let mut estimate = 4
+            + (self.num_rows_collector.as_u64().num_bytes()
+                + self.min_max_collector.num_bytes()
+                + self.gcd_collector.num_bytes())
+            + self.meta_num_bytes
+            + self.values_num_bytes;
+
+        if gcd.get() > 1 {
             let estimate_gain_from_gcd =
-                (stats.gcd.get() as f32).log2().floor() * stats.num_rows as f32 / 8.0f32;
+                (gcd.get() as f32).log2().floor() * num_rows as f32 / 8.0f32;
             estimate = estimate.saturating_sub(estimate_gain_from_gcd as u64);
         }
         Some(estimate)
@@ -103,18 +127,25 @@ impl ColumnCodecEstimator for BlockwiseLinearEstimator {
 
     fn serialize(
         &self,
-        stats: &ColumnStats,
         mut vals: &mut dyn Iterator<Item = u64>,
         wrt: &mut dyn Write,
     ) -> io::Result<()> {
-        stats.serialize(wrt)?;
+        let num_rows = self.num_rows_collector.as_u64().finalize();
+        let (min_value, max_value) = self.min_max_collector.finalize();
+        let gcd = self.gcd_collector.finalize();
+
+        num_rows.serialize(wrt)?;
+        min_value.serialize(wrt)?;
+        max_value.serialize(wrt)?;
+        gcd.serialize(wrt)?;
+
         let mut buffer = Vec::with_capacity(BLOCK_SIZE as usize);
-        let num_blocks = compute_num_blocks(stats.num_rows) as usize;
+        let num_blocks = compute_num_blocks(num_rows) as usize;
         let mut blocks = Vec::with_capacity(num_blocks);
 
         let mut bit_packer = BitPacker::new();
 
-        let gcd_divider = DividerU64::divide_by(stats.gcd.get());
+        let gcd_divider = DividerU64::divide_by(gcd.get());
 
         for _ in 0..num_blocks {
             buffer.clear();
@@ -125,7 +156,7 @@ impl ColumnCodecEstimator for BlockwiseLinearEstimator {
             );
 
             for buffer_val in buffer.iter_mut() {
-                *buffer_val = gcd_divider.divide(*buffer_val - stats.min_value);
+                *buffer_val = gcd_divider.divide(*buffer_val - min_value);
             }
 
             let line = Line::train(&VecColumn::from(buffer.to_vec()));
@@ -173,11 +204,15 @@ impl ColumnCodec<u64> for BlockwiseLinearCodec {
     type Estimator = BlockwiseLinearEstimator;
 
     fn load(mut bytes: OwnedBytes) -> io::Result<Self::ColumnValues> {
-        let stats = ColumnStats::deserialize(&mut bytes)?;
+        let num_rows = RowId::deserialize(&mut bytes)?;
+        let min_value = u64::deserialize(&mut bytes)?;
+        let max_value = u64::deserialize(&mut bytes)?;
+        let gcd = NonZeroU64::deserialize(&mut bytes)?;
+
         let footer_len: u32 = (&bytes[bytes.len() - 4..]).deserialize()?;
         let footer_offset = bytes.len() - 4 - footer_len as usize;
         let (data, mut footer) = bytes.split(footer_offset);
-        let num_blocks = compute_num_blocks(stats.num_rows);
+        let num_blocks = compute_num_blocks(num_rows);
         let mut blocks: Vec<Block> = iter::repeat_with(|| Block::deserialize(&mut footer))
             .take(num_blocks as usize)
             .collect::<io::Result<_>>()?;
@@ -189,7 +224,10 @@ impl ColumnCodec<u64> for BlockwiseLinearCodec {
         Ok(BlockwiseLinearReader {
             blocks: blocks.into_boxed_slice().into(),
             data,
-            stats,
+            num_rows,
+            min_value,
+            max_value,
+            gcd,
         })
     }
 }
@@ -198,7 +236,10 @@ impl ColumnCodec<u64> for BlockwiseLinearCodec {
 pub struct BlockwiseLinearReader {
     blocks: Arc<[Block]>,
     data: OwnedBytes,
-    stats: ColumnStats,
+    num_rows: RowId,
+    min_value: u64,
+    max_value: u64,
+    gcd: NonZeroU64,
 }
 
 impl ColumnValues for BlockwiseLinearReader {
@@ -212,9 +253,8 @@ impl ColumnValues for BlockwiseLinearReader {
         let bitpacked_diff = block.bit_unpacker.get(idx_within_block, block_bytes);
         // TODO optimize me! the line parameters could be tweaked to include the multiplication and
         // remove the dependency.
-        self.stats.min_value
+        self.min_value
             + self
-                .stats
                 .gcd
                 .get()
                 .wrapping_mul(interpoled_val.wrapping_add(bitpacked_diff))
@@ -222,17 +262,17 @@ impl ColumnValues for BlockwiseLinearReader {
 
     #[inline(always)]
     fn min_value(&self) -> u64 {
-        self.stats.min_value
+        self.min_value
     }
 
     #[inline(always)]
     fn max_value(&self) -> u64 {
-        self.stats.max_value
+        self.max_value
     }
 
     #[inline(always)]
     fn num_vals(&self) -> u32 {
-        self.stats.num_rows
+        self.num_rows
     }
 }
 
@@ -257,7 +297,7 @@ mod tests {
             "name",
         )
         .unwrap();
-        assert_eq!(actual_compression_rate, 0.175);
+        assert_eq!(actual_compression_rate, 0.475);
     }
 
     #[test]

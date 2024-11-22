@@ -147,10 +147,19 @@ pub(crate) fn index_json_value<'a, V: Value<'a>>(
                         .get_or_allocate_unordered_id(json_path_writer.as_str()),
                 );
                 if let Ok(i64_val) = val.try_into() {
-                    term_buffer.append_type_and_columnar_value::<i64>(i64_val);
+                    term_buffer.append_type_and_columnar_value_64::<i64>(i64_val);
                 } else {
-                    term_buffer.append_type_and_columnar_value(val);
+                    term_buffer.append_type_and_columnar_value_64(val);
                 }
+                postings_writer.subscribe(doc, 0u32, term_buffer, ctx);
+            }
+            ReferenceValueLeaf::U128(val) => {
+                set_path_id(
+                    term_buffer,
+                    ctx.path_to_unordered_id
+                        .get_or_allocate_unordered_id(json_path_writer.as_str()),
+                );
+                term_buffer.append_type_and_columnar_value_128(val);
                 postings_writer.subscribe(doc, 0u32, term_buffer, ctx);
             }
             ReferenceValueLeaf::I64(val) => {
@@ -159,7 +168,7 @@ pub(crate) fn index_json_value<'a, V: Value<'a>>(
                     ctx.path_to_unordered_id
                         .get_or_allocate_unordered_id(json_path_writer.as_str()),
                 );
-                term_buffer.append_type_and_columnar_value(val);
+                term_buffer.append_type_and_columnar_value_64(val);
                 postings_writer.subscribe(doc, 0u32, term_buffer, ctx);
             }
             ReferenceValueLeaf::F64(val) => {
@@ -168,7 +177,7 @@ pub(crate) fn index_json_value<'a, V: Value<'a>>(
                     ctx.path_to_unordered_id
                         .get_or_allocate_unordered_id(json_path_writer.as_str()),
                 );
-                term_buffer.append_type_and_columnar_value(val);
+                term_buffer.append_type_and_columnar_value_64(val);
                 postings_writer.subscribe(doc, 0u32, term_buffer, ctx);
             }
             ReferenceValueLeaf::Bool(val) => {
@@ -177,7 +186,7 @@ pub(crate) fn index_json_value<'a, V: Value<'a>>(
                     ctx.path_to_unordered_id
                         .get_or_allocate_unordered_id(json_path_writer.as_str()),
                 );
-                term_buffer.append_type_and_columnar_value(val);
+                term_buffer.append_type_and_columnar_value_64(val);
                 postings_writer.subscribe(doc, 0u32, term_buffer, ctx);
             }
             ReferenceValueLeaf::Date(val) => {
@@ -186,7 +195,7 @@ pub(crate) fn index_json_value<'a, V: Value<'a>>(
                     ctx.path_to_unordered_id
                         .get_or_allocate_unordered_id(json_path_writer.as_str()),
                 );
-                term_buffer.append_type_and_columnar_value(val);
+                term_buffer.append_type_and_columnar_value_64(val);
                 postings_writer.subscribe(doc, 0u32, term_buffer, ctx);
             }
             ReferenceValueLeaf::PreTokStr(_) => {
@@ -248,23 +257,23 @@ pub fn convert_to_columnar_value_and_append_to_json_term(
     );
     if let Ok(dt) = OffsetDateTime::parse(phrase, &Rfc3339) {
         let dt_utc = dt.to_offset(UtcOffset::UTC);
-        term.append_type_and_columnar_value(DateTime::from_utc(dt_utc));
+        term.append_type_and_columnar_value_64(DateTime::from_utc(dt_utc));
         return Some(term);
     }
     if let Ok(i64_val) = str::parse::<i64>(phrase) {
-        term.append_type_and_columnar_value(i64_val);
+        term.append_type_and_columnar_value_64(i64_val);
         return Some(term);
     }
     if let Ok(u64_val) = str::parse::<u64>(phrase) {
-        term.append_type_and_columnar_value(u64_val);
+        term.append_type_and_columnar_value_64(u64_val);
         return Some(term);
     }
     if let Ok(f64_val) = str::parse::<f64>(phrase) {
-        term.append_type_and_columnar_value(f64_val);
+        term.append_type_and_columnar_value_64(f64_val);
         return Some(term);
     }
     if let Ok(bool_val) = str::parse::<bool>(phrase) {
-        term.append_type_and_columnar_value(bool_val);
+        term.append_type_and_columnar_value_64(bool_val);
         return Some(term);
     }
     None
@@ -343,7 +352,7 @@ mod tests {
         );
 
         let mut term = Term::from_field_json_path(field, "attributes.dimensions.width", false);
-        term.append_type_and_columnar_value(400i64);
+        term.append_type_and_columnar_value_64(400i64);
         assert_eq!(
             format!("{term:?}"),
             "Term(field=1, type=Json, path=attributes.dimensions.width, type=I64, 400)"
@@ -363,7 +372,7 @@ mod tests {
     fn test_i64_term() {
         let field = Field::from_field_id(1);
         let mut term = Term::from_field_json_path(field, "color", false);
-        term.append_type_and_columnar_value(-4i64);
+        term.append_type_and_columnar_value_64(-4i64);
 
         assert_eq!(
             term.serialized_term(),
@@ -375,7 +384,7 @@ mod tests {
     fn test_u64_term() {
         let field = Field::from_field_id(1);
         let mut term = Term::from_field_json_path(field, "color", false);
-        term.append_type_and_columnar_value(4u64);
+        term.append_type_and_columnar_value_64(4u64);
 
         assert_eq!(
             term.serialized_term(),
@@ -387,7 +396,7 @@ mod tests {
     fn test_f64_term() {
         let field = Field::from_field_id(1);
         let mut term = Term::from_field_json_path(field, "color", false);
-        term.append_type_and_columnar_value(4.0f64);
+        term.append_type_and_columnar_value_64(4.0f64);
         assert_eq!(
             term.serialized_term(),
             b"\x00\x00\x00\x01jcolor\x00f\xc0\x10\x00\x00\x00\x00\x00\x00"
@@ -398,7 +407,7 @@ mod tests {
     fn test_bool_term() {
         let field = Field::from_field_id(1);
         let mut term = Term::from_field_json_path(field, "color", false);
-        term.append_type_and_columnar_value(true);
+        term.append_type_and_columnar_value_64(true);
         assert_eq!(
             term.serialized_term(),
             b"\x00\x00\x00\x01jcolor\x00o\x00\x00\x00\x00\x00\x00\x00\x01"

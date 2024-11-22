@@ -71,9 +71,21 @@ impl Term {
         term
     }
 
-    fn from_columnar_value<T: ColumnarValue>(field: Field, val: &T) -> Term {
+    fn from_columnar_value_64<T: ColumnarValue + MonotonicallyMappableToU64>(
+        field: Field,
+        val: &T,
+    ) -> Term {
         let mut term = Self::with_type_and_field(T::to_type(), field);
         term.set_u64(val.to_u64());
+        term
+    }
+
+    fn from_columnar_value_128<T: ColumnarValue + MonotonicallyMappableToU128>(
+        field: Field,
+        val: &T,
+    ) -> Term {
+        let mut term = Self::with_type_and_field(T::to_type(), field);
+        term.set_u128(val.to_u128());
         term
     }
 
@@ -101,27 +113,32 @@ impl Term {
 
     /// Builds a term given a field, and a `u64`-value
     pub fn from_field_u64(field: Field, val: u64) -> Term {
-        Term::from_columnar_value(field, &val)
+        Term::from_columnar_value_64(field, &val)
+    }
+
+    /// Builds a term given a field, and a `u128`-value
+    pub fn from_field_u128(field: Field, val: u128) -> Term {
+        Term::from_columnar_value_128(field, &val)
     }
 
     /// Builds a term given a field, and a `i64`-value
     pub fn from_field_i64(field: Field, val: i64) -> Term {
-        Term::from_columnar_value(field, &val)
+        Term::from_columnar_value_64(field, &val)
     }
 
     /// Builds a term given a field, and a `f64`-value
     pub fn from_field_f64(field: Field, val: f64) -> Term {
-        Term::from_columnar_value(field, &val)
+        Term::from_columnar_value_64(field, &val)
     }
 
     /// Builds a term given a field, and a `bool`-value
     pub fn from_field_bool(field: Field, val: bool) -> Term {
-        Term::from_columnar_value(field, &val)
+        Term::from_columnar_value_64(field, &val)
     }
 
     /// Builds a term given a field, and a `DateTime` value
     pub fn from_field_date(field: Field, val: DateTime) -> Term {
-        Term::from_columnar_value(field, &val.truncate(DATE_TIME_PRECISION_INDEXED))
+        Term::from_columnar_value_64(field, &val.truncate(DATE_TIME_PRECISION_INDEXED))
     }
 
     /// Builds a term given a field, and a string value
@@ -153,38 +170,50 @@ impl Term {
     /// The use of BigEndian has the benefit of preserving
     /// the natural order of the values.
     pub fn set_u64(&mut self, val: u64) {
-        self.set_columnar_value(val);
+        self.set_columnar_value_64(val);
     }
 
     /// Sets a `i64` value in the term.
     pub fn set_i64(&mut self, val: i64) {
-        self.set_columnar_value(val);
+        self.set_columnar_value_64(val);
     }
 
     /// Sets a `DateTime` value in the term.
     pub fn set_date(&mut self, date: DateTime) {
-        self.set_columnar_value(date);
+        self.set_columnar_value_64(date);
     }
 
     /// Sets a `f64` value in the term.
     pub fn set_f64(&mut self, val: f64) {
-        self.set_columnar_value(val);
+        self.set_columnar_value_64(val);
     }
 
     /// Sets a `bool` value in the term.
     pub fn set_bool(&mut self, val: bool) {
-        self.set_columnar_value(val);
+        self.set_columnar_value_64(val);
     }
 
-    fn set_columnar_value<T: ColumnarValue>(&mut self, val: T) {
+    /// Sets a `u128` value in the term.
+    pub fn set_u128(&mut self, val: u128) {
+        self.set_columnar_value_128(val);
+    }
+
+    fn set_columnar_value_64<T: ColumnarValue + MonotonicallyMappableToU64>(&mut self, val: T) {
         self.set_bytes(val.to_u64().to_be_bytes().as_ref());
+    }
+
+    fn set_columnar_value_128<T: ColumnarValue + MonotonicallyMappableToU128>(&mut self, val: T) {
+        self.set_bytes(val.to_u128().to_be_bytes().as_ref());
     }
 
     /// Append a type marker + columnar value to a term.
     /// This is used in JSON type to append a columnar value after the path.
     ///
     /// It will not clear existing bytes.
-    pub fn append_type_and_columnar_value<T: ColumnarValue>(&mut self, val: T) {
+    pub fn append_type_and_columnar_value_64<T: ColumnarValue + MonotonicallyMappableToU64>(
+        &mut self,
+        val: T,
+    ) {
         self.0.push(T::to_type().to_code());
         let value = if T::to_type() == Type::Date {
             DateTime::from_u64(val.to_u64())
@@ -194,6 +223,15 @@ impl Term {
             val.to_u64()
         };
         self.0.extend(value.to_be_bytes().as_ref());
+    }
+
+    /// Append a type marker + columnar value to a term.
+    pub fn append_type_and_columnar_value_128<T: ColumnarValue + MonotonicallyMappableToU128>(
+        &mut self,
+        val: T,
+    ) {
+        self.0.push(T::to_type().to_code());
+        self.0.extend(val.to_u128().to_be_bytes().as_ref());
     }
 
     /// Append a string type marker + string to a term.
@@ -341,10 +379,14 @@ where
     /// Returns `None` if the term is not of the u64 type, or if the term byte representation
     /// is invalid.
     pub fn as_u64(&self) -> Option<u64> {
-        self.get_columnar_type::<u64>()
+        self.get_columnar_type_64::<u64>()
     }
 
-    fn get_columnar_type<T: ColumnarValue>(&self) -> Option<T> {
+    pub fn as_u128(&self) -> Option<u128> {
+        self.get_columnar_type_128::<u128>()
+    }
+
+    fn get_columnar_type_64<T: ColumnarValue + MonotonicallyMappableToU64>(&self) -> Option<T> {
         if self.typ() != T::to_type() {
             return None;
         }
@@ -353,12 +395,21 @@ where
         Some(T::from_u64(value_u64))
     }
 
+    fn get_columnar_type_128<T: ColumnarValue + MonotonicallyMappableToU128>(&self) -> Option<T> {
+        if self.typ() != T::to_type() {
+            return None;
+        }
+        let value_bytes = self.value_bytes();
+        let value_u128 = u128::from_be_bytes(value_bytes.try_into().ok()?);
+        Some(T::from_u128(value_u128))
+    }
+
     /// Returns the `i64` value stored in a term.
     ///
     /// Returns `None` if the term is not of the i64 type, or if the term byte representation
     /// is invalid.
     pub fn as_i64(&self) -> Option<i64> {
-        self.get_columnar_type::<i64>()
+        self.get_columnar_type_64::<i64>()
     }
 
     /// Returns the `f64` value stored in a term.
@@ -366,7 +417,7 @@ where
     /// Returns `None` if the term is not of the f64 type, or if the term byte representation
     /// is invalid.
     pub fn as_f64(&self) -> Option<f64> {
-        self.get_columnar_type::<f64>()
+        self.get_columnar_type_64::<f64>()
     }
 
     /// Returns the `bool` value stored in a term.
@@ -374,7 +425,7 @@ where
     /// Returns `None` if the term is not of the bool type, or if the term byte representation
     /// is invalid.
     pub fn as_bool(&self) -> Option<bool> {
-        self.get_columnar_type::<bool>()
+        self.get_columnar_type_64::<bool>()
     }
 
     /// Returns the `Date` value stored in a term.
@@ -382,7 +433,7 @@ where
     /// Returns `None` if the term is not of the Date type, or if the term byte representation
     /// is invalid.
     pub fn as_date(&self) -> Option<DateTime> {
-        self.get_columnar_type::<DateTime>()
+        self.get_columnar_type_64::<DateTime>()
     }
 
     /// Returns the text associated with the term.
@@ -491,6 +542,9 @@ where
             }
             Type::Bytes => {
                 write_opt(f, self.as_bytes())?;
+            }
+            Type::U128 => {
+                write_opt(f, self.as_u128())?;
             }
             Type::Json => {
                 if let Some((path_bytes, sub_value_bytes)) = self.as_json() {

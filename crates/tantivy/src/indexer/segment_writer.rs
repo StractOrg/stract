@@ -253,6 +253,20 @@ impl SegmentWriter {
                         self.fieldnorms_writer.record(doc_id, field, num_vals);
                     }
                 }
+                FieldType::U128(_) => {
+                    let mut num_vals = 0;
+                    for value in values {
+                        let value = value.as_value();
+
+                        num_vals += 1;
+                        let u128_val = value.as_u128().ok_or_else(make_schema_error)?;
+                        term_buffer.set_u128(u128_val);
+                        postings_writer.subscribe(doc_id, 0u32, term_buffer, ctx);
+                    }
+                    if field_entry.has_fieldnorms() {
+                        self.fieldnorms_writer.record(doc_id, field, num_vals);
+                    }
+                }
                 FieldType::Date(_) => {
                     let mut num_vals = 0;
                     for value in values {
@@ -490,6 +504,7 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::collector::{Count, TopDocs};
+    use crate::columnar::MonotonicallyMappableToU64;
     use crate::columnfield::ColumnarValue;
     use crate::directory::RamDirectory;
     use crate::postings::{Postings, TermInfo};
@@ -683,8 +698,11 @@ mod tests {
         let term_from_path =
             |path: &str| -> Term { Term::from_field_json_path(json_field, path, false) };
 
-        fn set_columnar_val<T: ColumnarValue>(val: T, mut term: Term) -> Term {
-            term.append_type_and_columnar_value(val);
+        fn set_columnar_val_64<T: ColumnarValue + MonotonicallyMappableToU64>(
+            val: T,
+            mut term: Term,
+        ) -> Term {
+            term.append_type_and_columnar_value_64(val);
             term
         }
         fn set_str(val: &str, mut term: Term) -> Term {
@@ -696,14 +714,14 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_columnar_val(true, term).serialized_value_bytes()
+            set_columnar_val_64(true, term).serialized_value_bytes()
         );
 
         let term = term_from_path("complexobject.field\\.with\\.dot");
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_columnar_val(1i64, term).serialized_value_bytes()
+            set_columnar_val_64(1i64, term).serialized_value_bytes()
         );
 
         // Date
@@ -712,7 +730,7 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_columnar_val(
+            set_columnar_val_64(
                 DateTime::from_utc(
                     OffsetDateTime::parse("1985-04-12T23:20:50.52Z", &Rfc3339).unwrap(),
                 ),
@@ -726,7 +744,7 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_columnar_val(-0.2f64, term).serialized_value_bytes()
+            set_columnar_val_64(-0.2f64, term).serialized_value_bytes()
         );
 
         // Number In Array
@@ -734,21 +752,21 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_columnar_val(2i64, term).serialized_value_bytes()
+            set_columnar_val_64(2i64, term).serialized_value_bytes()
         );
 
         let term = term_from_path("my_arr");
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_columnar_val(3i64, term).serialized_value_bytes()
+            set_columnar_val_64(3i64, term).serialized_value_bytes()
         );
 
         let term = term_from_path("my_arr");
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_columnar_val(4i64, term).serialized_value_bytes()
+            set_columnar_val_64(4i64, term).serialized_value_bytes()
         );
 
         // El in Array
@@ -770,7 +788,7 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_columnar_val(-2i64, term).serialized_value_bytes()
+            set_columnar_val_64(-2i64, term).serialized_value_bytes()
         );
 
         let term = term_from_path("toto");
@@ -784,7 +802,7 @@ mod tests {
         assert!(term_stream.advance());
         assert_eq!(
             term_stream.key(),
-            set_columnar_val(1i64, term).serialized_value_bytes()
+            set_columnar_val_64(1i64, term).serialized_value_bytes()
         );
 
         assert!(!term_stream.advance());

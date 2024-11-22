@@ -411,7 +411,7 @@ fn test_non_text_json_term_freq() {
     let inv_idx = segment_reader.inverted_index(field).unwrap();
 
     let mut term = Term::from_field_json_path(field, "tenant_id", false);
-    term.append_type_and_columnar_value(75i64);
+    term.append_type_and_columnar_value_64(75i64);
 
     let postings = inv_idx
         .read_postings(&term, IndexRecordOption::WithFreqsAndPositions)
@@ -445,7 +445,7 @@ fn test_non_text_json_term_freq_bitpacked() {
     let inv_idx = segment_reader.inverted_index(field).unwrap();
 
     let mut term = Term::from_field_json_path(field, "tenant_id", false);
-    term.append_type_and_columnar_value(75i64);
+    term.append_type_and_columnar_value_64(75i64);
 
     let mut postings = inv_idx
         .read_postings(&term, IndexRecordOption::WithFreqsAndPositions)
@@ -457,4 +457,28 @@ fn test_non_text_json_term_freq_bitpacked() {
         assert_eq!(postings.advance(), i);
         assert_eq!(postings.term_freq(), 1u32);
     }
+}
+
+#[test]
+fn test_u128_columnar_values() {
+    let mut schema_builder = Schema::builder();
+    let field = schema_builder.add_u128_field("u128", INDEXED);
+    let schema = schema_builder.build();
+    let index = Index::create_in_ram(schema);
+    let mut writer: IndexWriter = index.writer_for_tests().unwrap();
+    writer.add_document(doc!(field => 1u128)).unwrap();
+    writer.commit().unwrap();
+    let reader = index.reader().unwrap();
+    assert_eq!(reader.searcher().num_docs(), 1);
+
+    let searcher = reader.searcher();
+    let segment_reader = searcher.segment_reader(0u32);
+    let inv_idx = segment_reader.inverted_index(field).unwrap();
+    let term = Term::from_field_u128(field, 1u128);
+    let postings = inv_idx
+        .read_postings(&term, IndexRecordOption::WithFreqsAndPositions)
+        .unwrap()
+        .unwrap();
+    assert_eq!(postings.doc(), 0);
+    assert_eq!(postings.term_freq(), 1u32);
 }

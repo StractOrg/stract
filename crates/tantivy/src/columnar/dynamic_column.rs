@@ -15,6 +15,7 @@ pub enum DynamicColumn {
     I64(Column<i64>),
     U64(Column<u64>),
     F64(Column<f64>),
+    U128(Column<u128>),
     DateTime(Column<DateTime>),
     Bytes(BytesColumn),
 }
@@ -29,6 +30,7 @@ impl fmt::Debug for DynamicColumn {
             DynamicColumn::F64(col) => write!(f, "{col:?}")?,
             DynamicColumn::DateTime(col) => write!(f, "{col:?}")?,
             DynamicColumn::Bytes(col) => write!(f, "{col:?}")?,
+            DynamicColumn::U128(col) => write!(f, "{col:?}")?,
         }
         write!(f, "]")
     }
@@ -43,6 +45,7 @@ impl DynamicColumn {
             DynamicColumn::F64(c) => &c.index,
             DynamicColumn::DateTime(c) => &c.index,
             DynamicColumn::Bytes(c) => &c.ords().index,
+            DynamicColumn::U128(c) => &c.index,
         }
     }
 
@@ -54,6 +57,7 @@ impl DynamicColumn {
             DynamicColumn::F64(c) => c.values.num_vals(),
             DynamicColumn::DateTime(c) => c.values.num_vals(),
             DynamicColumn::Bytes(c) => c.ords().values.num_vals(),
+            DynamicColumn::U128(c) => c.values.num_vals(),
         }
     }
 
@@ -65,6 +69,7 @@ impl DynamicColumn {
             DynamicColumn::F64(_) => ColumnType::F64,
             DynamicColumn::DateTime(_) => ColumnType::DateTime,
             DynamicColumn::Bytes(_) => ColumnType::Bytes,
+            DynamicColumn::U128(_) => ColumnType::U128,
         }
     }
 
@@ -73,6 +78,7 @@ impl DynamicColumn {
             NumericalType::I64 => self.coerce_to_i64(),
             NumericalType::U64 => self.coerce_to_u64(),
             NumericalType::F64 => self.coerce_to_f64(),
+            NumericalType::U128 => self.coerce_to_u128(),
         }
     }
 
@@ -131,6 +137,12 @@ impl DynamicColumn {
                 }))
             }
             DynamicColumn::U64(_) => Some(self),
+            _ => None,
+        }
+    }
+    fn coerce_to_u128(self) -> Option<DynamicColumn> {
+        match self {
+            DynamicColumn::U128(_) => Some(self),
             _ => None,
         }
     }
@@ -210,6 +222,7 @@ static_dynamic_conversions!(Column<i64>, I64);
 static_dynamic_conversions!(Column<f64>, F64);
 static_dynamic_conversions!(Column<DateTime>, DateTime);
 static_dynamic_conversions!(BytesColumn, Bytes);
+static_dynamic_conversions!(Column<u128>, U128);
 
 #[derive(Clone, Debug)]
 pub struct DynamicColumnHandle {
@@ -230,15 +243,7 @@ impl DynamicColumnHandle {
     }
 
     /// Returns the `u64` columnar field reader reader associated with `fields` of types
-    /// Str, u64, i64, f64, bool, ip, or datetime.
-    ///
-    /// Notice that for IpAddr, the columnfield reader will return the u64 representation of the
-    /// IpAddr.
-    /// In order to convert to u128 back cast to `CompactSpaceU64Accessor` and call
-    /// `compact_to_u128`.
-    ///
-    /// If not, the columnfield reader will returns the u64-value associated with the original
-    /// FastValue.
+    /// Str, u64, i64, f64, bool, or datetime.
     pub fn open_u64_lenient(&self) -> io::Result<Option<Column<u64>>> {
         let column_bytes = self.file_slice.read_bytes()?;
         match self.column_type {
@@ -254,6 +259,7 @@ impl DynamicColumnHandle {
                 let column = super::column::open_column_u64::<u64>(column_bytes)?;
                 Ok(Some(column))
             }
+            ColumnType::U128 => Ok(None),
         }
     }
 
@@ -264,6 +270,7 @@ impl DynamicColumnHandle {
             ColumnType::U64 => super::column::open_column_u64::<u64>(column_bytes)?.into(),
             ColumnType::F64 => super::column::open_column_u64::<f64>(column_bytes)?.into(),
             ColumnType::Bool => super::column::open_column_u64::<bool>(column_bytes)?.into(),
+            ColumnType::U128 => super::column::open_column_u128::<u128>(column_bytes)?.into(),
             ColumnType::DateTime => {
                 super::column::open_column_u64::<DateTime>(column_bytes)?.into()
             }

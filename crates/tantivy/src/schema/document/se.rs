@@ -105,6 +105,11 @@ where
 
                     val.serialize(self.writer)
                 }
+                ReferenceValueLeaf::U128(val) => {
+                    self.write_type_code(type_codes::U128_CODE)?;
+
+                    val.serialize(self.writer)
+                }
                 ReferenceValueLeaf::I64(val) => {
                     self.write_type_code(type_codes::I64_CODE)?;
 

@@ -9,7 +9,9 @@ use std::sync::Arc;
 pub use merge_mapping::{MergeRowOrder, ShuffleMergeOrder, StackMergeOrder};
 
 use super::writer::ColumnarSerializer;
-use crate::columnar::column::serialize_column_mappable_to_u64;
+use crate::columnar::column::{
+    serialize_column_mappable_to_u128, serialize_column_mappable_to_u64,
+};
 use crate::columnar::column_values::MergedColumnValues;
 use crate::columnar::columnar::merge::merge_dict_column::merge_bytes_or_str_column;
 use crate::columnar::columnar::writer::CompatibleNumericalTypes;
@@ -43,6 +45,7 @@ impl From<ColumnType> for ColumnTypeCategory {
             ColumnType::I64 => ColumnTypeCategory::Numerical,
             ColumnType::U64 => ColumnTypeCategory::Numerical,
             ColumnType::F64 => ColumnTypeCategory::Numerical,
+            ColumnType::U128 => ColumnTypeCategory::Numerical,
             ColumnType::Bytes => ColumnTypeCategory::Bytes,
             ColumnType::Bool => ColumnTypeCategory::Bool,
             ColumnType::DateTime => ColumnTypeCategory::DateTime,
@@ -113,6 +116,14 @@ fn dynamic_column_to_u64_monotonic(dynamic_column: DynamicColumn) -> Option<Colu
         DynamicColumn::F64(column) => Some(column.to_u64_monotonic()),
         DynamicColumn::DateTime(column) => Some(column.to_u64_monotonic()),
         DynamicColumn::Bytes(_) => None,
+        DynamicColumn::U128(_) => None,
+    }
+}
+
+fn dynamic_column_to_u128_monotonic(dynamic_column: DynamicColumn) -> Option<Column<u128>> {
+    match dynamic_column {
+        DynamicColumn::U128(column) => Some(column.to_u128_monotonic()),
+        _ => None,
     }
 }
 
@@ -147,6 +158,28 @@ fn merge_column(
                 merge_row_order,
             };
             serialize_column_mappable_to_u64(merged_column_index, &merge_column_values, wrt)?;
+        }
+        ColumnType::U128 => {
+            let mut column_indexes: Vec<ColumnIndex> = Vec::with_capacity(columns.len());
+            let mut column_values: Vec<Option<Arc<dyn ColumnValues<u128>>>> =
+                Vec::with_capacity(columns.len());
+            for dynamic_column_opt in columns {
+                if let Some(Column { index: idx, values }) =
+                    dynamic_column_opt.and_then(dynamic_column_to_u128_monotonic)
+                {
+                    column_indexes.push(idx);
+                    column_values.push(Some(values));
+                }
+            }
+
+            let merged_column_index =
+                crate::columnar::column_index::merge_column_index(merge_row_order);
+            let merge_column_values = MergedColumnValues {
+                column_indexes: &column_indexes[..],
+                column_values: &column_values[..],
+                merge_row_order,
+            };
+            serialize_column_mappable_to_u128(merged_column_index, &merge_column_values, wrt)?;
         }
         ColumnType::Bytes => {
             let mut column_indexes: Vec<ColumnIndex> = Vec::with_capacity(columns.len());
@@ -363,6 +396,7 @@ fn min_max_if_numerical(column: &DynamicColumn) -> Option<(NumericalValue, Numer
         DynamicColumn::I64(column) => Some((column.min_value().into(), column.max_value().into())),
         DynamicColumn::U64(column) => Some((column.min_value().into(), column.max_value().into())),
         DynamicColumn::F64(column) => Some((column.min_value().into(), column.max_value().into())),
+        DynamicColumn::U128(column) => Some((column.min_value().into(), column.max_value().into())),
         DynamicColumn::Bool(_) | DynamicColumn::DateTime(_) | DynamicColumn::Bytes(_) => None,
     }
 }

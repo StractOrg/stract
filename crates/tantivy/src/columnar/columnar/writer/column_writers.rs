@@ -148,6 +148,7 @@ impl CompatibleNumericalTypes {
                 NumericalType::I64 => *all_values_within_i64_range,
                 NumericalType::U64 => *all_values_within_u64_range,
                 NumericalType::F64 => true,
+                NumericalType::U128 => true,
             },
             CompatibleNumericalTypes::StaticType(static_numerical_type) => {
                 *static_numerical_type == numerical_type
@@ -171,6 +172,9 @@ impl CompatibleNumericalTypes {
                 }
                 NumericalValue::F64(_) => {
                     *all_values_within_i64_range = false;
+                    *all_values_within_u64_range = false;
+                }
+                NumericalValue::U128(_) => {
                     *all_values_within_u64_range = false;
                 }
             },

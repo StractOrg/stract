@@ -91,6 +91,15 @@ impl<'a> Value<'a> for &'a u64 {
     }
 }
 
+impl<'a> Value<'a> for &'a u128 {
+    type ArrayIter = Empty<&'a u128>;
+    type ObjectIter = Empty<(&'a str, &'a u128)>;
+    #[inline]
+    fn as_value(&self) -> ReferenceValue<'a, Self> {
+        ReferenceValue::Leaf(ReferenceValueLeaf::U128(**self))
+    }
+}
+
 impl<'a> Value<'a> for &'a i64 {
     type ArrayIter = Empty<&'a i64>;
     type ObjectIter = Empty<(&'a str, &'a i64)>;

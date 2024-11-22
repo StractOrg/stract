@@ -150,6 +150,13 @@ impl ColumnFieldsWriter {
                         NumericalValue::from(val),
                     );
                 }
+                ReferenceValueLeaf::U128(val) => {
+                    self.columnar_writer.record_numerical(
+                        doc_id,
+                        field_name,
+                        NumericalValue::from(val),
+                    );
+                }
                 ReferenceValueLeaf::I64(val) => {
                     self.columnar_writer.record_numerical(
                         doc_id,
@@ -265,6 +272,13 @@ fn record_json_value_to_columnar_writer<'a, V: Value<'a>>(
             ReferenceValueLeaf::Null => {} // TODO: Handle null
             ReferenceValueLeaf::Str(_) => {}
             ReferenceValueLeaf::U64(val) => {
+                columnar_writer.record_numerical(
+                    doc,
+                    json_path_writer.as_str(),
+                    NumericalValue::from(val),
+                );
+            }
+            ReferenceValueLeaf::U128(val) => {
                 columnar_writer.record_numerical(
                     doc,
                     json_path_writer.as_str(),

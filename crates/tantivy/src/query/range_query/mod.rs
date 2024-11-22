@@ -14,7 +14,7 @@ pub(crate) fn is_type_valid_for_columnfield_range_query(typ: Type) -> bool {
     match typ {
         Type::U64 | Type::I64 | Type::F64 | Type::Bool | Type::Date => true,
         Type::IpAddr => true,
-        Type::Str | Type::Bytes | Type::Json => false,
+        Type::Str | Type::Bytes | Type::Json | Type::U128 => false,
     }
 }
 

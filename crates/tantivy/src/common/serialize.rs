@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::io::{Read, Write};
+use std::num::NonZeroU64;
 use std::{fmt, io};
 
 use byteorder::{ReadBytesExt, WriteBytesExt};
@@ -284,6 +285,24 @@ impl<'a> BinarySerializable for Cow<'a, [u8]> {
             items.push(item);
         }
         Ok(Cow::Owned(items))
+    }
+}
+
+impl BinarySerializable for NonZeroU64 {
+    fn serialize<W: Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
+        self.get().serialize(writer)
+    }
+
+    fn deserialize<R: Read>(reader: &mut R) -> io::Result<Self> {
+        let val = u64::deserialize(reader)?;
+        if val == 0 {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "zero is not a valid NonZeroU64",
+            ))
+        } else {
+            Ok(NonZeroU64::new(val).unwrap())
+        }
     }
 }
 

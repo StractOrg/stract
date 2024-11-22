@@ -30,6 +30,8 @@ pub enum OwnedValue {
     PreTokStr(PreTokenizedString),
     /// Unsigned 64-bits Integer `u64`
     U64(u64),
+    /// Unsigned 128-bits Integer `u128`
+    U128(u128),
     /// Signed 64-bits Integer `i64`
     I64(i64),
     /// 64-bits Float `f64`
@@ -65,6 +67,7 @@ impl<'a> Value<'a> for &'a OwnedValue {
             OwnedValue::Str(val) => ReferenceValueLeaf::Str(val).into(),
             OwnedValue::PreTokStr(val) => ReferenceValueLeaf::PreTokStr(val.clone().into()).into(),
             OwnedValue::U64(val) => ReferenceValueLeaf::U64(*val).into(),
+            OwnedValue::U128(val) => ReferenceValueLeaf::U128(*val).into(),
             OwnedValue::I64(val) => ReferenceValueLeaf::I64(*val).into(),
             OwnedValue::F64(val) => ReferenceValueLeaf::F64(*val).into(),
             OwnedValue::Bool(val) => ReferenceValueLeaf::Bool(*val).into(),
@@ -97,6 +100,10 @@ impl ValueDeserialize for OwnedValue {
 
             fn visit_u64(&self, val: u64) -> Result<Self::Value, DeserializeError> {
                 Ok(OwnedValue::U64(val))
+            }
+
+            fn visit_u128(&self, val: u128) -> Result<Self::Value, DeserializeError> {
+                Ok(OwnedValue::U128(val))
             }
 
             fn visit_i64(&self, val: i64) -> Result<Self::Value, DeserializeError> {
@@ -174,6 +181,7 @@ impl serde::Serialize for OwnedValue {
             OwnedValue::Str(ref v) => serializer.serialize_str(v),
             OwnedValue::PreTokStr(ref v) => v.serialize(serializer),
             OwnedValue::U64(u) => serializer.serialize_u64(u),
+            OwnedValue::U128(u) => serializer.serialize_u128(u),
             OwnedValue::I64(u) => serializer.serialize_i64(u),
             OwnedValue::F64(u) => serializer.serialize_f64(u),
             OwnedValue::Bool(b) => serializer.serialize_bool(b),
@@ -225,6 +233,10 @@ impl<'de> serde::Deserialize<'de> for OwnedValue {
 
             fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E> {
                 Ok(OwnedValue::U64(v))
+            }
+
+            fn visit_u128<E>(self, v: u128) -> Result<Self::Value, E> {
+                Ok(OwnedValue::U128(v))
             }
 
             fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E> {
@@ -282,6 +294,7 @@ impl<'a, V: Value<'a>> From<ReferenceValue<'a, V>> for OwnedValue {
                 ReferenceValueLeaf::Null => OwnedValue::Null,
                 ReferenceValueLeaf::Str(val) => OwnedValue::Str(val.to_string()),
                 ReferenceValueLeaf::U64(val) => OwnedValue::U64(val),
+                ReferenceValueLeaf::U128(val) => OwnedValue::U128(val),
                 ReferenceValueLeaf::I64(val) => OwnedValue::I64(val),
                 ReferenceValueLeaf::F64(val) => OwnedValue::F64(val),
                 ReferenceValueLeaf::Date(val) => OwnedValue::Date(val),

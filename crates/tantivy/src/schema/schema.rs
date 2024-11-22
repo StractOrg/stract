@@ -57,9 +57,23 @@ impl SchemaBuilder {
         self.add_field(field_entry)
     }
 
-    /// Adds a new i64 field.
+    /// Adds a new u128 field.
     /// Returns the associated field handle
     ///
+    /// # Panics
+    ///
+    /// Panics when field already exists.
+    pub fn add_u128_field<T: Into<NumericOptions>>(
+        &mut self,
+        field_name_str: &str,
+        field_options: T,
+    ) -> Field {
+        let field_name = String::from(field_name_str);
+        let field_entry = FieldEntry::new_u128(field_name, field_options.into());
+        self.add_field(field_entry)
+    }
+
+    /// Adds a new i64 field.
     /// # Panics
     ///
     /// Panics when field already exists.

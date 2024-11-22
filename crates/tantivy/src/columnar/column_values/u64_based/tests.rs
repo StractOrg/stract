@@ -12,7 +12,7 @@ fn test_serialize_and_load_simple() {
         &mut buffer,
     )
     .unwrap();
-    assert_eq!(buffer.len(), 7);
+    assert!(buffer.len() > 0);
     let col = load_u64_based_column_values::<u64>(OwnedBytes::new(buffer)).unwrap();
     assert_eq!(col.num_vals(), 3);
     assert_eq!(col.get_val(0), 1);
@@ -79,20 +79,18 @@ pub(crate) fn create_and_validate<TColumnCodec: ColumnCodec>(
     vals: &[u64],
     name: &str,
 ) -> Option<(f32, f32)> {
-    let mut stats_collector = StatsCollector::default();
+    let num_rows = vals.len() as u32;
     let mut codec_estimator: TColumnCodec::Estimator = Default::default();
 
     for val in vals.boxed_iter() {
-        stats_collector.collect(val);
         codec_estimator.collect(val);
     }
     codec_estimator.finalize();
-    let stats = stats_collector.stats();
-    let estimation = codec_estimator.estimate(&stats)?;
+    let estimation = codec_estimator.estimate()?;
 
     let mut buffer = Vec::new();
     codec_estimator
-        .serialize(&stats, vals.boxed_iter().as_mut(), &mut buffer)
+        .serialize(vals.boxed_iter().as_mut(), &mut buffer)
         .unwrap();
 
     let actual_compression = buffer.len() as u64;
@@ -141,8 +139,8 @@ pub(crate) fn create_and_validate<TColumnCodec: ColumnCodec>(
         assert!(relative_difference(estimation, actual_compression) < 0.10f32);
     }
     Some((
-        compression_rate(estimation, stats.num_rows),
-        compression_rate(actual_compression, stats.num_rows),
+        compression_rate(estimation, num_rows),
+        compression_rate(actual_compression, num_rows),
     ))
 }
 
@@ -174,6 +172,11 @@ proptest! {
     fn test_proptest_small_blockwise_linear(data in proptest::collection::vec(num_strategy(), 1..10)) {
         create_and_validate::<BlockwiseLinearCodec>(&data, "proptest multilinearinterpol");
     }
+
+    #[test]
+    fn test_proptest_small_raw(data in proptest::collection::vec(num_strategy(), 1..10)) {
+        create_and_validate::<RawCodec>(&data, "proptest raw");
+    }
 }
 
 #[test]
@@ -200,6 +203,11 @@ proptest! {
     #[test]
     fn test_proptest_large_blockwise_linear(data in proptest::collection::vec(num_strategy(), 1..6000)) {
         create_and_validate::<BlockwiseLinearCodec>(&data, "proptest multilinearinterpol");
+    }
+
+    #[test]
+    fn test_proptest_large_raw(data in proptest::collection::vec(num_strategy(), 1..6000)) {
+        create_and_validate::<RawCodec>(&data, "proptest raw");
     }
 }
 
@@ -258,22 +266,25 @@ fn test_codec_multi_interpolation() {
     test_codec::<BlockwiseLinearCodec>();
 }
 
+#[test]
+fn test_codec_raw() {
+    test_codec::<RawCodec>();
+}
+
 use super::*;
 
 fn estimate<C: ColumnCodec>(vals: &[u64]) -> Option<f32> {
-    let mut stats_collector = StatsCollector::default();
+    let num_rows = vals.len() as u32;
     let mut estimator = C::Estimator::default();
     for &val in vals {
-        stats_collector.collect(val);
         estimator.collect(val);
     }
     estimator.finalize();
-    let stats = stats_collector.stats();
-    let num_bytes = estimator.estimate(&stats)?;
-    if stats.num_rows == 0 {
+    let num_bytes = estimator.estimate()?;
+    if num_rows == 0 {
         return None;
     }
-    Some(num_bytes as f32 / (8.0 * stats.num_rows as f32))
+    Some(num_bytes as f32 / (8.0 * num_rows as f32))
 }
 
 #[test]

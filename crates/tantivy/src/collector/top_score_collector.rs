@@ -2,7 +2,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::columnar::ColumnValues;
+use crate::columnar::{ColumnValues, MonotonicallyMappableToU64};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -31,7 +31,7 @@ impl<TCollector, TColumnarValue> Collector
     for ColumnFieldConvertCollector<TCollector, TColumnarValue>
 where
     TCollector: Collector<Fruit = Vec<(u64, DocAddress)>>,
-    TColumnarValue: ColumnarValue,
+    TColumnarValue: ColumnarValue + MonotonicallyMappableToU64,
 {
     type Fruit = Vec<(TColumnarValue, DocAddress)>;
 
@@ -273,7 +273,7 @@ impl TopDocs {
         order: Order,
     ) -> impl Collector<Fruit = Vec<(TColumnarValue, DocAddress)>>
     where
-        TColumnarValue: ColumnarValue,
+        TColumnarValue: ColumnarValue + MonotonicallyMappableToU64,
     {
         let u64_collector = self.order_by_u64_field(column_field.to_string(), order.clone());
         ColumnFieldConvertCollector {

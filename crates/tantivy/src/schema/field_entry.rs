@@ -40,6 +40,11 @@ impl FieldEntry {
         Self::new(field_name, FieldType::U64(int_options))
     }
 
+    /// Creates a new u128 field entry.
+    pub fn new_u128(field_name: String, int_options: NumericOptions) -> FieldEntry {
+        Self::new(field_name, FieldType::U128(int_options))
+    }
+
     /// Creates a new i64 field entry.
     pub fn new_i64(field_name: String, int_options: NumericOptions) -> FieldEntry {
         Self::new(field_name, FieldType::I64(int_options))
@@ -120,6 +125,7 @@ impl FieldEntry {
     pub fn is_stored(&self) -> bool {
         match self.field_type {
             FieldType::U64(ref options)
+            | FieldType::U128(ref options)
             | FieldType::I64(ref options)
             | FieldType::F64(ref options)
             | FieldType::Bool(ref options) => options.is_stored(),

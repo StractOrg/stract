@@ -1,11 +1,14 @@
 use std::io;
 
 use crate::bitpacker::{compute_num_bits, BitPacker, BitUnpacker};
+use crate::columnar::column_values::stats::{
+    ColumnStatsCollector, MinMaxCollector, NumRowsCollector,
+};
 use crate::common::{BinarySerializable, OwnedBytes};
 
 use super::line::Line;
 use super::ColumnValues;
-use crate::columnar::column_values::u64_based::{ColumnCodec, ColumnCodecEstimator, ColumnStats};
+use crate::columnar::column_values::u64_based::{ColumnCodec, ColumnCodecEstimator};
 use crate::columnar::column_values::VecColumn;
 use crate::columnar::RowId;
 
@@ -18,7 +21,9 @@ const LINE_ESTIMATION_BLOCK_LEN: usize = 512;
 pub struct LinearReader {
     data: OwnedBytes,
     linear_params: LinearParams,
-    stats: ColumnStats,
+    min_value: u64,
+    max_value: u64,
+    num_rows: u32,
 }
 
 impl ColumnValues for LinearReader {
@@ -31,17 +36,17 @@ impl ColumnValues for LinearReader {
 
     #[inline(always)]
     fn min_value(&self) -> u64 {
-        self.stats.min_value
+        self.min_value
     }
 
     #[inline(always)]
     fn max_value(&self) -> u64 {
-        self.stats.max_value
+        self.max_value
     }
 
     #[inline]
     fn num_vals(&self) -> u32 {
-        self.stats.num_rows
+        self.num_rows
     }
 }
 
@@ -80,6 +85,8 @@ pub struct LinearCodecEstimator {
     max_deviation: u64,
     first_val: u64,
     last_val: u64,
+    min_max_collector: MinMaxCollector<u64>,
+    num_rows_collector: NumRowsCollector,
 }
 
 impl Default for LinearCodecEstimator {
@@ -92,6 +99,8 @@ impl Default for LinearCodecEstimator {
             max_deviation: u64::MIN,
             first_val: 0u64,
             last_val: 0u64,
+            min_max_collector: MinMaxCollector::default(),
+            num_rows_collector: NumRowsCollector::default(),
         }
     }
 }
@@ -106,7 +115,7 @@ impl ColumnCodecEstimator for LinearCodecEstimator {
         }
     }
 
-    fn estimate(&self, stats: &ColumnStats) -> Option<u64> {
+    fn estimate(&self) -> Option<u64> {
         let line = self.line?;
         let amplitude = self.max_deviation - self.min_deviation;
         let num_bits = compute_num_bits(amplitude);
@@ -114,20 +123,27 @@ impl ColumnCodecEstimator for LinearCodecEstimator {
             line,
             bit_unpacker: BitUnpacker::new(num_bits),
         };
+
         Some(
-            stats.num_bytes()
+            self.min_max_collector.num_bytes()
+                + self.num_rows_collector.as_u64().num_bytes()
                 + linear_params.num_bytes()
-                + (num_bits as u64 * stats.num_rows as u64 + 7) / 8,
+                + (num_bits as u64 * self.num_rows_collector.as_u64().finalize() as u64 + 7) / 8,
         )
     }
 
     fn serialize(
         &self,
-        stats: &ColumnStats,
         vals: &mut dyn Iterator<Item = u64>,
         wrt: &mut dyn io::Write,
     ) -> io::Result<()> {
-        stats.serialize(wrt)?;
+        let num_rows = self.num_rows_collector.as_u64().finalize();
+        num_rows.serialize(wrt)?;
+
+        let (min_value, max_value) = self.min_max_collector.finalize();
+        min_value.serialize(wrt)?;
+        max_value.serialize(wrt)?;
+
         let line = self.line.unwrap();
         let amplitude = self.max_deviation - self.min_deviation;
         let num_bits = compute_num_bits(amplitude);
@@ -152,6 +168,9 @@ impl ColumnCodecEstimator for LinearCodecEstimator {
         } else {
             self.collect_before_line_estimation(value);
         }
+
+        self.min_max_collector.collect(value);
+        self.num_rows_collector.collect(value);
     }
 }
 
@@ -191,10 +210,14 @@ impl ColumnCodec for LinearCodec {
     type Estimator = LinearCodecEstimator;
 
     fn load(mut data: OwnedBytes) -> io::Result<Self::ColumnValues> {
-        let stats = ColumnStats::deserialize(&mut data)?;
+        let num_rows = u32::deserialize(&mut data)?;
+        let min_value = u64::deserialize(&mut data)?;
+        let max_value = u64::deserialize(&mut data)?;
         let linear_params = LinearParams::deserialize(&mut data)?;
         Ok(LinearReader {
-            stats,
+            min_value,
+            max_value,
+            num_rows,
             linear_params,
             data,
         })

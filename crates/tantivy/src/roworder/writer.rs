@@ -33,7 +33,8 @@ impl TryFrom<(crate::schema::Field, &crate::schema::FieldEntry)> for Field {
             | crate::schema::FieldType::Date(_)
             | crate::schema::FieldType::Bytes(_)
             | crate::schema::FieldType::JsonObject(_)
-            | crate::schema::FieldType::IpAddr(_) => {
+            | crate::schema::FieldType::IpAddr(_)
+            | crate::schema::FieldType::U128(_) => {
                 return Err(crate::TantivyError::SchemaError(format!(
                     "Field {:?} is not supported in row order",
                     entry
@@ -100,6 +101,7 @@ impl RowFieldsWriter {
                     | ReferenceValueLeaf::Date(_)
                     | ReferenceValueLeaf::Bytes(_)
                     | ReferenceValueLeaf::IpAddr(_)
+                    | ReferenceValueLeaf::U128(_)
                     | ReferenceValueLeaf::PreTokStr(_) => {}
 
                     ReferenceValueLeaf::U64(val) => {

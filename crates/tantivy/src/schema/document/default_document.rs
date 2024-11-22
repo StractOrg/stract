@@ -83,6 +83,11 @@ impl CompactDoc {
         self.add_leaf_field_value(field, value);
     }
 
+    /// Add a u128 field
+    pub fn add_u128(&mut self, field: Field, value: u128) {
+        self.add_leaf_field_value(field, value);
+    }
+
     /// Add a IP address field. Internally only Ipv6Addr is used.
     pub fn add_ip_addr(&mut self, field: Field, value: Ipv6Addr) {
         self.add_leaf_field_value(field, value);
@@ -238,6 +243,7 @@ impl CompactDoc {
             }
             ReferenceValueLeaf::Bytes(bytes) => write_bytes_into(&mut self.node_data, bytes),
             ReferenceValueLeaf::U64(num) => write_into(&mut self.node_data, num),
+            ReferenceValueLeaf::U128(num) => write_into(&mut self.node_data, num),
             ReferenceValueLeaf::I64(num) => write_into(&mut self.node_data, num),
             ReferenceValueLeaf::F64(num) => write_into(&mut self.node_data, num),
             ReferenceValueLeaf::Bool(b) => b as u32,
@@ -427,6 +433,11 @@ impl<'a> CompactDocValue<'a> {
                 .read_from::<u64>(addr)
                 .map(ReferenceValueLeaf::U64)
                 .map(Into::into),
+            ValueType::U128 => self
+                .container
+                .read_from::<u128>(addr)
+                .map(ReferenceValueLeaf::U128)
+                .map(Into::into),
             ValueType::I64 => self
                 .container
                 .read_from::<i64>(addr)
@@ -530,6 +541,8 @@ pub enum ValueType {
     Object = 11,
     /// Pre-tokenized str type,
     Array = 12,
+    /// Unsigned 128-bits Integer `u128`
+    U128 = 13,
 }
 
 impl BinarySerializable for ValueType {
@@ -540,7 +553,7 @@ impl BinarySerializable for ValueType {
 
     fn deserialize<R: Read>(reader: &mut R) -> io::Result<Self> {
         let num = u8::deserialize(reader)?;
-        let type_id = if (0..=12).contains(&num) {
+        let type_id = if (0..=13).contains(&num) {
             unsafe { std::mem::transmute::<u8, ValueType>(num) }
         } else {
             return Err(io::Error::new(
@@ -567,6 +580,7 @@ impl<'a> From<&ReferenceValueLeaf<'a>> for ValueType {
             ReferenceValueLeaf::Null => ValueType::Null,
             ReferenceValueLeaf::Str(_) => ValueType::Str,
             ReferenceValueLeaf::U64(_) => ValueType::U64,
+            ReferenceValueLeaf::U128(_) => ValueType::U128,
             ReferenceValueLeaf::I64(_) => ValueType::I64,
             ReferenceValueLeaf::F64(_) => ValueType::F64,
             ReferenceValueLeaf::Bool(_) => ValueType::Bool,

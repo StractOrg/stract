@@ -443,6 +443,10 @@ impl QueryParser {
                 let val: u64 = u64::from_str(phrase)?;
                 Ok(Term::from_field_u64(field, val))
             }
+            FieldType::U128(_) => {
+                let val: u128 = u128::from_str(phrase)?;
+                Ok(Term::from_field_u128(field, val))
+            }
             FieldType::I64(_) => {
                 let val: i64 = i64::from_str(phrase)?;
                 Ok(Term::from_field_i64(field, val))
@@ -528,6 +532,11 @@ impl QueryParser {
                 let val: u64 = u64::from_str(phrase)?;
                 let i64_term = Term::from_field_u64(field, val);
                 Ok(vec![LogicalLiteral::Term(i64_term)])
+            }
+            FieldType::U128(_) => {
+                let val: u128 = u128::from_str(phrase)?;
+                let u128_term = Term::from_field_u128(field, val);
+                Ok(vec![LogicalLiteral::Term(u128_term)])
             }
             FieldType::I64(_) => {
                 let val: i64 = i64::from_str(phrase)?;

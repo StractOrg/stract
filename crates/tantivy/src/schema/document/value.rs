@@ -40,6 +40,12 @@ pub trait Value<'a>: Send + Sync + Debug {
     }
 
     #[inline]
+    /// If the Value is a u128, returns the associated u128. Returns None otherwise.
+    fn as_u128(&self) -> Option<u128> {
+        self.as_leaf().and_then(|leaf| leaf.as_u128())
+    }
+
+    #[inline]
     /// If the Value is a i64, returns the associated i64. Returns None otherwise.
     fn as_i64(&self) -> Option<i64> {
         self.as_leaf().and_then(|leaf| leaf.as_i64())
@@ -113,6 +119,8 @@ pub enum ReferenceValueLeaf<'a> {
     Str(&'a str),
     /// Unsigned 64-bits Integer `u64`
     U64(u64),
+    /// Unsigned 128-bits Integer `u128`
+    U128(u128),
     /// Signed 64-bits Integer `i64`
     I64(i64),
     /// 64-bits Float `f64`
@@ -133,6 +141,13 @@ impl From<u64> for ReferenceValueLeaf<'_> {
     #[inline]
     fn from(value: u64) -> Self {
         ReferenceValueLeaf::U64(value)
+    }
+}
+
+impl From<u128> for ReferenceValueLeaf<'_> {
+    #[inline]
+    fn from(value: u128) -> Self {
+        ReferenceValueLeaf::U128(value)
     }
 }
 
@@ -199,6 +214,7 @@ impl<'a, T: Value<'a> + ?Sized> From<ReferenceValueLeaf<'a>> for ReferenceValue<
             ReferenceValueLeaf::Null => ReferenceValue::Leaf(ReferenceValueLeaf::Null),
             ReferenceValueLeaf::Str(val) => ReferenceValue::Leaf(ReferenceValueLeaf::Str(val)),
             ReferenceValueLeaf::U64(val) => ReferenceValue::Leaf(ReferenceValueLeaf::U64(val)),
+            ReferenceValueLeaf::U128(val) => ReferenceValue::Leaf(ReferenceValueLeaf::U128(val)),
             ReferenceValueLeaf::I64(val) => ReferenceValue::Leaf(ReferenceValueLeaf::I64(val)),
             ReferenceValueLeaf::F64(val) => ReferenceValue::Leaf(ReferenceValueLeaf::F64(val)),
             ReferenceValueLeaf::Date(val) => ReferenceValue::Leaf(ReferenceValueLeaf::Date(val)),
@@ -235,6 +251,16 @@ impl<'a> ReferenceValueLeaf<'a> {
     /// If the Value is a u64, returns the associated u64. Returns None otherwise.
     pub fn as_u64(&self) -> Option<u64> {
         if let Self::U64(val) = self {
+            Some(*val)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    /// If the Value is a u128, returns the associated u128. Returns None otherwise.
+    pub fn as_u128(&self) -> Option<u128> {
+        if let Self::U128(val) = self {
             Some(*val)
         } else {
             None
@@ -367,6 +393,12 @@ where
     /// If the Value is a u64, returns the associated u64. Returns None otherwise.
     pub fn as_u64(&self) -> Option<u64> {
         self.as_leaf().and_then(|leaf| leaf.as_u64())
+    }
+
+    #[inline]
+    /// If the Value is a u128, returns the associated u128. Returns None otherwise.
+    pub fn as_u128(&self) -> Option<u128> {
+        self.as_leaf().and_then(|leaf| leaf.as_u128())
     }
 
     #[inline]

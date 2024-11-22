@@ -159,6 +159,7 @@ pub(crate) fn value_type_to_column_type(typ: Type) -> Option<ColumnType> {
         Type::Bool => Some(ColumnType::Bool),
         Type::Date => Some(ColumnType::DateTime),
         Type::Bytes => Some(ColumnType::Bytes),
+        Type::U128 => Some(ColumnType::U128),
         Type::Json | Type::Str | Type::IpAddr => None,
     }
 }

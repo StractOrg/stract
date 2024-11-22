@@ -68,6 +68,8 @@ pub enum Type {
     Json = b'j',
     /// IpAddr
     IpAddr = b'p',
+    /// `u128`
+    U128 = b'U',
 }
 
 impl From<ColumnType> for Type {
@@ -78,6 +80,7 @@ impl From<ColumnType> for Type {
             ColumnType::F64 => Type::F64,
             ColumnType::Bool => Type::Bool,
             ColumnType::DateTime => Type::Date,
+            ColumnType::U128 => Type::U128,
             ColumnType::Bytes => Type::Bytes,
         }
     }
@@ -120,6 +123,7 @@ impl Type {
             Type::Bytes => "Bytes",
             Type::Json => "Json",
             Type::IpAddr => "IpAddr",
+            Type::U128 => "U128",
         }
     }
 
@@ -137,6 +141,7 @@ impl Type {
             b'b' => Some(Type::Bytes),
             b'j' => Some(Type::Json),
             b'p' => Some(Type::IpAddr),
+            b'U' => Some(Type::U128),
             _ => None,
         }
     }
@@ -167,6 +172,8 @@ pub enum FieldType {
     JsonObject(JsonObjectOptions),
     /// IpAddr field
     IpAddr(IpAddrOptions),
+    /// u128 field
+    U128(NumericOptions),
 }
 
 impl FieldType {
@@ -182,6 +189,7 @@ impl FieldType {
             FieldType::Bytes(_) => Type::Bytes,
             FieldType::JsonObject(_) => Type::Json,
             FieldType::IpAddr(_) => Type::IpAddr,
+            FieldType::U128(_) => Type::U128,
         }
     }
 
@@ -200,6 +208,7 @@ impl FieldType {
         match *self {
             FieldType::Str(ref text_options) => text_options.get_indexing_options().is_some(),
             FieldType::U64(ref int_options)
+            | FieldType::U128(ref int_options)
             | FieldType::I64(ref int_options)
             | FieldType::F64(ref int_options)
             | FieldType::Bool(ref int_options) => int_options.is_indexed(),
@@ -239,7 +248,8 @@ impl FieldType {
             FieldType::U64(ref int_options)
             | FieldType::I64(ref int_options)
             | FieldType::F64(ref int_options)
-            | FieldType::Bool(ref int_options) => int_options.is_columnar(),
+            | FieldType::Bool(ref int_options)
+            | FieldType::U128(ref int_options) => int_options.is_columnar(),
             FieldType::Date(ref date_options) => date_options.is_columnar(),
             FieldType::IpAddr(ref ip_addr_options) => ip_addr_options.is_columnar(),
             FieldType::JsonObject(ref json_object_options) => json_object_options.is_columnar(),
@@ -257,7 +267,8 @@ impl FieldType {
             FieldType::U64(ref int_options)
             | FieldType::I64(ref int_options)
             | FieldType::F64(ref int_options)
-            | FieldType::Bool(ref int_options) => int_options.is_row_order(),
+            | FieldType::Bool(ref int_options)
+            | FieldType::U128(ref int_options) => int_options.is_row_order(),
         }
     }
 
@@ -271,7 +282,8 @@ impl FieldType {
             FieldType::U64(ref int_options)
             | FieldType::I64(ref int_options)
             | FieldType::F64(ref int_options)
-            | FieldType::Bool(ref int_options) => int_options.fieldnorms(),
+            | FieldType::Bool(ref int_options)
+            | FieldType::U128(ref int_options) => int_options.fieldnorms(),
             FieldType::Date(ref date_options) => date_options.fieldnorms(),
             FieldType::Bytes(ref bytes_options) => bytes_options.fieldnorms(),
             FieldType::JsonObject(ref _json_object_options) => false,
@@ -295,7 +307,8 @@ impl FieldType {
             FieldType::U64(ref int_options)
             | FieldType::I64(ref int_options)
             | FieldType::F64(ref int_options)
-            | FieldType::Bool(ref int_options) => {
+            | FieldType::Bool(ref int_options)
+            | FieldType::U128(ref int_options) => {
                 if int_options.is_indexed() {
                     Some(IndexRecordOption::Basic)
                 } else {
@@ -359,6 +372,21 @@ impl FieldType {
                         } else {
                             Err(ValueParsingError::TypeError {
                                 expected: "a u64",
+                                json: JsonValue::String(field_text),
+                            })
+                        }
+                    }
+                    FieldType::U128(opt) => {
+                        if opt.should_coerce() {
+                            Ok(OwnedValue::U128(field_text.parse().map_err(|_| {
+                                ValueParsingError::TypeError {
+                                    expected: "a u128 or a u128 as string",
+                                    json: JsonValue::String(field_text),
+                                }
+                            })?))
+                        } else {
+                            Err(ValueParsingError::TypeError {
+                                expected: "a u128",
                                 json: JsonValue::String(field_text),
                             })
                         }
@@ -445,6 +473,16 @@ impl FieldType {
                     } else {
                         Err(ValueParsingError::OverflowError {
                             expected: "u64",
+                            json: JsonValue::Number(field_val_num),
+                        })
+                    }
+                }
+                FieldType::U128(_) => {
+                    if let Some(field_val_u128) = field_val_num.as_u128() {
+                        Ok(OwnedValue::U128(field_val_u128))
+                    } else {
+                        Err(ValueParsingError::OverflowError {
+                            expected: "u128",
                             json: JsonValue::Number(field_val_num),
                         })
                     }

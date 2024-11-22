@@ -20,7 +20,6 @@
 //! Read access performance is comparable to that of an array lookup.
 
 pub use crate::columnar::Column;
-use crate::columnar::MonotonicallyMappableToU64;
 
 pub use self::error::{ColumnFieldNotAvailableError, Result};
 pub use self::readers::ColumnFieldReaders;
@@ -33,8 +32,8 @@ mod readers;
 mod writer;
 
 /// Trait for types that are allowed for columnar fields:
-/// (u64, i64 and f64, bool, DateTime).
-pub trait ColumnarValue: MonotonicallyMappableToU64 {
+/// (u64, u128, i64, f64, bool, DateTime).
+pub trait ColumnarValue {
     /// Returns the `schema::Type` for this ColumnarValue.
     fn to_type() -> Type;
 }
@@ -67,13 +66,18 @@ impl ColumnarValue for DateTime {
         Type::Date
     }
 }
-
+impl ColumnarValue for u128 {
+    fn to_type() -> Type {
+        Type::U128
+    }
+}
 #[cfg(test)]
 mod tests {
 
     use std::ops::RangeInclusive;
     use std::path::Path;
 
+    use crate::columnar::MonotonicallyMappableToU64;
     use crate::common::{ByteCount, DateTimePrecision, HasLen, TerminatingWrite};
     use rand::prelude::SliceRandom;
     use rand::rngs::StdRng;
