@@ -98,6 +98,16 @@ impl HasAssociatedColumnType for u64 {
     }
 }
 
+impl HasAssociatedColumnType for u128 {
+    fn column_type() -> ColumnType {
+        ColumnType::U128
+    }
+
+    fn default_value() -> Self {
+        0u128
+    }
+}
+
 impl HasAssociatedColumnType for i64 {
     fn column_type() -> ColumnType {
         ColumnType::I64

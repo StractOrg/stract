@@ -4,7 +4,7 @@ use crate::index::SegmentId;
 use crate::indexer::{LogMergePolicy, NoMergePolicy};
 use crate::postings::Postings;
 use crate::query::TermQuery;
-use crate::schema::{Field, IndexRecordOption, Schema, INDEXED, TEXT};
+use crate::schema::{Field, IndexRecordOption, Schema, COLUMN, INDEXED, TEXT};
 use crate::tokenizer::TokenizerManager;
 use crate::{
     Directory, DocSet, Index, IndexBuilder, IndexReader, IndexSettings, IndexWriter, ReloadPolicy,
@@ -462,7 +462,7 @@ fn test_non_text_json_term_freq_bitpacked() {
 #[test]
 fn test_u128_columnar_values() {
     let mut schema_builder = Schema::builder();
-    let field = schema_builder.add_u128_field("u128", INDEXED);
+    let field = schema_builder.add_u128_field("u128", INDEXED | COLUMN);
     let schema = schema_builder.build();
     let index = Index::create_in_ram(schema);
     let mut writer: IndexWriter = index.writer_for_tests().unwrap();
@@ -481,4 +481,6 @@ fn test_u128_columnar_values() {
         .unwrap();
     assert_eq!(postings.doc(), 0);
     assert_eq!(postings.term_freq(), 1u32);
+    let column = segment_reader.column_fields().u128("u128").unwrap();
+    assert_eq!(column.first(0).unwrap(), 1u128);
 }

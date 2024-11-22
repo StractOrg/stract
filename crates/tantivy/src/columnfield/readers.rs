@@ -315,6 +315,13 @@ impl ColumnFieldReaders {
     pub fn bool(&self, field_name: &str) -> crate::Result<Column<bool>> {
         self.column(field_name)
     }
+
+    /// Returns the `u128` columnar field reader reader associated with `field`.
+    ///
+    /// If `field` is not a u128 columnar field, this method returns an Error.
+    pub fn u128(&self, field_name: &str) -> crate::Result<Column<u128>> {
+        self.column(field_name)
+    }
 }
 
 #[cfg(test)]

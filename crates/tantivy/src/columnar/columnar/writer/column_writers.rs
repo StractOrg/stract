@@ -125,6 +125,7 @@ pub(crate) enum CompatibleNumericalTypes {
     Dynamic {
         all_values_within_i64_range: bool,
         all_values_within_u64_range: bool,
+        all_values_within_u128_range: bool,
     },
     StaticType(NumericalType),
 }
@@ -134,6 +135,7 @@ impl Default for CompatibleNumericalTypes {
         CompatibleNumericalTypes::Dynamic {
             all_values_within_i64_range: true,
             all_values_within_u64_range: true,
+            all_values_within_u128_range: true,
         }
     }
 }
@@ -144,11 +146,12 @@ impl CompatibleNumericalTypes {
             CompatibleNumericalTypes::Dynamic {
                 all_values_within_i64_range,
                 all_values_within_u64_range,
+                all_values_within_u128_range,
             } => match numerical_type {
                 NumericalType::I64 => *all_values_within_i64_range,
                 NumericalType::U64 => *all_values_within_u64_range,
                 NumericalType::F64 => true,
-                NumericalType::U128 => true,
+                NumericalType::U128 => *all_values_within_u128_range,
             },
             CompatibleNumericalTypes::StaticType(static_numerical_type) => {
                 *static_numerical_type == numerical_type
@@ -161,10 +164,13 @@ impl CompatibleNumericalTypes {
             CompatibleNumericalTypes::Dynamic {
                 all_values_within_i64_range,
                 all_values_within_u64_range,
+                all_values_within_u128_range,
             } => match numerical_value {
                 NumericalValue::I64(val_i64) => {
                     let value_within_u64_range = val_i64 >= 0i64;
+                    let value_within_u128_range = val_i64 >= 0i64;
                     *all_values_within_u64_range &= value_within_u64_range;
+                    *all_values_within_u128_range &= value_within_u128_range;
                 }
                 NumericalValue::U64(val_u64) => {
                     let value_within_i64_range = val_u64 < i64::MAX as u64;
@@ -173,9 +179,14 @@ impl CompatibleNumericalTypes {
                 NumericalValue::F64(_) => {
                     *all_values_within_i64_range = false;
                     *all_values_within_u64_range = false;
+                    *all_values_within_u128_range = false;
                 }
-                NumericalValue::U128(_) => {
-                    *all_values_within_u64_range = false;
+                NumericalValue::U128(val_u128) => {
+                    let value_within_u64_range = val_u128 < u64::MAX as u128;
+                    *all_values_within_u64_range &= value_within_u64_range;
+
+                    let value_within_i64_range = val_u128 < i64::MAX as u128;
+                    *all_values_within_i64_range &= value_within_i64_range;
                 }
             },
             CompatibleNumericalTypes::StaticType(typ) => {
@@ -190,7 +201,7 @@ impl CompatibleNumericalTypes {
     }
 
     pub fn to_numerical_type(self) -> NumericalType {
-        for numerical_type in [NumericalType::I64, NumericalType::U64] {
+        for numerical_type in [NumericalType::I64, NumericalType::U64, NumericalType::U128] {
             if self.is_type_accepted(numerical_type) {
                 return numerical_type;
             }
@@ -346,7 +357,12 @@ mod tests {
 
     #[test]
     fn test_compatible_numerical_types_static() {
-        for typ in [NumericalType::I64, NumericalType::I64, NumericalType::F64] {
+        for typ in [
+            NumericalType::I64,
+            NumericalType::U64,
+            NumericalType::F64,
+            NumericalType::U128,
+        ] {
             let compatible_numerical_types = CompatibleNumericalTypes::StaticType(typ);
             assert_eq!(compatible_numerical_types.to_numerical_type(), typ);
         }

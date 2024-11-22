@@ -171,7 +171,7 @@ impl SymbolValue for u128 {
 
 #[derive(Default)]
 struct MiniBuffer {
-    pub bytes: [u8; 17],
+    pub bytes: [u8; 18],
     pub len: u8,
 }
 
