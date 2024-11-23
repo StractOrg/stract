@@ -124,21 +124,18 @@ impl super::InvertedIndexFilter for AndInvertedIndexFilter {
 mod tests {
     use file_store::temp::TempDir;
 
-    use crate::{
-        webgraph::{
-            query::{ForwardlinksQuery, TextFilter},
-            schema::ToUrl,
-            Edge, Node, Webgraph,
-        },
-        webpage::RelFlags,
+    use crate::webgraph::{
+        query::{ForwardlinksQuery, TextFilter},
+        schema::ToUrl,
+        Edge, Node, Webgraph,
     };
 
-    pub fn test_edges() -> Vec<(Node, Node, String)> {
+    pub fn test_edges() -> Vec<(Node, Node)> {
         vec![
-            (Node::from("a.com"), Node::from("b.com/123"), String::new()),
-            (Node::from("a.com"), Node::from("b.dk/123"), String::new()),
-            (Node::from("a.com"), Node::from("b.com/321"), String::new()),
-            (Node::from("a.com"), Node::from("c.com"), String::new()),
+            (Node::from("a.com"), Node::from("b.com/123")),
+            (Node::from("a.com"), Node::from("b.dk/123")),
+            (Node::from("a.com"), Node::from("b.com/321")),
+            (Node::from("a.com"), Node::from("c.com")),
         ]
     }
 
@@ -146,16 +143,8 @@ mod tests {
         let temp_dir = crate::gen_temp_dir().unwrap();
         let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
 
-        for (from, to, label) in test_edges() {
-            graph
-                .insert(Edge {
-                    from,
-                    to,
-                    rel_flags: RelFlags::default(),
-                    label,
-                    sort_score: 0.0,
-                })
-                .unwrap();
+        for (from, to) in test_edges() {
+            graph.insert(Edge::new_test(from, to)).unwrap();
         }
 
         graph.commit().unwrap();

@@ -320,7 +320,7 @@ mod tests {
         webpage::html::links::RelFlags,
     };
 
-    fn test_edges() -> Vec<(Node, Node, String)> {
+    fn test_edges() -> Vec<(Node, Node)> {
         //     ┌────┐
         //     │    │
         // ┌───A◄─┐ │
@@ -332,11 +332,11 @@ mod tests {
         //        │
         //        D
         vec![
-            (Node::from("A"), Node::from("B"), String::new()),
-            (Node::from("B"), Node::from("C"), String::new()),
-            (Node::from("A"), Node::from("C"), String::new()),
-            (Node::from("C"), Node::from("A"), String::new()),
-            (Node::from("D"), Node::from("C"), String::new()),
+            (Node::from("A"), Node::from("B")),
+            (Node::from("B"), Node::from("C")),
+            (Node::from("A"), Node::from("C")),
+            (Node::from("C"), Node::from("A")),
+            (Node::from("D"), Node::from("C")),
         ]
     }
 
@@ -346,16 +346,8 @@ mod tests {
             .open()
             .unwrap();
 
-        for (from, to, label) in test_edges() {
-            graph
-                .insert(Edge {
-                    from,
-                    to,
-                    rel_flags: RelFlags::default(),
-                    label,
-                    sort_score: 0.0,
-                })
-                .unwrap();
+        for (from, to) in test_edges() {
+            graph.insert(Edge::new_test(from, to)).unwrap();
         }
 
         graph.commit().unwrap();
@@ -371,130 +363,88 @@ mod tests {
             .unwrap();
 
         graph
-            .insert(Edge {
-                from: Node::from("A.com/1").into_host(),
-                to: Node::from("A.com/2").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/1").into_host(),
+                Node::from("A.com/2").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/1").into_host(),
-                to: Node::from("A.com/3").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/1").into_host(),
+                Node::from("A.com/3").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/1").into_host(),
-                to: Node::from("A.com/4").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/1").into_host(),
+                Node::from("A.com/4").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/2").into_host(),
-                to: Node::from("A.com/1").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/2").into_host(),
+                Node::from("A.com/1").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/2").into_host(),
-                to: Node::from("A.com/3").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/2").into_host(),
+                Node::from("A.com/3").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/2").into_host(),
-                to: Node::from("A.com/4").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/2").into_host(),
+                Node::from("A.com/4").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/3").into_host(),
-                to: Node::from("A.com/1").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/3").into_host(),
+                Node::from("A.com/1").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/3").into_host(),
-                to: Node::from("A.com/2").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/3").into_host(),
+                Node::from("A.com/2").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/3").into_host(),
-                to: Node::from("A.com/4").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/3").into_host(),
+                Node::from("A.com/4").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/4").into_host(),
-                to: Node::from("A.com/1").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/4").into_host(),
+                Node::from("A.com/1").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/4").into_host(),
-                to: Node::from("A.com/2").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/4").into_host(),
+                Node::from("A.com/2").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A.com/4").into_host(),
-                to: Node::from("A.com/3").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("A.com/4").into_host(),
+                Node::from("A.com/3").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("C.com").into_host(),
-                to: Node::from("B.com").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("C.com").into_host(),
+                Node::from("B.com").into_host(),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("D.com").into_host(),
-                to: Node::from("B.com").into_host(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("D.com").into_host(),
+                Node::from("B.com").into_host(),
+            ))
             .unwrap();
 
         graph.commit().unwrap();
@@ -533,86 +483,40 @@ mod tests {
             .open()
             .unwrap();
 
-        for (from, to, label) in test_edges() {
-            graph
-                .insert(Edge {
-                    from,
-                    to,
-                    rel_flags: RelFlags::default(),
-                    label,
-                    sort_score: 0.0,
-                })
-                .unwrap();
+        for (from, to) in test_edges() {
+            graph.insert(Edge::new_test(from, to)).unwrap();
         }
 
         graph
-            .insert(Edge {
-                from: Node::from("A"),
-                to: Node::from("B"),
-                rel_flags: RelFlags::default(),
-                label: "1".to_string(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(Node::from("A"), Node::from("B")))
             .unwrap();
         graph.commit().unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A"),
-                to: Node::from("B"),
-                rel_flags: RelFlags::default(),
-                label: "2".to_string(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(Node::from("A"), Node::from("B")))
             .unwrap();
         graph.commit().unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A"),
-                to: Node::from("B"),
-                rel_flags: RelFlags::default(),
-                label: "3".to_string(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(Node::from("A"), Node::from("B")))
             .unwrap();
         graph.commit().unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A"),
-                to: Node::from("B"),
-                rel_flags: RelFlags::default(),
-                label: "4".to_string(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(Node::from("A"), Node::from("B")))
             .unwrap();
         graph.commit().unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A"),
-                to: Node::from("B"),
-                rel_flags: RelFlags::default(),
-                label: "5".to_string(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(Node::from("A"), Node::from("B")))
             .unwrap();
         graph.commit().unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A"),
-                to: Node::from("B"),
-                rel_flags: RelFlags::default(),
-                label: "6".to_string(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(Node::from("A"), Node::from("B")))
             .unwrap();
         graph.commit().unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("A"),
-                to: Node::from("B"),
-                rel_flags: RelFlags::default(),
-                label: "7".to_string(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(Node::from("A"), Node::from("B")))
+            .unwrap();
+        graph.commit().unwrap();
+        graph
+            .insert(Edge::new_test(Node::from("A"), Node::from("B")))
             .unwrap();
         graph.commit().unwrap();
 
@@ -630,14 +534,13 @@ mod tests {
             .open()
             .unwrap();
 
-        for (from, to, label) in test_edges() {
+        for (from, to) in test_edges() {
             graph
                 .insert(Edge {
                     from,
                     to,
                     rel_flags: RelFlags::TAG,
-                    label,
-                    sort_score: 0.0,
+                    ..Edge::empty()
                 })
                 .unwrap();
         }
@@ -656,14 +559,13 @@ mod tests {
             .open()
             .unwrap();
 
-        for (from, to, label) in test_edges() {
+        for (from, to) in test_edges() {
             graph
                 .insert(Edge {
                     from,
                     to,
                     rel_flags: RelFlags::SAME_ICANN_DOMAIN,
-                    label,
-                    sort_score: 0.0,
+                    ..Edge::empty()
                 })
                 .unwrap();
         }

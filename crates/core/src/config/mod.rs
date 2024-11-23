@@ -100,6 +100,7 @@ pub struct WebgraphConstructConfig {
     pub graph_base_path: String,
     pub shard: ShardId,
     pub host_centrality_store_path: String,
+    pub host_rank_store_path: String,
     pub warc_source: WarcSource,
     pub limit_warc_files: Option<usize>,
     pub skip_warc_files: Option<usize>,

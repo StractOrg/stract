@@ -238,10 +238,7 @@ impl tantivy::DocSet for LinksScorer {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        webgraph::{query::HostBacklinksQuery, Edge, Node, Webgraph},
-        webpage::RelFlags,
-    };
+    use crate::webgraph::{query::HostBacklinksQuery, Edge, Node, Webgraph};
 
     #[test]
     fn test_simple() {
@@ -253,23 +250,11 @@ mod tests {
         let node_c = Node::from("C");
 
         graph
-            .insert(Edge {
-                from: node_a.clone(),
-                to: node_b.clone(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(node_a.clone(), node_b.clone()))
             .unwrap();
 
         graph
-            .insert(Edge {
-                from: node_c.clone(),
-                to: node_b.clone(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(node_c.clone(), node_b.clone()))
             .unwrap();
 
         graph.commit().unwrap();
@@ -290,23 +275,11 @@ mod tests {
         let node_b = Node::from("B");
 
         graph
-            .insert(Edge {
-                from: node_a.clone(),
-                to: node_b.clone(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(node_a.clone(), node_b.clone()))
             .unwrap();
 
         graph
-            .insert(Edge {
-                from: node_b.clone(),
-                to: node_b.clone(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(node_b.clone(), node_b.clone()))
             .unwrap();
 
         graph.commit().unwrap();
@@ -323,33 +296,24 @@ mod tests {
         let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
 
         graph
-            .insert(Edge {
-                from: Node::from("https://A.com/1"),
-                to: Node::from("https://B.com/1"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://A.com/1"),
+                Node::from("https://B.com/1"),
+            ))
             .unwrap();
 
         graph
-            .insert(Edge {
-                from: Node::from("https://A.com/2"),
-                to: Node::from("https://B.com/2"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://A.com/2"),
+                Node::from("https://B.com/2"),
+            ))
             .unwrap();
 
         graph
-            .insert(Edge {
-                from: Node::from("https://A.com/3"),
-                to: Node::from("https://B.com/3"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://A.com/3"),
+                Node::from("https://B.com/3"),
+            ))
             .unwrap();
 
         graph.commit().unwrap();

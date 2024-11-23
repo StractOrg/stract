@@ -72,6 +72,7 @@ fn canonical_or_self(index: &CanonicalIndex, url: Url) -> Url {
 
 pub struct WebgraphWorker {
     pub host_centrality_store: Option<Arc<speedy_kv::Db<NodeID, f64>>>,
+    pub host_rank_store: Option<Arc<speedy_kv::Db<NodeID, u64>>>,
     pub graph: webgraph::Webgraph,
     pub canonical_index: Option<Arc<CanonicalIndex>>,
 }
@@ -109,6 +110,18 @@ impl WebgraphWorker {
                     .as_ref()
                     .and_then(|store| store.get(&source.clone().into_host().id()).unwrap())
                     .unwrap_or(0.0);
+                let source_rank = self
+                    .host_rank_store
+                    .as_ref()
+                    .and_then(|store| store.get(&source.clone().into_host().id()).unwrap())
+                    .unwrap_or(u64::MAX);
+
+                let num_outgoing_hosts_from_page = webpage
+                    .anchor_links()
+                    .into_iter()
+                    .filter_map(|l| l.destination.host_str().map(|h| h.to_string()))
+                    .unique()
+                    .count() as u64;
 
                 for mut link in webpage.anchor_links().into_iter() {
                     let mut destination = link.destination.clone();
@@ -126,6 +139,11 @@ impl WebgraphWorker {
                         .as_ref()
                         .and_then(|store| store.get(&destination.clone().into_host().id()).unwrap())
                         .unwrap_or(0.0);
+                    let destination_rank = self
+                        .host_rank_store
+                        .as_ref()
+                        .and_then(|store| store.get(&destination.clone().into_host().id()).unwrap())
+                        .unwrap_or(u64::MAX);
 
                     trace!("inserting link {:?}", link);
                     self.graph
@@ -135,6 +153,11 @@ impl WebgraphWorker {
                             rel_flags: link.rel,
                             label: link.text,
                             sort_score: source_centrality + destination_centrality,
+                            from_centrality: source_centrality,
+                            to_centrality: destination_centrality,
+                            from_rank: source_rank,
+                            to_rank: destination_rank,
+                            num_outgoing_hosts_from_page,
                         })
                         .unwrap();
                 }
@@ -177,6 +200,9 @@ impl Webgraph {
             &config.host_centrality_store_path,
         )?);
 
+        let host_rank_store =
+            Arc::new(speedy_kv::Db::open_or_create(&config.host_rank_store_path)?);
+
         let num_workers = usize::from(std::thread::available_parallelism()?);
 
         let mut handlers = Vec::new();
@@ -196,6 +222,7 @@ impl Webgraph {
             let mut worker = WebgraphWorker {
                 graph: webgraph::Webgraph::open(graph_path, config.shard)?,
                 host_centrality_store: Some(host_centrality_store.clone()),
+                host_rank_store: Some(host_rank_store.clone()),
                 canonical_index: canonical_index.clone(),
             };
 

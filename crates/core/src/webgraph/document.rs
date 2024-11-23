@@ -172,6 +172,11 @@ pub struct Edge {
     pub rel_flags: RelFlags,
     pub label: String,
     pub sort_score: f64,
+    pub from_centrality: f64,
+    pub to_centrality: f64,
+    pub from_rank: u64,
+    pub to_rank: u64,
+    pub num_outgoing_hosts_from_page: u64,
 }
 
 impl Edge {
@@ -182,6 +187,20 @@ impl Edge {
             rel_flags: RelFlags::default(),
             label: String::default(),
             sort_score: 0.0,
+            from_centrality: 0.0,
+            to_centrality: 0.0,
+            from_rank: 0,
+            to_rank: 0,
+            num_outgoing_hosts_from_page: 0,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_test(from: Node, to: Node) -> Self {
+        Self {
+            from,
+            to,
+            ..Self::empty()
         }
     }
 }

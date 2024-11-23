@@ -321,6 +321,160 @@ impl Field for SortScore {
     }
 }
 
+#[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
+pub struct FromCentrality;
+impl Field for FromCentrality {
+    fn name(&self) -> &'static str {
+        "from_centrality"
+    }
+
+    fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
+        ReferenceValue::F64(edge.from_centrality)
+    }
+
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
+        edge.from_centrality = value
+            .as_ref()
+            .as_f64()
+            .ok_or(anyhow::anyhow!("Invalid centrality"))?;
+
+        Ok(())
+    }
+
+    fn field_type(&self) -> tantivy::schema::FieldType {
+        FieldType::F64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
+pub struct ToCentrality;
+
+impl Field for ToCentrality {
+    fn name(&self) -> &'static str {
+        "to_centrality"
+    }
+
+    fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
+        ReferenceValue::F64(edge.to_centrality)
+    }
+
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
+        edge.to_centrality = value
+            .as_ref()
+            .as_f64()
+            .ok_or(anyhow::anyhow!("Invalid centrality"))?;
+
+        Ok(())
+    }
+
+    fn field_type(&self) -> tantivy::schema::FieldType {
+        FieldType::F64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
+pub struct FromRank;
+
+impl Field for FromRank {
+    fn name(&self) -> &'static str {
+        "from_rank"
+    }
+
+    fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
+        ReferenceValue::U64(edge.from_rank)
+    }
+
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
+        edge.from_rank = value
+            .as_ref()
+            .as_u64()
+            .ok_or(anyhow::anyhow!("Invalid rank"))?;
+
+        Ok(())
+    }
+
+    fn field_type(&self) -> tantivy::schema::FieldType {
+        FieldType::U64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
+pub struct ToRank;
+
+impl Field for ToRank {
+    fn name(&self) -> &'static str {
+        "to_rank"
+    }
+
+    fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
+        ReferenceValue::U64(edge.to_rank)
+    }
+
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
+        edge.to_rank = value
+            .as_ref()
+            .as_u64()
+            .ok_or(anyhow::anyhow!("Invalid rank"))?;
+
+        Ok(())
+    }
+
+    fn field_type(&self) -> tantivy::schema::FieldType {
+        FieldType::U64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, bincode::Encode, bincode::Decode)]
+pub struct NumOutgoingHostsFromPage;
+
+impl Field for NumOutgoingHostsFromPage {
+    fn name(&self) -> &'static str {
+        "num_outgoing_hosts_from_page"
+    }
+
+    fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
+        ReferenceValue::U64(edge.num_outgoing_hosts_from_page)
+    }
+
+    fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
+        edge.num_outgoing_hosts_from_page = value
+            .as_ref()
+            .as_u64()
+            .ok_or(anyhow::anyhow!("Invalid number of outgoing hosts"))?;
+
+        Ok(())
+    }
+
+    fn field_type(&self) -> tantivy::schema::FieldType {
+        FieldType::U64(
+            NumericOptions::default()
+                .set_indexed()
+                .set_stored()
+                .set_columnar(),
+        )
+    }
+}
+
 #[enum_dispatch(Field)]
 #[derive(Clone, Copy, Debug, EnumDiscriminants, bincode::Encode, bincode::Decode)]
 #[strum_discriminants(derive(VariantArray))]
@@ -334,6 +488,11 @@ pub enum FieldEnum {
     RelFlags,
     Label,
     SortScore,
+    FromCentrality,
+    ToCentrality,
+    FromRank,
+    ToRank,
+    NumOutgoingHostsFromPage,
 }
 
 impl FieldEnum {
@@ -356,6 +515,11 @@ enum_dispatch_from_discriminant!(FieldEnumDiscriminants => FieldEnum,
   RelFlags,
   Label,
   SortScore,
+  FromCentrality,
+  ToCentrality,
+  FromRank,
+  ToRank,
+  NumOutgoingHostsFromPage,
 ]);
 
 impl crate::enum_map::InsertEnumMapKey for FieldEnumDiscriminants {

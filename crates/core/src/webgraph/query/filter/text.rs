@@ -76,24 +76,21 @@ impl super::InvertedIndexFilter for TextInvertedIndexFilter {
 mod tests {
     use file_store::temp::TempDir;
 
-    use crate::{
-        webgraph::{
-            query::{BacklinksQuery, ForwardlinksQuery, FullBacklinksQuery, FullForwardlinksQuery},
-            schema::{FromUrl, ToUrl},
-            Edge, Node, Webgraph,
-        },
-        webpage::RelFlags,
+    use crate::webgraph::{
+        query::{BacklinksQuery, ForwardlinksQuery, FullBacklinksQuery, FullForwardlinksQuery},
+        schema::{FromUrl, ToUrl},
+        Edge, Node, Webgraph,
     };
 
     use super::*;
 
-    pub fn test_edges() -> Vec<(Node, Node, String)> {
+    pub fn test_edges() -> Vec<(Node, Node)> {
         vec![
-            (Node::from("a.com"), Node::from("b.com"), String::new()),
-            (Node::from("a.com"), Node::from("b.dk"), String::new()),
-            (Node::from("b.com"), Node::from("b.dk"), String::new()),
-            (Node::from("c.dk"), Node::from("b.dk"), String::new()),
-            (Node::from("c.com"), Node::from("a.com"), String::new()),
+            (Node::from("a.com"), Node::from("b.com")),
+            (Node::from("a.com"), Node::from("b.dk")),
+            (Node::from("b.com"), Node::from("b.dk")),
+            (Node::from("c.dk"), Node::from("b.dk")),
+            (Node::from("c.com"), Node::from("a.com")),
         ]
     }
 
@@ -101,16 +98,8 @@ mod tests {
         let temp_dir = crate::gen_temp_dir().unwrap();
         let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
 
-        for (from, to, label) in test_edges() {
-            graph
-                .insert(Edge {
-                    from,
-                    to,
-                    rel_flags: RelFlags::default(),
-                    label,
-                    sort_score: 0.0,
-                })
-                .unwrap();
+        for (from, to) in test_edges() {
+            graph.insert(Edge::new_test(from, to)).unwrap();
         }
 
         graph.commit().unwrap();

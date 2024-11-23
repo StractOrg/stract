@@ -425,13 +425,10 @@ mod tests {
         let temp_dir = crate::gen_temp_dir().unwrap();
         let mut store = EdgeStore::open(&temp_dir, ShardId::new(0)).unwrap();
 
-        let e = Edge {
-            from: Node::from("https://www.first.com").into_host(),
-            to: Node::from("https://www.second.com").into_host(),
-            label: "test".to_string(),
-            rel_flags: RelFlags::default(),
-            sort_score: 0.0,
-        };
+        let e = Edge::new_test(
+            Node::from("https://www.first.com").into_host(),
+            Node::from("https://www.second.com").into_host(),
+        );
         let from_node_id = e.from.id();
         let to_node_id = e.to.id();
 
@@ -477,6 +474,11 @@ mod tests {
             label: "test".to_string(),
             rel_flags: RelFlags::default(),
             sort_score: a_centrality + b_centrality,
+            from_centrality: b_centrality,
+            to_centrality: a_centrality,
+            from_rank: 2,
+            to_rank: 1,
+            ..Edge::empty()
         };
 
         let e2 = Edge {
@@ -485,6 +487,11 @@ mod tests {
             label: "2".to_string(),
             rel_flags: RelFlags::default(),
             sort_score: a_centrality + c_centrality,
+            from_centrality: c_centrality,
+            to_centrality: a_centrality,
+            from_rank: 3,
+            to_rank: 1,
+            ..Edge::empty()
         };
 
         let e3 = Edge {
@@ -493,6 +500,11 @@ mod tests {
             label: "3".to_string(),
             rel_flags: RelFlags::default(),
             sort_score: a_centrality + d_centrality,
+            from_centrality: d_centrality,
+            to_centrality: a_centrality,
+            from_rank: 4,
+            to_rank: 1,
+            ..Edge::empty()
         };
 
         store.insert(e1.clone()).unwrap();
@@ -517,35 +529,26 @@ mod tests {
         let mut store = EdgeStore::open(&temp_dir, ShardId::new(0)).unwrap();
 
         store
-            .insert(Edge {
-                from: Node::from("https://www.first.com").into_host(),
-                to: Node::from("https://www.second.com").into_host(),
-                label: String::new(),
-                rel_flags: RelFlags::default(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://www.first.com").into_host(),
+                Node::from("https://www.second.com").into_host(),
+            ))
             .unwrap();
         store.commit().unwrap();
 
         store
-            .insert(Edge {
-                from: Node::from("https://www.second.com").into_host(),
-                to: Node::from("https://www.first.com").into_host(),
-                label: String::new(),
-                rel_flags: RelFlags::default(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://www.second.com").into_host(),
+                Node::from("https://www.first.com").into_host(),
+            ))
             .unwrap();
         store.commit().unwrap();
 
         store
-            .insert(Edge {
-                from: Node::from("https://www.third.com").into_host(),
-                to: Node::from("https://www.first.com").into_host(),
-                label: String::new(),
-                rel_flags: RelFlags::default(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://www.third.com").into_host(),
+                Node::from("https://www.first.com").into_host(),
+            ))
             .unwrap();
         store.commit().unwrap();
 

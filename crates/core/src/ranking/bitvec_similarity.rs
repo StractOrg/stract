@@ -309,8 +309,7 @@ mod tests {
                 from: a.clone(),
                 to: b.clone(),
                 rel_flags: RelFlags::NOFOLLOW,
-                label: String::new(),
-                sort_score: 0.0,
+                ..Edge::empty()
             })
             .unwrap();
 
@@ -318,9 +317,7 @@ mod tests {
             .insert(Edge {
                 from: a.clone(),
                 to: c.clone(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
+                ..Edge::empty()
             })
             .unwrap();
 

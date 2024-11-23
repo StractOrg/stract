@@ -177,10 +177,7 @@ mod tests {
     use file_store::temp::TempDir;
     use maplit::hashmap;
 
-    use crate::{
-        webgraph::{Edge, Webgraph},
-        webpage::html::links::RelFlags,
-    };
+    use crate::webgraph::{Edge, Webgraph};
 
     use super::*;
 
@@ -192,13 +189,10 @@ mod tests {
 
         for i in 0..n - 1 {
             graph
-                .insert(Edge {
-                    from: Node::from(i.to_string()),
-                    to: Node::from((i + 1).to_string()),
-                    label: String::new(),
-                    rel_flags: RelFlags::default(),
-                    sort_score: 0.0,
-                })
+                .insert(Edge::new_test(
+                    Node::from(i.to_string()),
+                    Node::from((i + 1).to_string()),
+                ))
                 .unwrap();
         }
         graph.commit().unwrap();

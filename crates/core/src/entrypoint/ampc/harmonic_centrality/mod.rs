@@ -83,10 +83,7 @@ mod tests {
     use tracing_test::traced_test;
     use webgraph::{Edge, Webgraph};
 
-    use crate::{
-        free_socket_addr, webgraph::centrality::harmonic::HarmonicCentrality,
-        webpage::html::links::RelFlags,
-    };
+    use crate::{free_socket_addr, webgraph::centrality::harmonic::HarmonicCentrality};
 
     use super::*;
 
@@ -106,14 +103,8 @@ mod tests {
 
         let edges = crate::webgraph::tests::test_edges();
 
-        for (i, (from, to, label)) in edges.into_iter().enumerate() {
-            let e = Edge {
-                from: from.clone(),
-                to: to.clone(),
-                label: label.clone(),
-                rel_flags: RelFlags::default(),
-                sort_score: 0.0,
-            };
+        for (i, (from, to)) in edges.into_iter().enumerate() {
+            let e = Edge::new_test(from.clone(), to.clone());
             combined.insert(e.clone()).unwrap();
 
             if i % 2 == 0 {

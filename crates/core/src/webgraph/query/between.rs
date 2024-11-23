@@ -153,7 +153,7 @@ impl Query for FullLinksBetweenQuery {
 
 #[cfg(test)]
 mod tests {
-    use crate::{webgraph::Webgraph, webpage::RelFlags};
+    use crate::webgraph::Webgraph;
 
     use super::*;
 
@@ -166,13 +166,7 @@ mod tests {
         let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
 
         graph
-            .insert(Edge {
-                from: from.clone(),
-                to: to.clone(),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(from.clone(), to.clone()))
             .unwrap();
         graph.commit().unwrap();
 

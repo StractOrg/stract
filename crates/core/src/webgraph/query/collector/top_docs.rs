@@ -449,12 +449,9 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> SegmentCollector
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        webgraph::{
-            query::{BacklinksQuery, HostBacklinksQuery},
-            Edge, EdgeLimit, Node, Webgraph,
-        },
-        webpage::RelFlags,
+    use crate::webgraph::{
+        query::{BacklinksQuery, HostBacklinksQuery},
+        Edge, EdgeLimit, Node, Webgraph,
     };
 
     #[test]
@@ -463,13 +460,10 @@ mod tests {
         let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
 
         graph
-            .insert(Edge {
-                from: Node::from("https://A.com/1"),
-                to: Node::from("https://B.com/1"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://A.com/1"),
+                Node::from("https://B.com/1"),
+            ))
             .unwrap();
 
         graph.commit().unwrap();
@@ -488,22 +482,16 @@ mod tests {
         let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
 
         graph
-            .insert(Edge {
-                from: Node::from("https://A.com/1"),
-                to: Node::from("https://B.com/1"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://A.com/1"),
+                Node::from("https://B.com/1"),
+            ))
             .unwrap();
         graph
-            .insert(Edge {
-                from: Node::from("https://A.com/2"),
-                to: Node::from("https://B.com/1"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://A.com/2"),
+                Node::from("https://B.com/1"),
+            ))
             .unwrap();
 
         graph.commit().unwrap();
@@ -529,24 +517,16 @@ mod tests {
         let mut graph = Webgraph::builder(&temp_dir, 0u64.into()).open().unwrap();
 
         graph
-            .insert(Edge {
-                from: Node::from("https://A.com/1"),
-                to: Node::from("https://B.com/1"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://A.com/1"),
+                Node::from("https://B.com/1"),
+            ))
             .unwrap();
-        graph.commit().unwrap();
-
         graph
-            .insert(Edge {
-                from: Node::from("https://A.com/2"),
-                to: Node::from("https://B.com/1"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
-                sort_score: 0.0,
-            })
+            .insert(Edge::new_test(
+                Node::from("https://A.com/2"),
+                Node::from("https://B.com/1"),
+            ))
             .unwrap();
 
         graph.commit().unwrap();
@@ -569,27 +549,24 @@ mod tests {
             .insert(Edge {
                 from: Node::from("https://A.com/1"),
                 to: Node::from("https://B.com/1"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
                 sort_score: 0.1,
+                ..Edge::empty()
             })
             .unwrap();
         graph
             .insert(Edge {
                 from: Node::from("https://A.com/2"),
                 to: Node::from("https://B.com/1"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
                 sort_score: 0.1,
+                ..Edge::empty()
             })
             .unwrap();
         graph
             .insert(Edge {
                 from: Node::from("https://C.com/1"),
                 to: Node::from("https://B.com/1"),
-                rel_flags: RelFlags::default(),
-                label: String::new(),
                 sort_score: 0.0,
+                ..Edge::empty()
             })
             .unwrap();
 

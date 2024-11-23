@@ -113,8 +113,7 @@ mod tests {
                     from,
                     to,
                     rel_flags,
-                    label: String::new(),
-                    sort_score: 0.0,
+                    ..Edge::empty()
                 })
                 .unwrap();
         }
