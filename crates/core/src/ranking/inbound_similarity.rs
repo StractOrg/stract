@@ -160,7 +160,7 @@ mod tests {
             graph
                 .raw_ingoing_edges(node, EdgeLimit::Unlimited)
                 .into_iter()
-                .map(|e| e.from.as_u64())
+                .map(|e| e.from.as_u128())
                 .collect(),
         )
     }

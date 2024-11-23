@@ -366,6 +366,7 @@ where
         let value_type = match type_code {
             type_codes::TEXT_CODE => ValueType::String,
             type_codes::U64_CODE => ValueType::U64,
+            type_codes::U128_CODE => ValueType::U128,
             type_codes::I64_CODE => ValueType::I64,
             type_codes::F64_CODE => ValueType::F64,
             type_codes::BOOL_CODE => ValueType::Bool,

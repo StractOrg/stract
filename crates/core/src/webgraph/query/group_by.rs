@@ -93,8 +93,8 @@ impl HostGroupSketchQuery {
 impl Query for HostGroupSketchQuery {
     type Collector = GroupSketchCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
-    type IntermediateOutput = FxHashMap<u64, HyperLogLog<4096>>;
-    type Output = FxHashMap<u64, HyperLogLog<4096>>;
+    type IntermediateOutput = FxHashMap<u128, HyperLogLog<4096>>;
+    type Output = FxHashMap<u128, HyperLogLog<4096>>;
 
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
         let mut raw: Self::TantivyQuery = match self.node {
@@ -211,8 +211,8 @@ impl HostGroupQuery {
 impl Query for HostGroupQuery {
     type Collector = GroupExactCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
-    type IntermediateOutput = FxHashMap<u64, FxHashSet<u64>>;
-    type Output = FxHashMap<u64, FxHashSet<u64>>;
+    type IntermediateOutput = FxHashMap<u128, FxHashSet<u128>>;
+    type Output = FxHashMap<u128, FxHashSet<u128>>;
 
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
         let mut raw: Self::TantivyQuery = match self.node {
@@ -287,7 +287,7 @@ mod tests {
         let result = graph.search(&query).unwrap();
 
         assert_eq!(result.len(), 1);
-        assert_eq!(result.get(&id.as_u64()).unwrap().size(), 3);
+        assert_eq!(result.get(&id.as_u128()).unwrap().size(), 3);
     }
 
     #[test]
@@ -299,6 +299,6 @@ mod tests {
         let result = graph.search(&query).unwrap();
 
         assert_eq!(result.len(), 1);
-        assert_eq!(result.get(&id.as_u64()).unwrap().len(), 3);
+        assert_eq!(result.get(&id.as_u128()).unwrap().len(), 3);
     }
 }

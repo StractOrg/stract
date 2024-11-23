@@ -29,12 +29,12 @@ impl TryFrom<(crate::schema::Field, &crate::schema::FieldEntry)> for Field {
             crate::schema::FieldType::I64(_) => RowValueType::I64,
             crate::schema::FieldType::F64(_) => RowValueType::F64,
             crate::schema::FieldType::Bool(_) => RowValueType::Bool,
+            crate::schema::FieldType::U128(_) => RowValueType::U128,
             crate::schema::FieldType::Str(_)
             | crate::schema::FieldType::Date(_)
             | crate::schema::FieldType::Bytes(_)
             | crate::schema::FieldType::JsonObject(_)
-            | crate::schema::FieldType::IpAddr(_)
-            | crate::schema::FieldType::U128(_) => {
+            | crate::schema::FieldType::IpAddr(_) => {
                 return Err(crate::TantivyError::SchemaError(format!(
                     "Field {:?} is not supported in row order",
                     entry
@@ -96,16 +96,30 @@ impl RowFieldsWriter {
 
             match value_access.as_value() {
                 ReferenceValue::Leaf(leaf) => match leaf {
-                    ReferenceValueLeaf::Null
-                    | ReferenceValueLeaf::Str(_)
-                    | ReferenceValueLeaf::Date(_)
-                    | ReferenceValueLeaf::Bytes(_)
-                    | ReferenceValueLeaf::IpAddr(_)
-                    | ReferenceValueLeaf::U128(_)
-                    | ReferenceValueLeaf::PreTokStr(_) => {}
+                    ReferenceValueLeaf::Null => {
+                        unimplemented!("Null values are not supported in row order")
+                    }
+                    ReferenceValueLeaf::Date(_) => {
+                        unimplemented!("Date values are not supported in row order")
+                    }
+                    ReferenceValueLeaf::Bytes(_) => {
+                        unimplemented!("Bytes values are not supported in row order")
+                    }
+                    ReferenceValueLeaf::IpAddr(_) => {
+                        unimplemented!("IpAddr values are not supported in row order")
+                    }
+                    ReferenceValueLeaf::PreTokStr(_) => {
+                        unimplemented!("PreTokStr values are not supported in row order")
+                    }
+                    ReferenceValueLeaf::Str(_) => {
+                        unimplemented!("String values are not supported in row order")
+                    }
 
                     ReferenceValueLeaf::U64(val) => {
                         buf.insert(field.field_id(), RowValue::U64(val));
+                    }
+                    ReferenceValueLeaf::U128(val) => {
+                        buf.insert(field.field_id(), RowValue::U128(val));
                     }
                     ReferenceValueLeaf::I64(val) => {
                         buf.insert(field.field_id(), RowValue::I64(val));

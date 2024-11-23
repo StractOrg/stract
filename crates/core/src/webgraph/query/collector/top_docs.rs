@@ -96,7 +96,7 @@ impl Deduplicator for NoDeduplicator {
 )]
 pub struct DocAddressWithHost {
     pub address: DocAddress,
-    pub host: u64,
+    pub host: u128,
 }
 
 impl DeduplicatorDoc for DocAddressWithHost {
@@ -322,7 +322,7 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> Collector for TopDo
             scorer,
             host_column: column_fields
                 .host_field
-                .map(|host_field| segment_column_fields.u64_by_enum(host_field).unwrap()),
+                .map(|host_field| segment_column_fields.u128_by_enum(host_field).unwrap()),
             filter: self
                 .filter
                 .as_ref()
@@ -416,7 +416,7 @@ pub struct TopDocsSegmentCollector<S: DocumentScorer, D: Deduplicator> {
     computer: Computer<D>,
     segment_ord: SegmentOrdinal,
     scorer: S,
-    host_column: Option<Column<u64>>,
+    host_column: Option<Column<u128>>,
     filter: Option<Box<dyn SegmentColumnFieldFilter>>,
     _deduplicator: PhantomData<D>,
 }

@@ -4385,6 +4385,10 @@ impl<H: HyperLogLogHasher, const N: usize> HyperLogLog<N, H> {
         self.registers[j] = self.registers[j].max(p as u8);
     }
 
+    pub fn add_u128(&mut self, item: u128) {
+        self.add(item as u64) // TODO: properly support u128
+    }
+
     pub fn clear(&mut self) {
         self.registers.iter_mut().for_each(|r| *r = 0);
     }

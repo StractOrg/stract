@@ -57,7 +57,7 @@ impl GroupExactCollector {
 }
 
 impl Collector for GroupExactCollector {
-    type Fruit = FxHashMap<u64, FxHashSet<u64>>;
+    type Fruit = FxHashMap<u128, FxHashSet<u128>>;
     type Child = GroupExactSegmentCollector;
 
     fn for_segment(
@@ -71,12 +71,12 @@ impl Collector for GroupExactCollector {
 
         let group = warmed_column_fields
             .segment(&segment.segment_id())
-            .u64(self.group_field)
+            .u128(self.group_field)
             .ok_or(anyhow!("Group field missing from index"))?;
 
         let value = warmed_column_fields
             .segment(&segment.segment_id())
-            .u64(self.value_field)
+            .u128(self.value_field)
             .ok_or(anyhow!("Value field missing from index"))?;
 
         let filter = self
@@ -96,7 +96,7 @@ impl Collector for GroupExactCollector {
         &self,
         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
     ) -> crate::Result<Self::Fruit> {
-        let mut groups: FxHashMap<u64, FxHashSet<u64>> = FxHashMap::default();
+        let mut groups: FxHashMap<u128, FxHashSet<u128>> = FxHashMap::default();
 
         for fruit in segment_fruits {
             for (group, set) in fruit {
@@ -109,14 +109,14 @@ impl Collector for GroupExactCollector {
 }
 
 pub struct GroupExactSegmentCollector {
-    group: Column<u64>,
-    value: Column<u64>,
-    groups: FxHashMap<u64, FxHashSet<u64>>,
+    group: Column<u128>,
+    value: Column<u128>,
+    groups: FxHashMap<u128, FxHashSet<u128>>,
     filter: Option<Box<dyn SegmentColumnFieldFilter>>,
 }
 
 impl tantivy::collector::SegmentCollector for GroupExactSegmentCollector {
-    type Fruit = FxHashMap<u64, FxHashSet<u64>>;
+    type Fruit = FxHashMap<u128, FxHashSet<u128>>;
 
     fn collect(&mut self, doc: tantivy::DocId, _: tantivy::Score) {
         if let Some(filter) = &self.filter {

@@ -60,7 +60,7 @@ impl GroupSketchCollector {
 }
 
 impl Collector for GroupSketchCollector {
-    type Fruit = FxHashMap<u64, HyperLogLog<4096>>;
+    type Fruit = FxHashMap<u128, HyperLogLog<4096>>;
     type Child = GroupSketchSegmentCollector;
 
     fn for_segment(
@@ -74,12 +74,12 @@ impl Collector for GroupSketchCollector {
 
         let group = warmed_column_fields
             .segment(&segment.segment_id())
-            .u64(self.group_field)
+            .u128(self.group_field)
             .ok_or(anyhow!("Group field missing from index"))?;
 
         let value = warmed_column_fields
             .segment(&segment.segment_id())
-            .u64(self.value_field)
+            .u128(self.value_field)
             .ok_or(anyhow!("Value field missing from index"))?;
 
         let filter = self
@@ -99,7 +99,7 @@ impl Collector for GroupSketchCollector {
         &self,
         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
     ) -> crate::Result<Self::Fruit> {
-        let mut groups: FxHashMap<u64, HyperLogLog<4096>> = FxHashMap::default();
+        let mut groups: FxHashMap<u128, HyperLogLog<4096>> = FxHashMap::default();
 
         for fruit in segment_fruits {
             for (group, hll) in fruit {
@@ -112,14 +112,14 @@ impl Collector for GroupSketchCollector {
 }
 
 pub struct GroupSketchSegmentCollector {
-    group: Column<u64>,
-    value: Column<u64>,
-    groups: FxHashMap<u64, HyperLogLog<4096>>,
+    group: Column<u128>,
+    value: Column<u128>,
+    groups: FxHashMap<u128, HyperLogLog<4096>>,
     filter: Option<Box<dyn SegmentColumnFieldFilter>>,
 }
 
 impl tantivy::collector::SegmentCollector for GroupSketchSegmentCollector {
-    type Fruit = FxHashMap<u64, HyperLogLog<4096>>;
+    type Fruit = FxHashMap<u128, HyperLogLog<4096>>;
 
     fn collect(&mut self, doc: tantivy::DocId, _: tantivy::Score) {
         if let Some(filter) = &self.filter {
@@ -131,7 +131,7 @@ impl tantivy::collector::SegmentCollector for GroupSketchSegmentCollector {
         let group = self.group.first(doc).unwrap();
         let value = self.value.first(doc).unwrap();
 
-        self.groups.entry(group).or_default().add(value);
+        self.groups.entry(group).or_default().add_u128(value);
     }
 
     fn harvest(self) -> Self::Fruit {

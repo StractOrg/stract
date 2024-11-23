@@ -182,9 +182,9 @@ impl InvertedIndex {
             )
             .unwrap();
 
-        let id = doc.get_first(field).unwrap().as_u64().unwrap();
+        let id = doc.get_first(field).unwrap().as_u128().unwrap();
 
-        if id == u64::MAX {
+        if id == u128::MAX {
             Ok(None)
         } else {
             Ok(Some(id.into()))

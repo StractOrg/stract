@@ -80,7 +80,7 @@ pub trait NumericalField:
     fn indexing_option(&self) -> IndexingOption {
         let orientation = self.orientation();
         match self.data_type() {
-            DataType::U64 | DataType::Bool | DataType::F64 => {
+            DataType::U64 | DataType::Bool | DataType::F64 | DataType::U128 => {
                 let mut opt = NumericOptions::default();
 
                 if orientation.contains(Orientation::COLUMNAR) {
@@ -240,6 +240,7 @@ impl NumericalFieldEnum {
 
 pub enum DataType {
     U64,
+    U128,
     F64,
     Bool,
     Bytes,
@@ -1061,14 +1062,18 @@ impl NumericalField for HostNodeID {
     ) -> Result<()> {
         match &webpage.node_id {
             Some(node_id) => {
-                doc.add_u64(self.tantivy_field(index.schema_ref()), node_id.as_u64());
+                doc.add_u128(self.tantivy_field(index.schema_ref()), node_id.as_u128());
             }
             None => {
-                doc.add_u64(self.tantivy_field(index.schema_ref()), u64::MAX);
+                doc.add_u128(self.tantivy_field(index.schema_ref()), u128::MAX);
             }
         }
 
         Ok(())
+    }
+
+    fn data_type(&self) -> DataType {
+        DataType::U128
     }
 
     fn orientation(&self) -> Orientation {

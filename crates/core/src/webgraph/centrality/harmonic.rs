@@ -59,7 +59,7 @@ fn initialize(
 
     for node in graph.host_nodes() {
         let mut counter = HyperLogLog::default();
-        counter.add(node.as_u64());
+        counter.add_u128(node.as_u128());
 
         counters.old.insert(node, counter);
         centralities.insert(node, KahanSum::default());
@@ -98,7 +98,7 @@ fn update_changed_counters(
                     .any(|(to, from)| *from > *to)
                 {
                     counter_to.merge(counter_from);
-                    new_changed_nodes.insert(edge.to.as_u64());
+                    new_changed_nodes.insert_u128(edge.to.as_u128());
 
                     new_exact_changed_nodes.insert(edge.to);
 
@@ -130,7 +130,7 @@ fn update_all_counters(
         .host_edges()
         .filter(|e| !e.rel_flags.intersects(*SKIPPED_REL))
         .for_each(|edge| {
-            if changed_nodes.contains(edge.from.as_u64()) {
+            if changed_nodes.contains_u128(edge.from.as_u128()) {
                 if let (Some(counter_to), Some(counter_from)) =
                     (counters.new.get_mut(&edge.to), counters.old.get(&edge.from))
                 {
@@ -141,7 +141,7 @@ fn update_all_counters(
                         .any(|(to, from)| *from > *to)
                     {
                         counter_to.merge(counter_from);
-                        new_changed_nodes.insert(edge.to.as_u64());
+                        new_changed_nodes.insert_u128(edge.to.as_u128());
 
                         if let Some(exact_changed_nodes) = &mut exact_changed_nodes {
                             exact_changed_nodes.insert(edge.to);
@@ -221,7 +221,7 @@ fn calculate_centrality(graph: &Webgraph) -> BTreeMap<NodeID, f64> {
     let mut changed_nodes = U64BloomFilter::new(num_nodes, 0.05);
 
     for node in graph.host_nodes() {
-        changed_nodes.insert(node.as_u64());
+        changed_nodes.insert_u128(node.as_u128());
     }
 
     info!("Found {} nodes in the graph", num_nodes);

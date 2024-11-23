@@ -92,9 +92,17 @@ impl U64BloomFilter {
         self.bit_vec.set(h % num_bits, true);
     }
 
+    pub fn insert_u128(&mut self, item: u128) {
+        self.insert(item as u64) // TODO: properly support u128
+    }
+
     pub fn contains(&self, item: u64) -> bool {
         let h = Self::hash(item);
         self.bit_vec[h % self.bit_vec.len()]
+    }
+
+    pub fn contains_u128(&self, item: u128) -> bool {
+        self.contains(item as u64) // TODO: properly support u128
     }
 
     pub fn estimate_card(&self) -> u64 {

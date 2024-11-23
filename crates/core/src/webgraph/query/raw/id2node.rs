@@ -58,7 +58,7 @@ impl Weight for Id2NodeWeight {
             let field = reader.schema().get_field(field.name())?;
             let inverted_index = reader.inverted_index(field)?;
 
-            let term = Term::from_field_u64(field, self.node.as_u64());
+            let term = Term::from_field_u128(field, self.node.as_u128());
 
             if let Some(postings) =
                 inverted_index.read_postings(&term, tantivy::schema::IndexRecordOption::Basic)?

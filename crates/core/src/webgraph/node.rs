@@ -34,31 +34,29 @@ use crate::{intmap, webpage::url_ext::UrlExt};
     Ord,
     Hash,
 )]
-pub struct NodeID(u64);
+pub struct NodeID(u128);
 
 impl NodeID {
+    #[cfg(test)]
     pub fn as_u64(self) -> u64 {
+        self.0 as u64
+    }
+
+    pub fn as_u128(self) -> u128 {
         self.0
-    }
-
-    pub fn from_be_bytes(bytes: [u8; 8]) -> Self {
-        NodeID(u64::from_be_bytes(bytes))
-    }
-
-    pub fn to_be_bytes(self) -> [u8; 8] {
-        self.0.to_be_bytes()
     }
 }
 
 impl From<u128> for NodeID {
     fn from(val: u128) -> Self {
-        NodeID(val as u64)
+        NodeID(val)
     }
 }
 
+#[cfg(test)]
 impl From<u64> for NodeID {
     fn from(val: u64) -> Self {
-        NodeID(val)
+        NodeID(val as u128)
     }
 }
 
@@ -95,7 +93,7 @@ impl intmap::Key for NodeID {
     }
 
     fn modulus_usize(self, rhs: usize) -> usize {
-        (self.0 % (rhs as u64)) as usize
+        (self.0 % (rhs as u128)) as usize
     }
 }
 

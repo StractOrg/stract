@@ -252,6 +252,7 @@ impl<'a> Iterator for FieldsIter<'a> {
 pub enum ReferenceValue<'a> {
     Str(&'a str),
     U64(u64),
+    U128(u128),
     F64(f64),
 }
 
@@ -266,6 +267,9 @@ impl<'a> tantivy::schema::Value<'a> for ReferenceValue<'a> {
             ),
             ReferenceValue::U64(u) => tantivy::schema::document::ReferenceValue::Leaf(
                 tantivy::schema::document::ReferenceValueLeaf::U64(*u),
+            ),
+            ReferenceValue::U128(u) => tantivy::schema::document::ReferenceValue::Leaf(
+                tantivy::schema::document::ReferenceValueLeaf::U128(*u),
             ),
             ReferenceValue::F64(f) => tantivy::schema::document::ReferenceValue::Leaf(
                 tantivy::schema::document::ReferenceValueLeaf::F64(*f),

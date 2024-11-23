@@ -136,7 +136,7 @@ impl Field for FromId {
     }
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
-        ReferenceValue::U64(edge.from.id().as_u64())
+        ReferenceValue::U128(edge.from.id().as_u128())
     }
 
     fn set_value(&self, _: &mut Edge, _: OwnedValue) -> Result<()> {
@@ -144,7 +144,7 @@ impl Field for FromId {
     }
 
     fn field_type(&self) -> FieldType {
-        FieldType::U64(
+        FieldType::U128(
             NumericOptions::default()
                 .set_indexed()
                 .set_stored()
@@ -161,7 +161,7 @@ impl Field for ToId {
     }
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
-        ReferenceValue::U64(edge.to.id().as_u64())
+        ReferenceValue::U128(edge.to.id().as_u128())
     }
 
     fn set_value(&self, _: &mut Edge, _: OwnedValue) -> Result<()> {
@@ -169,7 +169,7 @@ impl Field for ToId {
     }
 
     fn field_type(&self) -> FieldType {
-        FieldType::U64(
+        FieldType::U128(
             NumericOptions::default()
                 .set_indexed()
                 .set_stored()
@@ -186,7 +186,7 @@ impl Field for FromHostId {
     }
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
-        ReferenceValue::U64(edge.from.clone().into_host().id().as_u64())
+        ReferenceValue::U128(edge.from.clone().into_host().id().as_u128())
     }
 
     fn set_value(&self, _: &mut Edge, _: OwnedValue) -> Result<()> {
@@ -194,7 +194,7 @@ impl Field for FromHostId {
     }
 
     fn field_type(&self) -> FieldType {
-        FieldType::U64(
+        FieldType::U128(
             NumericOptions::default()
                 .set_indexed()
                 .set_stored()
@@ -211,7 +211,7 @@ impl Field for ToHostId {
     }
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
-        ReferenceValue::U64(edge.to.clone().into_host().id().as_u64())
+        ReferenceValue::U128(edge.to.clone().into_host().id().as_u128())
     }
 
     fn set_value(&self, _: &mut Edge, _: OwnedValue) -> Result<()> {
@@ -219,7 +219,7 @@ impl Field for ToHostId {
     }
 
     fn field_type(&self) -> FieldType {
-        FieldType::U64(
+        FieldType::U128(
             NumericOptions::default()
                 .set_indexed()
                 .set_stored()

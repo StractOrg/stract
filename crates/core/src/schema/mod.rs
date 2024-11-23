@@ -106,6 +106,7 @@ pub fn create_schema() -> tantivy::schema::Schema {
                 let fast = field.as_numerical().expect("Expected fast field");
                 match fast.data_type() {
                     DataType::U64 => builder.add_u64_field(field.name(), options),
+                    DataType::U128 => builder.add_u128_field(field.name(), options),
                     DataType::F64 => builder.add_f64_field(field.name(), options),
                     DataType::Bool => builder.add_bool_field(field.name(), options),
                     DataType::Bytes => {

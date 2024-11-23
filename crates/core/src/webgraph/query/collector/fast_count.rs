@@ -21,13 +21,13 @@ use crate::ampc::dht::ShardId;
 use super::Collector;
 
 pub enum FastCountValue {
-    U64(u64),
+    U128(u128),
 }
 
 impl FastCountValue {
     fn as_term(&self, field: tantivy::schema::Field) -> tantivy::schema::Term {
         match self {
-            FastCountValue::U64(value) => tantivy::schema::Term::from_field_u64(field, *value),
+            FastCountValue::U128(value) => tantivy::schema::Term::from_field_u128(field, *value),
         }
     }
 }

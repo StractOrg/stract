@@ -24,6 +24,7 @@ use crate::{enum_map::EnumMap, Result};
 #[derive(Debug, Clone)]
 pub struct SegmentColumnFields {
     u64_fields: EnumMap<FieldEnumDiscriminants, Column<u64>>,
+    u128_fields: EnumMap<FieldEnumDiscriminants, Column<u128>>,
     f64_fields: EnumMap<FieldEnumDiscriminants, Column<f64>>,
 }
 
@@ -34,6 +35,16 @@ impl SegmentColumnFields {
 
     pub fn u64_by_enum(&self, field: FieldEnum) -> Option<Column<u64>> {
         self.u64_fields
+            .get(FieldEnumDiscriminants::from(field))
+            .cloned()
+    }
+
+    pub fn u128<F: Field>(&self, field: F) -> Option<Column<u128>> {
+        self.u128_by_enum(field.into())
+    }
+
+    pub fn u128_by_enum(&self, field: FieldEnum) -> Option<Column<u128>> {
+        self.u128_fields
             .get(FieldEnumDiscriminants::from(field))
             .cloned()
     }
@@ -59,6 +70,7 @@ impl WarmedColumnFields {
         let mut segments = HashMap::new();
         for segment in tantivy_searcher.segment_readers() {
             let mut u64_fields = EnumMap::new();
+            let mut u128_fields = EnumMap::new();
             let mut f64_fields = EnumMap::new();
             for field in FieldEnum::iter() {
                 match field.field_type() {
@@ -67,6 +79,12 @@ impl WarmedColumnFields {
                     {
                         let column = segment.column_fields().u64(field.name())?;
                         u64_fields.insert(field.into(), column);
+                    }
+                    tantivy::schema::FieldType::U128(numeric_options)
+                        if numeric_options.is_columnar() =>
+                    {
+                        let column = segment.column_fields().u128(field.name())?;
+                        u128_fields.insert(field.into(), column);
                     }
                     tantivy::schema::FieldType::F64(numeric_options)
                         if numeric_options.is_columnar() =>
@@ -81,6 +99,7 @@ impl WarmedColumnFields {
                 segment.segment_id(),
                 SegmentColumnFields {
                     u64_fields,
+                    u128_fields,
                     f64_fields,
                 },
             );

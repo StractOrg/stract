@@ -356,9 +356,9 @@ impl EdgeStore {
 }
 
 pub struct SmallSegmentEdgesIter {
-    from_id: Column,
-    to_id: Column,
-    rel_flags: Column,
+    from_id: Column<u128>,
+    to_id: Column<u128>,
+    rel_flags: Column<u64>,
     doc_range: Range<DocId>,
     current_doc: DocId,
 }
@@ -382,8 +382,8 @@ impl SmallSegmentEdgesIter {
         }
 
         Self {
-            from_id: columns.u64(from_id).unwrap(),
-            to_id: columns.u64(to_id).unwrap(),
+            from_id: columns.u128(from_id).unwrap(),
+            to_id: columns.u128(to_id).unwrap(),
             rel_flags: columns.u64(schema::RelFlags).unwrap(),
             current_doc: doc_range.start,
             doc_range,

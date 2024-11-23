@@ -29,7 +29,7 @@ impl KeyTrait for String {
 
 impl KeyTrait for NodeID {
     fn as_bytes(&self) -> Vec<u8> {
-        self.as_u64().to_le_bytes().to_vec()
+        self.as_u128().to_le_bytes().to_vec()
     }
 }
 

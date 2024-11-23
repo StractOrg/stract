@@ -179,7 +179,7 @@ impl LocalRecallRankingWebpage {
         let host_id = columnfields
             .get(numerical_field::HostNodeID.into())
             .unwrap()
-            .as_u64()
+            .as_u128()
             .unwrap()
             .into();
 

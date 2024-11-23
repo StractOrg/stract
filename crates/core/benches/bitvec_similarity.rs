@@ -8,7 +8,7 @@ fn random_bitvec(max_len: usize, max_id: usize) -> BitVec {
     let mut ranks = Vec::with_capacity(max_len);
 
     for _ in 0..max_len {
-        ranks.push(rng.gen_range(0..max_id) as u64);
+        ranks.push(rng.gen_range(0..max_id) as u128);
     }
 
     ranks.sort_unstable();

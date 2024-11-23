@@ -56,7 +56,7 @@ pub fn fetch_small_edges<F: Field>(
                     .segment_reader(doc.segment_ord)
                     .segment_id(),
             );
-            field_column = Some(segment_column_fields.u64(node_id_field).unwrap());
+            field_column = Some(segment_column_fields.u128(node_id_field).unwrap());
             rel_flags_column = Some(segment_column_fields.u64(RelFlags).unwrap());
             score_column = Some(segment_column_fields.f64(SortScore).unwrap());
         }

@@ -136,13 +136,13 @@ impl Site {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-struct SiteId([u8; 8]);
+struct SiteId([u8; 16]);
 
 impl SiteId {
     fn from_url(url: &str) -> Result<Self> {
         let url = Url::robust_parse(url)?;
         let node_id = Node::from(&url).into_host().id();
-        Ok(Self(node_id.as_u64().to_be_bytes()))
+        Ok(Self(node_id.as_u128().to_be_bytes()))
     }
 }
 
@@ -274,7 +274,7 @@ pub fn run(config: SiteStatsConfig) -> Result<()> {
         crate::webgraph::centrality::TopNodes::Top(config.top_sites),
     )
     .into_iter()
-    .map(|(node, _)| SiteId(node.as_u64().to_be_bytes()))
+    .map(|(node, _)| SiteId(node.as_u128().to_be_bytes()))
     .collect();
 
     let jobs: Vec<_> = config

@@ -88,14 +88,14 @@ impl tantivy::query::Weight for LinksWeight {
     ) -> tantivy::Result<Box<dyn tantivy::query::Scorer>> {
         let schema = reader.schema();
         let field = schema.get_field(self.field.name())?;
-        let term = tantivy::Term::from_field_u64(field, self.node.as_u64());
+        let term = tantivy::Term::from_field_u128(field, self.node.as_u128());
 
         match LinksScorer::new(
             reader,
             term,
             self.deduplication_field,
             &self.warmed_column_fields,
-            self.node.as_u64(),
+            self.node.as_u128(),
             self.skip_self_links,
         ) {
             Ok(Some(scorer)) => Ok(Box::new(scorer)),
@@ -114,9 +114,9 @@ impl tantivy::query::Weight for LinksWeight {
 
 struct LinksScorer {
     postings: SegmentPostings,
-    dedup_column: Option<Column<u64>>,
-    last_dedup_val: Option<u64>,
-    self_dedup_val: u64,
+    dedup_column: Option<Column<u128>>,
+    last_dedup_val: Option<u128>,
+    self_dedup_val: u128,
     skip_self_links: bool,
 }
 
@@ -126,13 +126,13 @@ impl LinksScorer {
         term: tantivy::Term,
         deduplication_field: Option<FieldEnum>,
         warmed_column_fields: &WarmedColumnFields,
-        self_dedup_val: u64,
+        self_dedup_val: u128,
         skip_self_links: bool,
     ) -> tantivy::Result<Option<Self>> {
         let dedup_column = deduplication_field.map(|f| {
             warmed_column_fields
                 .segment(&reader.segment_id())
-                .u64(f)
+                .u128(f)
                 .unwrap()
         });
 
@@ -175,7 +175,7 @@ impl LinksScorer {
 }
 
 impl LinksScorer {
-    fn dedup_val(&self, doc: tantivy::DocId) -> Option<u64> {
+    fn dedup_val(&self, doc: tantivy::DocId) -> Option<u128> {
         if doc == tantivy::TERMINATED {
             return None;
         }
