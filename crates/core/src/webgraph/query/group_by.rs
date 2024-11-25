@@ -42,6 +42,8 @@ pub struct HostGroupSketchQuery {
     group: FieldEnum,
     value: FieldEnum,
     filters: Vec<FilterEnum>,
+    skip_self_links: bool,
+    deduplicate: bool,
 }
 
 impl HostGroupSketchQuery {
@@ -55,6 +57,8 @@ impl HostGroupSketchQuery {
             group: group.into(),
             value: value.into(),
             filters: Vec::new(),
+            skip_self_links: true,
+            deduplicate: true,
         }
     }
 
@@ -88,6 +92,16 @@ impl HostGroupSketchQuery {
             Some(filter)
         }
     }
+
+    pub fn skip_self_links(mut self, skip_self_links: bool) -> Self {
+        self.skip_self_links = skip_self_links;
+        self
+    }
+
+    pub fn deduplicate(mut self, deduplicate: bool) -> Self {
+        self.deduplicate = deduplicate;
+        self
+    }
 }
 
 impl Query for HostGroupSketchQuery {
@@ -98,14 +112,28 @@ impl Query for HostGroupSketchQuery {
 
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
         let mut raw: Self::TantivyQuery = match self.node {
-            LinksDirection::From(node) => Box::new(
-                raw::LinksQuery::new(node, FromHostId, searcher.warmed_column_fields().clone())
-                    .with_deduplication_field(ToHostId),
-            ),
-            LinksDirection::To(node) => Box::new(
-                raw::LinksQuery::new(node, ToHostId, searcher.warmed_column_fields().clone())
-                    .with_deduplication_field(FromHostId),
-            ),
+            LinksDirection::From(node) => {
+                let mut q =
+                    raw::LinksQuery::new(node, FromHostId, searcher.warmed_column_fields().clone())
+                        .skip_self_links(self.skip_self_links);
+
+                if self.deduplicate {
+                    q = q.with_deduplication_field(ToHostId)
+                }
+
+                Box::new(q)
+            }
+            LinksDirection::To(node) => {
+                let mut q =
+                    raw::LinksQuery::new(node, ToHostId, searcher.warmed_column_fields().clone())
+                        .skip_self_links(self.skip_self_links);
+
+                if self.deduplicate {
+                    q = q.with_deduplication_field(FromHostId)
+                }
+
+                Box::new(q)
+            }
         };
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
@@ -160,6 +188,8 @@ pub struct HostGroupQuery {
     group: FieldEnum,
     value: FieldEnum,
     filters: Vec<FilterEnum>,
+    skip_self_links: bool,
+    deduplicate: bool,
 }
 
 impl HostGroupQuery {
@@ -173,6 +203,8 @@ impl HostGroupQuery {
             group: group.into(),
             value: value.into(),
             filters: Vec::new(),
+            skip_self_links: true,
+            deduplicate: true,
         }
     }
 
@@ -188,6 +220,7 @@ impl HostGroupQuery {
         Self::new(LinksDirection::From(node), group, value)
     }
 
+    #[must_use]
     pub fn filter<F: Filter>(mut self, filter: F) -> Self {
         self.filters.push(filter.into());
         self
@@ -206,6 +239,18 @@ impl HostGroupQuery {
             Some(filter)
         }
     }
+
+    #[must_use]
+    pub fn skip_self_links(mut self, skip_self_links: bool) -> Self {
+        self.skip_self_links = skip_self_links;
+        self
+    }
+
+    #[must_use]
+    pub fn deduplicate(mut self, deduplicate: bool) -> Self {
+        self.deduplicate = deduplicate;
+        self
+    }
 }
 
 impl Query for HostGroupQuery {
@@ -216,14 +261,28 @@ impl Query for HostGroupQuery {
 
     fn tantivy_query(&self, searcher: &crate::webgraph::searcher::Searcher) -> Self::TantivyQuery {
         let mut raw: Self::TantivyQuery = match self.node {
-            LinksDirection::From(node) => Box::new(
-                raw::LinksQuery::new(node, FromHostId, searcher.warmed_column_fields().clone())
-                    .with_deduplication_field(ToHostId),
-            ),
-            LinksDirection::To(node) => Box::new(
-                raw::LinksQuery::new(node, ToHostId, searcher.warmed_column_fields().clone())
-                    .with_deduplication_field(FromHostId),
-            ),
+            LinksDirection::From(node) => {
+                let mut q =
+                    raw::LinksQuery::new(node, FromHostId, searcher.warmed_column_fields().clone())
+                        .skip_self_links(self.skip_self_links);
+
+                if self.deduplicate {
+                    q = q.with_deduplication_field(ToHostId)
+                }
+
+                Box::new(q)
+            }
+            LinksDirection::To(node) => {
+                let mut q =
+                    raw::LinksQuery::new(node, ToHostId, searcher.warmed_column_fields().clone())
+                        .skip_self_links(self.skip_self_links);
+
+                if self.deduplicate {
+                    q = q.with_deduplication_field(FromHostId)
+                }
+
+                Box::new(q)
+            }
         };
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
