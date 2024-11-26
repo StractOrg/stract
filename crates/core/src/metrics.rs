@@ -103,7 +103,7 @@ impl PrometheusRegistry {
 impl Display for PrometheusRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, (_, r)) in self.groups.iter().enumerate() {
-            f.write_str(&format!("{r}"))?;
+            write!(f, "{r}")?;
             f.write_str("\n")?;
 
             if i < self.groups.len() - 1 {
@@ -131,7 +131,7 @@ impl Display for LabelledMetric {
 
             let num_labels = self.labels.len();
             for (i, label) in self.labels.iter().enumerate() {
-                f.write_str(&format!("{}=\"{}\"", label.key, label.val))?;
+                write!(f, "{}=\"{}\"", label.key, label.val)?;
 
                 if i < num_labels - 1 {
                     f.write_str(",")?;
@@ -191,9 +191,9 @@ impl Display for PrometheusGroup {
         for m in &self.metrics {
             f.write_str("\n")?;
             f.write_str(&self.name)?;
-            f.write_str(&format!("{m}"))?;
+            write!(f, "{m}")?;
             f.write_str(" ")?;
-            f.write_str(&format!("{timestamp}"))?;
+            write!(f, "{timestamp}")?;
         }
 
         Ok(())
