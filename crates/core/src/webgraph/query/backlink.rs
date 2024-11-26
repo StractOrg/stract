@@ -365,6 +365,8 @@ pub struct FullBacklinksQuery {
     node: Node,
     limit: EdgeLimit,
     filters: Vec<FilterEnum>,
+    skip_self_links: bool,
+    deduplicate: bool,
 }
 
 impl FullBacklinksQuery {
@@ -373,15 +375,23 @@ impl FullBacklinksQuery {
             node,
             limit: EdgeLimit::Unlimited,
             filters: Vec::new(),
+            skip_self_links: true,
+            deduplicate: true,
         }
     }
 
     pub fn with_limit(self, limit: EdgeLimit) -> Self {
-        Self {
-            node: self.node,
-            limit,
-            filters: self.filters,
-        }
+        Self { limit, ..self }
+    }
+
+    pub fn skip_self_links(mut self, skip_self_links: bool) -> Self {
+        self.skip_self_links = skip_self_links;
+        self
+    }
+
+    pub fn deduplicate(mut self, deduplicate: bool) -> Self {
+        self.deduplicate = deduplicate;
+        self
     }
 
     pub fn filter<F: Filter>(mut self, filter: F) -> Self {
@@ -411,14 +421,18 @@ impl Query for FullBacklinksQuery {
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
-        let mut raw = Box::new(
-            LinksQuery::new(
-                self.node.id(),
-                ToId,
-                searcher.warmed_column_fields().clone(),
-            )
-            .with_deduplication_field(FromId),
-        ) as Box<dyn tantivy::query::Query>;
+        let mut q = LinksQuery::new(
+            self.node.id(),
+            ToId,
+            searcher.warmed_column_fields().clone(),
+        )
+        .skip_self_links(self.skip_self_links);
+
+        if self.deduplicate {
+            q = q.with_deduplication_field(FromId);
+        }
+
+        let mut raw = Box::new(q) as Box<dyn tantivy::query::Query>;
 
         if let Some(filter) = self.filter_as_and().and_then(|f| f.inverted_index_filter()) {
             let filter = filter.query(searcher);

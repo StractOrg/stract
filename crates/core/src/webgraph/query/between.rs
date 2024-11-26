@@ -19,7 +19,7 @@ use tantivy::query::{BooleanQuery, Occur};
 use crate::{
     ampc::dht::ShardId,
     webgraph::{
-        schema::{FromHostId, FromId, ToHostId, ToId},
+        schema::{FromHostId, ToHostId},
         searcher::Searcher,
         Edge, EdgeLimit, Node, Query,
     },
@@ -78,22 +78,16 @@ impl Query for FullLinksBetweenQuery {
     type Output = Vec<Edge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
-        let from_query = Box::new(
-            LinksQuery::new(
-                self.from.id(),
-                FromHostId,
-                searcher.warmed_column_fields().clone(),
-            )
-            .with_deduplication_field(ToId),
-        ) as Box<dyn tantivy::query::Query>;
-        let to_query = Box::new(
-            LinksQuery::new(
-                self.to.id(),
-                ToHostId,
-                searcher.warmed_column_fields().clone(),
-            )
-            .with_deduplication_field(FromId),
-        ) as Box<dyn tantivy::query::Query>;
+        let from_query = Box::new(LinksQuery::new(
+            self.from.id(),
+            FromHostId,
+            searcher.warmed_column_fields().clone(),
+        )) as Box<dyn tantivy::query::Query>;
+        let to_query = Box::new(LinksQuery::new(
+            self.to.id(),
+            ToHostId,
+            searcher.warmed_column_fields().clone(),
+        )) as Box<dyn tantivy::query::Query>;
 
         let mut queries = vec![(Occur::Must, from_query), (Occur::Must, to_query)];
 
