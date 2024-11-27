@@ -199,6 +199,7 @@ pub fn normalize_url(url: &Url) -> String {
     let scheme = url.scheme();
 
     if scheme != "http" && scheme != "https" {
+        url.set_query(None);
         return url.to_string();
     }
 
