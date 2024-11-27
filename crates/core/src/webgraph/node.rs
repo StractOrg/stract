@@ -218,7 +218,7 @@ pub fn normalize_url(url: &Url) -> String {
         normalized = prefix.to_string();
     }
 
-    normalized.to_lowercase()
+    normalized
 }
 
 #[cfg(test)]
