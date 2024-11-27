@@ -64,7 +64,7 @@ pub trait Tokenizer: 'static + Clone + Send + Sync {
 /// Simple wrapper of `Box<dyn TokenStream + 'a>`.
 pub struct BoxTokenStream<'a>(Box<dyn TokenStream + 'a>);
 
-impl<'a> TokenStream for BoxTokenStream<'a> {
+impl TokenStream for BoxTokenStream<'_> {
     fn advance(&mut self) -> bool {
         self.0.advance()
     }
@@ -91,7 +91,7 @@ impl<'a> Deref for BoxTokenStream<'a> {
         &*self.0
     }
 }
-impl<'a> DerefMut for BoxTokenStream<'a> {
+impl DerefMut for BoxTokenStream<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut *self.0
     }
@@ -155,7 +155,8 @@ impl<'a, T> LendingIterator for TokenIter<'a, T>
 where
     T: TokenStream,
 {
-    type Item<'b> = &'b Token
+    type Item<'b>
+        = &'b Token
     where
         'a: 'b;
 

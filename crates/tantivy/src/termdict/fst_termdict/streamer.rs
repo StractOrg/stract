@@ -80,7 +80,7 @@ where
     current_value: TermInfo,
 }
 
-impl<'a, A> TermStreamer<'a, A>
+impl<A> TermStreamer<'_, A>
 where
     A: Automaton,
 {
@@ -135,11 +135,12 @@ where
     }
 }
 
-impl<'a, A> LendingIterator for TermStreamer<'a, A>
+impl<A> LendingIterator for TermStreamer<'_, A>
 where
     A: Automaton,
 {
-    type Item<'b> = (&'b [u8], &'b TermInfo)
+    type Item<'b>
+        = (&'b [u8], &'b TermInfo)
     where
         Self: 'b;
 

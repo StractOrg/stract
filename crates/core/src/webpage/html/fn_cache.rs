@@ -84,7 +84,7 @@ cache! {
 
 /// Some manual implementations so we can use previously cached data
 /// to compute the next field.
-impl<'a> FnCache<'a> {
+impl FnCache<'_> {
     pub fn first_ingredient_tag_id(&mut self) -> Option<&String> {
         if self.first_ingredient_tag_id.is_none() {
             let root = self.html.root.clone(); // Node is just a NodeRef, so it's cheap to clone

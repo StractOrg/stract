@@ -194,7 +194,7 @@ pub struct MergePointer<'a> {
     pub is_finished: bool,
 }
 
-impl<'a> MergePointer<'a> {
+impl MergePointer<'_> {
     pub fn advance(&mut self) -> bool {
         self.is_finished = self
             .stream
@@ -209,13 +209,13 @@ impl<'a> MergePointer<'a> {
     }
 }
 
-impl<'a> PartialOrd for MergePointer<'a> {
+impl PartialOrd for MergePointer<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a> Ord for MergePointer<'a> {
+impl Ord for MergePointer<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match (self.is_finished, other.is_finished) {
             (true, true) | (false, false) => self.term.cmp(&other.term),
@@ -225,13 +225,13 @@ impl<'a> Ord for MergePointer<'a> {
     }
 }
 
-impl<'a> PartialEq for MergePointer<'a> {
+impl PartialEq for MergePointer<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.term == other.term && self.is_finished == other.is_finished
     }
 }
 
-impl<'a> Eq for MergePointer<'a> {}
+impl Eq for MergePointer<'_> {}
 
 #[cfg(test)]
 mod tests {

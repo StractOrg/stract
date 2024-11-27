@@ -85,7 +85,7 @@ pub struct RegexTokenStream<'a> {
     cursor: usize,
 }
 
-impl<'a> TokenStream for RegexTokenStream<'a> {
+impl TokenStream for RegexTokenStream<'_> {
     fn advance(&mut self) -> bool {
         let Some(regex_match) = self.regex.find(self.text) else {
             return false;

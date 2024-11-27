@@ -103,7 +103,7 @@ pub struct SerializedRef<'a, T> {
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<'a, T> std::fmt::Debug for SerializedRef<'a, T> {
+impl<T> std::fmt::Debug for SerializedRef<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let truncated = self.bytes.len() > 16;
 
@@ -125,21 +125,21 @@ impl<'a, T> std::fmt::Debug for SerializedRef<'a, T> {
     }
 }
 
-impl<'a, T> Clone for SerializedRef<'a, T> {
+impl<T> Clone for SerializedRef<'_, T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, T> Copy for SerializedRef<'a, T> {}
+impl<T> Copy for SerializedRef<'_, T> {}
 
-impl<'a, T> AsRef<[u8]> for SerializedRef<'a, T> {
+impl<T> AsRef<[u8]> for SerializedRef<'_, T> {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
     }
 }
 
-impl<'a, T> SerializedRef<'a, T> {
+impl<T> SerializedRef<'_, T> {
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes
     }
@@ -163,21 +163,21 @@ impl<'a, T, const N: usize> From<&'a [u8; N]> for SerializedRef<'a, T> {
     }
 }
 
-impl<'a, T> PartialOrd for SerializedRef<'a, T> {
+impl<T> PartialOrd for SerializedRef<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a, T> PartialEq for SerializedRef<'a, T> {
+impl<T> PartialEq for SerializedRef<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.bytes == other.bytes
     }
 }
 
-impl<'a, T> Eq for SerializedRef<'a, T> {}
+impl<T> Eq for SerializedRef<'_, T> {}
 
-impl<'a, T> Ord for SerializedRef<'a, T> {
+impl<T> Ord for SerializedRef<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.bytes.cmp(other.bytes)
     }

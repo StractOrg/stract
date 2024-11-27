@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -128,7 +128,7 @@ fn article_to_entity(article: Article) -> Entity {
     }
 }
 
-impl<'a> Iterator for EntityIterator<'a> {
+impl Iterator for EntityIterator<'_> {
     type Item = Entity;
 
     fn next(&mut self) -> Option<Self::Item> {

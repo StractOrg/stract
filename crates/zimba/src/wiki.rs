@@ -94,7 +94,7 @@ pub struct Article {
     pub content: String,
 }
 
-impl<'a> Iterator for ArticleIterator<'a> {
+impl Iterator for ArticleIterator<'_> {
     type Item = Article;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -216,7 +216,7 @@ impl Image {
     }
 }
 
-impl<'a> Iterator for ImageIterator<'a> {
+impl Iterator for ImageIterator<'_> {
     type Item = Image;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,7 @@
 #[derive(Clone)]
 pub struct ExactMatch<'a>(pub &'a [u8]);
 
-impl<'a> fst::Automaton for ExactMatch<'a> {
+impl fst::Automaton for ExactMatch<'_> {
     type State = Option<usize>;
 
     fn start(&self) -> Self::State {

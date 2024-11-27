@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -312,7 +312,7 @@ impl<'a> NodeQuery<'a> {
     }
 }
 
-impl<'a> Clone for NodeQuery<'a> {
+impl Clone for NodeQuery<'_> {
     fn clone(&self) -> Self {
         Self {
             node: self.node,

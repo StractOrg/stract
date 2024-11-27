@@ -232,7 +232,7 @@ pub struct FieldReader<'a> {
     doc: DocId,
 }
 
-impl<'a> FieldReader<'a> {
+impl FieldReader<'_> {
     pub fn get(&self, field: NumericalFieldEnum) -> Option<Value> {
         if field.orientation().contains(Orientation::ROW) {
             let field_id = self.field_ids.get(field)?;

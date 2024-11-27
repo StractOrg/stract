@@ -314,9 +314,9 @@ impl<S> DhtTableIterator<S> {
     }
 }
 
-impl<'a, S> Iterator for DhtTableIterator<S>
+impl<S> Iterator for DhtTableIterator<S>
 where
-    S: Stream<Item = Result<(dht::Key, dht::Value)>> + 'a,
+    S: Stream<Item = Result<(dht::Key, dht::Value)>>,
 {
     type Item = (dht::Key, dht::Value);
 

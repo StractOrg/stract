@@ -136,7 +136,7 @@ pub struct RandomLookupIter<'a, V> {
     _phantom: std::marker::PhantomData<V>,
 }
 
-impl<'a, V> Iterator for RandomLookupIter<'a, V>
+impl<V> Iterator for RandomLookupIter<'_, V>
 where
     V: ConstSerializable,
 {

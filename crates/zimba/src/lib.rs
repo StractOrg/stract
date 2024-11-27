@@ -449,7 +449,7 @@ enum CompressedReader<'a> {
     Zstd(BufReader<zstd::Decoder<'a, BufReader<&'a [u8]>>>),
 }
 
-impl<'a> std::io::Read for CompressedReader<'a> {
+impl std::io::Read for CompressedReader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match self {
             CompressedReader::Uncompressed(reader) => reader.read(buf),
@@ -690,7 +690,7 @@ impl<'a> DirEntryIterator<'a> {
     }
 }
 
-impl<'a> Iterator for DirEntryIterator<'a> {
+impl Iterator for DirEntryIterator<'_> {
     type Item = Result<DirEntry, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {

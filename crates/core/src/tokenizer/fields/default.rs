@@ -80,7 +80,7 @@ impl tantivy::tokenizer::Tokenizer for Normal {
     }
 }
 
-impl<'a> tantivy::tokenizer::TokenStream for NormalTokenStream<'a> {
+impl tantivy::tokenizer::TokenStream for NormalTokenStream<'_> {
     fn advance(&mut self) -> bool {
         self.token = self.stream.next().map(|token| {
             let span = token.span();

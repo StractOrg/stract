@@ -87,7 +87,7 @@ impl Predicate {
                     .attributes
                     .borrow()
                     .get(attr.as_str())
-                    .map_or(false, |v| v.split_ascii_whitespace().any(|v| v == value)),
+                    .is_some_and(|v| v.split_ascii_whitespace().any(|v| v == value)),
             },
         }
     }

@@ -30,7 +30,7 @@ impl<T: PartialOrd + Copy + std::fmt::Debug + Send + Sync + 'static + Default>
     ///
     /// The docs is used if the column is full (each docs has exactly one value), otherwise the
     /// internal docid vec is used for the iterator, which e.g. may contain duplicate docs.
-    pub fn iter_docid_vals<'a>(&'a self, docs: &'a [u32]) -> impl Iterator<Item = (DocId, T)> + '_ {
+    pub fn iter_docid_vals<'a>(&'a self, docs: &'a [u32]) -> impl Iterator<Item = (DocId, T)> + 'a {
         docs.iter().cloned().zip(self.val_cache.iter().cloned())
     }
 }

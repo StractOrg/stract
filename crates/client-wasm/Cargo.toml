@@ -21,9 +21,16 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 bincode.workspace = true
 js-sys.workspace = true
-optics = {path = "../optics"}
+optics = { path = "../optics" }
 serde-wasm-bindgen.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 wasm-bindgen.workspace = true
+
+
+# https://github.com/rustwasm/wasm-bindgen/issues/4283
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(wasm_bindgen_unstable_test_coverage)',
+] }

@@ -290,9 +290,7 @@ impl selectors::Element for NodeDataRef<ElementData> {
         self.attributes
             .borrow()
             .get(local_name!("id"))
-            .map_or(false, |id_attr| {
-                case_sensitivity.eq(id.0.as_bytes(), id_attr.as_bytes())
-            })
+            .is_some_and(|id_attr| case_sensitivity.eq(id.0.as_bytes(), id_attr.as_bytes()))
     }
 
     #[inline]
@@ -324,7 +322,7 @@ impl selectors::Element for NodeDataRef<ElementData> {
             NamespaceConstraint::Specific(ns_url) => attrs
                 .map
                 .get(&ExpandedName::new(ns_url, local_name.0.clone()))
-                .map_or(false, |attr| operation.eval_str(&attr.value)),
+                .is_some_and(|attr| operation.eval_str(&attr.value)),
         }
     }
 

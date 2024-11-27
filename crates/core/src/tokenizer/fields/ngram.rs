@@ -43,7 +43,7 @@ fn reuse_token_alloc(token: &mut tantivy::tokenizer::Token, new_token: &tantivy:
     token.position_length = new_token.position_length;
 }
 
-impl<'a, const N: usize> tantivy::tokenizer::TokenStream for NGramTokenStream<'a, N> {
+impl<const N: usize> tantivy::tokenizer::TokenStream for NGramTokenStream<'_, N> {
     fn advance(&mut self) -> bool {
         if !self.inner.advance() {
             return false;

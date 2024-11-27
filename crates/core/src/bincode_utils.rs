@@ -102,7 +102,7 @@ mod de_owned {
         pub(crate) de: &'a mut DE,
     }
 
-    impl<'a, 'de, DE: Decoder> Deserializer<'de> for SerdeDecoder<'a, DE> {
+    impl<'de, DE: Decoder> Deserializer<'de> for SerdeDecoder<'_, DE> {
         type Error = DecodeError;
 
         fn deserialize_any<V>(self, _: V) -> Result<V::Value, Self::Error>
@@ -443,7 +443,7 @@ mod de_owned {
         }
     }
 
-    impl<'de, 'a, DE: Decoder> EnumAccess<'de> for SerdeDecoder<'a, DE> {
+    impl<'de, DE: Decoder> EnumAccess<'de> for SerdeDecoder<'_, DE> {
         type Error = DecodeError;
         type Variant = Self;
 
@@ -457,7 +457,7 @@ mod de_owned {
         }
     }
 
-    impl<'de, 'a, DE: Decoder> VariantAccess<'de> for SerdeDecoder<'a, DE> {
+    impl<'de, DE: Decoder> VariantAccess<'de> for SerdeDecoder<'_, DE> {
         type Error = DecodeError;
 
         fn unit_variant(self) -> Result<(), Self::Error> {
@@ -570,7 +570,7 @@ mod ser {
         pub(super) enc: &'a mut ENC,
     }
 
-    impl<'a, ENC> Serializer for SerdeEncoder<'a, ENC>
+    impl<ENC> Serializer for SerdeEncoder<'_, ENC>
     where
         ENC: Encoder,
     {
@@ -769,7 +769,7 @@ mod ser {
 
     type Compound<'a, ENC> = SerdeEncoder<'a, ENC>;
 
-    impl<'a, ENC: Encoder> SerializeSeq for Compound<'a, ENC> {
+    impl<ENC: Encoder> SerializeSeq for Compound<'_, ENC> {
         type Ok = ();
         type Error = EncodeError;
 
@@ -785,7 +785,7 @@ mod ser {
         }
     }
 
-    impl<'a, ENC: Encoder> SerializeTuple for Compound<'a, ENC> {
+    impl<ENC: Encoder> SerializeTuple for Compound<'_, ENC> {
         type Ok = ();
         type Error = EncodeError;
 
@@ -801,7 +801,7 @@ mod ser {
         }
     }
 
-    impl<'a, ENC: Encoder> SerializeTupleStruct for Compound<'a, ENC> {
+    impl<ENC: Encoder> SerializeTupleStruct for Compound<'_, ENC> {
         type Ok = ();
         type Error = EncodeError;
 
@@ -817,7 +817,7 @@ mod ser {
         }
     }
 
-    impl<'a, ENC: Encoder> SerializeTupleVariant for Compound<'a, ENC> {
+    impl<ENC: Encoder> SerializeTupleVariant for Compound<'_, ENC> {
         type Ok = ();
         type Error = EncodeError;
 
@@ -833,7 +833,7 @@ mod ser {
         }
     }
 
-    impl<'a, ENC: Encoder> SerializeMap for Compound<'a, ENC> {
+    impl<ENC: Encoder> SerializeMap for Compound<'_, ENC> {
         type Ok = ();
         type Error = EncodeError;
 
@@ -856,7 +856,7 @@ mod ser {
         }
     }
 
-    impl<'a, ENC: Encoder> SerializeStruct for Compound<'a, ENC> {
+    impl<ENC: Encoder> SerializeStruct for Compound<'_, ENC> {
         type Ok = ();
         type Error = EncodeError;
 
@@ -872,7 +872,7 @@ mod ser {
         }
     }
 
-    impl<'a, ENC: Encoder> SerializeStructVariant for Compound<'a, ENC> {
+    impl<ENC: Encoder> SerializeStructVariant for Compound<'_, ENC> {
         type Ok = ();
         type Error = EncodeError;
 

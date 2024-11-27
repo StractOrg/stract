@@ -135,7 +135,7 @@ pub struct JsonFieldTokenStream<'a> {
     token: tantivy::tokenizer::Token,
 }
 
-impl<'a> JsonFieldTokenStream<'a> {
+impl JsonFieldTokenStream<'_> {
     // search for the end of the current token.
     fn search_token_end(&mut self, is_quote: bool) -> usize {
         let mut escaped = false;
@@ -159,7 +159,7 @@ impl<'a> JsonFieldTokenStream<'a> {
     }
 }
 
-impl<'a> tantivy::tokenizer::TokenStream for JsonFieldTokenStream<'a> {
+impl tantivy::tokenizer::TokenStream for JsonFieldTokenStream<'_> {
     fn advance(&mut self) -> bool {
         self.token.text.clear();
         self.token.position = self.token.position.wrapping_add(1);

@@ -35,25 +35,25 @@ struct CandidatePassage<'a> {
     score: f32,
 }
 
-impl<'a> PartialOrd for CandidatePassage<'a> {
+impl PartialOrd for CandidatePassage<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a> Ord for CandidatePassage<'a> {
+impl Ord for CandidatePassage<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.score.total_cmp(&other.score)
     }
 }
 
-impl<'a> PartialEq for CandidatePassage<'a> {
+impl PartialEq for CandidatePassage<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.score == other.score
     }
 }
 
-impl<'a> Eq for CandidatePassage<'a> {}
+impl Eq for CandidatePassage<'_> {}
 
 struct OverlappingSents<'a> {
     text: &'a str,

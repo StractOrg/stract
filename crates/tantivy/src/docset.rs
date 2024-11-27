@@ -99,7 +99,7 @@ pub trait DocSet: Send {
     }
 }
 
-impl<'a> DocSet for &'a mut dyn DocSet {
+impl DocSet for &mut dyn DocSet {
     fn advance(&mut self) -> u32 {
         (**self).advance()
     }

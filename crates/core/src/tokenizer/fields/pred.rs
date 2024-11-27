@@ -48,7 +48,7 @@ pub struct PredTokenStream<'a> {
     next_position: usize,
 }
 
-impl<'a> tantivy::tokenizer::TokenStream for PredTokenStream<'a> {
+impl tantivy::tokenizer::TokenStream for PredTokenStream<'_> {
     fn advance(&mut self) -> bool {
         self.token = self.stream.next().map(|token| {
             let span = token.span();

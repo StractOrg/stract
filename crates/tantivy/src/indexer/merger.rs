@@ -707,13 +707,13 @@ struct PeekSegmentPostingsWithNewDocId<'a> {
     doc_id_mapping: &'a [Option<DocId>],
 }
 
-impl<'a> DerefMut for PeekSegmentPostingsWithNewDocId<'a> {
+impl DerefMut for PeekSegmentPostingsWithNewDocId<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.segment
     }
 }
 
-impl<'a> Deref for PeekSegmentPostingsWithNewDocId<'a> {
+impl Deref for PeekSegmentPostingsWithNewDocId<'_> {
     type Target = SegmentPostingsWithNewDocId;
 
     fn deref(&self) -> &Self::Target {
@@ -721,7 +721,7 @@ impl<'a> Deref for PeekSegmentPostingsWithNewDocId<'a> {
     }
 }
 
-impl<'a> Drop for PeekSegmentPostingsWithNewDocId<'a> {
+impl Drop for PeekSegmentPostingsWithNewDocId<'_> {
     fn drop(&mut self) {
         self.segment.postings.advance();
         self.segment.new_doc_id = if self.segment.postings.doc() == TERMINATED {

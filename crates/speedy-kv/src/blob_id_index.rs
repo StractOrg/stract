@@ -124,7 +124,7 @@ where
     }
 }
 
-impl<'a, K, A> Iterator for BlobIdIndexIter<'a, K, A>
+impl<K, A> Iterator for BlobIdIndexIter<'_, K, A>
 where
     A: fst::Automaton,
 {

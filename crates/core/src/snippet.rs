@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -31,14 +31,14 @@ use utoipa::ToSchema;
 use itertools::Itertools;
 use whatlang::Lang;
 
-/// For now we use an algorithm similar to the `UnifiedHighlighter` in lucene <https://lucene.apache.org/core/7_3_1/highlighter/org/apache/lucene/search/uhighlight/UnifiedHighlighter.html>.
-/// The document text is treated as the entire corpus, and each passage is scored as a document in this corpus using BM25.
-/// The top scoring passage is used as the start of a snippet, maybe combined with the subsequent passage(s) in order to
-/// reach the desired snippet length.
-///
-/// In the future we want to implement something closer to the method described in <https://cs.pomona.edu/~dkauchak/ir_project/whitepapers/Snippet-IL.pdf>.
-/// This might require us to store each paragraph of the webpage separately to get adequate performance (maybe we can split passages online with adequate performance
-/// but we need to test this).
+// For now we use an algorithm similar to the `UnifiedHighlighter` in lucene <https://lucene.apache.org/core/7_3_1/highlighter/org/apache/lucene/search/uhighlight/UnifiedHighlighter.html>.
+// The document text is treated as the entire corpus, and each passage is scored as a document in this corpus using BM25.
+// The top scoring passage is used as the start of a snippet, maybe combined with the subsequent passage(s) in order to
+// reach the desired snippet length.
+//
+// In the future we want to implement something closer to the method described in <https://cs.pomona.edu/~dkauchak/ir_project/whitepapers/Snippet-IL.pdf>.
+// This might require us to store each paragraph of the webpage separately to get adequate performance (maybe we can split passages online with adequate performance
+// but we need to test this).
 
 const K1: f64 = 1.2;
 const B: f64 = 0.75;

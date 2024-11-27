@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -382,11 +382,7 @@ fn intersection_with_slop(left: &[u32], right: &[u32], out: &mut [u32], slop: u3
         // left_val < right_slop -> left index increment.
         // right_slop <= left_val <= right -> find the best match.
         // left_val > right -> right index increment.
-        let right_slop = if right_val >= slop {
-            right_val - slop
-        } else {
-            0
-        };
+        let right_slop = right_val.saturating_sub(slop);
 
         if left_val < right_slop {
             left_index += 1;

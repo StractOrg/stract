@@ -11,9 +11,12 @@ version = "0.1.0"
 
 [features]
 cors = []
-default = ["cors", "dev"]
-dev = ["cors"]
+default = ["cors", "dev", "serde"]
+dev = ["cors", "serde"]
 return_body = []
+
+# DOESN'T DO ANYTHING. This is only used to silence a warning from openraft.
+serde = []
 
 [[bin]]
 name = "stract"

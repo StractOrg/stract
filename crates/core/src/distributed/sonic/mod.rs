@@ -263,7 +263,7 @@ pub struct Request<'a, Req, Res> {
     body: Option<Req>,
 }
 
-impl<'a, Req, Res> Request<'a, Req, Res>
+impl<Req, Res> Request<'_, Req, Res>
 where
     Res: bincode::Encode,
 {

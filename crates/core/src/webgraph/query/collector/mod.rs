@@ -74,7 +74,7 @@ where
     }
 }
 
-impl<'a, T> tantivy::collector::Collector for TantivyCollector<'a, T>
+impl<T> tantivy::collector::Collector for TantivyCollector<'_, T>
 where
     T: Collector,
 {
