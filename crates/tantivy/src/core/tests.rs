@@ -483,4 +483,8 @@ fn test_u128_columnar_values() {
     assert_eq!(postings.term_freq(), 1u32);
     let column = segment_reader.column_fields().u128("u128").unwrap();
     assert_eq!(column.first(0).unwrap(), 1u128);
+
+    let cached_column = column.to_cached();
+    assert_eq!(cached_column.first(0).unwrap(), 1u128);
+    assert_eq!(cached_column.first(0).unwrap(), 1u128);
 }

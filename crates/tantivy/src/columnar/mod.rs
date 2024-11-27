@@ -33,7 +33,7 @@ mod value;
 
 use crate::sstable::VoidSSTable;
 pub use block_accessor::ColumnBlockAccessor;
-pub use column::{BytesColumn, Column};
+pub use column::{BytesColumn, CachedColumn, Column};
 pub use column_index::ColumnIndex;
 pub use column_values::{
     ColumnValues, EmptyColumnValues, MonotonicallyMappableToU128, MonotonicallyMappableToU64,

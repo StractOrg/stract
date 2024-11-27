@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::{columnar::Column, postings::SegmentPostings, DocSet};
+use tantivy::{columnar::CachedColumn, postings::SegmentPostings, DocSet};
 
 use crate::webgraph::{
     schema::{Field, FieldEnum},
@@ -114,7 +114,7 @@ impl tantivy::query::Weight for LinksWeight {
 
 struct LinksScorer {
     postings: SegmentPostings,
-    dedup_column: Option<Column<u128>>,
+    dedup_column: Option<CachedColumn<u128>>,
     last_dedup_val: Option<u128>,
     self_dedup_val: u128,
     skip_self_links: bool,
@@ -134,6 +134,7 @@ impl LinksScorer {
                 .segment(&reader.segment_id())
                 .u128(f)
                 .unwrap()
+                .to_cached()
         });
 
         Ok(reader

@@ -1,3 +1,4 @@
+mod cached;
 mod dictionary_encoded;
 mod serialize;
 
@@ -7,6 +8,7 @@ use std::ops::{Range, RangeInclusive};
 use std::sync::Arc;
 
 use crate::common::BinarySerializable;
+pub use cached::CachedColumn;
 pub use dictionary_encoded::BytesColumn;
 pub use serialize::{
     open_column_bytes, open_column_u128, open_column_u64, serialize_column_mappable_to_u128,
@@ -57,6 +59,12 @@ impl<T: MonotonicallyMappableToU128> Column<T> {
             index: self.index,
             values,
         }
+    }
+}
+
+impl<T> Column<T> {
+    pub fn to_cached(self) -> CachedColumn<T> {
+        CachedColumn::new(self)
     }
 }
 
