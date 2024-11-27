@@ -190,13 +190,15 @@ pub fn run(config: HarmonicCoordinatorConfig) -> Result<()> {
         .build()?
         .block_on(setup_gossip(tokio_conf))?;
 
-    let jobs = cluster
+    let jobs: Vec<_> = cluster
         .workers
         .iter()
         .map(|worker| CentralityJob {
             shard: worker.shard(),
         })
         .collect();
+
+    tracing::info!("starting {} jobs", jobs.len());
 
     let coordinator = build(&cluster.dht, cluster.workers.clone());
     let res = coordinator.run(jobs, CentralityFinish)?;

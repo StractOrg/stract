@@ -128,6 +128,7 @@ impl RemoteWorker for RemoteApproxCentralityWorker {
 }
 
 pub fn run(config: ApproxHarmonicWorkerConfig) -> Result<()> {
+    tracing::info!("starting worker");
     let tokio_conf = config.clone();
 
     let graph = Webgraph::builder(config.graph_path, config.shard).open()?;
@@ -138,6 +139,7 @@ pub fn run(config: ApproxHarmonicWorkerConfig) -> Result<()> {
     };
     crate::start_gossip_cluster_thread(tokio_conf.gossip, Some(service));
 
+    tracing::info!("worker ready");
     worker.run(config.host)?;
 
     Ok(())

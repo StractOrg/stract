@@ -42,6 +42,7 @@ pub struct CentralityWorker {
     changed_nodes: Arc<Mutex<U64BloomFilter>>,
     round: AtomicU64,
     has_updated_meta_for_round: AtomicBool,
+    num_nodes: u64,
 }
 
 impl CentralityWorker {
@@ -52,6 +53,7 @@ impl CentralityWorker {
         changed_nodes.fill();
 
         Self {
+            num_nodes,
             shard,
             graph,
             changed_nodes: Arc::new(Mutex::new(changed_nodes)),
@@ -107,7 +109,7 @@ impl Message<CentralityWorker> for NumNodes {
     type Response = u64;
 
     fn handle(self, worker: &CentralityWorker) -> Self::Response {
-        worker.graph.host_nodes().len() as u64
+        worker.num_nodes
     }
 }
 
@@ -173,6 +175,7 @@ impl RemoteWorker for RemoteCentralityWorker {
 }
 
 pub fn run(config: HarmonicWorkerConfig) -> Result<()> {
+    tracing::info!("starting worker");
     let tokio_conf = config.clone();
 
     let graph = Webgraph::builder(config.graph_path, config.shard).open()?;
@@ -183,6 +186,7 @@ pub fn run(config: HarmonicWorkerConfig) -> Result<()> {
     };
     crate::start_gossip_cluster_thread(tokio_conf.gossip, Some(service));
 
+    tracing::info!("worker ready");
     worker.run(config.host)?;
 
     Ok(())
