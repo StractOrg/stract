@@ -27,7 +27,7 @@ use rustc_hash::FxHashSet;
 use store::EdgeStore;
 
 pub use builder::WebgraphBuilder;
-pub use document::*;
+pub use edge::*;
 pub use node::*;
 pub use shortest_path::ShortestPaths;
 
@@ -36,7 +36,7 @@ use searcher::Searcher;
 mod builder;
 pub mod centrality;
 mod doc_address;
-mod document;
+mod edge;
 mod node;
 pub mod query;
 pub mod remote;

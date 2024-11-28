@@ -53,10 +53,7 @@ where
 pub trait Deduplicator: Clone + Send + Sync {
     type Doc: DeduplicatorDoc;
 
-    fn deduplicate(
-        &self,
-        docs: Vec<(tantivy::Score, Self::Doc)>,
-    ) -> Vec<(tantivy::Score, Self::Doc)>;
+    fn deduplicate(&self, docs: Vec<(u64, Self::Doc)>) -> Vec<(u64, Self::Doc)>;
 }
 
 impl DeduplicatorDoc for DocAddress {
@@ -75,10 +72,7 @@ pub struct NoDeduplicator;
 impl Deduplicator for NoDeduplicator {
     type Doc = DocAddress;
 
-    fn deduplicate(
-        &self,
-        docs: Vec<(tantivy::Score, Self::Doc)>,
-    ) -> Vec<(tantivy::Score, Self::Doc)> {
+    fn deduplicate(&self, docs: Vec<(u64, Self::Doc)>) -> Vec<(u64, Self::Doc)> {
         docs
     }
 }
@@ -124,10 +118,7 @@ pub struct HostDeduplicator;
 impl Deduplicator for HostDeduplicator {
     type Doc = DocAddressWithHost;
 
-    fn deduplicate(
-        &self,
-        docs: Vec<(tantivy::Score, Self::Doc)>,
-    ) -> Vec<(tantivy::Score, Self::Doc)> {
+    fn deduplicate(&self, docs: Vec<(u64, Self::Doc)>) -> Vec<(u64, Self::Doc)> {
         docs.into_iter().unique_by(|(_, doc)| doc.host).collect()
     }
 }
@@ -299,7 +290,7 @@ where
 }
 
 impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> Collector for TopDocsCollector<S, D> {
-    type Fruit = Vec<(tantivy::Score, <D as Deduplicator>::Doc)>;
+    type Fruit = Vec<(u64, <D as Deduplicator>::Doc)>;
 
     type Child = TopDocsSegmentCollector<S, D>;
 
@@ -340,8 +331,8 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> Collector for TopDo
         let before_deduplication: Vec<_> = segment_fruits.into_iter().flatten().collect();
         let deduplicated = self.deduplicator.deduplicate(before_deduplication);
 
-        for (score, doc) in deduplicated {
-            computer.push(score, doc);
+        for (rank, doc) in deduplicated {
+            computer.push(rank, doc);
         }
 
         let result = computer.harvest();
@@ -367,19 +358,19 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> Collector for TopDo
 }
 
 enum Computer<D: Deduplicator> {
-    TopN(TopNComputer<tantivy::Score, <D as Deduplicator>::Doc>),
+    TopN(TopNComputer<u64, <D as Deduplicator>::Doc, false>),
     All(AllComputer<D>),
 }
 
 impl<D: Deduplicator> Computer<D> {
-    fn push(&mut self, score: tantivy::Score, doc: <D as Deduplicator>::Doc) {
+    fn push(&mut self, rank: u64, doc: <D as Deduplicator>::Doc) {
         match self {
-            Computer::TopN(computer) => computer.push(score, doc),
-            Computer::All(computer) => computer.push(score, doc),
+            Computer::TopN(computer) => computer.push(rank, doc),
+            Computer::All(computer) => computer.push(rank, doc),
         }
     }
 
-    fn harvest(self) -> Vec<(tantivy::Score, <D as Deduplicator>::Doc)> {
+    fn harvest(self) -> Vec<(u64, <D as Deduplicator>::Doc)> {
         match self {
             Computer::TopN(computer) => computer
                 .into_sorted_vec()
@@ -392,7 +383,7 @@ impl<D: Deduplicator> Computer<D> {
 }
 
 struct AllComputer<D: Deduplicator> {
-    docs: Vec<(tantivy::Score, <D as Deduplicator>::Doc)>,
+    docs: Vec<(u64, <D as Deduplicator>::Doc)>,
 }
 
 impl<D: Deduplicator> AllComputer<D> {
@@ -400,13 +391,13 @@ impl<D: Deduplicator> AllComputer<D> {
         Self { docs: Vec::new() }
     }
 
-    fn push(&mut self, score: tantivy::Score, doc: <D as Deduplicator>::Doc) {
-        self.docs.push((score, doc));
+    fn push(&mut self, rank: u64, doc: <D as Deduplicator>::Doc) {
+        self.docs.push((rank, doc));
     }
 
-    fn harvest(self) -> Vec<(tantivy::Score, <D as Deduplicator>::Doc)> {
+    fn harvest(self) -> Vec<(u64, <D as Deduplicator>::Doc)> {
         let mut docs = self.docs;
-        docs.sort_by(|(score1, _), (score2, _)| score2.total_cmp(score1));
+        docs.sort_by(|(rank1, _), (rank2, _)| rank1.cmp(rank2));
         docs
     }
 }
@@ -424,7 +415,7 @@ pub struct TopDocsSegmentCollector<S: DocumentScorer, D: Deduplicator> {
 impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> SegmentCollector
     for TopDocsSegmentCollector<S, D>
 {
-    type Fruit = Vec<(tantivy::Score, <D as Deduplicator>::Doc)>;
+    type Fruit = Vec<(u64, <D as Deduplicator>::Doc)>;
 
     fn collect(&mut self, doc: DocId, _: tantivy::Score) {
         if doc == tantivy::TERMINATED {
@@ -437,9 +428,9 @@ impl<S: DocumentScorer + 'static, D: Deduplicator + 'static> SegmentCollector
             }
         }
 
-        let score = self.scorer.score(doc);
+        let rank = self.scorer.rank(doc);
         self.computer
-            .push(score, <D::Doc as DeduplicatorDoc>::new(self, doc));
+            .push(rank, <D::Doc as DeduplicatorDoc>::new(self, doc));
     }
 
     fn harvest(self) -> Self::Fruit {
@@ -549,7 +540,7 @@ mod tests {
             .insert(Edge {
                 from: Node::from("https://A.com/1"),
                 to: Node::from("https://B.com/1"),
-                sort_score: 0.1,
+                sort_score: 1,
                 ..Edge::empty()
             })
             .unwrap();
@@ -557,7 +548,7 @@ mod tests {
             .insert(Edge {
                 from: Node::from("https://A.com/2"),
                 to: Node::from("https://B.com/1"),
-                sort_score: 0.1,
+                sort_score: 1,
                 ..Edge::empty()
             })
             .unwrap();
@@ -565,7 +556,7 @@ mod tests {
             .insert(Edge {
                 from: Node::from("https://C.com/1"),
                 to: Node::from("https://B.com/1"),
-                sort_score: 0.0,
+                sort_score: 3,
                 ..Edge::empty()
             })
             .unwrap();

@@ -140,7 +140,7 @@ impl Query for FullLinksBetweenQuery {
 
     fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
         let mut edges: Vec<_> = results.into_iter().flatten().collect();
-        edges.sort_by(|a, b| b.sort_score.total_cmp(&a.sort_score));
+        edges.sort_by(|a, b| a.sort_score.cmp(&b.sort_score));
         edges
     }
 }

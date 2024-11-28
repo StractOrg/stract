@@ -26,7 +26,7 @@ use tantivy::schema::Value;
 use crate::enum_dispatch_from_discriminant;
 use crate::Result;
 
-use super::document::{Edge, ReferenceValue};
+use super::edge::{Edge, ReferenceValue};
 use super::tokenizer;
 use super::tokenizer::Tokenizer;
 use super::tokenizer::TokenizerEnum;
@@ -298,13 +298,13 @@ impl Field for SortScore {
     }
 
     fn document_value<'a>(&self, edge: &'a Edge) -> ReferenceValue<'a> {
-        ReferenceValue::F64(edge.sort_score)
+        ReferenceValue::U64(edge.sort_score)
     }
 
     fn set_value(&self, edge: &mut Edge, value: OwnedValue) -> Result<()> {
         let sort_score = value
             .as_ref()
-            .as_f64()
+            .as_u64()
             .ok_or(anyhow::anyhow!("Invalid sort score"))?;
         edge.sort_score = sort_score;
 
@@ -312,7 +312,7 @@ impl Field for SortScore {
     }
 
     fn field_type(&self) -> FieldType {
-        FieldType::F64(
+        FieldType::U64(
             NumericOptions::default()
                 .set_indexed()
                 .set_stored()

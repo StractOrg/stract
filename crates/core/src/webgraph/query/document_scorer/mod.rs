@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tantivy::{columnar::Column, DocId, Score, SegmentReader};
+use tantivy::{columnar::Column, DocId, SegmentReader};
 
 use crate::webgraph::{
     schema::{Field, SortScore},
@@ -26,11 +26,11 @@ pub trait DocumentScorer: Send + Sync + Sized {
         segment: &SegmentReader,
         column_fields: &WarmedColumnFields,
     ) -> tantivy::Result<Self>;
-    fn score(&self, doc: DocId) -> Score;
+    fn rank(&self, doc: DocId) -> u64;
 }
 
 pub struct DefaultDocumentScorer {
-    column: Column<f64>,
+    column: Column<u64>,
 }
 
 impl DocumentScorer for DefaultDocumentScorer {
@@ -40,7 +40,7 @@ impl DocumentScorer for DefaultDocumentScorer {
     ) -> tantivy::Result<Self> {
         let column = column_fields
             .segment(&segment.segment_id())
-            .f64(SortScore)
+            .u64(SortScore)
             .ok_or(tantivy::TantivyError::FieldNotFound(format!(
                 "{} column not found",
                 SortScore.name()
@@ -48,11 +48,11 @@ impl DocumentScorer for DefaultDocumentScorer {
         Ok(Self { column })
     }
 
-    fn score(&self, doc: DocId) -> Score {
+    fn rank(&self, doc: DocId) -> u64 {
         if doc == tantivy::TERMINATED {
-            return 0.0;
+            return u64::MAX;
         }
 
-        self.column.first(doc).unwrap_or(0.0) as Score
+        self.column.first(doc).unwrap_or(u64::MAX)
     }
 }

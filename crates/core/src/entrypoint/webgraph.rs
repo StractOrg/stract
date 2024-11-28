@@ -152,7 +152,7 @@ impl WebgraphWorker {
                             to: destination,
                             rel_flags: link.rel,
                             label: link.text,
-                            sort_score: source_centrality + destination_centrality,
+                            sort_score: source_rank.saturating_add(destination_rank),
                             from_centrality: source_centrality,
                             to_centrality: destination_centrality,
                             from_rank: source_rank,

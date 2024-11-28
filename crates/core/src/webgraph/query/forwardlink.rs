@@ -23,7 +23,7 @@ use super::{
 };
 use crate::{
     webgraph::{
-        document::Edge,
+        edge::Edge,
         schema::{FromHostId, FromId, ToHostId, ToId},
         EdgeLimit, Node, NodeID, Searcher, SmallEdge,
     },
@@ -89,7 +89,7 @@ impl ForwardlinksQuery {
 impl Query for ForwardlinksQuery {
     type Collector = TopDocsCollector;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
-    type IntermediateOutput = Vec<(f64, SmallEdge)>;
+    type IntermediateOutput = Vec<(u64, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
@@ -174,7 +174,7 @@ impl Query for ForwardlinksQuery {
 
     fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
         let mut edges: Vec<_> = results.into_iter().flatten().collect();
-        edges.sort_by(|(a, _), (b, _)| b.total_cmp(a));
+        edges.sort_by(|(a, _), (b, _)| a.cmp(b));
         edges.into_iter().map(|(_, e)| e).collect()
     }
 }
@@ -234,7 +234,7 @@ impl HostForwardlinksQuery {
 impl Query for HostForwardlinksQuery {
     type Collector = TopDocsCollector<DefaultDocumentScorer, HostDeduplicator>;
     type TantivyQuery = Box<dyn tantivy::query::Query>;
-    type IntermediateOutput = Vec<(f64, SmallEdge)>;
+    type IntermediateOutput = Vec<(u64, SmallEdge)>;
     type Output = Vec<SmallEdge>;
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery {
@@ -327,7 +327,7 @@ impl Query for HostForwardlinksQuery {
 
     fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
         let mut edges: Vec<_> = results.into_iter().flatten().collect();
-        edges.sort_by(|(a, _), (b, _)| b.total_cmp(a));
+        edges.sort_by(|(a, _), (b, _)| a.cmp(b));
         edges.into_iter().map(|(_, e)| e).collect()
     }
 }
@@ -464,7 +464,7 @@ impl Query for FullForwardlinksQuery {
 
     fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
         let mut edges: Vec<_> = results.into_iter().flatten().collect();
-        edges.sort_by(|a, b| b.sort_score.total_cmp(&a.sort_score));
+        edges.sort_by(|a, b| a.sort_score.cmp(&b.sort_score));
         edges
     }
 }
@@ -612,7 +612,7 @@ impl Query for FullHostForwardlinksQuery {
 
     fn merge_results(results: Vec<Self::IntermediateOutput>) -> Self::Output {
         let mut edges: Vec<_> = results.into_iter().flatten().collect();
-        edges.sort_by(|a, b| b.sort_score.total_cmp(&a.sort_score));
+        edges.sort_by(|a, b| a.sort_score.cmp(&b.sort_score));
         edges
     }
 }

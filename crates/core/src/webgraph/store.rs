@@ -22,7 +22,7 @@ use std::{
 };
 
 use super::{
-    document::SmallEdge,
+    edge::SmallEdge,
     query::collector::{Collector, TantivyCollector},
     schema::{self, create_schema, Field, FromHostId, FromId, ToHostId, ToId},
     searcher::Searcher,
@@ -67,7 +67,7 @@ impl EdgeStore {
             .settings(tantivy::IndexSettings {
                 sort_by_field: Some(tantivy::IndexSortByField {
                     field: schema::SortScore.name().to_string(),
-                    order: tantivy::Order::Desc,
+                    order: tantivy::Order::Asc,
                 }),
                 ..Default::default()
             })
@@ -465,6 +465,12 @@ mod tests {
         let b_centrality = 2.0;
         let c_centrality = 4.0;
         let d_centrality = 3.0;
+
+        let a_rank = 1;
+        let b_rank = 2;
+        let c_rank = 3;
+        let d_rank = 4;
+
         let mut store =
             EdgeStore::open(&temp_dir.as_ref().join("test-segment"), ShardId::new(0)).unwrap();
 
@@ -473,11 +479,11 @@ mod tests {
             to: a.clone(),
             label: "test".to_string(),
             rel_flags: RelFlags::default(),
-            sort_score: a_centrality + b_centrality,
+            sort_score: a_rank + b_rank,
             from_centrality: b_centrality,
             to_centrality: a_centrality,
-            from_rank: 2,
-            to_rank: 1,
+            from_rank: b_rank,
+            to_rank: a_rank,
             ..Edge::empty()
         };
 
@@ -486,11 +492,11 @@ mod tests {
             to: a.clone(),
             label: "2".to_string(),
             rel_flags: RelFlags::default(),
-            sort_score: a_centrality + c_centrality,
+            sort_score: a_rank + c_rank,
             from_centrality: c_centrality,
             to_centrality: a_centrality,
-            from_rank: 3,
-            to_rank: 1,
+            from_rank: c_rank,
+            to_rank: a_rank,
             ..Edge::empty()
         };
 
@@ -499,17 +505,17 @@ mod tests {
             to: a.clone(),
             label: "3".to_string(),
             rel_flags: RelFlags::default(),
-            sort_score: a_centrality + d_centrality,
+            sort_score: a_rank + d_rank,
             from_centrality: d_centrality,
             to_centrality: a_centrality,
-            from_rank: 4,
-            to_rank: 1,
+            from_rank: d_rank,
+            to_rank: a_rank,
             ..Edge::empty()
         };
 
-        store.insert(e1.clone()).unwrap();
-        store.insert(e2.clone()).unwrap();
         store.insert(e3.clone()).unwrap();
+        store.insert(e2.clone()).unwrap();
+        store.insert(e1.clone()).unwrap();
 
         store.commit().unwrap();
 
@@ -518,9 +524,9 @@ mod tests {
 
         assert_eq!(edges.len(), 3);
 
-        assert_eq!(edges[0].from, e2.from.id());
-        assert_eq!(edges[1].from, e3.from.id());
-        assert_eq!(edges[2].from, e1.from.id());
+        assert_eq!(edges[0].from, e1.from.id());
+        assert_eq!(edges[1].from, e2.from.id());
+        assert_eq!(edges[2].from, e3.from.id());
     }
 
     #[test]

@@ -214,7 +214,7 @@ pub fn run(config: ApproxHarmonicCoordinatorConfig) -> Result<()> {
 
     let norm = 1.0 / ((num_samples - 1) as f64);
 
-    let jobs = cluster
+    let jobs: Vec<_> = cluster
         .workers
         .iter()
         .map(|worker| ApproxCentralityJob {
@@ -229,6 +229,8 @@ pub fn run(config: ApproxHarmonicCoordinatorConfig) -> Result<()> {
                 .collect(),
         })
         .collect();
+
+    tracing::info!("starting {} jobs", jobs.len());
 
     let coordinator = build(
         &cluster.dht,
