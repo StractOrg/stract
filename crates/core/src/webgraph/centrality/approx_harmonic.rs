@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ use rayon::prelude::*;
 
 use crate::{
     config::WebgraphGranularity,
+    hyperloglog::HyperLogLog,
     webgraph::{NodeID, ShortestPaths, Webgraph},
 };
 
@@ -30,14 +31,18 @@ const EPSILON: f64 = 0.3;
 // Approximate harmonic centrality by sampling O(log n / epsilon^2) nodes and
 // computing single-source shortest paths from each of them.
 //
-// Epsilong is set to 0.3.
+// Epsilon is set to 0.3.
 pub struct ApproxHarmonic {
     inner: speedy_kv::Db<NodeID, f64>,
 }
 
 impl ApproxHarmonic {
     pub fn build<P: AsRef<Path>>(graph: &Webgraph, output: P) -> Self {
-        let num_nodes = graph.page_nodes().len();
+        let num_nodes = graph
+            .page_nodes()
+            .map(|node| node.as_u128() as u64)
+            .collect::<HyperLogLog<2048>>()
+            .size() as u64;
 
         tracing::info!("found approximately {} nodes in graph", num_nodes);
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use indicatif::ParallelProgressIterator;
+use indicatif::ProgressIterator;
 use itertools::Itertools;
 use std::{cmp, collections::BTreeMap};
 
@@ -119,15 +119,17 @@ impl Mapper for ApproxCentralityMapper {
 
         pool.install(|| match self {
             ApproxCentralityMapper::InitCentrality => {
-                let num_nodes = worker.graph().page_nodes().len();
-                let nodes: Vec<_> = worker.graph().page_nodes().into_iter().collect();
-                nodes
-                    .par_chunks(BATCH_SIZE)
-                    .progress_count(num_nodes as u64 / BATCH_SIZE as u64)
+                let num_nodes = worker.num_nodes();
+                worker
+                    .graph()
+                    .page_nodes()
+                    .chunks(BATCH_SIZE)
+                    .into_iter()
+                    .progress_count(num_nodes / BATCH_SIZE as u64)
                     .for_each(|chunk| {
                         let pairs: Vec<_> = chunk
-                            .iter()
-                            .map(|node| (*node, KahanSum::from(0.0)))
+                            .into_iter()
+                            .map(|node| (node, KahanSum::from(0.0)))
                             .collect();
 
                         dht.next().centrality.batch_set(pairs)

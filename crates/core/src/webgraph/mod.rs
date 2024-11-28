@@ -158,8 +158,8 @@ impl Webgraph {
         self.store.iter_host_node_ids(0, u32::MAX).collect()
     }
 
-    pub fn page_nodes(&self) -> FxHashSet<NodeID> {
-        self.store.iter_page_node_ids(0, u32::MAX).collect()
+    pub fn page_nodes(&self) -> impl Iterator<Item = NodeID> + '_ {
+        self.store.iter_page_node_ids(0, u32::MAX)
     }
 
     pub fn random_page_nodes_with_outgoing(&self, num: usize) -> Vec<NodeID> {

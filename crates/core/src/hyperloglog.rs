@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -4348,6 +4348,16 @@ impl<H: HyperLogLogHasher, const N: usize> Default for HyperLogLog<N, H> {
             registers: vec![0; N],
             _hasher: PhantomData,
         }
+    }
+}
+
+impl<H: HyperLogLogHasher, const N: usize> FromIterator<u64> for HyperLogLog<N, H> {
+    fn from_iter<T: IntoIterator<Item = u64>>(iter: T) -> Self {
+        let mut hll = Self::default();
+        for item in iter {
+            hll.add(item);
+        }
+        hll
     }
 }
 

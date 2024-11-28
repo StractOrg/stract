@@ -21,6 +21,7 @@ use crate::{
         member::{Service, ShardId},
         sonic,
     },
+    hyperloglog::HyperLogLog,
     webgraph::{self, Webgraph},
     Result,
 };
@@ -32,13 +33,20 @@ use super::{impl_worker, ApproxCentralityJob, Message, RemoteWorker, Worker as _
 pub struct ApproxCentralityWorker {
     shard: ShardId,
     graph: Arc<Webgraph>,
+    num_nodes: u64,
 }
 
 impl ApproxCentralityWorker {
     pub fn new(graph: Webgraph, shard: ShardId) -> Self {
+        let num_nodes = graph
+            .page_nodes()
+            .map(|node| node.as_u128() as u64)
+            .collect::<HyperLogLog<2048>>()
+            .size() as u64;
         Self {
             graph: Arc::new(graph),
             shard,
+            num_nodes,
         }
     }
 
@@ -49,6 +57,10 @@ impl ApproxCentralityWorker {
     pub fn shard(&self) -> ShardId {
         self.shard
     }
+
+    pub fn num_nodes(&self) -> u64 {
+        self.num_nodes
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
@@ -58,7 +70,7 @@ impl Message<ApproxCentralityWorker> for NumNodes {
     type Response = u64;
 
     fn handle(self, worker: &ApproxCentralityWorker) -> Self::Response {
-        worker.graph.page_nodes().len() as u64
+        worker.num_nodes
     }
 }
 
