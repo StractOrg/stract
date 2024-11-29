@@ -396,17 +396,6 @@ pub fn mv<P1: AsRef<std::path::Path>, P2: AsRef<std::path::Path>>(
     Ok(())
 }
 
-pub fn urlencode(s: &str) -> String {
-    const FRAGMENT: &percent_encoding::AsciiSet = &percent_encoding::CONTROLS
-        .add(b' ')
-        .add(b'"')
-        .add(b'<')
-        .add(b'>')
-        .add(b'`');
-
-    percent_encoding::utf8_percent_encode(s, FRAGMENT).to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

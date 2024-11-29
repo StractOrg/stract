@@ -186,6 +186,7 @@ whatlang = { version = "0.16.0", features = ["serde"] }
 xxhash-rust = { version = "0.8.10", features = ["xxh3", "const_xxh3"] }
 zipf = "7.0.0"
 zstd = { version = "0.13", features = ["experimental"] }
+urlencoding = "2.1.3"
 
 [profile.test.package]
 flate2.opt-level = 3

@@ -169,7 +169,7 @@ impl Bangs {
                 )
                 .collect::<String>();
 
-                let query = crate::urlencode(query.as_str());
+                let query = urlencoding::encode(query.as_str()).into_owned();
                 let url = bang.url.replace("{{{s}}}", query.as_str());
 
                 return Url::parse(url.as_str())
