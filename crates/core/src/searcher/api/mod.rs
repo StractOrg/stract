@@ -304,7 +304,7 @@ where
             .collect();
 
             let mut query = query.clone();
-            query.query = q;
+            query.query = urlencoding::encode(&q).into_owned();
 
             let res = self.search_websites(&query).await?;
 
