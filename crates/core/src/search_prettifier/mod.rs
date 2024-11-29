@@ -34,9 +34,9 @@ use crate::{
     ranking::{SignalEnumDiscriminants, SignalScore},
     searcher::SearchQuery,
     snippet::TextSnippet,
-    web_spell::{self, CorrectionTerm},
     webpage::url_ext::UrlExt,
 };
+use web_spell::{self, CorrectionTerm};
 
 pub use self::stack_overflow::{create_stackoverflow_sidebar, CodeOrText};
 pub use entity::DisplayedEntity;

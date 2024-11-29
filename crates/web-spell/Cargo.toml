@@ -1,0 +1,27 @@
+[package]
+edition = "2021"
+license = "AGPL-3.0"
+name = "web-spell"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+bincode.workspace = true
+fst.workspace = true
+itertools.workspace = true
+indicatif.workspace = true
+rayon.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+memmap2.workspace = true
+whatlang.workspace = true
+fnv.workspace = true
+
+[dev-dependencies]
+file_store.workspace = true
+proptest.workspace = true
