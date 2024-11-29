@@ -26,9 +26,9 @@ use whatlang::Lang;
 use crate::{
     config::{self, WebSpellConfig},
     entrypoint::download_all_warc_files,
-    web_spell::{FirstTrainer, FirstTrainerResult, SecondTrainer},
     webpage::Html,
 };
+use web_spell::{FirstTrainer, FirstTrainerResult, SecondTrainer};
 
 pub struct SpellWorker {
     prev_trained: Vec<FnvHashMap<Lang, FirstTrainerResult>>,

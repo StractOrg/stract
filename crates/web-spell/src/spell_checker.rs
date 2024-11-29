@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -20,10 +20,8 @@ use std::{path::Path, str::FromStr};
 use fnv::FnvHashMap;
 use whatlang::Lang;
 
-use crate::{
-    config::CorrectionConfig,
-    web_spell::stupid_backoff::{IntoMiddle, LeftToRight, RightToLeft},
-};
+use crate::config::CorrectionConfig;
+use crate::stupid_backoff::{IntoMiddle, LeftToRight, RightToLeft};
 
 use super::{error_model, Correction, CorrectionTerm, Error, ErrorModel, StupidBackoff, TermDict};
 

@@ -92,7 +92,6 @@ pub mod tokenizer;
 #[allow(unused)]
 mod ttl_cache;
 pub mod warc;
-pub mod web_spell;
 pub mod webgraph;
 pub mod webpage;
 mod widgets;

@@ -5072,6 +5072,7 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",
+ "web-spell",
  "whatlang",
  "zimba",
 ]
@@ -6184,6 +6185,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99d97402f69875b579ec37f2aa52d1f455a1d6224251edba32e8c18a5da2698d"
 dependencies = [
  "riff",
+]
+
+[[package]]
+name = "web-spell"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "file_store",
+ "fnv",
+ "fst",
+ "indicatif 0.17.8",
+ "itertools 0.13.0",
+ "memmap2",
+ "proptest",
+ "rayon",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tracing",
+ "uuid",
+ "whatlang",
 ]
 
 [[package]]

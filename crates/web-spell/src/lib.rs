@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -17,12 +17,14 @@
 //! This module contains the spell checker. It is based on the paper
 //! http://static.googleusercontent.com/media/research.google.com/en/us/pubs/archive/36180.pdf
 //! from google.
+mod config;
 mod error_model;
 pub mod spell_checker;
 mod stupid_backoff;
 mod term_freqs;
 mod trainer;
 
+pub use config::CorrectionConfig;
 pub use error_model::ErrorModel;
 pub use spell_checker::SpellChecker;
 pub use stupid_backoff::StupidBackoff;
@@ -34,7 +36,6 @@ pub use trainer::SecondTrainer;
 use fst::Streamer;
 use std::ops::Range;
 
-use crate::ceil_char_boundary;
 use itertools::intersperse;
 
 #[derive(Debug, thiserror::Error)]
@@ -233,9 +234,20 @@ impl PartialEq for MergePointer<'_> {
 
 impl Eq for MergePointer<'_> {}
 
+fn ceil_char_boundary(str: &str, index: usize) -> usize {
+    let mut res = index;
+
+    while !str.is_char_boundary(res) && res < str.len() {
+        res += 1;
+    }
+
+    res
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn test_sentence_ranges() {
@@ -268,5 +280,19 @@ mod tests {
 
         assert_eq!(ranges.len(), 1);
         assert_eq!(&text[ranges[0].clone()], "site.com is the best");
+    }
+
+    proptest! {
+        #[test]
+        fn prop_ceil_char_boundary(s: String, index: usize) {
+            let index = if s.is_empty() {
+                0
+            } else {
+                index % s.len()
+            };
+
+            let ceil = ceil_char_boundary(&s, index);
+            prop_assert!(s.is_char_boundary(ceil));
+        }
     }
 }

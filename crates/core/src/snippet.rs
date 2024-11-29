@@ -22,11 +22,11 @@ use crate::query::Query;
 use crate::tokenizer::fields::{
     BigramTokenizer, DefaultTokenizer, FieldTokenizer, Stemmed, TrigramTokenizer,
 };
-use crate::web_spell::sentence_ranges;
 use crate::webpage::region::Region;
 use hashbrown::{HashMap, HashSet};
 use lending_iter::LendingIterator;
 use utoipa::ToSchema;
+use web_spell::sentence_ranges;
 
 use itertools::Itertools;
 use whatlang::Lang;

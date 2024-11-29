@@ -40,7 +40,6 @@ use crate::ranking::{
     SignalScore,
 };
 use crate::search_prettifier::{DisplayedSidebar, DisplayedWebpage, HighlightedSpellCorrection};
-use crate::web_spell::SpellChecker;
 use crate::webgraph::remote::RemoteWebgraph;
 use crate::webgraph::EdgeLimit;
 use crate::webpage::html::links::RelFlags;
@@ -51,6 +50,7 @@ use crate::{
     ranking::{models::lambdamart::LambdaMART, pipeline::RankingPipeline},
 };
 use crate::{query, webgraph, Result};
+use web_spell::SpellChecker;
 
 use self::sidebar::SidebarManager;
 use self::widget::WidgetManager;
@@ -361,33 +361,29 @@ where
             .terms
             .into_iter()
             .filter_map(|t| match t {
-                crate::web_spell::CorrectionTerm::Corrected { orig, correction } => {
+                web_spell::CorrectionTerm::Corrected { orig, correction } => {
                     Some((orig, correction))
                 }
-                crate::web_spell::CorrectionTerm::NotCorrected(_) => None,
+                web_spell::CorrectionTerm::NotCorrected(_) => None,
             })
             .collect();
 
-        let mut correction = crate::web_spell::Correction::empty(query);
+        let mut correction = web_spell::Correction::empty(query);
 
         for term in terms {
             match term {
                 query::parser::Term::SimpleOrPhrase(query::parser::SimpleOrPhrase::Simple(t)) => {
                     if let Some(term_correction) = correction_map.get(t.as_str()) {
-                        correction.push(crate::web_spell::CorrectionTerm::Corrected {
+                        correction.push(web_spell::CorrectionTerm::Corrected {
                             orig: String::from(t),
                             correction: term_correction.to_string(),
                         });
                     } else {
-                        correction.push(crate::web_spell::CorrectionTerm::NotCorrected(
-                            String::from(t),
-                        ));
+                        correction.push(web_spell::CorrectionTerm::NotCorrected(String::from(t)));
                     }
                 }
                 _ => {
-                    correction.push(crate::web_spell::CorrectionTerm::NotCorrected(
-                        term.to_string(),
-                    ));
+                    correction.push(web_spell::CorrectionTerm::NotCorrected(term.to_string()));
                 }
             }
         }

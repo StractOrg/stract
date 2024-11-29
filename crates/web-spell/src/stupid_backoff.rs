@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::config;
 use fst::{Automaton, IntoStreamer, Streamer};
 
 const DISCOUNT: f64 = 0.4;
@@ -143,7 +144,7 @@ impl StupidBackoffTrainer {
         let f = File::create(path.as_ref().join("n_counts.bin"))?;
         let mut wrt = BufWriter::new(f);
 
-        bincode::encode_into_std_write(&self.n_counts, &mut wrt, common::bincode_config())?;
+        bincode::encode_into_std_write(&self.n_counts, &mut wrt, config::bincode_config())?;
         wrt.flush()?;
 
         Ok(())
@@ -226,7 +227,7 @@ impl StupidBackoff {
 
         let file = File::open(folder.as_ref().join("n_counts.bin"))?;
         let mut reader = std::io::BufReader::new(file);
-        let n_counts = bincode::decode_from_std_read(&mut reader, common::bincode_config())?;
+        let n_counts = bincode::decode_from_std_read(&mut reader, config::bincode_config())?;
 
         Ok(Self {
             ngrams,
@@ -257,7 +258,7 @@ impl StupidBackoff {
             .open(folder.as_ref().join("n_counts.bin"))?;
 
         let mut wrt = BufWriter::new(file);
-        bincode::encode_into_std_write(&n_counts, &mut wrt, common::bincode_config())?;
+        bincode::encode_into_std_write(&n_counts, &mut wrt, config::bincode_config())?;
         wrt.flush()?;
 
         let file = OpenOptions::new()
@@ -424,7 +425,7 @@ impl NextWordsStrategy for IntoMiddle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gen_temp_dir;
+    use file_store::gen_temp_dir;
 
     #[test]
     fn test_contexts() {

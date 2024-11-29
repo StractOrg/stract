@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,7 @@
 use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 
-use crate::web_spell::error_model::ErrorModel;
+use crate::error_model::ErrorModel;
 
 use super::{stupid_backoff::StupidBackoffTrainer, tokenize, Result};
 use std::{
