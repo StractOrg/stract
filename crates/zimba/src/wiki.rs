@@ -29,6 +29,7 @@ struct WorkingCluster<T> {
     data: Vec<T>,
 }
 
+/// An iterator over the articles.
 pub struct ArticleIterator<'a> {
     zim: &'a ZimFile,
     // key: cluster number, value: list of article refs in that cluster
@@ -87,6 +88,7 @@ impl<'a> ArticleIterator<'a> {
     }
 }
 
+/// Wikipedia article.
 #[derive(Debug)]
 pub struct Article {
     pub url: String,
@@ -145,6 +147,7 @@ struct ImageRef {
     url: String,
 }
 
+/// An iterator over the images.
 pub struct ImageIterator<'a> {
     zim: &'a ZimFile,
     // key: cluster number, value: list of article refs in that cluster
