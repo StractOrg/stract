@@ -55,6 +55,7 @@ pub enum ErrorType {
 )]
 pub struct ErrorSequence(Vec<ErrorType>);
 
+/// Return all the possible ways to transform one string into another with a single edit.
 pub fn possible_errors(a: &str, b: &str) -> Option<ErrorSequence> {
     if a == b {
         return None;
@@ -165,6 +166,7 @@ impl From<StoredErrorModel> for ErrorModel {
     }
 }
 
+/// A model for the probability of an error sequence.
 #[derive(Debug)]
 pub struct ErrorModel {
     errors: HashMap<ErrorSequence, u64>,
@@ -185,6 +187,7 @@ impl ErrorModel {
         }
     }
 
+    /// Save the error model to disk.
     pub fn save<P: AsRef<Path>>(self, path: P) -> Result<()> {
         let file = OpenOptions::new()
             .write(true)
@@ -199,6 +202,7 @@ impl ErrorModel {
         Ok(())
     }
 
+    /// Open the error model from disk.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let file = OpenOptions::new().read(true).open(path)?;
 
@@ -209,6 +213,7 @@ impl ErrorModel {
         Ok(stored.into())
     }
 
+    /// Add an error sequence to the error model.
     pub fn add(&mut self, a: &str, b: &str) {
         if let Some(errors) = possible_errors(a, b) {
             *self.errors.entry(errors).or_insert(0) += 1;
@@ -216,11 +221,13 @@ impl ErrorModel {
         }
     }
 
+    /// Get the probability of an error sequence.
     pub fn prob(&self, error: &ErrorSequence) -> f64 {
         let count = self.errors.get(error).unwrap_or(&0);
         *count as f64 / self.total as f64
     }
 
+    /// Get the log probability of an error sequence.
     pub fn log_prob(&self, error: &ErrorSequence) -> f64 {
         match self.errors.get(error) {
             Some(count) => (*count as f64).log2() - ((self.total + 1) as f64).log2(),
