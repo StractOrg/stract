@@ -15,3 +15,6 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 ```
+
+## License
+Zimba is licensed under the MIT license. See the [LICENSE](LICENSE) file for details.
