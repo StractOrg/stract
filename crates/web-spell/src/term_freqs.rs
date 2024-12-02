@@ -1,19 +1,3 @@
-// Stract is an open source web search engine.
-// Copyright (C) 2024 Stract ApS
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 use super::{MergePointer, Result};
 use fst::{IntoStreamer, Streamer};
 
@@ -161,6 +145,7 @@ struct Metadata {
     dicts: Vec<Uuid>,
 }
 
+/// A dictionary of terms and their frequencies.
 pub struct TermDict {
     builder: DictBuilder,
     stored: Vec<StoredDict>,
@@ -169,6 +154,7 @@ pub struct TermDict {
 }
 
 impl TermDict {
+    /// Open a term dictionary from a model directory.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         if path.as_ref().exists() {
             let file = File::open(path.as_ref().join("meta.json"))?;
@@ -203,6 +189,7 @@ impl TermDict {
         }
     }
 
+    /// Insert a term into the dictionary.
     pub fn insert(&mut self, term: &str) {
         if term.len() <= 1 {
             return;
@@ -235,6 +222,7 @@ impl TermDict {
         self.builder.insert(term);
     }
 
+    /// Save the current state of the dictionary to disk.
     pub fn commit(&mut self) -> Result<()> {
         let builder = std::mem::take(&mut self.builder);
 
@@ -251,6 +239,7 @@ impl TermDict {
         Ok(())
     }
 
+    /// Remove unused dictionaries from disk.
     fn gc(&self) -> Result<()> {
         let all_dicts = self
             .path
@@ -277,6 +266,7 @@ impl TermDict {
         Ok(())
     }
 
+    /// Save the metadata to disk.
     fn save_meta(&self) -> Result<()> {
         let file = OpenOptions::new()
             .create(true)
@@ -289,6 +279,7 @@ impl TermDict {
         Ok(())
     }
 
+    /// Merge all dictionary segments into a single dictionary.
     pub fn merge_dicts(&mut self) -> Result<()> {
         if self.stored.len() <= 1 {
             return Ok(());
@@ -311,6 +302,7 @@ impl TermDict {
         Ok(())
     }
 
+    /// Get the frequency of a term across all dictionary segments.
     pub fn freq(&self, term: &str) -> Option<u64> {
         let mut freqs = None;
 
@@ -326,6 +318,7 @@ impl TermDict {
         freqs
     }
 
+    /// Get all terms in the dictionary.
     pub fn terms(&self) -> Vec<String> {
         let mut terms = Vec::new();
 
@@ -340,6 +333,7 @@ impl TermDict {
         terms
     }
 
+    /// Search for terms in the dictionary with a given edit distance.
     pub fn search(&self, term: &str, max_edit_distance: u32) -> Vec<String> {
         let mut res = Vec::new();
 
@@ -354,6 +348,7 @@ impl TermDict {
         res
     }
 
+    /// Merge another term dictionary into this one.
     pub fn merge(&mut self, other: Self) -> Result<()> {
         for stored in other.stored {
             let uuid = uuid::Uuid::new_v4();
@@ -369,6 +364,7 @@ impl TermDict {
         Ok(())
     }
 
+    /// Get the path to the model directory.
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }

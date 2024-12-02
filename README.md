@@ -44,7 +44,7 @@ We recommend everyone to use the hosted version at [stract.com](https://stract.c
 
 # ‍💼 License
 
-Stract is offered under the terms defined under the [LICENSE.md](LICENSE.md) file.
+Stract is offered under the terms defined under the [LICENSE.md](LICENSE.md) file unless otherwise specified in the relevant subdirectory.
 
 # 📬 Contact
 

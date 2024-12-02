@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-license = "AGPL-3.0"
+license = "MIT"
 name = "web-spell"
 version = "0.1.0"
 

@@ -1,22 +1,24 @@
-// Stract is an open source web search engine.
-// Copyright (C) 2024 Stract ApS
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-//! This module contains the spell checker. It is based on the paper
+//! This module contains the spell checker. It is roughly based on the paper
 //! http://static.googleusercontent.com/media/research.google.com/en/us/pubs/archive/36180.pdf
 //! from google.
+//!
+//! # Usage
+//!
+//! ```rust
+//! # use std::path::Path;
+//! # use web_spell::{CorrectionConfig, SpellChecker, Lang};
+//!
+//! # let path = Path::new("../data/web_spell/checker");
+//!
+//! # if !path.exists() {
+//! #     return;
+//! # }
+//!
+//! let checker = SpellChecker::open("<path-to-model>", CorrectionConfig::default());
+//! # let checker = SpellChecker::open(path, CorrectionConfig::default());
+//! let correction = checker.unwrap().correct("hwllo", &Lang::Eng);
+//! ```
+
 mod config;
 mod error_model;
 pub mod spell_checker;
@@ -26,6 +28,7 @@ mod trainer;
 
 pub use config::CorrectionConfig;
 pub use error_model::ErrorModel;
+pub use spell_checker::Lang;
 pub use spell_checker::SpellChecker;
 pub use stupid_backoff::StupidBackoff;
 pub use term_freqs::TermDict;
@@ -108,6 +111,7 @@ impl From<Correction> for String {
 }
 
 impl Correction {
+    /// Create an empty correction.
     pub fn empty(original: String) -> Self {
         Self {
             original,
@@ -115,10 +119,12 @@ impl Correction {
         }
     }
 
+    /// Push a term to the correction.
     pub fn push(&mut self, term: CorrectionTerm) {
         self.terms.push(term);
     }
 
+    /// Check if all terms are not corrected.
     pub fn is_all_orig(&self) -> bool {
         self.terms
             .iter()
@@ -126,6 +132,13 @@ impl Correction {
     }
 }
 
+/// Split text into sentence ranges by detecting common sentence boundaries like periods, exclamation marks,
+/// question marks and newlines. Returns a Vec of byte ranges for each detected sentence.
+///
+/// The splitting is optimized for performance and simplicity rather than perfect accuracy. It handles
+/// common cases like abbreviations, URLs, ellipses and whitespace trimming.
+///
+/// Note that this is a heuristic approach and may not handle all edge cases correctly.
 pub fn sentence_ranges(text: &str) -> Vec<Range<usize>> {
     let skip = ["mr.", "ms.", "dr."];
 
@@ -178,6 +191,7 @@ pub fn sentence_ranges(text: &str) -> Vec<Range<usize>> {
     res
 }
 
+/// Tokenize text into words.
 pub fn tokenize(text: &str) -> Vec<String> {
     text.to_lowercase()
         .split_whitespace()
@@ -188,11 +202,20 @@ pub fn tokenize(text: &str) -> Vec<String> {
         .map(|s| s.to_string())
         .collect()
 }
-pub struct MergePointer<'a> {
-    pub term: String,
-    pub value: u64,
-    pub stream: fst::map::Stream<'a>,
-    pub is_finished: bool,
+
+/// A pointer for merging two term streams.
+struct MergePointer<'a> {
+    /// The current head of the stream.
+    pub(crate) term: String,
+
+    /// The current head value.
+    pub(crate) value: u64,
+
+    /// The stream to merge.
+    pub(crate) stream: fst::map::Stream<'a>,
+
+    /// Whether the stream is finished.
+    pub(crate) is_finished: bool,
 }
 
 impl MergePointer<'_> {
@@ -234,6 +257,7 @@ impl PartialEq for MergePointer<'_> {
 
 impl Eq for MergePointer<'_> {}
 
+/// Get the next character boundary after or at the given index.
 fn ceil_char_boundary(str: &str, index: usize) -> usize {
     let mut res = index;
 

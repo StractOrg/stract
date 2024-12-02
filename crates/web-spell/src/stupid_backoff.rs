@@ -1,19 +1,3 @@
-// Stract is an open source web search engine.
-// Copyright (C) 2024 Stract ApS
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 use super::{tokenize, MergePointer, Result};
 use std::{
     cmp::Reverse,
@@ -62,6 +46,9 @@ impl AsRef<[u8]> for StoredNgram {
     }
 }
 
+/// A trainer for the stupid backoff language model.
+///
+/// This is used to train the language model from a corpus of text.
 pub struct StupidBackoffTrainer {
     max_ngram_size: usize,
     ngrams: BTreeMap<Ngram, u64>,
@@ -70,6 +57,8 @@ pub struct StupidBackoffTrainer {
 }
 
 impl StupidBackoffTrainer {
+    /// Create a new trainer for a given maximum n-gram size.
+    /// It's preferred to use an n-gram size of 3.
     pub fn new(max_ngram_size: usize) -> Self {
         Self {
             max_ngram_size,
@@ -79,6 +68,7 @@ impl StupidBackoffTrainer {
         }
     }
 
+    /// Train the model on a sequence of tokens.
     pub fn train(&mut self, tokens: &[String]) {
         for window in tokens.windows(self.max_ngram_size) {
             for i in 1..=window.len() {
@@ -105,6 +95,7 @@ impl StupidBackoffTrainer {
         }
     }
 
+    /// Build the language model from the trainer.
     pub fn build<P: AsRef<Path>>(self, path: P) -> Result<()> {
         if !path.as_ref().exists() {
             std::fs::create_dir_all(path.as_ref())?;
@@ -151,6 +142,7 @@ impl StupidBackoffTrainer {
     }
 }
 
+/// Merge multiple streams into a single FST.
 fn merge_streams(
     mut builder: fst::MapBuilder<BufWriter<File>>,
     streams: Vec<fst::map::Stream<'_, fst::automaton::AlwaysMatch>>,
@@ -208,6 +200,16 @@ fn merge_streams(
     Ok(())
 }
 
+/// A stupid backoff language model for scoring n-grams.
+///
+/// The model scores n-grams by recursively backing off to lower order n-grams when the full
+/// n-gram is not found in the training data. The backoff is done by multiplying the score
+/// by a constant factor (0.4).
+///
+/// The model stores n-grams in two FSTs:
+/// `ngrams` contains regular n-grams with their frequencies, while `rotated_ngrams` contains
+/// n-grams with their words rotated to enable efficient prefix queries. Additionally, the model
+/// maintains counts of total n-grams seen for each order n in `n_counts`.
 pub struct StupidBackoff {
     ngrams: fst::Map<memmap2::Mmap>,
     rotated_ngrams: fst::Map<memmap2::Mmap>,
@@ -216,6 +218,7 @@ pub struct StupidBackoff {
 }
 
 impl StupidBackoff {
+    /// Open a language model from a model directory.
     pub fn open<P: AsRef<Path>>(folder: P) -> Result<Self> {
         let mmap = unsafe { memmap2::Mmap::map(&File::open(folder.as_ref().join("ngrams.bin"))?)? };
         let ngrams = fst::Map::new(mmap)?;
@@ -237,6 +240,7 @@ impl StupidBackoff {
         })
     }
 
+    /// Merge multiple language models into a single model.
     pub fn merge<P: AsRef<Path>>(models: Vec<Self>, folder: P) -> Result<Self> {
         if !folder.as_ref().exists() {
             std::fs::create_dir_all(folder.as_ref())?;
@@ -307,6 +311,7 @@ impl StupidBackoff {
         })
     }
 
+    /// Return the frequency of the n-gram.
     pub fn freq(&self, words: &[String]) -> Option<u64> {
         if words.len() >= self.ngrams.len() || words.is_empty() {
             return None;
@@ -319,6 +324,7 @@ impl StupidBackoff {
         self.ngrams.get(ngram)
     }
 
+    /// Return the log probability of the n-gram.
     pub fn log_prob<S: NextWordsStrategy>(&self, words: &[String], strat: S) -> f64 {
         if words.len() >= self.ngrams.len() || words.is_empty() {
             return -(self.n_counts[0] as f64).log2();
@@ -336,10 +342,12 @@ impl StupidBackoff {
         }
     }
 
+    /// Return the probability of the n-gram.
     pub fn prob<S: NextWordsStrategy>(&self, words: &[String], strat: S) -> f64 {
         self.log_prob(words, strat).exp2()
     }
 
+    /// Given a word, return all n-grams where that word appears in the middle of the n-gram.
     pub fn contexts(&self, word: &str) -> Vec<(Vec<String>, u64)> {
         let q = word.to_string() + " ";
         let automaton = fst::automaton::Str::new(&q).starts_with();
@@ -360,13 +368,20 @@ impl StupidBackoff {
     }
 }
 
+/// A trait for strategies that determine the next words to consider when backing off.
 pub trait NextWordsStrategy: Sized {
+    /// The inverse strategy.
     type Inv: NextWordsStrategy;
 
+    /// Return the next words to consider.
     fn next_words<'a>(&mut self, words: &'a [String]) -> &'a [String];
+
+    /// Return the inverse strategy.
     fn inverse(self) -> Self::Inv;
 }
 
+/// A strategy that backs off by removing words from left to right. For example, given the sequence
+/// "the cat sat", it would first consider "cat sat", then just "sat".
 pub struct LeftToRight;
 
 impl NextWordsStrategy for LeftToRight {
@@ -381,6 +396,8 @@ impl NextWordsStrategy for LeftToRight {
     }
 }
 
+/// A strategy that backs off by removing words from right to left. For example, given the sequence
+/// "the cat sat", it would first consider "the cat", then just "the".
 pub struct RightToLeft;
 
 impl NextWordsStrategy for RightToLeft {
@@ -395,6 +412,8 @@ impl NextWordsStrategy for RightToLeft {
     }
 }
 
+/// A strategy that backs off by removing words from either left or right. For example, given the sequence
+/// "the cat sat", it would first consider "cat sat", then just "sat".
 #[derive(Default)]
 pub struct IntoMiddle {
     last_left: bool,

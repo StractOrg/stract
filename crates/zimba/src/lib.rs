@@ -1,21 +1,28 @@
-// Stract is an open source web search engine.
-// Copyright (C) 2024 Stract ApS
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 //! Zim file reader.
 //! https://wiki.openzim.org/wiki/ZIM_file_format
+//!
+//! The ZIM file format is used for storing web content in a highly compressed format.
+//! It is commonly used for offline storage of Wikipedia and other web content.
+//!
+//! A ZIM archive starts with a header that contains metadata about the file,
+//! including a magic number, version information, and pointers to various sections
+//! of the file. The header is followed by a list of MIME types, path pointers,
+//! title pointers, directory entries, and clusters.
+//!
+//! # Usage
+//! ```no_run
+//! use zimba::{ZimFile, Error};
+//!
+//! fn main() -> Result<(), Error> {
+//!     let zim_file = ZimFile::open("path/to/file.zim")?;
+//!
+//!     for article in zim_file.articles()? {
+//!         println!("{}", article.title);
+//!     }
+//!
+//!     Ok(())
+//! }
+//! ```
 
 pub mod wiki;
 
@@ -54,6 +61,7 @@ pub enum Error {
     Lzma(#[from] lzma::Error),
 }
 
+/// Read a zero-terminated string.
 fn read_zero_terminated(bytes: &[u8]) -> IResult<&[u8], String> {
     let (remaining, string) = map(take_while(|b| b != 0), |bytes: &[u8]| {
         String::from_utf8_lossy(bytes).into_owned()
@@ -112,21 +120,58 @@ impl NomParseNumber for u8 {
     }
 }
 
+/// The ZIM file header.
 #[derive(Debug)]
 #[allow(unused)]
 struct Header {
+    /// A 4-byte magic number. It must be `72_173_914` (0x44D495A) for a valid ZIM file.
     magic: u32,
+
+    /// Major version of the ZIM archive format.
+    /// Major version is updated when an incompatible
+    /// change is integrated in the format (a lib
+    /// made for a version N will probably not be
+    /// able to read a version N+1).
     major_version: u16,
+
+    /// Minor version of the ZIM archive format.
+    /// Minor version is updated when an compatible
+    /// change is integrated (a lib made for a
+    /// minor version n will be able to read a
+    /// minor version n+1).
     minor_version: u16,
+
+    /// Unique ID of this ZIM archive.
     uuid: u128,
+
+    /// Number of entries in the ZIM archive.
     entry_count: u32,
+
+    /// Number of clusters in the ZIM archive.
     cluster_count: u32,
+
+    /// Position of the URL pointer list.
     url_ptr_pos: u64,
+
+    /// Position of the title pointer list.
+    /// This is considered deprecated and should not be used if possible.
     title_ptr_pos: u64,
+
+    /// Position of the cluster pointer list.
     cluster_ptr_pos: u64,
+
+    /// Position of the MIME type list.
     mime_list_pos: u64,
+
+    /// Position of the main page or 0xFFFFFFFF if not set.
     main_page: u32,
+
+    /// Position of the layout page or 0xFFFFFFFF if not set.
     layout_page: u32,
+
+    /// Pointer to the MD5 checksum of this archive without
+    /// the checksum itself.
+    /// This points always 16 bytes before the end of the archive.
     checksum_pos: u64,
 }
 
@@ -191,8 +236,10 @@ impl Header {
     }
 }
 
+/// A list of MIME types.
 #[derive(Debug)]
 pub struct MimeTypes(Vec<String>);
+
 impl MimeTypes {
     fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
         let mut mime_types = Vec::new();
@@ -226,6 +273,7 @@ impl std::ops::Index<u16> for MimeTypes {
 #[derive(Debug)]
 pub struct UrlPointer(pub u64);
 
+/// A list of URL pointers.
 #[derive(Debug)]
 pub struct UrlPointerList(Vec<UrlPointer>);
 
@@ -256,6 +304,7 @@ impl UrlPointerList {
     }
 }
 
+/// A title pointer.
 #[derive(Debug)]
 #[allow(unused)]
 pub struct TitlePointer(u32);
@@ -291,6 +340,7 @@ impl TitlePointerList {
     }
 }
 
+/// A cluster pointer.
 #[derive(Debug)]
 struct ClusterPointer(u64);
 
@@ -325,6 +375,9 @@ impl ClusterPointerList {
     }
 }
 
+/// A directory entry in a ZIM file, representing either content or a redirect.
+/// Content entries contain actual data like articles or images, while redirect entries
+/// point to other entries in the archive.
 #[derive(Debug)]
 pub enum DirEntry {
     Content {
@@ -459,11 +512,17 @@ impl std::io::Read for CompressedReader<'_> {
     }
 }
 
+/// An offset in a cluster.
 #[derive(Debug)]
 struct ClusterOffset {
     offset: u64,
 }
 
+/// A cluster.
+///
+/// Clusters contain the actual data of the directory entries.
+/// The purpose of the clusters are that data of more than one directory entry can be compressed inside one cluster, making the compression much more efficient.
+/// Typically clusters have a size of about 1 MB.
 #[derive(Debug)]
 pub struct Cluster {
     blob_offsets: Vec<ClusterOffset>,
@@ -579,6 +638,7 @@ impl Cluster {
     }
 }
 
+/// A ZIM file.
 pub struct ZimFile {
     header: Header,
     mime_types: MimeTypes,
@@ -589,6 +649,7 @@ pub struct ZimFile {
 }
 
 impl ZimFile {
+    /// Open a ZIM file. The file is memory-mapped and only the header and pointers are read into memory upfront.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<ZimFile, Error> {
         let file = File::open(path)?;
         let mmap = unsafe { memmap2::MmapOptions::new().map(&file)? };
@@ -627,6 +688,7 @@ impl ZimFile {
         })
     }
 
+    /// Get a directory entry by its index.
     pub fn get_dir_entry(&self, index: usize) -> Result<Option<DirEntry>, Error> {
         if index >= self.header.entry_count as usize {
             return Ok(None);
@@ -636,6 +698,7 @@ impl ZimFile {
         Ok(Some(DirEntry::from_bytes(&self.mmap[pointer..])?))
     }
 
+    /// Get a cluster by its index.
     pub fn get_cluster(&self, index: u32) -> Result<Option<Cluster>, Error> {
         if index >= self.header.cluster_count {
             return Ok(None);
@@ -645,35 +708,42 @@ impl ZimFile {
         Ok(Some(Cluster::from_bytes(&self.mmap[pointer..])?))
     }
 
+    /// Get the MIME type list.
     #[must_use]
     pub fn mime_types(&self) -> &MimeTypes {
         &self.mime_types
     }
 
+    /// Get the URL pointers.
     #[must_use]
     pub fn url_pointers(&self) -> &UrlPointerList {
         &self.url_pointers
     }
 
+    /// Get the title pointers.
     #[must_use]
     pub fn title_pointers(&self) -> &TitlePointerList {
         &self.title_pointers
     }
 
+    /// Iterate over the directory entries.
     #[must_use]
     pub fn dir_entries(&self) -> DirEntryIterator<'_> {
         DirEntryIterator::new(&self.mmap, &self.url_pointers)
     }
 
+    /// Iterate over the articles.
     pub fn articles(&self) -> Result<ArticleIterator<'_>, Error> {
         ArticleIterator::new(self)
     }
 
+    /// Iterate over the images.
     pub fn images(&self) -> Result<ImageIterator<'_>, Error> {
         ImageIterator::new(self)
     }
 }
 
+/// An iterator over the directory entries.
 pub struct DirEntryIterator<'a> {
     mmap: &'a memmap2::Mmap,
     url_pointers: &'a UrlPointerList,
