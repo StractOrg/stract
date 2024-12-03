@@ -1,7 +1,7 @@
 <script lang="ts">
   const footer = [
     ['/privacy-and-happy-lawyers', 'Terms & Privacy'],
-    ['/beta/api/docs', 'API'],
+    ['https://docs.stract.com/', 'API'],
   ] as const;
 </script>
 
