@@ -16,12 +16,24 @@
 
 use super::DhtConn;
 
+/// A setup is responsible for initializing the DHT before each round of computation.
 pub trait Setup {
     type DhtTables;
 
+    /// Setup initial state of the DHT.
     fn init_dht(&self) -> DhtConn<Self::DhtTables>;
+
+    /// Setup state for a new round.
+    ///
+    /// This is called once for each round of computation.
+    /// The first round will run `setup_first_round` first
+    /// but will still call `setup_round` after that.
     #[allow(unused_variables)] // reason = "dht might be used by implementors"
     fn setup_round(&self, dht: &Self::DhtTables) {}
+
+    /// Setup state for the first round.
+    ///
+    /// This is called once before the first round of computation.
     fn setup_first_round(&self, dht: &Self::DhtTables) {
         self.setup_round(dht);
     }

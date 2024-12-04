@@ -16,6 +16,8 @@
 
 use super::prelude::Job;
 
+/// A finisher is responsible for determining if the computation is finished
+/// or if another round of computation is needed.
 pub trait Finisher {
     type Job: Job;
 

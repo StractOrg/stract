@@ -24,6 +24,8 @@ use super::{DhtConn, Finisher, Job, JobScheduled, RemoteWorker, Setup, Worker, W
 use crate::{distributed::retry_strategy::ExponentialBackoff, Result};
 use anyhow::anyhow;
 
+/// A coordinator is responsible for scheduling jobs on workers and coordinating
+/// between rounds of computation.
 pub struct Coordinator<J>
 where
     J: Job,

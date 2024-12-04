@@ -14,6 +14,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! # Framework for Adaptive Massively Parallel Computation (AMPC).
+//!
+//! AMPC is a system for implementing large-scale distributed graph algorithms efficiently.
+//! It provides a framework for parallel computation across clusters of machines.
+//!
+//! While similar in concept to MapReduce, AMPC uses a distributed hash table (DHT) as its
+//! underlying data structure rather than the traditional map and reduce phases. This key
+//! architectural difference enables more flexible and efficient computation patterns.
+//!
+//! The main advantage over MapReduce is that workers can dynamically access any keys in
+//! the DHT during computation. This is in contrast to MapReduce where the keyspace must
+//! be statically partitioned between reducers before computation begins. The dynamic
+//! access pattern allows for more natural expression of graph algorithms in a distributed
+//! setting.
+//!
+//! This is roughly inspired by
+//! [Massively Parallel Graph Computation: From Theory to Practice](https://research.google/blog/massively-parallel-graph-computation-from-theory-to-practice/)
+//!
+//! ## Key concepts
+//!
+//! * **DHT**: A distributed hash table is used to store the result of the computation for
+//!     each round.
+//! * **Worker**: A worker owns a subset of the overall graph and is responsible for
+//!     executing mappers on its portion of the graph and sending results to the DHT.
+//! * **Mapper**: A mapper is the specific computation to be run on the graph.
+//! * **Coordinator**: The coordinator is responsible for scheduling the jobs on the workers.
+
 use self::{job::Job, worker::WorkerRef};
 use crate::distributed::sonic;
 
