@@ -17,7 +17,7 @@
 use tokio::fs::File;
 use tokio::io;
 use tokio_stream::StreamExt;
-use tracing::{debug, info};
+use tracing::info;
 
 use crate::config::{
     defaults, IndexerConfig, IndexerDualEncoderConfig, IndexerGraphConfig, LocalConfig,
@@ -73,7 +73,7 @@ fn download_files() {
 }
 
 fn build_spellchecker() -> Result<()> {
-    debug!("Building spellchecker");
+    info!("Building spellchecker");
     let spellchecker_path = Path::new(DATA_PATH).join("web_spell");
 
     if !spellchecker_path.exists() {
@@ -97,7 +97,7 @@ fn build_spellchecker() -> Result<()> {
 }
 
 fn create_webgraph() -> Result<()> {
-    debug!("Creating webgraph");
+    info!("Creating webgraph");
     let out_path = Path::new(DATA_PATH).join("webgraph");
 
     if out_path.exists() {
@@ -128,7 +128,7 @@ fn create_webgraph() -> Result<()> {
 }
 
 fn calculate_centrality() {
-    debug!("Calculating centrality");
+    info!("Calculating centrality");
     let webgraph_path = Path::new(DATA_PATH).join("webgraph");
     let out_path = Path::new(DATA_PATH).join("centrality");
 
@@ -144,7 +144,7 @@ fn calculate_centrality() {
 }
 
 fn create_inverted_index() -> Result<()> {
-    debug!("Creating inverted index");
+    info!("Creating inverted index");
     let out_path = Path::new(DATA_PATH).join("index");
 
     if out_path.exists() {
@@ -209,6 +209,7 @@ fn create_inverted_index() -> Result<()> {
 }
 
 fn create_entity_index() -> Result<()> {
+    info!("Creating entity index");
     let out_path = Path::new(DATA_PATH).join("entity");
     if out_path.exists() {
         std::fs::remove_dir_all(&out_path)?;
