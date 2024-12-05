@@ -341,7 +341,9 @@ impl InvertedIndex {
             From<<Q::Collector as generic_query::Collector>::Fruit>,
     {
         let fruit = self.search_initial_generic(query)?;
-        let mut fruit = query.remote_collector().merge_fruits(vec![fruit.into()])?;
+        let mut fruit = query
+            .coordinator_collector()
+            .merge_fruits(vec![fruit.into()])?;
 
         if let Some(shard_id) = self.shard_id {
             fruit = query.filter_fruit_shards(shard_id, fruit);

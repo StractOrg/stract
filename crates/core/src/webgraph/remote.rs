@@ -120,7 +120,7 @@ impl RemoteWebgraph {
         <<Q::Collector as webgraph::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit:
             From<<Q::Collector as webgraph::Collector>::Fruit>,
     {
-        let collector = query.remote_collector();
+        let collector = query.coordinator_collector();
 
         let res = self
             .conn()
@@ -250,7 +250,7 @@ impl RemoteWebgraph {
         queries
             .iter()
             .zip_eq(fruits.into_iter())
-            .map(|(query, shard_fruits)| query.remote_collector().merge_fruits(shard_fruits))
+            .map(|(query, shard_fruits)| query.coordinator_collector().merge_fruits(shard_fruits))
             .collect::<Result<Vec<_>, _>>()
     }
 

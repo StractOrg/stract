@@ -414,7 +414,7 @@ impl SearchClient for DistributedSearcher {
         >: From<<Q as sonic::service::Message<SearchService>>::Response>,
         <<Q::Collector as generic_query::Collector>::Child as tantivy::collector::SegmentCollector>::Fruit:
             From<<Q::Collector as generic_query::Collector>::Fruit> {
-        let collector = query.remote_collector();
+        let collector = query.coordinator_collector();
 
         let res = self.conn().await
             .send(query, &AllShardsSelector, &RandomReplicaSelector)
@@ -518,7 +518,7 @@ impl SearchClient for DistributedSearcher {
             queries
                 .iter()
                 .zip_eq(fruits.into_iter())
-                .map(|(query, shard_fruits)| query.remote_collector().merge_fruits(shard_fruits))
+                .map(|(query, shard_fruits)| query.coordinator_collector().merge_fruits(shard_fruits))
                 .collect::<Result<Vec<_>, _>>()
     }
     

@@ -47,7 +47,7 @@ impl GenericQuery for TopKeyPhrasesQuery {
         TopKeyPhrasesCollector::new(self.top_n).with_shard_id(ctx.shard_id)
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopKeyPhrasesCollector::new(self.top_n)
     }
 

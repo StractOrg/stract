@@ -14,6 +14,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! # Main flow
+//! ```md
+//! `coordinator`  <------>  `searcher`
+//! -----------------------------------
+//! send query to searcher
+//!                        search index
+//!                        collect fruits
+//!                        send fruits to coordinator
+//! merge fruits
+//! filter fruits
+//!     for each shard
+//! send fruits to searchers
+//!                        construct intermediate output
+//!                           from fruits
+//!                        send intermediate output to coordinator
+//! merge intermediate outputs
+//! return final output
+//! ---------------------------------------------------
+//! ```
+
 use super::searcher::Searcher;
 use crate::{ampc::dht::ShardId, Result};
 pub use collector::Collector;
@@ -49,7 +69,7 @@ pub trait Query: Send + Sync + bincode::Encode + bincode::Decode + Clone {
 
     fn tantivy_query(&self, searcher: &Searcher) -> Self::TantivyQuery;
     fn collector(&self, searcher: &Searcher) -> Self::Collector;
-    fn remote_collector(&self) -> Self::Collector;
+    fn coordinator_collector(&self) -> Self::Collector;
 
     fn filter_fruit_shards(
         &self,

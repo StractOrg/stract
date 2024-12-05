@@ -65,7 +65,7 @@ impl GenericQuery for GetSiteUrlsQuery {
             .disable_offset()
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         Self::Collector::new()
             .with_limit(self.limit as usize)
             .with_offset(self.offset.unwrap_or(0) as usize)

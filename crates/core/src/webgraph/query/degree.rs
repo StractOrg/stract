@@ -53,7 +53,7 @@ impl Query for InDegreeQuery {
         .with_shard_id(searcher.shard())
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         FastCountCollector::new(
             ToId.name().to_string(),
             FastCountValue::U128(self.node.as_u128()),

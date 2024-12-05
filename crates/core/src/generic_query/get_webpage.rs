@@ -68,7 +68,7 @@ impl GenericQuery for GetWebpageQuery {
         FirstDocCollector::with_shard_id(ctx.shard_id)
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         FirstDocCollector::without_shard_id()
     }
 
