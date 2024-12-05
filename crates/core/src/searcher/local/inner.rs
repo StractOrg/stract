@@ -16,32 +16,31 @@
 
 use crate::{
     generic_query::{self, GenericQuery},
+    index::Index,
     inverted_index,
     ranking::{LocalRanker, SignalComputer},
     searcher::InitialWebsiteResult,
     Result,
 };
 use std::sync::Arc;
+use tokio::sync::{OwnedRwLockReadGuard, RwLock};
 
 use crate::{
     config::CollectorConfig, models::dual_encoder::DualEncoder, query::Query,
     ranking::models::linear::LinearRegression, search_ctx::Ctx, searcher::SearchQuery,
 };
 
-use super::{InvertedIndexResult, ReadGuard, SearchableIndex};
+use super::InvertedIndexResult;
 
-pub struct InnerLocalSearcher<I: SearchableIndex> {
-    index: I,
+pub struct InnerLocalSearcher {
+    index: Arc<RwLock<Index>>,
     linear_regression: Option<Arc<LinearRegression>>,
     dual_encoder: Option<Arc<DualEncoder>>,
     collector_config: CollectorConfig,
 }
 
-impl<I> InnerLocalSearcher<I>
-where
-    I: SearchableIndex,
-{
-    pub fn new(index: I) -> Self {
+impl InnerLocalSearcher {
+    pub fn new(index: Arc<RwLock<Index>>) -> Self {
         Self {
             index,
             linear_regression: None,
@@ -50,8 +49,8 @@ where
         }
     }
 
-    pub async fn guard(&self) -> I::ReadGuard {
-        self.index.read_guard().await
+    pub async fn guard(&self) -> OwnedRwLockReadGuard<Index> {
+        self.index.clone().read_owned().await
     }
 
     pub fn set_linear_model(&mut self, model: LinearRegression) {
@@ -66,19 +65,19 @@ where
         self.collector_config = config;
     }
 
-    fn parse_query<G: ReadGuard>(
+    fn parse_query(
         &self,
         ctx: &Ctx,
-        guard: &G,
+        guard: &OwnedRwLockReadGuard<Index>,
         query: &SearchQuery,
     ) -> Result<Query> {
         Query::parse(ctx, query, guard.inverted_index())
     }
 
-    fn ranker<G: ReadGuard>(
+    fn ranker(
         &self,
         query: &Query,
-        guard: &G,
+        guard: &OwnedRwLockReadGuard<Index>,
         de_rank_similar: bool,
         computer: SignalComputer,
     ) -> Result<LocalRanker> {
@@ -99,10 +98,10 @@ where
             .with_offset(query.offset()))
     }
 
-    fn search_inverted_index<G: ReadGuard>(
+    fn search_inverted_index(
         &self,
         ctx: &Ctx,
-        guard: &G,
+        guard: &OwnedRwLockReadGuard<Index>,
         query: &SearchQuery,
         de_rank_similar: bool,
     ) -> Result<InvertedIndexResult> {
@@ -112,8 +111,7 @@ where
 
         computer.set_region_count(
             guard
-                .search_index()
-                .region_count
+                .region_count()
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .clone(),
@@ -149,7 +147,7 @@ where
     pub fn search_initial(
         &self,
         query: &SearchQuery,
-        guard: &I::ReadGuard,
+        guard: &OwnedRwLockReadGuard<Index>,
         de_rank_similar: bool,
     ) -> Result<InitialWebsiteResult> {
         let query = query.clone();
@@ -168,7 +166,7 @@ where
         &self,
         websites: &[inverted_index::WebpagePointer],
         query: &str,
-        guard: &I::ReadGuard,
+        guard: &OwnedRwLockReadGuard<Index>,
     ) -> Result<Vec<inverted_index::RetrievedWebpage>> {
         let ctx = guard.inverted_index().local_search_ctx();
         let query = SearchQuery {
@@ -183,7 +181,7 @@ where
     pub fn search_initial_generic<Q: GenericQuery>(
         &self,
         query: &Q,
-        guard: &I::ReadGuard,
+        guard: &OwnedRwLockReadGuard<Index>,
     ) -> Result<<Q::Collector as generic_query::Collector>::Fruit> {
         guard.inverted_index().search_initial_generic(query)
     }
@@ -192,7 +190,7 @@ where
         &self,
         query: &Q,
         fruit: <Q::Collector as generic_query::Collector>::Fruit,
-        guard: &I::ReadGuard,
+        guard: &OwnedRwLockReadGuard<Index>,
     ) -> Result<Q::IntermediateOutput> {
         guard.inverted_index().retrieve_generic(query, fruit)
     }
@@ -200,7 +198,7 @@ where
     pub fn search_generic<Q: GenericQuery>(
         &self,
         query: Q,
-        guard: &I::ReadGuard,
+        guard: &OwnedRwLockReadGuard<Index>,
     ) -> Result<Q::Output> {
         let fruit = self.search_initial_generic(&query, guard)?;
         Ok(Q::merge_results(vec![

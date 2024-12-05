@@ -137,7 +137,7 @@ impl_search!([
 ]);
 
 pub struct SearchService {
-    local_searcher: LocalSearcher<Arc<RwLock<Index>>>,
+    local_searcher: LocalSearcher,
     // dropping the handle leaves the cluster
     #[allow(unused)]
     cluster_handle: Arc<Cluster>,

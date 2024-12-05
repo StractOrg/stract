@@ -14,6 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! Searchers are responsible for executing search queries against an index.
+//! There are two types of searchers:
+//! - [`local::LocalSearcher`] which runs the search on the local machine.
+//! - [`distributed::DistributedSearcher`] which runs the search on a remote cluster. Each node
+//!     will run a local searcher and then the results are merged on the coordinator node.
+
 pub mod api;
 pub mod distributed;
 pub mod local;

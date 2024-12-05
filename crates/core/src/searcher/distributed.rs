@@ -31,7 +31,6 @@ use crate::{
         entity_search_server, live_index::LiveIndexService, search_server::{self, RetrieveReq, SearchService}
     },
     generic_query::{self, Collector},
-    index::Index,
     inverted_index::{RetrievedWebpage, ShardId, WebpagePointer},
     ranking::pipeline::{PrecisionRankingWebpage, RecallRankingWebpage},
     Result,
@@ -44,7 +43,7 @@ use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
 use itertools::Itertools;
 use std::future::Future;
 use thiserror::Error;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 
 use super::{InitialWebsiteResult, LocalSearcher, SearchQuery};
 
@@ -284,6 +283,7 @@ impl ReusableClientManager for LiveIndexService {
     }
 }
 
+/// A searcher that runs the search on a remote cluster.
 pub struct DistributedSearcher {
     client: Mutex<ReusableShardedClient<SearchService>>,
 }
@@ -584,9 +584,9 @@ impl SearchClient for DistributedSearcher {
 }
 
 /// This should only be used for testing and benchmarks.
-pub struct LocalSearchClient(LocalSearcher<Arc<RwLock<Index>>>);
-impl From<LocalSearcher<Arc<RwLock<Index>>>> for LocalSearchClient {
-    fn from(searcher: LocalSearcher<Arc<RwLock<Index>>>) -> Self {
+pub struct LocalSearchClient(LocalSearcher);
+impl From<LocalSearcher> for LocalSearchClient {
+    fn from(searcher: LocalSearcher) -> Self {
         Self(searcher)
     }
 }
