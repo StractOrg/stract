@@ -68,7 +68,7 @@ impl<M: CrossEncoder> FullRankingStage for ReRanker<M> {
         self.crossencoder_score_webpages(webpages);
     }
 
-    fn top_n(&self) -> Top {
+    fn top(&self) -> Top {
         Top::Limit(20)
     }
 }

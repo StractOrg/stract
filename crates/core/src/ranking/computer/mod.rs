@@ -14,6 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! The ranking computer is responsible for computing the core ranking signals for
+//! each potential page in the result set. This module handles the initial ranking phase
+//! that runs independently on each search node in the distributed search cluster.
+//!
+//! The computer evaluates a set of core ranking signals for each candidate page,
+//! including text-based relevance scores like BM25 and authority scores (harmonic centrality).
+//! These signals are combined using a linear model to produce an initial ranking score.
+//! The top pages are passed to the coordinator node for the final ranking phase.
+//!
+//! The core signals computed here are designed to be fast to calculate while still
+//! providing strong relevance signals. More expensive ranking features are deferred
+//! to the final ranking phase on the coordinator.
+
 use crate::query::optic::AsSearchableRule;
 use crate::query::{Query, MAX_TERMS_FOR_NGRAM_LOOKUPS};
 use crate::ranking::bm25f::MultiBm25FWeight;

@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -29,6 +29,9 @@ use crate::models::bert::BertModel;
 
 const TRUNCATE_INPUT: usize = 128;
 
+/// A cross-encoder model for ranking pages.
+///
+/// Takes a query and a page body as input and returns a score for the page.
 pub struct CrossEncoderModel {
     tokenizer: tokenizers::Tokenizer,
     encoder: BertModel,
