@@ -136,7 +136,7 @@ impl CrawlableSite {
     }
 }
 
-impl crawler::DatumStream for tokio::sync::Mutex<Vec<crawler::CrawlDatum>> {
+impl crawler::DatumSink for tokio::sync::Mutex<Vec<crawler::CrawlDatum>> {
     async fn write(&self, crawl_datum: crawler::CrawlDatum) -> Result<(), crawler::Error> {
         self.lock().await.push(crawl_datum);
         Ok(())

@@ -21,7 +21,7 @@ use crate::{
     warc,
 };
 
-use super::{CrawlDatum, DatumStream, Error, Result};
+use super::{CrawlDatum, DatumSink, Error, Result};
 use anyhow::anyhow;
 
 /// The WarcWriter is responsible for storing the crawl datums
@@ -30,7 +30,7 @@ pub struct WarcWriter {
     tx: tokio::sync::mpsc::Sender<WarcWriterMessage>,
 }
 
-impl DatumStream for WarcWriter {
+impl DatumSink for WarcWriter {
     async fn write(&self, crawl_datum: CrawlDatum) -> Result<()> {
         self.tx
             .send(WarcWriterMessage::Crawl(crawl_datum))

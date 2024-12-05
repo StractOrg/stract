@@ -14,6 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! # Crawler
+//!
+//! The crawler is responsible for fetching webpages and storing them in WARC files
+//! for later processing.
+//!
+//! Before starting a crawl, a plan needs to be created. This plan is then used by
+//! the crawler coordinator to assign sites to crawl to different workers.
+//! A site is only assigned to one worker at a time for politeness.
+
 use std::{collections::VecDeque, future::Future, net::SocketAddr, sync::Arc};
 
 type HashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
@@ -35,7 +44,7 @@ pub use router::Router;
 mod file_queue;
 pub mod planner;
 pub mod robot_client;
-mod wander_prirotiser;
+mod wander_prioritiser;
 mod warc_writer;
 mod worker;
 
@@ -304,7 +313,7 @@ impl Crawler {
     }
 }
 
-pub trait DatumStream: Send + Sync {
+pub trait DatumSink: Send + Sync {
     fn write(&self, crawl_datum: CrawlDatum) -> impl Future<Output = Result<()>> + Send;
     fn finish(&self) -> impl Future<Output = Result<()>> + Send;
 }

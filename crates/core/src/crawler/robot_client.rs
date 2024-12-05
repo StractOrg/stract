@@ -45,6 +45,7 @@ pub(super) fn reqwest_client(config: &CrawlerConfig) -> Result<reqwest::Client> 
         .map_err(|e| Error::from(anyhow!(e)))
 }
 
+/// Reqwest client that respects robots.txt for each request.
 #[derive(Clone)]
 pub struct RobotClient {
     robots_txt_manager: RobotsTxtManager,

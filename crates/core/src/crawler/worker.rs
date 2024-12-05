@@ -39,8 +39,8 @@ use crate::{
 };
 
 use super::{
-    encoded_body, robot_client::RobotClient, wander_prirotiser::WanderPrioritiser, CrawlDatum,
-    DatumStream, Domain, Error, Result, RetrieableUrl, Site, WarcWriter, WeightedUrl, WorkerJob,
+    encoded_body, robot_client::RobotClient, wander_prioritiser::WanderPrioritiser, CrawlDatum,
+    DatumSink, Domain, Error, Result, RetrieableUrl, Site, WarcWriter, WeightedUrl, WorkerJob,
     MAX_CONTENT_LENGTH, MAX_OUTGOING_URLS_PER_PAGE,
 };
 
@@ -126,7 +126,8 @@ impl WorkerThread {
     }
 }
 
-pub struct JobExecutor<S: DatumStream> {
+/// JobExecutor receives a job from the coordinator and crawls the urls in the job.
+pub struct JobExecutor<S: DatumSink> {
     writer: Arc<S>,
     client: RobotClient,
     has_gotten_429_response: bool,
@@ -144,7 +145,7 @@ pub struct JobExecutor<S: DatumStream> {
     job: WorkerJob,
 }
 
-impl<S: DatumStream> JobExecutor<S> {
+impl<S: DatumSink> JobExecutor<S> {
     pub fn new(
         job: WorkerJob,
         config: Arc<CrawlerConfig>,
