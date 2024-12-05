@@ -135,7 +135,7 @@ impl Query for ForwardlinksQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopDocsCollector::from(self.limit).enable_offset()
     }
 
@@ -286,7 +286,7 @@ impl Query for HostForwardlinksQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopDocsCollector::from(self.limit)
             .enable_offset()
             .with_deduplicator(HostDeduplicator)
@@ -437,7 +437,7 @@ impl Query for FullForwardlinksQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopDocsCollector::from(self.limit).enable_offset()
     }
 
@@ -576,7 +576,7 @@ impl Query for FullHostForwardlinksQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopDocsCollector::from(self.limit)
             .enable_offset()
             .with_deduplicator(HostDeduplicator)

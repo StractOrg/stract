@@ -21,7 +21,7 @@
 //! with multiple shards. Each shard cluster
 //! is a Raft cluster, and each key is then routed to the correct
 //! cluster based on hash(key) % number_of_shards. The keys
-//! are currently *not* rebalanced if the number of shards change, so
+//! are currently *not* re-balanced if the number of shards change, so
 //! if an entire shard becomes unavailable or a new shard is added, all
 //! keys in the entire DHT is essentially lost as the
 //! keys might hash incorrectly.

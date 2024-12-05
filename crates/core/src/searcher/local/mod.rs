@@ -14,15 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-mod guard;
-use guard::ReadGuard;
+//! The local searcher runs the search against a local index.
 
 mod inner;
 use inner::InnerLocalSearcher;
-use tokio::sync::{OwnedRwLockReadGuard, RwLock};
+use tokio::sync::RwLock;
 
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::Arc;
 
 use itertools::Itertools;
@@ -44,29 +42,12 @@ use crate::{inverted_index, Result};
 use super::WebsitesResult;
 use super::{InitialWebsiteResult, SearchQuery};
 
-pub trait SearchableIndex: Send + Sync + 'static {
-    type ReadGuard: ReadGuard;
-
-    fn read_guard(&self) -> impl Future<Output = Self::ReadGuard>;
+pub struct LocalSearcherBuilder {
+    inner: InnerLocalSearcher,
 }
 
-impl SearchableIndex for Arc<RwLock<Index>> {
-    type ReadGuard = OwnedRwLockReadGuard<Index>;
-
-    async fn read_guard(&self) -> Self::ReadGuard {
-        self.clone().read_owned().await
-    }
-}
-
-pub struct LocalSearcherBuilder<I: SearchableIndex> {
-    inner: InnerLocalSearcher<I>,
-}
-
-impl<I> LocalSearcherBuilder<I>
-where
-    I: SearchableIndex,
-{
-    pub fn new(index: I) -> Self {
+impl LocalSearcherBuilder {
+    pub fn new(index: Arc<RwLock<Index>>) -> Self {
         Self {
             inner: InnerLocalSearcher::new(index),
         }
@@ -87,22 +68,19 @@ where
         self
     }
 
-    pub fn build(self) -> LocalSearcher<I> {
+    pub fn build(self) -> LocalSearcher {
         LocalSearcher {
             inner: Arc::new(self.inner),
         }
     }
 }
 
-pub struct LocalSearcher<I: SearchableIndex> {
-    inner: Arc<InnerLocalSearcher<I>>,
+pub struct LocalSearcher {
+    inner: Arc<InnerLocalSearcher>,
 }
 
-impl<I> LocalSearcher<I>
-where
-    I: SearchableIndex,
-{
-    pub fn builder(index: I) -> LocalSearcherBuilder<I> {
+impl LocalSearcher {
+    pub fn builder(index: Arc<RwLock<Index>>) -> LocalSearcherBuilder {
         LocalSearcherBuilder::new(index)
     }
 
@@ -203,7 +181,7 @@ where
         })
     }
 
-    /// This function is mainly used for tests and benchmarks
+    /// This function is only used for tests and benchmarks
     pub fn search_sync(&self, query: &SearchQuery) -> Result<WebsitesResult> {
         crate::block_on(self.search(query))
     }

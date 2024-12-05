@@ -51,6 +51,14 @@ impl Index {
         })
     }
 
+    pub fn inverted_index(&self) -> &InvertedIndex {
+        &self.inverted_index
+    }
+
+    pub fn region_count(&self) -> &Mutex<RegionCount> {
+        &self.region_count
+    }
+
     pub fn path(&self) -> PathBuf {
         PathBuf::from(&self.path)
     }

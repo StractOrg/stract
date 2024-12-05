@@ -23,6 +23,8 @@ use crate::Result;
 use anyhow::anyhow;
 use tokio::net::ToSocketAddrs;
 
+/// A worker is responsible for executing a mapper on its portion of the graph and
+/// sending results to the DHT.
 pub trait Worker: Send + Sync {
     type Remote: RemoteWorker<Job = Self::Job>;
 

@@ -14,6 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! The precision stage of the ranking pipeline.
+//!
+//! This stage focusses on refining the first page of results
+//! from the recall stage.
+
 use std::sync::Arc;
 
 use crate::{

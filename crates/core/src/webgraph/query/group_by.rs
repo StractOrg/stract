@@ -157,7 +157,7 @@ impl Query for HostGroupSketchQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         GroupSketchCollector::new(self.group, self.value)
     }
 
@@ -306,7 +306,7 @@ impl Query for HostGroupQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         GroupExactCollector::new(self.group, self.value)
     }
 

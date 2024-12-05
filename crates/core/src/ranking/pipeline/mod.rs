@@ -68,10 +68,10 @@ impl<T> StageOrModifier<T>
 where
     T: RankableWebpage + Send + Sync,
 {
-    fn top_n(&self) -> Top {
+    fn top(&self) -> Top {
         match self {
-            StageOrModifier::Stage(stage) => stage.top_n(),
-            StageOrModifier::Modifier(modifier) => modifier.top_n(),
+            StageOrModifier::Stage(stage) => stage.top(),
+            StageOrModifier::Modifier(modifier) => modifier.top(),
         }
     }
 
@@ -139,7 +139,7 @@ where
         let coefficients = query.signal_coefficients();
 
         for stage_or_modifier in self.stages_or_modifiers.iter() {
-            let webpages = if let Top::Limit(top_n) = stage_or_modifier.top_n() {
+            let webpages = if let Top::Limit(top_n) = stage_or_modifier.top() {
                 if query.offset() > top_n {
                     continue;
                 }

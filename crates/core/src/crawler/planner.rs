@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 use anyhow::{anyhow, Result};
 use futures::stream::FuturesOrdered;
 use futures::StreamExt;
@@ -71,6 +72,7 @@ impl From<StoredUrl> for Url {
     }
 }
 
+/// Store urls in groups on disk based on their harmonic rank.
 struct UrlGrouper {
     groups: Vec<speedy_kv::Db<StoredUrl, ()>>,
     folder: std::path::PathBuf,
@@ -169,6 +171,7 @@ struct Budget {
     remaining_schedulable: u64,
 }
 
+/// Create a crawl plan based on the harmonic rank of the hosts.
 pub struct CrawlPlanner {
     host_centrality: Arc<speedy_kv::Db<NodeID, f64>>,
     host_centrality_rank: Arc<speedy_kv::Db<NodeID, u64>>,

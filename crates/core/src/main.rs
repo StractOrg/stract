@@ -66,20 +66,14 @@ enum Commands {
     },
 
     /// Deploy the search server.
-    SearchServer {
-        config_path: String,
-    },
+    SearchServer { config_path: String },
 
     /// Deploy the entity search server.
-    EntitySearchServer {
-        config_path: String,
-    },
+    EntitySearchServer { config_path: String },
 
     /// Deploy the json http api. The api interacts with
     /// the search servers, webgraph servers etc. to provide the necesarry functionality.
-    Api {
-        config_path: String,
-    },
+    Api { config_path: String },
 
     /// Deploy the crawler.
     Crawler {
@@ -102,23 +96,19 @@ enum Commands {
         ml: bool,
     },
 
-    // Commands for the live index.
+    /// Commands for the live index.
     LiveIndex {
         #[clap(subcommand)]
         options: LiveIndex,
     },
 
-    // Build spell correction model.
-    WebSpell {
-        config_path: String,
-    },
+    /// Build spell correction model.
+    WebSpell { config_path: String },
 
-    // Compute statistics for sites.
-    SiteStats {
-        config_path: String,
-    },
+    /// Compute statistics for sites.
+    SiteStats { config_path: String },
 
-    // Commands to compute distributed graph algorithms.
+    /// Commands to compute distributed graph algorithms.
     Ampc {
         #[clap(subcommand)]
         options: AmpcOptions,
@@ -155,20 +145,22 @@ enum AmpcOptions {
 
 #[derive(Subcommand)]
 enum AdminOptions {
-    Init {
-        host: SocketAddr,
-    },
-    Status,
-    TopKeyphrases {
-        top: usize,
-    },
+    /// Create the admin config file. Run this before any other admin commands so the client knows where to connect.
+    Init { host: SocketAddr },
 
+    /// Print the reachable cluster members and which service they are running.
+    Status,
+
+    /// Export the top most common phrases in the index.
+    TopKeyphrases { top: usize },
+
+    /// Get statistics about the index.
     #[clap(subcommand)]
-    Index(AdminIndexOptions),
+    IndexStats(AdminIndexStatsOptions),
 }
 
 #[derive(Subcommand)]
-enum AdminIndexOptions {
+enum AdminIndexStatsOptions {
     /// Get the size of the index
     Size,
 }
@@ -251,9 +243,7 @@ enum WebgraphOptions {
 #[derive(Subcommand)]
 enum IndexingOptions {
     /// Create the search index.
-    Search {
-        config_path: String,
-    },
+    Search { config_path: String },
 
     /// Merge multiple search indexes into a single index.
     MergeSearch {
@@ -267,10 +257,8 @@ enum IndexingOptions {
         output_path: String,
     },
 
-    // Create an index of canonical urls.
-    Canonical {
-        config_path: String,
-    },
+    /// Create an index of canonical urls.
+    Canonical { config_path: String },
 }
 
 fn load_toml_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> T {
@@ -511,8 +499,8 @@ fn main() -> Result<()> {
                     .block_on(entrypoint::admin::top_keyphrases(top))?;
             }
 
-            AdminOptions::Index(index_options) => match index_options {
-                AdminIndexOptions::Size => {
+            AdminOptions::IndexStats(index_options) => match index_options {
+                AdminIndexStatsOptions::Size => {
                     tokio::runtime::Builder::new_current_thread()
                         .enable_all()
                         .build()?

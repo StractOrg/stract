@@ -83,7 +83,7 @@ impl Query for Id2NodeQuery {
         }))
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         FirstDocCollector::without_shard_id()
     }
 

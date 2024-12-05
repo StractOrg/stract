@@ -271,7 +271,9 @@ impl EdgeStore {
             From<<Q::Collector as Collector>::Fruit>,
     {
         let fruit = self.search_initial(query)?;
-        let fruit = query.remote_collector().merge_fruits(vec![fruit.into()])?;
+        let fruit = query
+            .coordinator_collector()
+            .merge_fruits(vec![fruit.into()])?;
         let res = self.retrieve(query, fruit)?;
         Ok(Q::merge_results(vec![res]))
     }

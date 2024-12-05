@@ -14,6 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! The ranking module is responsible for ranking pages based on their relevance to a query.
+//!
+//! The core ranking signals are computed by the `computer` module, which runs independently
+//! on each search shard in the search cluster. Increasingly complex stages
+//! run in the ranking pipeline on the coordinator node to produce the final ranking.
+
 pub mod bitvec_similarity;
 pub mod bm25;
 pub mod bm25f;

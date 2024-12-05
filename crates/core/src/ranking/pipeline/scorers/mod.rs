@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! Scorers are used to compute the ranking signals in the ranking pipeline.
+//!
+//! Each scorer computes a single signal which is then used to rank the pages.
+
 pub mod embedding;
 pub mod inbound_similarity;
 pub mod lambdamart;
@@ -26,14 +30,23 @@ use crate::ranking::{SignalCalculation, SignalCoefficients, SignalEnum};
 
 use super::{RankableWebpage, Top};
 
+/// A ranking stage that computes some signals for each page.
+///
+/// This trait is implemented for all scorers.
+/// Most of the time you will want to implement the [`RankingStage`] trait instead,
+/// but this trait gives you more control over the ranking pipeline.
 pub trait FullRankingStage: Send + Sync {
     type Webpage: RankableWebpage;
 
+    /// Compute the signal for each page.
     fn compute(&self, webpages: &mut [Self::Webpage]);
-    fn top_n(&self) -> Top {
+
+    /// The number of pages to return from this part of the pipeline.
+    fn top(&self) -> Top {
         Top::Unlimited
     }
 
+    /// Update the score for each page.
     fn update_scores(&self, webpages: &mut [Self::Webpage], coefficients: &SignalCoefficients) {
         for webpage in webpages.iter_mut() {
             webpage.set_raw_score(webpage.signals().iter().fold(0.0, |acc, (signal, calc)| {
@@ -42,16 +55,21 @@ pub trait FullRankingStage: Send + Sync {
         }
     }
 
+    /// Rank the pages by their score.
     fn rank(&self, webpages: &mut [Self::Webpage]) {
         webpages.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
     }
 }
 
+/// A ranking stage that computes a single signal for each page.
 pub trait RankingStage: Send + Sync {
     type Webpage: RankableWebpage;
 
+    /// Compute the signal for a single page.
     fn compute(&self, webpage: &Self::Webpage) -> (SignalEnum, SignalCalculation);
-    fn top_n(&self) -> Top {
+
+    /// The number of pages to return from this part of the pipeline.
+    fn top(&self) -> Top {
         Top::Unlimited
     }
 }
@@ -69,7 +87,7 @@ where
         }
     }
 
-    fn top_n(&self) -> Top {
-        self.top_n()
+    fn top(&self) -> Top {
+        self.top()
     }
 }

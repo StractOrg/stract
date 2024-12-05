@@ -182,7 +182,7 @@ impl Query for BacklinksQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopDocsCollector::from(self.limit).enable_offset()
     }
 
@@ -314,7 +314,7 @@ impl Query for HostBacklinksQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopDocsCollector::from(self.limit)
             .enable_offset()
             .with_deduplicator(HostDeduplicator)
@@ -467,7 +467,7 @@ impl Query for FullBacklinksQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopDocsCollector::from(self.limit).enable_offset()
     }
 
@@ -617,7 +617,7 @@ impl Query for FullHostBacklinksQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopDocsCollector::from(self.limit)
             .enable_offset()
             .with_deduplicator(HostDeduplicator)
@@ -742,7 +742,7 @@ impl Query for BacklinksWithLabelsQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopDocsCollector::from(self.limit).enable_offset()
     }
 

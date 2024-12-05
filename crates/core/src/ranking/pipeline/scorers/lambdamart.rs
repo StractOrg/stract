@@ -36,7 +36,7 @@ impl RankingStage for Arc<models::LambdaMART> {
         )
     }
 
-    fn top_n(&self) -> Top {
+    fn top(&self) -> Top {
         Top::Limit(20)
     }
 }
@@ -59,7 +59,7 @@ impl RankingStage for PrecisionLambda {
         )
     }
 
-    fn top_n(&self) -> Top {
+    fn top(&self) -> Top {
         Top::Limit(20)
     }
 }

@@ -113,7 +113,7 @@ impl Query for FullLinksBetweenQuery {
         collector
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         TopDocsCollector::from(self.limit).enable_offset()
     }
 

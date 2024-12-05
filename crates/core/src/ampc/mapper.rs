@@ -16,6 +16,7 @@
 
 use super::{prelude::Job, DhtConn};
 
+/// A mapper is the specific computation to be run on the graph.
 pub trait Mapper: bincode::Encode + bincode::Decode + Send + Sync + Clone {
     type Job: Job<Mapper = Self>;
 

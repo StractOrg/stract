@@ -14,6 +14,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! # Main flow
+//! ```md
+//! `coordinator`  <------>  `searcher`
+//! -----------------------------------
+//! send query to searcher
+//!                        search index
+//!                        collect fruits
+//!                        send fruits to coordinator
+//! merge fruits
+//! filter fruits
+//!     for each shard
+//! send fruits to searchers
+//!                        construct intermediate output
+//!                           from fruits
+//!                        send intermediate output to coordinator
+//! merge intermediate outputs
+//! return final output
+//! ---------------------------------------------------
+//! ```
+
 use crate::{inverted_index::ShardId, search_ctx, Result};
 
 pub mod top_key_phrases;
@@ -34,6 +54,8 @@ pub use get_site_urls::GetSiteUrlsQuery;
 pub mod collector;
 pub use collector::Collector;
 
+/// A generic query that can be executed on a searcher
+/// against an index.
 pub trait GenericQuery: Send + Sync + bincode::Encode + bincode::Decode + Clone {
     type Collector: Collector;
     type TantivyQuery: tantivy::query::Query;
@@ -42,7 +64,7 @@ pub trait GenericQuery: Send + Sync + bincode::Encode + bincode::Decode + Clone 
 
     fn tantivy_query(&self, ctx: &search_ctx::Ctx) -> Self::TantivyQuery;
     fn collector(&self, ctx: &search_ctx::Ctx) -> Self::Collector;
-    fn remote_collector(&self) -> Self::Collector;
+    fn coordinator_collector(&self) -> Self::Collector;
 
     fn filter_fruit_shards(
         &self,

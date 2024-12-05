@@ -70,7 +70,7 @@ impl GenericQuery for SizeQuery {
         SizeCollector::new().with_shard_id(ctx.shard_id)
     }
 
-    fn remote_collector(&self) -> Self::Collector {
+    fn coordinator_collector(&self) -> Self::Collector {
         SizeCollector::new()
     }
 
