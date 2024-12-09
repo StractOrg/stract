@@ -18,9 +18,10 @@
 
 pub mod coordinator;
 mod mapper;
+mod updated_nodes;
 pub mod worker;
 
-use bloom::U64BloomFilter;
+pub use updated_nodes::UpdatedNodes;
 
 use crate::distributed::member::ShardId;
 use crate::{
@@ -49,7 +50,7 @@ pub struct Meta {
 pub struct ShortestPathTables {
     distances: DefaultDhtTable<webgraph::NodeID, u64>,
     meta: DefaultDhtTable<(), Meta>,
-    changed_nodes: DefaultDhtTable<ShardId, U64BloomFilter>,
+    changed_nodes: DefaultDhtTable<ShardId, UpdatedNodes>,
 }
 
 impl_dht_tables!(ShortestPathTables, [distances, meta, changed_nodes]);

@@ -16,16 +16,19 @@
 
 use std::sync::{atomic::AtomicBool, Arc, Mutex};
 
-use bloom::U64BloomFilter;
 use rustc_hash::FxHashMap;
 
-use super::{DhtTable as _, Mapper, Meta, ShortestPathJob, ShortestPathTables};
+use super::{
+    updated_nodes::{UpdatedNodes, UpdatedNodesKind},
+    worker::ShortestPathWorker,
+    DhtTable as _, Mapper, Meta, ShortestPathJob, ShortestPathTables,
+};
 use crate::{
     ampc::{
         dht::{U64Min, UpsertAction},
         DhtConn,
     },
-    webgraph,
+    webgraph::{self, query},
     webpage::html::links::RelFlags,
 };
 
@@ -84,7 +87,7 @@ impl ShortestPathMapper {
 
     fn map_batch(
         batch: &[webgraph::SmallEdge],
-        new_changed_nodes: &Mutex<U64BloomFilter>,
+        new_changed_nodes: &Mutex<UpdatedNodes>,
         round_had_changes: &AtomicBool,
         dht: &DhtConn<ShortestPathTables>,
     ) {
@@ -93,9 +96,92 @@ impl ShortestPathMapper {
 
         for (node, action) in updates {
             if action.is_changed() {
-                new_changed_nodes.insert_u128(node.as_u128());
+                new_changed_nodes.add(node);
                 round_had_changes.store(true, std::sync::atomic::Ordering::Relaxed);
             }
+        }
+    }
+
+    fn relax_all_edges(
+        worker: &ShortestPathWorker,
+        changed_nodes: &UpdatedNodes,
+        new_changed_nodes: &Mutex<UpdatedNodes>,
+        round_had_changes: &AtomicBool,
+        dht: &DhtConn<ShortestPathTables>,
+    ) {
+        let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
+        pool.scope(|s| {
+            let mut batch = Vec::with_capacity(BATCH_SIZE);
+
+            for edge in worker.graph().page_edges() {
+                if edge.rel_flags.intersects(*SKIPPED_REL) {
+                    continue;
+                }
+
+                if changed_nodes.contains(edge.from) {
+                    batch.push(edge);
+                }
+
+                if batch.len() >= BATCH_SIZE {
+                    let update_batch = batch.clone();
+                    s.spawn(move |_| {
+                        Self::map_batch(&update_batch, new_changed_nodes, round_had_changes, dht)
+                    });
+                    batch.clear();
+                }
+            }
+
+            if !batch.is_empty() {
+                Self::map_batch(&batch, new_changed_nodes, round_had_changes, dht);
+            }
+        });
+    }
+
+    fn relax_exact_edges(
+        worker: &ShortestPathWorker,
+        changed_nodes: &UpdatedNodes,
+        exact_changed_nodes: &[webgraph::NodeID],
+        new_changed_nodes: &Mutex<UpdatedNodes>,
+        round_had_changes: &AtomicBool,
+        dht: &DhtConn<ShortestPathTables>,
+    ) {
+        let mut batch = Vec::with_capacity(BATCH_SIZE);
+
+        let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
+
+        pool.scope(|s| {
+            for node in exact_changed_nodes {
+                for edge in worker
+                    .graph()
+                    .search(&query::ForwardlinksQuery::new(*node))
+                    .unwrap_or_default()
+                {
+                    if edge.rel_flags.intersects(*SKIPPED_REL) {
+                        continue;
+                    }
+
+                    if changed_nodes.contains(edge.from) {
+                        batch.push(edge);
+                    }
+
+                    if batch.len() >= BATCH_SIZE {
+                        let update_batch = batch.clone();
+                        s.spawn(move |_| {
+                            Self::map_batch(
+                                &update_batch,
+                                new_changed_nodes,
+                                round_had_changes,
+                                dht,
+                            )
+                        });
+                        batch.clear();
+                    }
+                }
+            }
+        });
+
+        if !batch.is_empty() {
+            Self::map_batch(&batch, new_changed_nodes, round_had_changes, dht);
         }
     }
 }
@@ -112,47 +198,41 @@ impl Mapper for ShortestPathMapper {
         match self {
             ShortestPathMapper::RelaxEdges => {
                 let round_had_changes = Arc::new(AtomicBool::new(false));
-                let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
 
-                let new_changed_nodes = Arc::new(Mutex::new(U64BloomFilter::empty_from(
-                    &worker.changed_nodes().lock().unwrap(),
-                )));
+                let mut changed_nodes = worker.changed_nodes().lock().unwrap();
+                changed_nodes.add(job.source);
 
-                pool.scope(|s| {
-                    let mut changed_nodes = worker.changed_nodes().lock().unwrap();
-                    changed_nodes.insert_u128(job.source.as_u128());
+                let new_changed_nodes =
+                    Arc::new(Mutex::new(UpdatedNodes::empty_from(&changed_nodes)));
 
-                    let mut batch = Vec::with_capacity(BATCH_SIZE);
+                match changed_nodes.kind() {
+                    UpdatedNodesKind::Exact => {
+                        let exact_changed_nodes: Vec<_> = changed_nodes
+                            .as_exact()
+                            .unwrap()
+                            .clone()
+                            .into_iter()
+                            .collect();
 
-                    for edge in worker.graph().page_edges() {
-                        if edge.rel_flags.intersects(*SKIPPED_REL) {
-                            continue;
-                        }
-
-                        if changed_nodes.contains_u128(edge.from.as_u128()) {
-                            batch.push(edge);
-                        }
-
-                        if batch.len() >= BATCH_SIZE {
-                            let update_batch = batch.clone();
-                            let update_new_changed_nodes = new_changed_nodes.clone();
-                            let update_round_had_changes = round_had_changes.clone();
-                            s.spawn(move |_| {
-                                Self::map_batch(
-                                    &update_batch,
-                                    &update_new_changed_nodes,
-                                    &update_round_had_changes,
-                                    dht,
-                                )
-                            });
-                            batch.clear();
-                        }
+                        Self::relax_exact_edges(
+                            worker,
+                            &changed_nodes,
+                            &exact_changed_nodes,
+                            &new_changed_nodes,
+                            &round_had_changes,
+                            dht,
+                        );
                     }
-
-                    if !batch.is_empty() {
-                        Self::map_batch(&batch, &new_changed_nodes, &round_had_changes, dht);
+                    UpdatedNodesKind::Sketch => {
+                        Self::relax_all_edges(
+                            worker,
+                            &changed_nodes,
+                            &new_changed_nodes,
+                            &round_had_changes,
+                            dht,
+                        );
                     }
-                });
+                }
 
                 dht.next()
                     .changed_nodes
@@ -169,10 +249,10 @@ impl Mapper for ShortestPathMapper {
                 let all_changed_nodes: Vec<_> =
                     dht.next().changed_nodes.iter().map(|(_, v)| v).collect();
                 let mut changed_nodes =
-                    U64BloomFilter::empty_from(&worker.changed_nodes().lock().unwrap());
+                    UpdatedNodes::empty_from(&worker.changed_nodes().lock().unwrap());
 
-                for bloom in all_changed_nodes {
-                    changed_nodes.union(bloom.clone());
+                for other in &all_changed_nodes {
+                    changed_nodes = changed_nodes.union(other);
                 }
 
                 *worker.changed_nodes().lock().unwrap() = changed_nodes;

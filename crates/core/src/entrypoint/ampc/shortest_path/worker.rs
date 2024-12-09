@@ -30,14 +30,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{impl_worker, Message, RemoteWorker, ShortestPathJob};
-use bloom::U64BloomFilter;
+use super::{impl_worker, updated_nodes::UpdatedNodes, Message, RemoteWorker, ShortestPathJob};
 
 #[derive(Clone)]
 pub struct ShortestPathWorker {
     shard: ShardId,
     graph: Arc<Webgraph>,
-    changed_nodes: Arc<Mutex<U64BloomFilter>>,
+    changed_nodes: Arc<Mutex<UpdatedNodes>>,
     nodes_sketch: HyperLogLog<4096>,
 }
 
@@ -48,14 +47,12 @@ impl ShortestPathWorker {
         for node in graph.page_nodes() {
             nodes_sketch.add_u128(node.as_u128());
         }
+        let num_nodes = nodes_sketch.size() as u64;
 
         Self {
             graph: Arc::new(graph),
             shard,
-            changed_nodes: Arc::new(Mutex::new(U64BloomFilter::new(
-                nodes_sketch.size() as u64,
-                0.01,
-            ))),
+            changed_nodes: Arc::new(Mutex::new(UpdatedNodes::new(num_nodes))),
             nodes_sketch,
         }
     }
@@ -68,7 +65,7 @@ impl ShortestPathWorker {
         self.shard
     }
 
-    pub fn changed_nodes(&self) -> &Arc<Mutex<U64BloomFilter>> {
+    pub fn changed_nodes(&self) -> &Arc<Mutex<UpdatedNodes>> {
         &self.changed_nodes
     }
 
@@ -78,7 +75,7 @@ impl ShortestPathWorker {
 
     pub fn update_changed_nodes_precision(&self, num_nodes: u64) {
         let mut changed_nodes = self.changed_nodes().lock().unwrap();
-        *changed_nodes = U64BloomFilter::new(num_nodes, 0.01);
+        *changed_nodes = UpdatedNodes::new(num_nodes);
     }
 }
 
