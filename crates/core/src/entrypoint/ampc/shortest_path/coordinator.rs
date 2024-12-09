@@ -28,6 +28,7 @@ use crate::ampc::{Coordinator, DefaultDhtTable, DhtConn};
 use crate::config::ShortestPathCoordinatorConfig;
 use crate::distributed::cluster::Cluster;
 use crate::distributed::member::{Member, Service, ShardId};
+use crate::hyperloglog::HyperLogLog;
 use crate::webpage::url_ext::UrlExt;
 use crate::{webgraph, Result};
 
@@ -173,6 +174,21 @@ pub fn run(config: ShortestPathCoordinatorConfig) -> Result<()> {
         .enable_all()
         .build()?
         .block_on(setup_gossip(tokio_conf))?;
+
+    let sketch = cluster
+        .workers
+        .iter()
+        .map(|worker| worker.get_node_sketch())
+        .fold(HyperLogLog::default(), |mut acc, sketch| {
+            acc.merge(&sketch);
+            acc
+        });
+
+    let num_nodes = sketch.size() as u64;
+
+    for worker in cluster.workers.iter() {
+        worker.update_changed_nodes_precision(num_nodes);
+    }
 
     let jobs: Vec<_> = cluster
         .workers

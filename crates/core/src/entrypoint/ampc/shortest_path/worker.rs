@@ -75,6 +75,11 @@ impl ShortestPathWorker {
     pub fn nodes_sketch(&self) -> &HyperLogLog<4096> {
         &self.nodes_sketch
     }
+
+    pub fn update_changed_nodes_precision(&self, num_nodes: u64) {
+        let mut changed_nodes = self.changed_nodes().lock().unwrap();
+        *changed_nodes = U64BloomFilter::new(num_nodes, 0.01);
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
@@ -85,6 +90,17 @@ impl Message<ShortestPathWorker> for GetNodeSketch {
 
     fn handle(self, worker: &ShortestPathWorker) -> Self::Response {
         worker.nodes_sketch().clone()
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
+pub struct UpdateChangedNodesPrecision(u64);
+
+impl Message<ShortestPathWorker> for UpdateChangedNodesPrecision {
+    type Response = ();
+
+    fn handle(self, worker: &ShortestPathWorker) -> Self::Response {
+        worker.update_changed_nodes_precision(self.0);
     }
 }
 
@@ -109,7 +125,7 @@ impl Message<ShortestPathWorker> for BatchId2Node {
     }
 }
 
-impl_worker!(ShortestPathJob, RemoteShortestPathWorker => ShortestPathWorker, [BatchId2Node, GetNodeSketch]);
+impl_worker!(ShortestPathJob, RemoteShortestPathWorker => ShortestPathWorker, [BatchId2Node, GetNodeSketch, UpdateChangedNodesPrecision]);
 
 #[derive(Clone)]
 pub struct RemoteShortestPathWorker {
@@ -142,6 +158,10 @@ impl RemoteShortestPathWorker {
 
     pub fn get_node_sketch(&self) -> HyperLogLog<4096> {
         self.send(GetNodeSketch)
+    }
+
+    pub fn update_changed_nodes_precision(&self, num_nodes: u64) {
+        self.send(UpdateChangedNodesPrecision(num_nodes));
     }
 }
 
