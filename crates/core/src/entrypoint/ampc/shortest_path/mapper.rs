@@ -21,7 +21,7 @@ use rustc_hash::FxHashMap;
 use super::{
     updated_nodes::{UpdatedNodes, UpdatedNodesKind},
     worker::ShortestPathWorker,
-    DhtTable as _, Mapper, Meta, ShortestPathJob, ShortestPathTables,
+    DhtTable as _, Mapper, ShortestPathJob, ShortestPathTables,
 };
 use crate::{
     ampc::{
@@ -237,13 +237,12 @@ impl Mapper for ShortestPathMapper {
                 dht.next()
                     .changed_nodes
                     .set(worker.shard(), new_changed_nodes.lock().unwrap().clone());
-                dht.next().meta.set(
-                    (),
-                    Meta {
-                        round_had_changes: round_had_changes
-                            .load(std::sync::atomic::Ordering::Relaxed),
-                    },
-                );
+
+                let mut meta = dht.next().meta.get(()).unwrap();
+                meta.round_had_changes =
+                    round_had_changes.load(std::sync::atomic::Ordering::Relaxed);
+
+                dht.next().meta.set((), meta);
             }
             ShortestPathMapper::UpdateChangedNodes => {
                 let all_changed_nodes: Vec<_> =

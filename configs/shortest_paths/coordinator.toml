@@ -1,6 +1,7 @@
 source = "https://www.cdc.gov/healthywater/swimming/"
 host = "0.0.0.0:5000"
 output_path = "data/shortest_paths"
+max_distance = 4
 
 [gossip]
 addr = "0.0.0.0:5001"

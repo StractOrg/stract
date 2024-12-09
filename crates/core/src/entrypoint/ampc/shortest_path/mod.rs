@@ -44,6 +44,7 @@ use self::worker::{RemoteShortestPathWorker, ShortestPathWorker};
 )]
 pub struct Meta {
     round_had_changes: bool,
+    round: u64,
 }
 
 #[derive(bincode::Encode, bincode::Decode, Debug, Clone)]

@@ -78,9 +78,12 @@ impl Setup for ShortestPathSetup {
     }
 
     fn setup_round(&self, dht: &Self::DhtTables) {
+        let meta = dht.meta.get(()).unwrap();
+
         dht.meta.set(
             (),
             Meta {
+                round: meta.round + 1,
                 round_had_changes: false,
             },
         );
@@ -92,18 +95,28 @@ impl Setup for ShortestPathSetup {
             (),
             Meta {
                 round_had_changes: true,
+                round: 0,
             },
         );
     }
 }
 
-pub struct ShortestPathFinish;
+pub struct ShortestPathFinish {
+    max_distance: Option<u64>,
+}
 
 impl Finisher for ShortestPathFinish {
     type Job = ShortestPathJob;
 
     fn is_finished(&self, dht: &ShortestPathTables) -> bool {
-        !dht.meta.get(()).unwrap().round_had_changes
+        let meta = dht.meta.get(()).unwrap();
+        if let Some(max_distance) = self.max_distance {
+            if meta.round >= max_distance {
+                return true;
+            }
+        }
+
+        !meta.round_had_changes
     }
 }
 
@@ -202,7 +215,12 @@ pub fn run(config: ShortestPathCoordinatorConfig) -> Result<()> {
     tracing::info!("starting {} jobs", jobs.len());
 
     let coordinator = build(&cluster.dht, cluster.workers.clone(), source);
-    let res = coordinator.run(jobs, ShortestPathFinish)?;
+    let res = coordinator.run(
+        jobs,
+        ShortestPathFinish {
+            max_distance: config.max_distance,
+        },
+    )?;
 
     let output_path = Path::new(&config.output_path);
 

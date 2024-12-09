@@ -686,6 +686,7 @@ pub struct ShortestPathCoordinatorConfig {
     pub gossip: GossipConfig,
     pub host: SocketAddr,
     pub output_path: String,
+    pub max_distance: Option<u64>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
