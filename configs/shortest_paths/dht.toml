@@ -1,0 +1,7 @@
+node_id = 0
+shard = 0
+host = "0.0.0.0:3101"
+
+[gossip]
+addr = "0.0.0.0:3102"
+seed_nodes = []

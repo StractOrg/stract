@@ -17,3 +17,4 @@
 pub mod approximated_harmonic_centrality;
 pub mod dht;
 pub mod harmonic_centrality;
+pub mod shortest_path;

@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::de::DeserializeOwned;
@@ -141,6 +142,13 @@ enum AmpcOptions {
     /// Start a coordinator to distribute the approximation of the harmonic centrality computation.
     /// Workers needs to be started before the coordinator.
     ApproxHarmonicCoordinator { config_path: String },
+
+    /// Start a worker to compute the shortest paths of a graph.
+    ShortestPathWorker { config_path: String },
+
+    /// Start a coordinator to distribute the shortest path computation.
+    /// Workers needs to be started before the coordinator.
+    ShortestPathCoordinator { config_path: String },
 }
 
 #[derive(Subcommand)]
@@ -477,6 +485,14 @@ fn main() -> Result<()> {
             AmpcOptions::ApproxHarmonicCoordinator { config_path } => {
                 let config: config::ApproxHarmonicCoordinatorConfig = load_toml_config(config_path);
                 entrypoint::ampc::approximated_harmonic_centrality::coordinator::run(config)?;
+            }
+            AmpcOptions::ShortestPathWorker { config_path } => {
+                let config: config::ShortestPathWorkerConfig = load_toml_config(config_path);
+                entrypoint::ampc::shortest_path::worker::run(config)?;
+            }
+            AmpcOptions::ShortestPathCoordinator { config_path } => {
+                let config: config::ShortestPathCoordinatorConfig = load_toml_config(config_path);
+                entrypoint::ampc::shortest_path::coordinator::run(config)?;
             }
         },
 

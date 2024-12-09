@@ -1,0 +1,7 @@
+shard = 0
+graph_path = "data/webgraph"
+host = "0.0.0.0:5002"
+
+[gossip]
+addr = "0.0.0.0:5003"
+seed_nodes = ["0.0.0.0:3102"]

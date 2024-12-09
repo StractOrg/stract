@@ -135,6 +135,13 @@ pub enum Service {
     ApproxHarmonicCoordinator {
         host: SocketAddr,
     },
+    ShortestPathWorker {
+        host: SocketAddr,
+        shard: ShardId,
+    },
+    ShortestPathCoordinator {
+        host: SocketAddr,
+    },
 }
 
 impl std::fmt::Display for Service {
@@ -162,6 +169,12 @@ impl std::fmt::Display for Service {
             }
             Self::ApproxHarmonicCoordinator { host } => {
                 write!(f, "ApproxHarmonicCoordinator {}", host)
+            }
+            Self::ShortestPathWorker { host, shard } => {
+                write!(f, "ShortestPathWorker {} {}", host, shard)
+            }
+            Self::ShortestPathCoordinator { host } => {
+                write!(f, "ShortestPathCoordinator {}", host)
             }
         }
     }

@@ -27,6 +27,12 @@ pub enum UpsertAction {
     Inserted,
 }
 
+impl UpsertAction {
+    pub fn is_changed(&self) -> bool {
+        matches!(self, UpsertAction::Merged | UpsertAction::Inserted)
+    }
+}
+
 #[enum_dispatch]
 pub trait UpsertFn {
     fn upsert(&self, old: Value, new: Value) -> Value;
@@ -41,6 +47,7 @@ pub enum UpsertEnum {
     HyperLogLog64Upsert,
     HyperLogLog128Upsert,
     U64Add,
+    U64Min,
     F32Add,
     F64Add,
     KahanSumAdd,
@@ -91,6 +98,18 @@ impl UpsertFn for U64Add {
         let new = unwrap_value!(new, U64);
 
         Value::U64(old + new)
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)]
+pub struct U64Min;
+
+impl UpsertFn for U64Min {
+    fn upsert(&self, old: Value, new: Value) -> Value {
+        let old = unwrap_value!(old, U64);
+        let new = unwrap_value!(new, U64);
+
+        Value::U64(old.min(new))
     }
 }
 

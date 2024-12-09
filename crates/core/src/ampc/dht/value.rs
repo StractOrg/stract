@@ -50,6 +50,9 @@ impl ValueTrait for HyperLogLog128 {}
 type HarmonicMeta = crate::entrypoint::ampc::harmonic_centrality::Meta;
 impl ValueTrait for HarmonicMeta {}
 
+type ShortestPathMeta = crate::entrypoint::ampc::shortest_path::Meta;
+impl ValueTrait for ShortestPathMeta {}
+
 impl ValueTrait for U64BloomFilter {}
 
 type Unit = ();
@@ -71,6 +74,7 @@ pub enum Value {
     HyperLogLog64(HyperLogLog64),
     HyperLogLog128(HyperLogLog128),
     HarmonicMeta(HarmonicMeta),
+    ShortestPathMeta(ShortestPathMeta),
     U64BloomFilter(U64BloomFilter),
     Unit(Unit),
 }
@@ -108,5 +112,6 @@ impl_from_to_value!(HyperLogLog32, HyperLogLog32);
 impl_from_to_value!(HyperLogLog64, HyperLogLog64);
 impl_from_to_value!(HyperLogLog128, HyperLogLog128);
 impl_from_to_value!(HarmonicMeta, HarmonicMeta);
+impl_from_to_value!(ShortestPathMeta, ShortestPathMeta);
 impl_from_to_value!(U64BloomFilter, U64BloomFilter);
 impl_from_to_value!(Unit, Unit);

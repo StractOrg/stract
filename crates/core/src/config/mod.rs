@@ -681,7 +681,23 @@ pub struct HarmonicCoordinatorConfig {
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct ShortestPathCoordinatorConfig {
+    pub source: String,
+    pub gossip: GossipConfig,
+    pub host: SocketAddr,
+    pub output_path: String,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct HarmonicWorkerConfig {
+    pub gossip: GossipConfig,
+    pub shard: ShardId,
+    pub graph_path: String,
+    pub host: SocketAddr,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct ShortestPathWorkerConfig {
     pub gossip: GossipConfig,
     pub shard: ShardId,
     pub graph_path: String,
