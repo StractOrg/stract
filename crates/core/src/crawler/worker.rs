@@ -567,6 +567,7 @@ impl<S: DatumSink> JobExecutor<S> {
                 payload_type,
                 body: String::new(),
                 fetch_time_ms: 0,
+                date: chrono::Utc::now(),
             }))
         } else {
             Ok(None)
@@ -607,6 +608,7 @@ impl<S: DatumSink> JobExecutor<S> {
             body: body?,
             payload_type: payload_type?,
             fetch_time_ms: 0,
+            date: chrono::Utc::now(),
         })
     }
 

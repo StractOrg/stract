@@ -267,6 +267,7 @@ pub struct CrawlDatum {
     pub payload_type: warc::PayloadType,
     pub body: String,
     pub fetch_time_ms: u64,
+    pub date: chrono::DateTime<chrono::Utc>,
 }
 
 pub struct Crawler {

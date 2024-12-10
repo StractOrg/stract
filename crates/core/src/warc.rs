@@ -1,5 +1,5 @@
 // Stract is an open source web search engine.
-// Copyright (C) 2023 Stract ApS
+// Copyright (C) 2024 Stract ApS
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -236,6 +236,8 @@ impl Arbitrary for WarcRecord {
 pub struct Request {
     // WARC-Target-URI
     pub url: String,
+    // WARC-Date
+    pub date: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl Request {
@@ -246,6 +248,11 @@ impl Request {
                 .get("WARC-TARGET-URI")
                 .ok_or(Error::WarcParse("No target url".to_string()))?
                 .to_owned(),
+            date: record.header.get("WARC-DATE").and_then(|d| {
+                chrono::DateTime::parse_from_rfc3339(d)
+                    .ok()
+                    .map(|d| d.with_timezone(&chrono::Utc))
+            }),
         })
     }
 }
@@ -256,7 +263,17 @@ impl Arbitrary for Request {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
-        ".+".prop_map(|url| Self { url }).boxed()
+        (".+", any::<u64>())
+            .prop_map(|(url, timestamp)| {
+                let date = match chrono::TimeZone::timestamp_opt(&chrono::Utc, timestamp as i64, 0)
+                {
+                    chrono::LocalResult::Single(date) => Some(date),
+                    _ => None,
+                };
+
+                Self { url, date }
+            })
+            .boxed()
     }
 }
 
@@ -664,6 +681,12 @@ impl WarcWriter {
         self.writer.write_all("WARC/1.0\r\n".as_bytes())?;
 
         self.writer.write_all("WARC-Type: request\r\n".as_bytes())?;
+
+        if let Some(date) = &record.request.date {
+            self.writer
+                .write_all(format!("WARC-Date: {}\r\n", date.to_rfc3339()).as_bytes())?;
+        }
+
         self.writer
             .write_all(format!("WARC-Target-URI: {}\r\n", record.request.url).as_bytes())?;
         self.writer.write_all("Content-Length: 0\r\n".as_bytes())?;
@@ -804,9 +827,11 @@ mod tests {
     #[test]
     fn writer_reader_invariant() {
         let mut writer = WarcWriter::new();
+        let date = chrono::Utc::now();
         let record1 = WarcRecord {
             request: Request {
                 url: "https://a.com".to_string(),
+                date: Some(date),
             },
             response: Response {
                 body: "body of a".to_string(),
@@ -821,6 +846,7 @@ mod tests {
         let record2 = WarcRecord {
             request: Request {
                 url: "https://b.com".to_string(),
+                date: Some(date),
             },
             response: Response {
                 body: "body of b".to_string(),
@@ -841,10 +867,12 @@ mod tests {
 
         assert_eq!(records.len(), 2);
         assert_eq!(&records[0].request.url, "https://a.com");
+        assert_eq!(records[0].request.date, Some(date));
         assert_eq!(&records[0].response.body, "body of a");
         assert_eq!(records[0].metadata.fetch_time_ms, 1337);
 
         assert_eq!(&records[1].request.url, "https://b.com");
+        assert_eq!(records[1].request.date, Some(date));
         assert_eq!(&records[1].response.body, "body of b");
         assert_eq!(records[1].metadata.fetch_time_ms, 4242);
     }
@@ -857,6 +885,7 @@ mod tests {
         let record = WarcRecord {
             request: Request {
                 url: "https://a.com".to_string(),
+                date: None,
             },
             response: Response {
                 body: utf8.to_string(),
@@ -889,6 +918,7 @@ mod tests {
         let record = WarcRecord {
             request: Request {
                 url: "https://a.com".to_string(),
+                date: None,
             },
             response: Response {
                 body: body.to_string(),

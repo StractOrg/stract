@@ -114,6 +114,7 @@ async fn writer_task(mut rx: tokio::sync::mpsc::Receiver<WarcWriterMessage>, s3:
                         let warc_record = warc::WarcRecord {
                             request: warc::Request {
                                 url: datum.url.to_string(),
+                                date: Some(datum.date),
                             },
                             response: warc::Response {
                                 body: datum.body,
