@@ -17,6 +17,7 @@
 use std::net::SocketAddr;
 use std::path::Path;
 
+use indicatif::ProgressIterator;
 use rustc_hash::FxHashMap;
 
 use crate::ampc::dht::ShardId;
@@ -115,7 +116,7 @@ pub fn run(config: ApproxHarmonicCoordinatorConfig) -> Result<()> {
 
     let mut centralities: FxHashMap<webgraph::NodeID, KahanSum> = FxHashMap::default();
 
-    for source in sampled_nodes {
+    for source in sampled_nodes.into_iter().progress() {
         let jobs: Vec<_> = cluster
             .workers
             .iter()
@@ -124,8 +125,6 @@ pub fn run(config: ApproxHarmonicCoordinatorConfig) -> Result<()> {
                 source,
             })
             .collect();
-
-        tracing::info!("starting {} jobs", jobs.len());
 
         let coordinator =
             shortest_path::coordinator::build(&cluster.dht, cluster.workers.clone(), source);
