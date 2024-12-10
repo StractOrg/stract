@@ -175,7 +175,7 @@ impl RemoteShortestPathWorker {
     }
 
     pub fn sample_nodes(&self, num_nodes: u64) -> Vec<webgraph::NodeID> {
-        self.send(SampleNodes(num_nodes))
+        self.send_without_timeout(SampleNodes(num_nodes))
     }
 }
 

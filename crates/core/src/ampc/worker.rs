@@ -98,11 +98,30 @@ where
         Ok(res)
     }
 
+    fn send_raw_without_timeout(&self, req: &JobReq<Self::Job>) -> Result<JobResp<Self::Job>> {
+        let mut conn = self.conn()?;
+        let res = block_on(conn.send_without_timeout(req))?;
+        Ok(res)
+    }
+
     fn send<R>(&self, req: R) -> R::Response
     where
         R: RequestWrapper<<Self::Job as Job>::Worker>,
     {
         match self.send_raw(&Req::User(R::wrap(req))).unwrap() {
+            Resp::Coordinator(_) => panic!("unexpected coordinator response"),
+            Resp::User(res) => R::unwrap_response(res).unwrap(),
+        }
+    }
+
+    fn send_without_timeout<R>(&self, req: R) -> R::Response
+    where
+        R: RequestWrapper<<Self::Job as Job>::Worker>,
+    {
+        match self
+            .send_raw_without_timeout(&Req::User(R::wrap(req)))
+            .unwrap()
+        {
             Resp::Coordinator(_) => panic!("unexpected coordinator response"),
             Resp::User(res) => R::unwrap_response(res).unwrap(),
         }
