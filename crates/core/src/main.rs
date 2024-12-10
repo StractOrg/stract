@@ -134,13 +134,8 @@ enum AmpcOptions {
     /// Workers needs to be started before the coordinator.
     HarmonicCoordinator { config_path: String },
 
-    /// Start a worker to compute an approximation of the harmonic centrality of a graph.
-    /// The approximation samples O(log n / sample_rate^2) nodes from the graph and computes
-    /// shortest paths from the sampled nodes.
-    ApproxHarmonicWorker { config_path: String },
-
     /// Start a coordinator to distribute the approximation of the harmonic centrality computation.
-    /// Workers needs to be started before the coordinator.
+    /// Uses shortest path workers. Workers needs to be started before the coordinator.
     ApproxHarmonicCoordinator { config_path: String },
 
     /// Start a worker to compute the shortest paths of a graph.
@@ -469,27 +464,27 @@ fn main() -> Result<()> {
                     .build()?
                     .block_on(entrypoint::ampc::dht::run(config))?;
             }
+
             AmpcOptions::HarmonicWorker { config_path } => {
                 let config: config::HarmonicWorkerConfig = load_toml_config(config_path);
                 entrypoint::ampc::harmonic_centrality::worker::run(config)?;
             }
+
             AmpcOptions::HarmonicCoordinator { config_path } => {
                 let config: config::HarmonicCoordinatorConfig = load_toml_config(config_path);
                 entrypoint::ampc::harmonic_centrality::coordinator::run(config)?;
             }
 
-            AmpcOptions::ApproxHarmonicWorker { config_path } => {
-                let config: config::ApproxHarmonicWorkerConfig = load_toml_config(config_path);
-                entrypoint::ampc::approximated_harmonic_centrality::worker::run(config)?;
-            }
             AmpcOptions::ApproxHarmonicCoordinator { config_path } => {
                 let config: config::ApproxHarmonicCoordinatorConfig = load_toml_config(config_path);
                 entrypoint::ampc::approximated_harmonic_centrality::coordinator::run(config)?;
             }
+
             AmpcOptions::ShortestPathWorker { config_path } => {
                 let config: config::ShortestPathWorkerConfig = load_toml_config(config_path);
                 entrypoint::ampc::shortest_path::worker::run(config)?;
             }
+
             AmpcOptions::ShortestPathCoordinator { config_path } => {
                 let config: config::ShortestPathCoordinatorConfig = load_toml_config(config_path);
                 entrypoint::ampc::shortest_path::coordinator::run(config)?;

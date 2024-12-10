@@ -29,8 +29,8 @@ use crate::{
     webgraph,
 };
 
-use self::mapper::ShortestPathMapper;
-use self::worker::{RemoteShortestPathWorker, ShortestPathWorker};
+pub use self::mapper::ShortestPathMapper;
+pub use self::worker::{RemoteShortestPathWorker, ShortestPathWorker};
 
 #[derive(
     serde::Serialize,
@@ -49,17 +49,17 @@ pub struct Meta {
 
 #[derive(bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct ShortestPathTables {
-    distances: DefaultDhtTable<webgraph::NodeID, u64>,
-    meta: DefaultDhtTable<(), Meta>,
-    changed_nodes: DefaultDhtTable<ShardId, UpdatedNodes>,
+    pub distances: DefaultDhtTable<webgraph::NodeID, u64>,
+    pub meta: DefaultDhtTable<(), Meta>,
+    pub changed_nodes: DefaultDhtTable<ShardId, UpdatedNodes>,
 }
 
 impl_dht_tables!(ShortestPathTables, [distances, meta, changed_nodes]);
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct ShortestPathJob {
-    shard: ShardId,
-    source: webgraph::NodeID,
+    pub shard: ShardId,
+    pub source: webgraph::NodeID,
 }
 
 impl Job for ShortestPathJob {

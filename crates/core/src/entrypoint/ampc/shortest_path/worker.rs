@@ -41,7 +41,7 @@ pub struct ShortestPathWorker {
 }
 
 impl ShortestPathWorker {
-    pub fn new(graph: Webgraph, shard: ShardId) -> Self {
+    pub fn new(graph: Arc<Webgraph>, shard: ShardId) -> Self {
         let mut nodes_sketch = HyperLogLog::default();
 
         for node in graph.page_nodes() {
@@ -50,7 +50,7 @@ impl ShortestPathWorker {
         let num_nodes = nodes_sketch.size() as u64;
 
         Self {
-            graph: Arc::new(graph),
+            graph,
             shard,
             changed_nodes: Arc::new(Mutex::new(UpdatedNodes::new(num_nodes))),
             nodes_sketch,
@@ -102,6 +102,19 @@ impl Message<ShortestPathWorker> for UpdateChangedNodesPrecision {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
+pub struct SampleNodes(u64);
+
+impl Message<ShortestPathWorker> for SampleNodes {
+    type Response = Vec<webgraph::NodeID>;
+
+    fn handle(self, worker: &ShortestPathWorker) -> Self::Response {
+        worker
+            .graph()
+            .random_page_nodes_with_outgoing(self.0 as usize)
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode, Debug, Clone)]
 pub struct BatchId2Node(Vec<webgraph::NodeID>);
 
 impl Message<ShortestPathWorker> for BatchId2Node {
@@ -122,7 +135,7 @@ impl Message<ShortestPathWorker> for BatchId2Node {
     }
 }
 
-impl_worker!(ShortestPathJob, RemoteShortestPathWorker => ShortestPathWorker, [BatchId2Node, GetNodeSketch, UpdateChangedNodesPrecision]);
+impl_worker!(ShortestPathJob, RemoteShortestPathWorker => ShortestPathWorker, [BatchId2Node, GetNodeSketch, UpdateChangedNodesPrecision, SampleNodes]);
 
 #[derive(Clone)]
 pub struct RemoteShortestPathWorker {
@@ -160,6 +173,10 @@ impl RemoteShortestPathWorker {
     pub fn update_changed_nodes_precision(&self, num_nodes: u64) {
         self.send(UpdateChangedNodesPrecision(num_nodes));
     }
+
+    pub fn sample_nodes(&self, num_nodes: u64) -> Vec<webgraph::NodeID> {
+        self.send(SampleNodes(num_nodes))
+    }
 }
 
 impl RemoteWorker for RemoteShortestPathWorker {
@@ -174,7 +191,7 @@ pub fn run(config: ShortestPathWorkerConfig) -> Result<()> {
     tracing::info!("starting worker");
     let tokio_conf = config.clone();
 
-    let graph = Webgraph::builder(config.graph_path, config.shard).open()?;
+    let graph = Arc::new(Webgraph::builder(config.graph_path, config.shard).open()?);
     let worker = ShortestPathWorker::new(graph, config.shard);
     let service = Service::ShortestPathWorker {
         host: tokio_conf.host,

@@ -14,155 +14,32 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::Path;
 
-use super::mapper::ApproxCentralityMapper;
-use super::{worker::RemoteApproxCentralityWorker, ApproxCentralityTables};
-use super::{ApproxCentralityJob, DhtTable as _, Finisher, Meta, Setup};
-use crate::ampc::{Coordinator, DefaultDhtTable, DhtConn};
+use rustc_hash::FxHashMap;
+
+use crate::ampc::dht::ShardId;
+use crate::ampc::{DhtTable as _, DhtTables as _};
 use crate::config::ApproxHarmonicCoordinatorConfig;
 use crate::distributed::cluster::Cluster;
-use crate::distributed::member::{Member, Service, ShardId};
-use crate::webgraph::centrality::{store_csv, store_harmonic, top_nodes, TopNodes};
-use crate::Result;
-
-pub struct ApproxCentralitySetup {
-    dht: DhtConn<ApproxCentralityTables>,
-    workers: Vec<RemoteApproxCentralityWorker>,
-    sample_rate: f64,
-}
-
-impl ApproxCentralitySetup {
-    pub async fn new(cluster: &Cluster, sample_rate: f64) -> Result<Self> {
-        let dht_members: Vec<_> = cluster
-            .members()
-            .await
-            .into_iter()
-            .filter_map(|member| {
-                if let Service::Dht { host, shard } = member.service {
-                    Some((shard, host))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let workers = cluster
-            .members()
-            .await
-            .into_iter()
-            .filter_map(|member| {
-                if let Service::ApproxHarmonicWorker { host, shard } = member.service {
-                    Some(RemoteApproxCentralityWorker::new(shard, host))
-                } else {
-                    None
-                }
-            })
-            .collect::<Result<Vec<RemoteApproxCentralityWorker>>>()?;
-
-        Ok(Self::new_for_dht_members(
-            &dht_members,
-            workers,
-            sample_rate,
-        ))
-    }
-    pub fn new_for_dht_members(
-        dht_members: &[(ShardId, SocketAddr)],
-        workers: Vec<RemoteApproxCentralityWorker>,
-        sample_rate: f64,
-    ) -> Self {
-        let initial = ApproxCentralityTables {
-            meta: DefaultDhtTable::new(dht_members, "meta"),
-            centrality: DefaultDhtTable::new(dht_members, "centrality"),
-        };
-
-        let dht = DhtConn::new(initial);
-
-        Self {
-            dht,
-            workers,
-            sample_rate,
-        }
-    }
-}
-
-fn num_samples(num_nodes: u64, sample_rate: f64) -> u64 {
-    ((num_nodes as f64).log2() / sample_rate.powi(2)).ceil() as u64
-}
-
-impl Setup for ApproxCentralitySetup {
-    type DhtTables = ApproxCentralityTables;
-
-    fn init_dht(&self) -> DhtConn<Self::DhtTables> {
-        self.dht.clone()
-    }
-
-    fn setup_round(&self, dht: &Self::DhtTables) {
-        let meta = dht.meta.get(()).unwrap();
-
-        dht.meta.set(
-            (),
-            Meta {
-                round: meta.round + 1,
-                num_samples_per_worker: meta.num_samples_per_worker,
-            },
-        );
-    }
-
-    fn setup_first_round(&self, dht: &Self::DhtTables) {
-        let upper_bound_num_nodes: u64 = self.workers.iter().map(|w| w.num_nodes()).sum();
-        let num_samples_per_worker =
-            num_samples(upper_bound_num_nodes, self.sample_rate) / (self.workers.len() as u64);
-
-        dht.meta.set(
-            (),
-            Meta {
-                round: 0,
-                num_samples_per_worker,
-            },
-        );
-    }
-}
-
-pub struct ApproxCentralityFinish;
-
-impl Finisher for ApproxCentralityFinish {
-    type Job = ApproxCentralityJob;
-
-    fn is_finished(&self, dht: &ApproxCentralityTables) -> bool {
-        dht.meta.get(()).unwrap().round > 0
-    }
-}
-
-pub fn build(
-    dht: &[(ShardId, SocketAddr)],
-    workers: Vec<RemoteApproxCentralityWorker>,
-    sample_rate: f64,
-    save_centralities_with_zero: bool,
-) -> Coordinator<ApproxCentralityJob> {
-    let setup = ApproxCentralitySetup::new_for_dht_members(dht, workers.clone(), sample_rate);
-
-    let mut coord = Coordinator::new(setup, workers.clone());
-
-    if save_centralities_with_zero {
-        coord = coord.with_mapper(ApproxCentralityMapper::InitCentrality)
-    }
-
-    coord.with_mapper(ApproxCentralityMapper::ApproximateCentrality)
-}
+use crate::distributed::member::Service;
+use crate::entrypoint::ampc::shortest_path::coordinator::ShortestPathFinish;
+use crate::entrypoint::ampc::shortest_path::{self, RemoteShortestPathWorker, ShortestPathJob};
+use crate::hyperloglog::HyperLogLog;
+use crate::kahan_sum::KahanSum;
+use crate::webgraph::centrality::{store_harmonic, TopNodes};
+use crate::{webgraph, Result};
 
 struct ClusterInfo {
     // dropping the handle will leave the cluster
     _handle: Cluster,
     dht: Vec<(ShardId, SocketAddr)>,
-    workers: Vec<RemoteApproxCentralityWorker>,
+    workers: Vec<RemoteShortestPathWorker>,
 }
 
 async fn setup_gossip(config: ApproxHarmonicCoordinatorConfig) -> Result<ClusterInfo> {
-    let handle = Cluster::join(
-        Member::new(Service::ApproxHarmonicCoordinator { host: config.host }),
+    let handle = Cluster::join_as_spectator(
         config.gossip.addr,
         config.gossip.seed_nodes.unwrap_or_default(),
     )
@@ -186,19 +63,23 @@ async fn setup_gossip(config: ApproxHarmonicCoordinatorConfig) -> Result<Cluster
     let workers = members
         .iter()
         .filter_map(|member| {
-            if let Service::ApproxHarmonicWorker { host, shard } = member.service {
-                Some(RemoteApproxCentralityWorker::new(shard, host))
+            if let Service::ShortestPathWorker { host, shard } = member.service {
+                Some(RemoteShortestPathWorker::new(shard, host))
             } else {
                 None
             }
         })
-        .collect::<Result<Vec<RemoteApproxCentralityWorker>>>()?;
+        .collect::<Result<Vec<RemoteShortestPathWorker>>>()?;
 
     Ok(ClusterInfo {
         _handle: handle,
         dht,
         workers,
     })
+}
+
+fn num_samples(num_nodes: u64, sample_rate: f64) -> u64 {
+    ((num_nodes as f64).log2() / sample_rate.powi(2)).ceil() as u64
 }
 
 pub fn run(config: ApproxHarmonicCoordinatorConfig) -> Result<()> {
@@ -208,58 +89,77 @@ pub fn run(config: ApproxHarmonicCoordinatorConfig) -> Result<()> {
         .build()?
         .block_on(setup_gossip(tokio_conf))?;
 
-    let upper_bound_num_nodes: u64 = cluster.workers.iter().map(|w| w.num_nodes()).sum();
+    let sketch = cluster
+        .workers
+        .iter()
+        .map(|worker| worker.get_node_sketch())
+        .fold(HyperLogLog::default(), |mut acc, sketch| {
+            acc.merge(&sketch);
+            acc
+        });
 
-    let num_samples = num_samples(upper_bound_num_nodes, config.sample_rate);
+    let num_nodes = sketch.size() as u64;
+
+    let num_samples = num_samples(num_nodes, config.sample_rate);
+    tracing::info!("sampling {} nodes", num_samples);
 
     let norm = 1.0 / ((num_samples - 1) as f64);
 
-    let jobs: Vec<_> = cluster
+    let num_samples_per_worker = num_samples.div_ceil(cluster.workers.len() as u64);
+
+    let sampled_nodes: Vec<_> = cluster
         .workers
         .iter()
-        .map(|worker| ApproxCentralityJob {
-            shard: worker.shard(),
-            max_distance: config.max_distance,
-            norm,
-            all_workers: cluster
-                .workers
-                .clone()
-                .into_iter()
-                .map(|w| (w.shard(), w.addr()))
-                .collect(),
-        })
+        .flat_map(|worker| worker.sample_nodes(num_samples_per_worker))
         .collect();
 
-    tracing::info!("starting {} jobs", jobs.len());
+    let mut centralities: FxHashMap<webgraph::NodeID, KahanSum> = FxHashMap::default();
 
-    let coordinator = build(
-        &cluster.dht,
-        cluster.workers.clone(),
-        config.sample_rate,
-        config.save_centralities_with_zero,
-    );
-    let res = coordinator.run(jobs, ApproxCentralityFinish)?;
+    for source in sampled_nodes {
+        let jobs: Vec<_> = cluster
+            .workers
+            .iter()
+            .map(|worker| ShortestPathJob {
+                shard: worker.shard(),
+                source,
+            })
+            .collect();
+
+        tracing::info!("starting {} jobs", jobs.len());
+
+        let coordinator =
+            shortest_path::coordinator::build(&cluster.dht, cluster.workers.clone(), source);
+
+        let res = coordinator.run(
+            jobs,
+            ShortestPathFinish {
+                max_distance: Some(config.max_distance as u64),
+            },
+        )?;
+
+        for (node, distance) in res.distances.iter() {
+            let centrality = KahanSum::from((1.0 / distance as f64) * norm);
+            centralities
+                .entry(node)
+                .and_modify(|sum| *sum += centrality)
+                .or_insert(centrality);
+        }
+
+        res.drop_tables();
+    }
 
     let output_path = Path::new(&config.output_path);
 
     let store = store_harmonic(
-        res.centrality
-            .iter()
-            .map(|(n, c)| (n, f64::from(c)))
-            .filter(|(_, c)| {
-                if config.save_centralities_with_zero {
-                    true
-                } else {
-                    *c > 0.0
-                }
-            }),
+        centralities.iter().map(|(id, c)| (*id, f64::from(*c))),
         output_path,
     );
 
-    let top_nodes = top_nodes(&store, TopNodes::Top(1_000_000));
+    let top_nodes = webgraph::centrality::top_nodes(&store, TopNodes::Top(1_000_000));
 
     let ids = top_nodes.iter().map(|(id, _)| *id).collect::<Vec<_>>();
-    let id2node: BTreeMap<_, _> = cluster
+
+    let id2node: FxHashMap<_, _> = cluster
         .workers
         .iter()
         .flat_map(|w| {
@@ -275,7 +175,7 @@ pub fn run(config: ApproxHarmonicCoordinatorConfig) -> Result<()> {
         .filter_map(|(id, c)| id2node.get(id).map(|n| (n.clone(), *c)))
         .collect::<Vec<_>>();
 
-    store_csv(top_nodes, output_path.join("harmonic.csv"));
+    webgraph::centrality::store_csv(top_nodes, output_path.join("harmonic.csv"));
 
     Ok(())
 }

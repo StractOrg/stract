@@ -62,6 +62,24 @@ impl Add<f64> for KahanSum {
     }
 }
 
+impl AddAssign<KahanSum> for KahanSum {
+    fn add_assign(&mut self, rhs: KahanSum) {
+        let y = (rhs.sum + rhs.err) - self.err;
+        let t = self.sum + y;
+        self.err = (t - self.sum) - y;
+        self.sum = t;
+    }
+}
+
+impl Add<KahanSum> for KahanSum {
+    type Output = Self;
+    fn add(self, rhs: KahanSum) -> Self::Output {
+        let mut k = self;
+        k += rhs;
+        k
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,6 +99,26 @@ mod tests {
             std::f64::consts::E,
         ] {
             sum += elem;
+        }
+
+        assert_eq!(10017.579623446147f64, f64::from(sum));
+    }
+
+    #[test]
+    fn it_works_kahan() {
+        let mut sum = KahanSum::default();
+        assert_eq!(0.0, f64::from(sum));
+
+        for elem in [
+            10000.0f64,
+            std::f64::consts::PI,
+            std::f64::consts::E,
+            std::f64::consts::PI,
+            std::f64::consts::E,
+            std::f64::consts::PI,
+            std::f64::consts::E,
+        ] {
+            sum += KahanSum::from(elem);
         }
 
         assert_eq!(10017.579623446147f64, f64::from(sum));

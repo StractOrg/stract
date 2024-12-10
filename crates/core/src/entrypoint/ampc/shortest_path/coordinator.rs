@@ -24,10 +24,10 @@ use url::Url;
 use super::mapper::ShortestPathMapper;
 use super::{worker::RemoteShortestPathWorker, ShortestPathTables};
 use super::{DhtTable as _, Finisher, Meta, Setup, ShortestPathJob};
-use crate::ampc::{Coordinator, DefaultDhtTable, DhtConn};
+use crate::ampc::{Coordinator, DefaultDhtTable, DhtConn, DhtTables};
 use crate::config::ShortestPathCoordinatorConfig;
 use crate::distributed::cluster::Cluster;
-use crate::distributed::member::{Member, Service, ShardId};
+use crate::distributed::member::{Service, ShardId};
 use crate::hyperloglog::HyperLogLog;
 use crate::webpage::url_ext::UrlExt;
 use crate::{webgraph, Result};
@@ -102,7 +102,7 @@ impl Setup for ShortestPathSetup {
 }
 
 pub struct ShortestPathFinish {
-    max_distance: Option<u64>,
+    pub max_distance: Option<u64>,
 }
 
 impl Finisher for ShortestPathFinish {
@@ -140,8 +140,7 @@ struct ClusterInfo {
 }
 
 async fn setup_gossip(config: ShortestPathCoordinatorConfig) -> Result<ClusterInfo> {
-    let handle = Cluster::join(
-        Member::new(Service::ShortestPathCoordinator { host: config.host }),
+    let handle = Cluster::join_as_spectator(
         config.gossip.addr,
         config.gossip.seed_nodes.unwrap_or_default(),
     )
@@ -259,6 +258,8 @@ pub fn run(config: ShortestPathCoordinatorConfig) -> Result<()> {
             writer.write_record(&[node.as_str().to_string(), distance.to_string()])?;
         }
     }
+
+    res.drop_tables();
 
     Ok(())
 }

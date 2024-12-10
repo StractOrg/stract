@@ -17,7 +17,6 @@
 use crate::{
     ampc::{dht::ShardId, prelude::*, Coordinator, DhtConn},
     config::HarmonicCoordinatorConfig,
-    distributed::member::Member,
     webgraph::centrality::{store_csv, store_harmonic, top_nodes, TopNodes},
     Result,
 };
@@ -143,8 +142,7 @@ struct ClusterInfo {
 }
 
 async fn setup_gossip(config: HarmonicCoordinatorConfig) -> Result<ClusterInfo> {
-    let handle = Cluster::join(
-        Member::new(Service::HarmonicCoordinator { host: config.host }),
+    let handle = Cluster::join_as_spectator(
         config.gossip.addr,
         config.gossip.seed_nodes.unwrap_or_default(),
     )
@@ -233,6 +231,8 @@ pub fn run(config: HarmonicCoordinatorConfig) -> Result<()> {
         .collect::<Vec<_>>();
 
     store_csv(top_nodes, output_path.join("harmonic.csv"));
+
+    res.drop_tables();
 
     Ok(())
 }

@@ -716,17 +716,6 @@ pub struct ApproxHarmonicCoordinatorConfig {
 
     #[serde(default = "defaults::ApproxHarmonic::max_distance")]
     pub max_distance: u8,
-
-    #[serde(default = "defaults::ApproxHarmonic::save_centralities_with_zero")]
-    pub save_centralities_with_zero: bool,
-}
-
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-pub struct ApproxHarmonicWorkerConfig {
-    pub gossip: GossipConfig,
-    pub shard: ShardId,
-    pub graph_path: String,
-    pub host: SocketAddr,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]

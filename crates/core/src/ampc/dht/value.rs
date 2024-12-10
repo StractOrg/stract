@@ -22,9 +22,6 @@ pub trait ValueTrait: TryFrom<Value> + Into<Value> {}
 
 impl ValueTrait for String {}
 
-type ApproxHarmonicMeta = crate::entrypoint::ampc::approximated_harmonic_centrality::Meta;
-impl ValueTrait for ApproxHarmonicMeta {}
-
 type F32 = f32;
 impl ValueTrait for F32 {}
 
@@ -66,7 +63,6 @@ impl ValueTrait for Unit {}
 )]
 pub enum Value {
     String(String),
-    ApproxHarmonicMeta(ApproxHarmonicMeta),
     F32(F32),
     F64(F64),
     U64(U64),
@@ -105,7 +101,6 @@ macro_rules! impl_from_to_value {
 }
 
 impl_from_to_value!(String, String);
-impl_from_to_value!(ApproxHarmonicMeta, ApproxHarmonicMeta);
 impl_from_to_value!(F32, F32);
 impl_from_to_value!(F64, F64);
 impl_from_to_value!(U64, U64);
