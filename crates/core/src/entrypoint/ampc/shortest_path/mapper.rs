@@ -153,8 +153,12 @@ impl ShortestPathMapper {
             for node in exact_changed_nodes {
                 for edge in worker
                     .graph()
-                    .search(&query::ForwardlinksQuery::new(*node))
-                    .unwrap_or_default()
+                    .search(
+                        &query::ForwardlinksQuery::new(*node)
+                            .skip_self_links(false)
+                            .deduplicate(false),
+                    )
+                    .unwrap()
                 {
                     if edge.rel_flags.intersects(*SKIPPED_REL) {
                         continue;

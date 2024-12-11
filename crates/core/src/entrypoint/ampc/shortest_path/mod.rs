@@ -71,3 +71,107 @@ impl Job for ShortestPathJob {
         self.shard == worker.shard()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::BTreeMap, sync::Arc};
+
+    use tracing_test::traced_test;
+    use webgraph::{Edge, ShortestPaths, Webgraph};
+
+    use crate::{config::WebgraphGranularity, free_socket_addr};
+
+    use super::*;
+
+    #[test]
+    #[traced_test]
+    fn test_simple_graph() {
+        let temp_dir = crate::gen_temp_dir().unwrap();
+        let mut combined = Webgraph::builder(temp_dir.as_ref().join("combined"), 0u64.into())
+            .open()
+            .unwrap();
+        let mut a = Webgraph::builder(temp_dir.as_ref().join("a"), 0u64.into())
+            .open()
+            .unwrap();
+        let mut b = Webgraph::builder(temp_dir.as_ref().join("b"), 0u64.into())
+            .open()
+            .unwrap();
+
+        let edges = crate::webgraph::tests::test_edges();
+
+        for (i, (from, to)) in edges.into_iter().enumerate() {
+            let e = Edge::new_test(from.clone(), to.clone());
+            combined.insert(e.clone()).unwrap();
+
+            if i % 2 == 0 {
+                a.insert(e).unwrap();
+            } else {
+                b.insert(e).unwrap();
+            }
+        }
+
+        combined.commit().unwrap();
+        a.commit().unwrap();
+        b.commit().unwrap();
+
+        let a = Arc::new(a);
+        let b = Arc::new(b);
+
+        let node = webgraph::Node::from("C");
+
+        let expected = combined
+            .raw_distances(node.id(), WebgraphGranularity::Page)
+            .into_iter()
+            .map(|(node, dist)| (node, dist as u64))
+            .collect::<BTreeMap<_, _>>();
+
+        let worker = ShortestPathWorker::new(a, 1.into());
+
+        let worker_addr = free_socket_addr();
+
+        std::thread::spawn(move || {
+            worker.run(worker_addr).unwrap();
+        });
+
+        std::thread::sleep(std::time::Duration::from_secs(2)); // Wait for worker to start
+        let a = RemoteShortestPathWorker::new(1.into(), worker_addr).unwrap();
+
+        let worker = ShortestPathWorker::new(b, 2.into());
+        let worker_addr = free_socket_addr();
+        std::thread::spawn(move || {
+            worker.run(worker_addr).unwrap();
+        });
+
+        std::thread::sleep(std::time::Duration::from_secs(2)); // Wait for worker to start
+
+        let b = RemoteShortestPathWorker::new(2.into(), worker_addr).unwrap();
+
+        let (dht_shard, dht_addr) = crate::entrypoint::ampc::dht::tests::setup();
+
+        let res = coordinator::build(
+            &[(dht_shard, dht_addr)],
+            vec![a.clone(), b.clone()],
+            node.id(),
+        )
+        .run(
+            vec![
+                ShortestPathJob {
+                    shard: a.shard(),
+                    source: node.id(),
+                },
+                ShortestPathJob {
+                    shard: b.shard(),
+                    source: node.id(),
+                },
+            ],
+            coordinator::ShortestPathFinish {
+                max_distance: Some(128),
+            },
+        )
+        .unwrap();
+
+        let actual = res.distances.iter().collect::<BTreeMap<_, _>>();
+
+        assert_eq!(expected, actual);
+    }
+}

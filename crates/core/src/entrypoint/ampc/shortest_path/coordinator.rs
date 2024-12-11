@@ -127,7 +127,7 @@ pub fn build(
 ) -> Coordinator<ShortestPathJob> {
     let setup = ShortestPathSetup::new_for_dht_members(dht, source);
 
-    Coordinator::new(setup, workers.clone())
+    Coordinator::new(setup, workers)
         .with_mapper(ShortestPathMapper::RelaxEdges)
         .with_mapper(ShortestPathMapper::UpdateChangedNodes)
 }
