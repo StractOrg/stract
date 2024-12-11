@@ -265,6 +265,8 @@ impl Arbitrary for Request {
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         (".+", any::<u64>())
             .prop_map(|(url, timestamp)| {
+                let timestamp = timestamp % 1_733_000_000;
+
                 let date = match chrono::TimeZone::timestamp_opt(&chrono::Utc, timestamp as i64, 0)
                 {
                     chrono::LocalResult::Single(date) => Some(date),
