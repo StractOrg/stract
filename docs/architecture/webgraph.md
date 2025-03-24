@@ -4,7 +4,7 @@ The webgraph, often conceptualized as the "internet's map," provides a structure
 The webgraph is stored in a tantivy index on disk, where each document represents an edge (hyperlink) between two web pages. Each document contains metadata about the link, such as the source URL, destination URL, anchor text etc.
 
 ## Webgraph Uses
-The structure of the web can provide highly valuable information when detemining the relevance of a page to a user's search query. PageRank, which is a centrality meassure developed by Larry Page and Sergey Brin, was one of the primary reasons why Google provided much better search results than their competitors in the early days.
+The structure of the web can provide highly valuable information when determining the relevance of a page to a user's search query. PageRank, which is a centrality meassure developed by Larry Page and Sergey Brin, was one of the primary reasons why Google provided much better search results than their competitors in the early days.
 
 Stract uses a similar centrality meassure called Harmonic Centrality which has been shown to satisfy some useful axioms for centrality ([paper](https://arxiv.org/abs/1308.2140)).
 
