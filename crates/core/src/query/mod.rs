@@ -1244,6 +1244,48 @@ mod tests {
                 .unwrap(),
             )
             .expect("failed to insert webpage");
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test page with trailing slash</title>
+                            </head>
+                            <body>
+                                This is a test page with a trailing slash {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.example.com/trailing-slash/",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
+        index
+            .insert(
+                &Webpage::test_parse(
+                    &format!(
+                        r#"
+                        <html>
+                            <head>
+                                <title>Test page with UPPERCASE link</title>
+                            </head>
+                            <body>
+                                This is a test page with an UPPERCASE link {}
+                            </body>
+                        </html>
+                    "#,
+                        rand_words(1000)
+                    ),
+                    "https://www.example.com/UPPERCASE",
+                )
+                .unwrap(),
+            )
+            .expect("failed to insert webpage");
         index.commit().expect("failed to commit index");
         let searcher = LocalSearcher::builder(Arc::new(RwLock::new(index))).build();
 
@@ -1256,6 +1298,34 @@ mod tests {
 
         let query = SearchQuery {
             query: "test exacturl:https://www.first.com".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search_sync(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 0);
+
+        let query = SearchQuery {
+            query: "test exacturl:https://www.example.com/trailing-slash/".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search_sync(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+
+        let query = SearchQuery {
+            query: "test exacturl:https://www.example.com/trailing-slash".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search_sync(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 0);
+
+        let query = SearchQuery {
+            query: "test exacturl:https://www.example.com/UPPERCASE".to_string(),
+            ..Default::default()
+        };
+        let result = searcher.search_sync(&query).expect("Search failed");
+        assert_eq!(result.webpages.len(), 1);
+
+        let query = SearchQuery {
+            query: "test exacturl:https://www.example.com/uppercase".to_string(),
             ..Default::default()
         };
         let result = searcher.search_sync(&query).expect("Search failed");

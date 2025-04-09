@@ -584,7 +584,7 @@ impl TextField for UrlNoTokenizer {
     }
 
     fn query_tokenizer(&self, _: Option<&whatlang::Lang>) -> FieldTokenizer {
-        FieldTokenizer::Words(WordTokenizer::default())
+        FieldTokenizer::Identity(Identity {})
     }
 
     fn is_searchable(&self) -> bool {
